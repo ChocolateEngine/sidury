@@ -1,13 +1,20 @@
 #include "gamesystem.h"
 #include "../../chocolate/inc/core/engine.h"
+#include "player.h"
 #include <algorithm>
+
+
+GameSystem* g_pGame = NULL;
 
 
 GameSystem::GameSystem(  ):
 	aPaused( true ),
 	aMouseDelta( 0, 0 ),
-	aView( 0, 0, 200, 200, 0.1, 100, 90 )
+	aMousePos(0, 0),
+	aFrameTime(0.f),
+	aView( 0, 0, 200, 200, 0.05, 1000, 90 )
 {
+	g_pGame = this;
 }
 
 
@@ -16,6 +23,8 @@ GameSystem::~GameSystem(  )
 }
 
 const int swarmModelCount = 1;
+
+Player* g_player = NULL;
 
 Model* g_riverhouse = new Model;
 Model* g_swarmModels[swarmModelCount] = {NULL};
@@ -36,6 +45,7 @@ void GameSystem::Init(  )
 	aView.ComputeProjection();
 
 	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse );
+	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", g_riverhouse );
 
 	for ( int i = 0; i < swarmModelCount; i++ )
 	{
@@ -43,20 +53,29 @@ void GameSystem::Init(  )
 		//apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/act_like_a_baka.jpg", g_swarmModels[i] );
 	}
 
+	// create a player
+	g_player = new Player;
+	g_player->Spawn();
+
+	// setup rand(  )
 	srand( ( unsigned int )time( 0 ) );
 }
 
 
-void GameSystem::Update( float dt )
+void GameSystem::Update( float frameTime )
 {
-	CheckPaused();
+	aFrameTime = frameTime;
+
+	CheckPaused(  );
 
 	if ( aPaused )
 		return;
 
-	InputCamera( dt );
-	UpdateCamera();
-	SetupModels( dt );
+	g_player->Update( frameTime );
+
+	SetupModels( frameTime );
+
+	ResetInputs(  );
 }
 
 
@@ -79,13 +98,12 @@ void GameSystem::CheckPaused(  )
 
 	if ( aPaused )
 	{
-		aMouseDelta.x = 0;
-		aMouseDelta.y = 0;
+		ResetInputs(  );
 	}
 }
 
 
-void GameSystem::SetupModels( float dt )
+void GameSystem::SetupModels( float frameTime )
 {
 	// swarm models
 	float r = 0.f;
@@ -99,83 +117,10 @@ void GameSystem::SetupModels( float dt )
 }
 
 
-void GameSystem::UpdateCamera(  )
+void GameSystem::ResetInputs(  )
 {
-	static glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	static glm::vec3 forward = glm::vec3(0.0f, 0.0f, -1.0f);
-	static glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
-
-	glm::quat xRot = glm::angleAxis(glm::radians(mY), glm::normalize(glm::vec3(-1.0f, 0.0f, 0.0f)));
-	glm::quat yRot = glm::angleAxis(glm::radians(mX), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
-	aCamera.transform.rotation = xRot * yRot;
-
-	aView.viewMatrix = ToFirstPersonCameraTransformation(aCamera.transform);
-
-	aCamera.forward = forward * yRot;
-	//aCamera.up = up;
-	aCamera.up = up * yRot;
-	aCamera.right = right * yRot;
-
-	aCamera.back = -aCamera.forward;
-	aCamera.down = -aCamera.up;
-	aCamera.left = -aCamera.right;
-
-	apGraphics->SetView( aView );
-
 	aMouseDelta.x = 0;
 	aMouseDelta.y = 0;
-}
-
-void GameSystem::InputCamera( float dt )
-{
-	const Uint8* state = SDL_GetKeyboardState( NULL );
-
-	const float speed = state[SDL_SCANCODE_LSHIFT] ? 12.f : 6.f;
-
-	glm::vec3 move = {};
-
-	if ( state[SDL_SCANCODE_W] ) move += aCamera.forward;
-	if ( state[SDL_SCANCODE_S] ) move += aCamera.back;
-	if ( state[SDL_SCANCODE_A] ) move += aCamera.left;
-	if ( state[SDL_SCANCODE_D] ) move += aCamera.right;
-
-	if ( state[SDL_SCANCODE_SPACE] ) move += aCamera.up;
-	if ( state[SDL_SCANCODE_LCTRL] ) move += aCamera.down;
-
-	glm::normalize( move );
-	aCamera.transform.position += move * speed * dt;
-
-	/*if (input->IsPressed("Jump"))
-		camera.transform.position += glm::vec3(0.0f, 1.0f, 0.0f) * speed * dt;
-	else if (input->IsPressed("Crouch"))
-		camera.transform.position += glm::vec3(0.0f, -1.0f, 0.0f) * speed * dt;*/
-
-	/*if (input->IsPressed("LookUp"))
-		mY += 180.0f * dt;
-	else if (input->IsPressed("LookDown"))
-		mY -= 180.0f *dt;
-
-	if (input->IsPressed("TurnRight"))
-		mX += 180.0f * dt;
-	else if (input->IsPressed("TurnLeft"))
-		mX -= 180.0f * dt;*/
-
-	mX += aMouseDelta.x * 0.1f;
-	mY -= aMouseDelta.y * 0.1f;
-
-	auto constrain = [](float num) -> float
-	{
-		num = std::fmod(num, 360.0f);
-		return (num < 0.0f) ? num += 360.0f : num;
-	};
-
-	mX = constrain(mX);
-	mY = std::clamp(mY, -70.0f, 70.0f);
-
-	/*if (input->IsJustPressed("ZoomIn"))
-		camera.transform.scale += 0.1f;
-	else if (input->IsJustPressed("ZoomOut"))
-		camera.transform.scale -= 0.1f;*/
 }
 
 

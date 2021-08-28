@@ -7,6 +7,17 @@
 
 struct Camera
 {
+	Camera():
+		forward(0, 0, 0),
+		back(0, 0, 0),
+		up(0, 0, 0),
+		down(0, 0, 0),
+		right(0, 0, 0),
+		left(0, 0, 0)
+	{
+		transform = {};
+	}
+
 	glm::vec3 forward;
 	glm::vec3 back;
 	glm::vec3 up;
@@ -27,11 +38,10 @@ public:
 	~GameSystem (  );
 
 	virtual void Init(  );
-	virtual void Update( float dt );
-	virtual void SetupModels( float dt );
+	virtual void Update( float frameTime );
+	virtual void SetupModels( float frameTime );
 	virtual void CheckPaused(  );
-	virtual void UpdateCamera(  );
-	virtual void InputCamera( float dt );
+	virtual void ResetInputs(  );
 
 	virtual void HandleSDLEvent( SDL_Event* e );
 
@@ -41,7 +51,7 @@ public:
 	glm::vec2 aMouseDelta;
 	glm::vec2 aMousePos;
 
-	float mX, mY;
+	float aFrameTime;
 
 	Camera aCamera;
 	View aView;
@@ -49,3 +59,7 @@ public:
 	// make a timescale option?
 	bool aPaused;
 };
+
+
+extern GameSystem* g_pGame;
+
