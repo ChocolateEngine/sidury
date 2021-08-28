@@ -1,0 +1,89 @@
+# Blender MTL File: 'riverhouse.blend'
+# Material Count: 8
+
+newmtl dirtfloor001a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\dirtfloor001a.png
+
+newmtl door01
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\door01a.png
+
+newmtl water_coast02
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.090196 0.192157 0.207843
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+
+newmtl woodbeam002a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodbeam002a.png
+
+newmtl woodfloor006a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodfloor006a.png
+
+newmtl woodshingles002a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodshingles002a.png
+
+newmtl woodwall037a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodwall037a.png
+
+newmtl woodwall045a
+Ns 900.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodwall045a.png

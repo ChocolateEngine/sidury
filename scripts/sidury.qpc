@@ -1,0 +1,45 @@
+macro PROJECT_NAME "Sidury"
+macro OUT_NAME "sidury"
+
+include "../chocolate/scripts/base/core.qpc"
+
+macro BASE_DEBUG_ARGS ""
+
+config
+{
+	general
+	{
+		out_dir "$ROOT_DIR$/$GAME_DIR$"
+		config_type "application"
+	}
+	
+	compile
+	{
+		inc_dirs
+		{
+			"../chocolate/inc"
+		}
+	}
+	
+    debug
+    {
+        command     "$ROOT_DIR_ABS$/sidury/sidury.exe"
+        working_dir "$ROOT_DIR_ABS$/sidury"
+        arguments   "$BASE_DEBUG_ARGS$"
+    }
+}
+
+
+requires
+{
+	"$ROOT_DIR$/chocolate/scripts/chocolate.qpc"
+	"$ROOT_DIR$/scripts/client.qpc"
+}
+
+
+files
+{
+	"../src/gameloader.c"
+	"../chocolate/src/shared/platform.cpp"
+}
+
