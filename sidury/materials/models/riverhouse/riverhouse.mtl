@@ -10,7 +10,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\dirtfloor001a.png
+map_Kd dirtfloor001a.png
 
 newmtl door01
 Ns 900.000000
@@ -21,7 +21,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\door01a.png
+map_Kd door01a.png
 
 newmtl water_coast02
 Ns 900.000000
@@ -42,7 +42,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodbeam002a.png
+map_Kd woodbeam002a.png
 
 newmtl woodfloor006a
 Ns 900.000000
@@ -53,7 +53,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodfloor006a.png
+map_Kd woodfloor006a.png
 
 newmtl woodshingles002a
 Ns 900.000000
@@ -64,7 +64,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodshingles002a.png
+map_Kd woodshingles002a.png
 
 newmtl woodwall037a
 Ns 900.000000
@@ -75,7 +75,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodwall037a.png
+map_Kd woodwall037a.png
 
 newmtl woodwall045a
 Ns 900.000000
@@ -86,4 +86,4 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 1
-map_Kd vrchat_projects\\riverhouse\\Assets\\textures_hl2\\woodwall045a.png
+map_Kd woodwall045a.png
