@@ -20,6 +20,14 @@ config
 			"../chocolate/inc"
 		}
 	}
+
+	link
+	{
+		lib_dirs
+		{
+			"../chocolate/lib"
+		}
+	}
 	
     debug
     {

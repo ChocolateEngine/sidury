@@ -30,7 +30,7 @@ config
 		// import_lib "$BUILD_DIR$/qpc$EXT_LIB$"
 		lib_dirs
 		{
-			"$VK_DIR$/Lib"
+			"$VK_DIR$/Lib" [$WINDOWS$]
 			"../chocolate/lib"
 		}
 		
