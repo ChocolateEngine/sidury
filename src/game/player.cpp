@@ -5,11 +5,18 @@
 #include <algorithm>
 
 
+
 Player::Player():
-	aCamera(g_pGame->aCamera),
+	mX(0), mY(0),
+	aFlags(0),
+	maxSpeed(0),
+	moveForward(0), moveSide(0),
 	aVelocity(0, 0, 0),
+	aMoveType(MoveType::Walk),
 	aOrigin(0, 0, 0)
 {
+	aTransform = {};
+	aDirection = {};
 }
 
 Player::~Player()
@@ -19,6 +26,22 @@ Player::~Player()
 
 void Player::Spawn()
 {
+	Respawn();
+}
+
+
+void Player::Respawn()
+{
+	// HACK FOR RIVERHOUSE SPAWN POS
+	//aTransform.pos = {114.112556, 1690.37122, -982.597900};
+	aTransform.pos = {-43.8928490, 1706.54492, 364.839417};
+	aTransform.rot = {0, 0, 0, 0};
+	aVelocity = {0, 0, 0};
+	aOrigin = {0, 0, 0};
+	moveForward = 0.f;
+	moveSide = 0.f;
+	mX = 0.f;
+	mY = 0.f;
 }
 
 
@@ -26,7 +49,23 @@ void Player::Update( float dt )
 {
 	UpdateInputs();
 
-	NoClipMove();
+	DetermineMoveType();
+
+	switch ( aMoveType )
+	{
+		case MoveType::Walk:
+			WalkMove();
+			break;
+
+		case MoveType::Fly:
+			FlyMove();
+			break;
+
+		case MoveType::NoClip:
+		default:
+			NoClipMove();
+			break;
+	}
 
 	UpdateView();
 }
@@ -34,12 +73,12 @@ void Player::Update( float dt )
 
 void Player::SetPos( const glm::vec3& origin )
 {
-	aCamera.transform.position = origin;
+	aTransform.pos = origin;
 }
 
 const glm::vec3& Player::GetPos(  )
 {
-	return aCamera.transform.position;
+	return aTransform.pos;
 }
 
 
@@ -51,22 +90,23 @@ void Player::UpdateView(  )
 
 	glm::quat xRot = glm::angleAxis(glm::radians(mY), glm::normalize(glm::vec3(-1.0f, 0.0f, 0.0f)));
 	glm::quat yRot = glm::angleAxis(glm::radians(mX), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
-	aCamera.transform.rotation = xRot * yRot;
+	aTransform.rot = xRot * yRot;
 
-	// hmm
-	g_pGame->aView.viewMatrix = ToFirstPersonCameraTransformation(aCamera.transform);
+	aDirection.Update( forward*yRot, up*xRot, right*yRot );
 
-	aCamera.forward = forward * yRot;
-	aCamera.up = up * xRot;
-	aCamera.right = right * yRot;
-
-	aCamera.back = -aCamera.forward;
-	aCamera.down = -aCamera.up;
-	aCamera.left = -aCamera.right;
-
-	// hmmmm
-	g_pGame->apGraphics->SetView( g_pGame->aView );
+	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( aTransform ) );
 }
+
+
+// will replace with convars later when implemented
+#define FORWARD_SPEED 400.f
+#define SIDE_SPEED 400.f  // 350.f
+
+
+#define MAX_SPEED 400.f  // 320.f
+#define STOP_SPEED 100.f
+#define ACCEL_SPEED 10.f
+#define FRICTION 8.f // 4.f
 
 
 void Player::UpdateInputs(  )
@@ -74,13 +114,16 @@ void Player::UpdateInputs(  )
 	moveForward = 0.f;
 	moveSide = 0.f;
 
+	// blech
 	const Uint8* state = SDL_GetKeyboardState( NULL );
-	const float speed = state[SDL_SCANCODE_LSHIFT] ? 2.0f : 1.0f;
+	const float forwardSpeed = state[SDL_SCANCODE_LSHIFT] ? FORWARD_SPEED * 2.0f : FORWARD_SPEED;
+	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? SIDE_SPEED * 2.0f : SIDE_SPEED;
+	maxSpeed = state[SDL_SCANCODE_LSHIFT] ? MAX_SPEED * 2.0f : MAX_SPEED;
 
-	if ( state[SDL_SCANCODE_W] ) moveForward = speed;
-	if ( state[SDL_SCANCODE_S] ) moveForward += -speed;
-	if ( state[SDL_SCANCODE_A] ) moveSide = -speed;
-	if ( state[SDL_SCANCODE_D] ) moveSide += speed;
+	if ( state[SDL_SCANCODE_W] ) moveForward = forwardSpeed;
+	if ( state[SDL_SCANCODE_S] ) moveForward += -forwardSpeed;
+	if ( state[SDL_SCANCODE_A] ) moveSide = -sideSpeed;
+	if ( state[SDL_SCANCODE_D] ) moveSide += sideSpeed;
 
 	// TODO: move aMouseDelta to input system
 	mX += g_pGame->aMouseDelta.x * 0.1f;
@@ -93,33 +136,7 @@ void Player::UpdateInputs(  )
 	};
 
 	mX = constrain(mX);
-	mY = std::clamp(mY, -80.0f, 80.0f);
-}
-
-
-void Player::OldMove()
-{
-	const Uint8* state = SDL_GetKeyboardState( NULL );
-
-	const float speed = state[SDL_SCANCODE_LSHIFT] ? 12.f : 6.f;
-
-	glm::vec3 move = {};
-
-	if ( state[SDL_SCANCODE_W] ) move += aCamera.forward;
-	if ( state[SDL_SCANCODE_S] ) move += aCamera.back;
-	if ( state[SDL_SCANCODE_A] ) move += aCamera.left;
-	if ( state[SDL_SCANCODE_D] ) move += aCamera.right;
-
-	if ( state[SDL_SCANCODE_SPACE] ) move += aCamera.up;
-	if ( state[SDL_SCANCODE_LCTRL] ) move += aCamera.down;
-
-	glm::normalize( move );
-	aCamera.transform.position += move * speed * g_pGame->aFrameTime;
-
-	/*if (input->IsPressed("Jump"))
-		camera.transform.position += glm::vec3(0.0f, 1.0f, 0.0f) * speed * dt;
-	else if (input->IsPressed("Crouch"))
-		camera.transform.position += glm::vec3(0.0f, -1.0f, 0.0f) * speed * dt;*/
+	mY = std::clamp(mY, -90.0f, 90.0f);
 }
 
 
@@ -135,100 +152,78 @@ float VectorNormalize(glm::vec3& v)
 }
 
 
-// wtf does this even do
-void VectorMA( const glm::vec3& start, float scale, const glm::vec3& direction, glm::vec3& dest )
+void Player::DetermineMoveType(  )
 {
-	dest = start + direction * scale;
+	// will setup properly later, not sure if it will stay in here though
+	// right now have a lazy way to toggle noclip
+	static bool wasNoClipButtonPressed = false;
+	bool toggleNoClip = false;
+
+	const Uint8* state = SDL_GetKeyboardState( NULL );
+	if ( state[SDL_SCANCODE_V] )
+		toggleNoClip = true; 
+
+	if ( toggleNoClip && !wasNoClipButtonPressed )
+	{
+		if ( aMoveType == MoveType::NoClip )
+		{
+			aMoveType = MoveType::Walk;
+		}
+		else
+		{
+			aMoveType = MoveType::NoClip;
+		}
+	}
+
+	wasNoClipButtonPressed = toggleNoClip;
 }
 
 
-// will replace with convars later when implemented
-#define MAX_SPEED 4.0f
-#define STOP_SPEED 1.5f
-#define ACCEL_SPEED 6.f
-#define FRICTION 3.f
-#define FLY_SPEED 8.f
-
-
-void Player::BaseFlyMove()
+void Player::UpdatePosition(  )
 {
-	float factor = FLY_SPEED;
+	SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+}
 
-	glm::vec3 wishvel(0, 0, 0);
-	glm::vec3 wishdir(0, 0, 0);
-	float wishspeed = 0;
-	float maxspeed = MAX_SPEED * factor;
 
-	float fmove = moveForward * factor;
-	float smove = moveSide * factor;
+void Player::BaseFlyMove(  )
+{
+	int			i = 0;
+	glm::vec3	wishvel(0,0,0), wishdir(0,0,0);
+	float		wishspeed = 0;
 
-	VectorNormalize(aCamera.forward);  // Normalize remainder of vectors
-	VectorNormalize(aCamera.right);    // 
+	// forward and side movement
+	for (i=0 ; i<3 ; i++)
+		wishvel[i] = aDirection.forward[i]*aDirection.up[1]*moveForward + aDirection.right[i]*moveSide;
 
-	for (int i=0 ; i<3 ; i++)       // Determine x and y parts of velocity (slow down forward velocity by up vector)
-		wishvel[i] = aCamera.forward[i]*aCamera.up[1]*fmove + aCamera.right[i]*smove;
+	// vertical movement
+	// why is this super slow when looking near 80 degrees down or up and higher?
+	wishvel[1] = aDirection.up[2]*moveForward;
 
-	wishvel[1] = aCamera.up[2]*fmove;
+	wishdir = wishvel;
 
-	wishdir = wishvel;   // Determine maginitude of speed of move
 	wishspeed = VectorNormalize(wishdir);
-
-	// Clamp to max speed
-	if (wishspeed > maxspeed )
+	if (wishspeed > maxSpeed)
 	{
-		wishvel *= maxspeed/wishspeed;
-		wishspeed = maxspeed;
+		wishvel = wishvel * maxSpeed/wishspeed;
+		wishspeed = maxSpeed;
 	}
 
+	AddFriction(  );
 	Accelerate( wishspeed, wishdir );
-
-	float spd = glm::length( aVelocity );
-	if (spd < 0.01f)
-	{
-		aVelocity.x = 0;
-		aVelocity.y = 0;
-		aVelocity.z = 0;
-		return;
-	}
-
-	// Bleed off some speed, but if we have less than the bleed
-	//  threshhold, bleed the theshold amount.
-	float control = (spd < maxspeed/4.0) ? maxspeed/4.0 : spd;
-
-	float friction = FRICTION * 1.0;
-
-	// Add the amount to the drop amount.
-	float drop = control * friction * g_pGame->aFrameTime;
-
-	// scale the velocity
-	float newspeed = spd - drop;
-	if (newspeed < 0)
-		newspeed = 0;
-
-	// Determine proportion of old speed we are using.
-	newspeed /= spd;
-	aVelocity *= newspeed;
 }
 
 
 void Player::NoClipMove(  )
 {
 	BaseFlyMove(  );
-
-	glm::vec3 out;
-	VectorMA( GetPos(), g_pGame->aFrameTime, aVelocity, out );
-	SetPos( out );
+	UpdatePosition(  );
 }
 
 
 void Player::FlyMove(  )
 {
 	BaseFlyMove(  );
-
-	// TODO: test for collision
-	glm::vec3 out;
-	VectorMA( GetPos(), g_pGame->aFrameTime, aVelocity, out );
-	SetPos( out );
+	UpdatePosition(  );
 }
 
 
@@ -238,11 +233,8 @@ void Player::WalkMove(  )
 	glm::vec3	wishvel(0,0,0), wishdir(0,0,0);
 	float		wishspeed = 0;
 
-	//if ( state[SDL_SCANCODE_SPACE] ) umove += speed;
-	//if ( state[SDL_SCANCODE_LCTRL] ) umove -= speed;
-
 	for (i=0 ; i<3 ; i++)
-		wishvel[i] = aCamera.forward[i]*moveForward + aCamera.right[i]*moveSide;
+		wishvel[i] = aDirection.forward[i]*moveForward + aDirection.right[i]*moveSide;
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
 	//	wishvel[1] = umove;
@@ -252,10 +244,10 @@ void Player::WalkMove(  )
 	wishdir = wishvel;
 
 	wishspeed = VectorNormalize(wishdir);
-	if (wishspeed > MAX_SPEED)
+	if (wishspeed > maxSpeed)
 	{
-		wishvel = wishvel * MAX_SPEED/wishspeed;
-		wishspeed = MAX_SPEED;
+		wishvel = wishvel * maxSpeed/wishspeed;
+		wishspeed = maxSpeed;
 	}
 
 	// TEMP
@@ -271,7 +263,10 @@ void Player::WalkMove(  )
 		SV_AirAccelerate (wishspeed, wishvel);
 	}*/
 
-	SetPos( GetPos() + aVelocity );
+	// just gonna put this here
+	// AddGravity(  );
+
+	UpdatePosition(  );
 }
 
 
@@ -336,7 +331,7 @@ void Player::Accelerate( float wishspeed, const glm::vec3 wishdir )
 }
 
 
-#define GRAVITY 2.f
+#define GRAVITY 0.08f
 
 void Player::AddGravity(  )
 {

@@ -12,7 +12,8 @@ GameSystem::GameSystem(  ):
 	aMouseDelta( 0, 0 ),
 	aMousePos(0, 0),
 	aFrameTime(0.f),
-	aView( 0, 0, 200, 200, 0.05, 1000, 90 )
+	// only large near and farz for riverhouse and quake movement
+	aView( 0, 0, 200, 200, 1, 10000, 90 )
 {
 	g_pGame = this;
 }
@@ -22,7 +23,7 @@ GameSystem::~GameSystem(  )
 {
 }
 
-const int swarmModelCount = 1;
+const int swarmModelCount = 4;
 
 Player* g_player = NULL;
 
@@ -44,12 +45,15 @@ void GameSystem::Init(  )
 	apGraphics->GetWindowSize( &aView.width, &aView.height );
 	aView.ComputeProjection();
 
-	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse );
+	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse );
+	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_riverhouse );
+	aModels.push_back( g_riverhouse );
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", g_riverhouse );
 
 	for ( int i = 0; i < swarmModelCount; i++ )
 	{
 		//g_swarmModels[i] = new Model;
+		//aModels.push_back(g_swarmModels[i]);
 		//apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/act_like_a_baka.jpg", g_swarmModels[i] );
 	}
 
@@ -62,8 +66,23 @@ void GameSystem::Init(  )
 }
 
 
+void GameSystem::InitConsoleCommands(  )
+{
+	ConCommand cmd;
+
+	cmd.str = "respawn";
+	cmd.func = [ & ]( std::vector< std::string > sArgs )
+	{
+		g_player->Respawn();
+	};
+	aConsoleCommands.push_back( cmd );
+}
+
+
 void GameSystem::Update( float frameTime )
 {
+	BaseClass::Update( frameTime );
+
 	aFrameTime = frameTime;
 
 	CheckPaused(  );
@@ -149,5 +168,12 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 			break;
 		}
 	}
+}
+
+
+void GameSystem::SetViewMatrix( const glm::mat4& viewMatrix )
+{
+	aView.viewMatrix = viewMatrix;
+	apGraphics->SetView( aView );
 }
 
