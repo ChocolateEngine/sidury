@@ -34,7 +34,7 @@ void Player::Respawn()
 {
 	// HACK FOR RIVERHOUSE SPAWN POS
 	//aTransform.pos = {114.112556, 1690.37122, -982.597900};
-	aTransform.pos = {-43.8928490, 1706.54492, 364.839417};
+	aTransform.pos = {1085.69824, 322.443970, 644.222046};
 	aTransform.rot = {0, 0, 0, 0};
 	aVelocity = {0, 0, 0};
 	aOrigin = {0, 0, 0};
