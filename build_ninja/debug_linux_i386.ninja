@@ -1,0 +1,260 @@
+
+# rules
+rule cc_msvc
+    command = $compiler /nologo /Fd"$out.pdb" /Fo"$out" /c $in $cflags
+
+rule exe_msvc
+    command = link.exe /OUT:$out @$out.rsp $cflags
+    rspfile = $out.rsp
+    rspfile_content = $in
+
+rule ar_msvc
+    command = lib.exe /OUT:$out @$out.rsp $cflags
+    rspfile = $out.rsp
+    rspfile_content = $in
+
+rule so_msvc
+    command = link.exe /DLL /OUT:$out @$out.rsp $cflags
+    rspfile = $out.rsp
+    rspfile_content = $in
+
+
+rule cc_gcc
+    command = $compiler -c -o $out $in $cflags
+
+rule exe_gcc
+    command = $compiler -o $out $in $cflags
+
+rule ar_gcc
+    command = ar rcs $out $in
+
+rule so_gcc
+    command = $compiler -o $out $in -fPIC -shared $cflags
+
+
+rule cc_clang
+    command = $compiler -c -o $out $in $cflags
+
+rule exe_clang
+    command = $compiler -o $out $in $cflags
+
+rule ar_clang
+    command = ar rcs $out $in
+
+rule so_clang
+    command = $compiler -o $out $in -fPIC -shared $cflags
+
+
+rule mkdir
+    command = mkdir "$out"
+
+#!/usr/bin/env ninja -f
+# variables
+sidury_src_dir = /home/karl/Desktop/Git-Repos/sidury/scripts
+out_file = sidury
+sidury_compiler = g++
+sidury_build_dir = /home/karl/Desktop/Git-Repos/sidury/obj/sidury/Debug
+
+build $sidury_build_dir: mkdir $sidury_build_dir
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/sidury/Debug/gameloader.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/gameloader.c
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -std=c++17
+    compiler = $sidury_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/sidury/Debug/platform.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/platform.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -std=c++17
+    compiler = $sidury_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/scripts/sidury: exe_gcc /home/karl/Desktop/Git-Repos/sidury/obj/sidury/Debug/gameloader.o /home/karl/Desktop/Git-Repos/sidury/obj/sidury/Debug/platform.o || 
+    cflags = -L "/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Lib" -L "/home/karl/Desktop/Git-Repos/sidury/scripts" -l dl
+
+
+#!/usr/bin/env ninja -f
+# variables
+client_src_dir = /home/karl/Desktop/Git-Repos/sidury/scripts
+out_file = client
+client_compiler = g++
+client_build_dir = /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug
+
+build $client_build_dir: mkdir $client_build_dir
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/game_entry.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/core/game_entry.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/util.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/util.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/system.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/system.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/msgs.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/msgs.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/platform.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/platform.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/console.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/console.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/util.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/game/util.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/player.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/game/player.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/gamesystem.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/game/gamesystem.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/inputsystem.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/game/inputsystem.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/world.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/src/game/world.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/src/game" -std=c++17
+    compiler = $client_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/scripts/client.so: so_gcc /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/game_entry.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/util.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/system.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/msgs.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/platform.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/console.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/util.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/player.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/gamesystem.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/inputsystem.o /home/karl/Desktop/Git-Repos/sidury/obj/client/Debug/world.o || 
+    cflags = -L "/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Lib" -L "/home/karl/Desktop/Git-Repos/sidury/scripts/C$:\VulkanSDK\1.2.182.0/Lib" -L "/home/karl/Desktop/Git-Repos/sidury/chocolate/lib" -L "/home/karl/Desktop/Git-Repos/sidury/scripts" -l dl -l SDL2 -l vulkan -l pthread -l X11 -l Xxf86vm -l Xrandr -l Xi
+
+
+#!/usr/bin/env ninja -f
+# variables
+chocolate_src_dir = /home/karl/Desktop/Git-Repos/sidury/chocolate/scripts
+out_file = engine
+chocolate_compiler = g++
+chocolate_build_dir = /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug
+
+build $chocolate_build_dir: mkdir $chocolate_build_dir
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/util.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/util.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/system.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/system.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/msgs.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/msgs.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/platform.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/platform.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/console.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/shared/console.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_impl_vulkan.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_impl_vulkan.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_demo.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_demo.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_widgets.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_widgets.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_draw.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_draw.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_impl_sdl.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_impl_sdl.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_tables.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/imgui/imgui_tables.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/graphics.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/graphics.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/audio.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/audio.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/main.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/main.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/input.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/input.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/gui.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/gui.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/engine.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/engine.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/device.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/renderer/device.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/renderer.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/renderer/renderer.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/allocator.o: cc_gcc /home/karl/Desktop/Git-Repos/sidury/chocolate/src/core/renderer/allocator.cpp
+    cflags = -D_X86_ -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Include" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/lib/io" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/core" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/imgui" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/shared" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/types" -I"/home/karl/Desktop/Git-Repos/sidury/chocolate/inc/SDL2" -std=c++17
+    compiler = $chocolate_compiler
+
+
+build /home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/engine.so: so_gcc /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/util.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/system.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/msgs.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/platform.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/console.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_impl_vulkan.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_demo.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_widgets.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_draw.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_impl_sdl.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/imgui_tables.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/graphics.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/audio.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/main.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/input.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/gui.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/engine.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/device.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/renderer.o /home/karl/Desktop/Git-Repos/sidury/obj/engine/Debug/allocator.o
+    cflags = -L "/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Lib" -L "/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts/C$:\VulkanSDK\1.2.182.0/Lib" -L "/home/karl/Desktop/Git-Repos/sidury/chocolate/lib" -L "/home/karl/Desktop/Git-Repos/sidury/chocolate/scripts" -l dl -l SDL2 -l vulkan -l pthread -l X11 -l Xxf86vm -l Xrandr -l Xi
