@@ -1,7 +1,12 @@
 macro PROJECT_NAME "Sidury Client"
 macro OUT_NAME "client"
 
-include "../chocolate/scripts/base/core.qpc"
+include "../chocolate/scripts/core.qpc"
+
+macro BULLET_DIR "../chocolate/thirdparty/bullet3-3.17"
+
+macro BULLET_POSTFIX ""
+macro BULLET_POSTFIX "_Debug" [$WINDOWS$ && $DEBUG$]
 
 macro BASE_DEBUG_ARGS ""
 
@@ -18,6 +23,7 @@ config
 		{
 			"../chocolate/inc"
 			"../src/game"
+			"$BULLET_DIR$/src"
 		}
 		
 		defines
@@ -32,10 +38,15 @@ config
 		{
 			"$VK_DIR$/Lib" [$WINDOWS$]
 			"../chocolate/lib"
+			"$BULLET_DIR$/build/lib/$CONFIG$" [$WINDOWS$]  // idk what it would be on linux yet
 		}
 		
 		libs
 		{
+			// why bullet, why ???
+			"LinearMath$BULLET_POSTFIX$"
+			"BulletCollision$BULLET_POSTFIX$"
+			"BulletDynamics$BULLET_POSTFIX$"
 		}
 	}
 	
@@ -50,7 +61,7 @@ config
 
 requires
 {
-	"$ROOT_DIR$/chocolate/scripts/chocolate.qpc"
+	"../chocolate/scripts/chocolate.qpc"
 }
 
 
@@ -60,6 +71,7 @@ files
 	{
 		"../src/core/*.cpp"
 		"../chocolate/src/shared/*.cpp"
+		"../chocolate/src/types/*.cpp"
 		"../inc/core/*.h"
 	}
 	

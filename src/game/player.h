@@ -2,12 +2,15 @@
 
 #include "gamesystem.h"
 #include "util.h"
+#include "../../chocolate/inc/types/transform.h"
+#include "physics.h"
 
 
 #define FL_NONE 0
 #define FL_ONGROUND 1
 
 
+// should probably move into transform
 struct Direction
 {
 	Direction():
@@ -57,20 +60,20 @@ public:
 	const glm::vec3& GetPos(  );
 
 	// ==================================
-	// quake movement
+	// movement
 	// ==================================
 	void DetermineMoveType(  );
 	void UpdatePosition(  );
+	bool IsOnGround(  );
 
+	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
 	void BaseFlyMove(  );
 	void NoClipMove(  );
 	void FlyMove(  );
 	void WalkMove(  );
 
 	void AddFriction(  );
-	void Accelerate( float wishspeed, const glm::vec3 wishdir );
-	//void AirAccelerate( float wishspeed, glm::vec3 wishveloc );
-	void AddGravity(  );
+	void Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
 	enum class MoveType
 	{
@@ -80,19 +83,25 @@ public:
 		Fly,
 	};
 
+	void SetMoveType( MoveType type );
+	void SetCollisionEnabled( bool enable );
+	// void SetGravity( const glm::vec3& gravity );
+	void EnableGravity( bool enabled );
+
 	MoveType aMoveType;
 
 	int aFlags;
 
 	glm::vec3 aOrigin;
 	glm::vec3 aVelocity;
-
-	float moveForward, moveSide;
+	glm::vec3 aMove;
 	float maxSpeed;
 
 	float mX, mY;
 	Direction aDirection;
 	Transform aTransform;
+
+	PhysicsObject* apPhysObj;
 };
 
 

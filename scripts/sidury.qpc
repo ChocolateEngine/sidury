@@ -1,7 +1,7 @@
 macro PROJECT_NAME "Sidury"
 macro OUT_NAME "sidury"
 
-include "../chocolate/scripts/base/core.qpc"
+include "../chocolate/scripts/core.qpc"
 
 macro BASE_DEBUG_ARGS ""
 

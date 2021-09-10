@@ -1,3 +1,3 @@
-py chocolate\qpc\qpc.py -a scripts/sidury.qpc scripts/client.qpc chocolate/scripts/chocolate.qpc -m GAME_DIR=sidury -g visual_studio -f -mf sidury
+py chocolate\qpc\qpc.py -b scripts/base.qpcb -a all -g visual_studio -ar amd64 -f -mf sidury
 
 pause

@@ -1,0 +1,13 @@
+
+macro GAME_DIR sidury
+
+group "all"
+{
+	"chocolate/scripts/chocolate.qpc"
+	"scripts/sidury.qpc"
+	"scripts/client.qpc"
+}
+
+// global default setting to use filesystem folders for IDE's like visual studio
+system_folders "true"  // could also use 1/0
+

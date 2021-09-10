@@ -5,18 +5,34 @@
 #include <algorithm>
 
 
+// will replace with convars later when implemented
+#define FORWARD_SPEED 400.f
+#define SIDE_SPEED 400.f  // 350.f
+
+#define MAX_SPEED 400.f  // 320.f
+#define STOP_SPEED 100.f
+#define ACCEL_SPEED 10.f
+#define FRICTION 8.f // 4.f
+#define PLAYER_MASS 200.f
+#define JUMP_FORCE 500.f
+
+// TEMP
+#define SPAWN_POS 1085.69824, 322.443970, 644.222046
+
 
 Player::Player():
 	mX(0), mY(0),
 	aFlags(0),
 	maxSpeed(0),
-	moveForward(0), moveSide(0),
+	aMove(0, 0, 0),
 	aVelocity(0, 0, 0),
 	aMoveType(MoveType::Walk),
 	aOrigin(0, 0, 0)
 {
 	aTransform = {};
 	aDirection = {};
+
+	apPhysObj = NULL;
 }
 
 Player::~Player()
@@ -26,22 +42,45 @@ Player::~Player()
 
 void Player::Spawn()
 {
+	// should be below this code, but then the phys engine crashes
 	Respawn();
+
+	aTransform.position = {SPAWN_POS};
+
+	PhysicsObjectInfo physInfo;
+	physInfo.mass = PLAYER_MASS;
+	physInfo.transform = aTransform;
+	//physInfo.callbacks = true;
+	physInfo.shapeType = ShapeType::Box;
+	//physInfo.collisionType = CollisionType::Kinematic;
+	physInfo.bounds = {16, 72, 16};
+
+	apPhysObj = g_pGame->apPhysEnv->CreatePhysicsObject( physInfo );
+	apPhysObj->SetAlwaysActive( true );
+	//apPhysObj->SetWorldTransform( aTransform );
+
+	// enable Continuous Collision Detection
+	//apPhysObj->aRigidBody.setCcdMotionThreshold( 1e-7 );
+	//apPhysObj->aRigidBody.setCcdSweptSphereRadius( 0.5f );
+
+	SetMoveType( MoveType::Walk );
 }
 
 
 void Player::Respawn()
 {
 	// HACK FOR RIVERHOUSE SPAWN POS
-	//aTransform.pos = {114.112556, 1690.37122, -982.597900};
-	aTransform.pos = {1085.69824, 322.443970, 644.222046};
-	aTransform.rot = {0, 0, 0, 0};
+	aTransform.position = {SPAWN_POS};
+	aTransform.rotation = {0, 0, 0, 0};
 	aVelocity = {0, 0, 0};
 	aOrigin = {0, 0, 0};
-	moveForward = 0.f;
-	moveSide = 0.f;
+	aMove = {0, 0, 0};
 	mX = 0.f;
 	mY = 0.f;
+
+	// crashes physics engine, yay
+	//if ( apRigidBody )
+	//	apRigidBody->setWorldTransform( toBt( aTransform ) );
 }
 
 
@@ -73,13 +112,23 @@ void Player::Update( float dt )
 
 void Player::SetPos( const glm::vec3& origin )
 {
-	aTransform.pos = origin;
+	aTransform.position = origin;
 }
 
 const glm::vec3& Player::GetPos(  )
 {
-	return aTransform.pos;
+	return aTransform.position;
 }
+
+/*void Player::SetAng( const glm::vec3& angle )
+{
+	aTransform.position = origin;
+}
+
+const glm::vec3& Player::GetAng(  )
+{
+	return aTransform.position;
+}*/
 
 
 void Player::UpdateView(  )
@@ -90,29 +139,21 @@ void Player::UpdateView(  )
 
 	glm::quat xRot = glm::angleAxis(glm::radians(mY), glm::normalize(glm::vec3(-1.0f, 0.0f, 0.0f)));
 	glm::quat yRot = glm::angleAxis(glm::radians(mX), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
-	aTransform.rot = xRot * yRot;
+	aTransform.rotation = xRot * yRot;
 
 	aDirection.Update( forward*yRot, up*xRot, right*yRot );
 
-	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( aTransform ) );
+	// temp
+	Transform transform = aTransform;
+	transform.position.y += 56;  // view offset
+
+	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( transform ) );
 }
-
-
-// will replace with convars later when implemented
-#define FORWARD_SPEED 400.f
-#define SIDE_SPEED 400.f  // 350.f
-
-
-#define MAX_SPEED 400.f  // 320.f
-#define STOP_SPEED 100.f
-#define ACCEL_SPEED 10.f
-#define FRICTION 8.f // 4.f
 
 
 void Player::UpdateInputs(  )
 {
-	moveForward = 0.f;
-	moveSide = 0.f;
+	aMove = {0, 0, 0};
 
 	// blech
 	const Uint8* state = SDL_GetKeyboardState( NULL );
@@ -120,10 +161,28 @@ void Player::UpdateInputs(  )
 	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? SIDE_SPEED * 2.0f : SIDE_SPEED;
 	maxSpeed = state[SDL_SCANCODE_LSHIFT] ? MAX_SPEED * 2.0f : MAX_SPEED;
 
-	if ( state[SDL_SCANCODE_W] ) moveForward = forwardSpeed;
-	if ( state[SDL_SCANCODE_S] ) moveForward += -forwardSpeed;
-	if ( state[SDL_SCANCODE_A] ) moveSide = -sideSpeed;
-	if ( state[SDL_SCANCODE_D] ) moveSide += sideSpeed;
+	if ( state[SDL_SCANCODE_W] ) aMove.x = forwardSpeed;
+	if ( state[SDL_SCANCODE_S] ) aMove.x += -forwardSpeed;
+	if ( state[SDL_SCANCODE_A] ) aMove.z = -sideSpeed;
+	if ( state[SDL_SCANCODE_D] ) aMove.z += sideSpeed;
+
+	// HACK:
+	static bool wasJumpButtonPressed = false;
+	bool jump = false;
+
+	if ( state[SDL_SCANCODE_SPACE] )
+		jump = true; 
+
+	if ( jump && !wasJumpButtonPressed && IsOnGround() )
+	{
+		apPhysObj->ApplyImpulse( {0, JUMP_FORCE, 0} );
+		aVelocity.y += JUMP_FORCE;
+	}
+
+	wasJumpButtonPressed = jump;
+
+	//if ( state[SDL_SCANCODE_SPACE] ) aMove.y = FORWARD_SPEED;
+	// if ( state[SDL_SCANCODE_LCTRL] ) aMove.y -= FORWARD_SPEED;
 
 	// TODO: move aMouseDelta to input system
 	mX += g_pGame->aMouseDelta.x * 0.1f;
@@ -143,6 +202,8 @@ void Player::UpdateInputs(  )
 // glm::normalize doesn't return a float
 float VectorNormalize(glm::vec3& v)
 {
+	float bruh = glm::lxNorm(v, 2);
+
 	float length = sqrt(glm::dot(v, v));
 
 	if (length)
@@ -165,48 +226,153 @@ void Player::DetermineMoveType(  )
 
 	if ( toggleNoClip && !wasNoClipButtonPressed )
 	{
-		if ( aMoveType == MoveType::NoClip )
-		{
-			aMoveType = MoveType::Walk;
-		}
-		else
-		{
-			aMoveType = MoveType::NoClip;
-		}
+		SetMoveType( aMoveType == MoveType::NoClip ? MoveType::Walk : MoveType::NoClip );
 	}
 
 	wasNoClipButtonPressed = toggleNoClip;
 }
 
 
+void Player::SetMoveType( MoveType type )
+{
+	aMoveType = type;
+
+	switch (type)
+	{
+		case MoveType::NoClip:
+		{
+			// no gravity for noclip
+			EnableGravity( false );
+			SetCollisionEnabled( false );
+			break;
+		}
+
+		case MoveType::Fly:
+		{
+			// no gravity for flying
+			EnableGravity( false );
+			SetCollisionEnabled( true );
+			break;
+		}
+
+		case MoveType::Walk:
+		default:
+		{
+			// add gravity
+			EnableGravity( true );
+			SetCollisionEnabled( true );
+			break;
+		}
+	}
+}
+
+
+void Player::SetCollisionEnabled( bool enable )
+{
+	apPhysObj->SetCollisionEnabled( enable );
+}
+
+
+void Player::EnableGravity( bool enabled )
+{
+	apPhysObj->SetGravity( enabled ? g_pGame->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
+}
+
+
 void Player::UpdatePosition(  )
 {
-	SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+	aTransform = apPhysObj->GetWorldTransform();
+}
+
+
+bool Player::IsOnGround(  )
+{
+	btVector3 btFrom = toBt( GetPos() );
+	btVector3 btTo( GetPos().x, -10000.0, GetPos().z );
+	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
+
+	g_pGame->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+
+	if ( res.hasHit() )
+	{
+		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
+		if ( dist < 300.f )  // 500.f, 3000.f
+		{
+			return true;
+		}
+		
+	}
+
+	return false;
+
+	/*
+	// maybe useful code
+	// https://gamedev.stackexchange.com/questions/58012/detect-when-a-bullet-rigidbody-is-on-ground
+	
+	// Go through collisions
+	int numManifolds = btDispatcher->getNumManifolds();
+    for (int i = 0; i < numManifolds; i++)
+    {
+        btPersistentManifold* contactManifold = btWorld->getDispatcher()->getManifoldByIndexInternal(i);
+        btCollisionObject* obA = const_cast<btCollisionObject*>(contactManifold->getBody0());
+        btCollisionObject* obB = const_cast<btCollisionObject*>(contactManifold->getBody1());
+
+        GameObject* gameObjA = static_cast<GameObject*>(obA->getUserPointer());
+        GameObject* gameObjB = static_cast<GameObject*>(obB->getUserPointer());
+		if (gameObjA->name == "Camera" || gameObjB->name == "Camera" have some way to check if one of the objects is the rigidbody you want ) {
+		int numContacts = contactManifold->getNumContacts();
+		for (int j = 0; j < numContacts; j++)
+		{
+			btManifoldPoint& pt = contactManifold->getContactPoint(j);
+			if (pt.getDistance() < 0.f)
+			{
+				glm::vec3 normal;
+
+				if (gameObjB->name == "Camera") //Check each object to see if it's the rigid body and determine the correct normal.
+					normal = -pt.m_normalWorldOnB;
+				else
+					normal = pt.m_normalWorldOnB;
+
+				// put the threshold here where 0.4f is
+				if (normal.y > 0.4f ) {
+					// The character controller is on the ground
+				}
+			}
+		}
+	}
+	*/
+}
+
+
+float Player::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
+{
+	wishdir = wishvel;
+	float wishspeed = VectorNormalize( wishdir );
+
+	if ( wishspeed > maxSpeed )
+	{
+		wishvel = wishvel * maxSpeed/wishspeed;
+		wishspeed = maxSpeed;
+	}
+
+	return wishspeed;
 }
 
 
 void Player::BaseFlyMove(  )
 {
-	int			i = 0;
-	glm::vec3	wishvel(0,0,0), wishdir(0,0,0);
-	float		wishspeed = 0;
+	glm::vec3 wishvel(0,0,0);
+	glm::vec3 wishdir(0,0,0);
 
 	// forward and side movement
-	for (i=0 ; i<3 ; i++)
-		wishvel[i] = aDirection.forward[i]*aDirection.up[1]*moveForward + aDirection.right[i]*moveSide;
+	for ( int i = 0; i < 3; i++ )
+		wishvel[i] = aDirection.forward[i]*aDirection.up[1]*aMove.x + aDirection.right[i]*aMove.z;
 
 	// vertical movement
-	// why is this super slow when looking near 80 degrees down or up and higher?
-	wishvel[1] = aDirection.up[2]*moveForward;
+	// why is this super slow when looking near 80 degrees down or up and higher and when not sprinting?
+	wishvel[1] = aDirection.up[2]*aMove.x;
 
-	wishdir = wishvel;
-
-	wishspeed = VectorNormalize(wishdir);
-	if (wishspeed > maxSpeed)
-	{
-		wishvel = wishvel * maxSpeed/wishspeed;
-		wishspeed = maxSpeed;
-	}
+	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
 	AddFriction(  );
 	Accelerate( wishspeed, wishdir );
@@ -216,80 +382,65 @@ void Player::BaseFlyMove(  )
 void Player::NoClipMove(  )
 {
 	BaseFlyMove(  );
-	UpdatePosition(  );
+
+	apPhysObj->SetLinearVelocity( aVelocity );
 }
 
 
 void Player::FlyMove(  )
 {
 	BaseFlyMove(  );
-	UpdatePosition(  );
+
+	apPhysObj->SetLinearVelocity( aVelocity );
 }
 
 
 void Player::WalkMove(  )
 {
-	int			i = 0;
-	glm::vec3	wishvel(0,0,0), wishdir(0,0,0);
-	float		wishspeed = 0;
-
-	for (i=0 ; i<3 ; i++)
-		wishvel[i] = aDirection.forward[i]*moveForward + aDirection.right[i]*moveSide;
+	glm::vec3 wishvel = aDirection.forward*aMove.x + aDirection.right*aMove.z;
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
-	//	wishvel[1] = umove;
+	//	wishvel[1] = aMove.y;
 	//else
 		wishvel[1] = 0;
 
-	wishdir = wishvel;
+	glm::vec3 wishdir(0,0,0);
+	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	wishspeed = VectorNormalize(wishdir);
-	if (wishspeed > maxSpeed)
-	{
-		wishvel = wishvel * maxSpeed/wishspeed;
-		wishspeed = maxSpeed;
-	}
-
-	// TEMP
-	bool onground = true;
-
-	if ( onground )
+	if ( IsOnGround() )
 	{
 		AddFriction(  );
-		Accelerate( wishspeed, wishdir );
+		Accelerate( wishspeed, wishdir, false );
 	}
-	/*else
+	else
 	{	// not on ground, so little effect on velocity
-		SV_AirAccelerate (wishspeed, wishvel);
-	}*/
+		Accelerate( wishspeed, wishvel, true );
+		aVelocity.y = apPhysObj->GetLinearVelocity().y;
+	}
 
-	// just gonna put this here
-	// AddGravity(  );
-
-	UpdatePosition(  );
+	//SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+	apPhysObj->SetLinearVelocity( aVelocity );
 }
 
 
 void Player::AddFriction()
 {
-	glm::vec3	vel(0, 0, 0);
-	float	speed, newspeed, control;
 	glm::vec3	start(0, 0, 0), stop(0, 0, 0);
 	float	friction;
 	//trace_t	trace;
 
-	vel = aVelocity;
+	glm::vec3 vel = aVelocity;
 
-	speed = sqrt(vel[0]*vel[0] + vel[2]*vel[2]);
+	float speed = sqrt(vel[0]*vel[0] + vel[2]*vel[2]);
 	if (!speed)
 		return;
 
 	// if the leading edge is over a dropoff, increase friction
-	start[0] = stop[0] = GetPos().x + vel[0]/speed*16;
-	//start[1] = stop[1] = GetPos().y + vel[1]/vspeed*16;
-	// start[2] = aOrigin[2] + sv_player->v.mins[2];
-	//start[1] = GetPos().y + -1.f;
-	start[2] = stop[2] = GetPos().z + vel[2]/speed*16;
+	start.x = stop.x = GetPos().x + vel.x / speed*16.f;
+	start.z = stop.z = GetPos().z + vel.z / speed*16.f;
+
+	// start.y = GetPos().y + sv_player->v.mins.y;
+	start.y = stop.y = GetPos().y + vel.y / speed*16.f;
 	stop[1] = start[1] - 34;
 
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
@@ -300,44 +451,28 @@ void Player::AddFriction()
 		friction = FRICTION;
 
 	// apply friction
-	control = speed < STOP_SPEED ? STOP_SPEED : speed;
-	newspeed = speed - g_pGame->aFrameTime * control * friction;
+	float control = speed < STOP_SPEED ? STOP_SPEED : speed;
+	float newspeed = glm::max( 0.f, speed - g_pGame->aFrameTime * control * friction );
 
-	if (newspeed < 0)
-		newspeed = 0;
 	newspeed /= speed;
-
-	aVelocity[0] = vel[0] * newspeed;
-	aVelocity[1] = vel[1] * newspeed;
-	aVelocity[2] = vel[2] * newspeed;
+	aVelocity = vel * newspeed;
 }
 
 
-void Player::Accelerate( float wishspeed, const glm::vec3 wishdir )
+void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 {
-	int			i;
-	float		addspeed, accelspeed, currentspeed;
+	float baseWishSpeed = inAir ? glm::min( 30.f, VectorNormalize( wishDir ) ) : wishSpeed;
 
-	currentspeed = glm::dot(aVelocity, wishdir);
-	addspeed = wishspeed - currentspeed;
-	if (addspeed <= 0)
+	float currentspeed = glm::dot( aVelocity, wishDir );
+	float addspeed = baseWishSpeed - currentspeed;
+
+	if ( addspeed <= 0.f )
 		return;
-	accelspeed = ACCEL_SPEED * g_pGame->aFrameTime * wishspeed;
-	if (accelspeed > addspeed)
-		accelspeed = addspeed;
 
-	for (i=0 ; i<3 ; i++)
-		aVelocity[i] += accelspeed*wishdir[i];
-}
+	addspeed = glm::min( addspeed, ACCEL_SPEED * g_pGame->aFrameTime * wishSpeed );
 
-
-#define GRAVITY 0.08f
-
-void Player::AddGravity(  )
-{
-	float gravityScale = 1.0;
-
-	aVelocity[1] -= gravityScale * GRAVITY * g_pGame->aFrameTime;
+	for ( int i = 0; i < 3; i++ )
+		aVelocity[i] += addspeed * wishDir[i];
 }
 
 

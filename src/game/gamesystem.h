@@ -4,6 +4,8 @@
 #include "../../chocolate/inc/core/graphics.h"
 #include "../../chocolate/inc/types/renderertypes.h"
 
+#include "physics.h"
+
 
 class GameSystem : public BaseSystem
 {
@@ -28,6 +30,9 @@ public:
 	BaseGraphicsSystem* apGraphics = NULL;
 
 	std::vector< Model* > aModels;
+
+	PhysicsEnvironment* apPhysEnv;
+	//std::vector< Collider* > aColliders;
 
 	glm::vec2 aMouseDelta;
 	glm::vec2 aMousePos;

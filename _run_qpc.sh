@@ -1,1 +1,1 @@
-python chocolate/qpc/qpc.py -a scripts/sidury.qpc scripts/client.qpc chocolate/scripts/chocolate.qpc -m GAME_DIR=sidury  -g makefile ninja -f -mf sidury
+python chocolate/qpc/qpc.py -b scripts/base.qpcb -a all -g makefile ninja -f -mf sidury
