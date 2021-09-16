@@ -2,8 +2,11 @@
 #include "player.h"
 
 
+#if !NO_BULLET_PHYSICS
 
-PhysicsObject::PhysicsObject(  )
+
+PhysicsObject::PhysicsObject(  ):
+	aPhysInfo( ShapeType::Invalid )
 {
 }
 
@@ -48,6 +51,8 @@ Transform& PhysicsObject::GetWorldTransform(  )
 void PhysicsObject::SetWorldTransform( const Transform& transform )
 {
 	aTransform = transform;
+
+	apRigidBody->setWorldTransform( toBt(aTransform) );
 }
 
 
@@ -305,7 +310,7 @@ PhysicsObject* PhysicsEnvironment::CreatePhysicsObject( PhysicsObjectInfo& physI
 	phys->apCollisionShape->setUserPointer( phys );
 	phys->apRigidBody->setUserPointer( phys );
 
-	phys->SetWorldTransform( physInfo.transform );
+	//phys->SetWorldTransform( physInfo.transform );
 
 	return phys;
 }
@@ -490,3 +495,4 @@ void PhysicsEnvironment::RayTest( const glm::vec3& from, const glm::vec3& to, st
 }
 
 
+#endif // !NO_BULLET_PHYSICS

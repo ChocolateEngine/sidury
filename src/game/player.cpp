@@ -20,6 +20,12 @@
 #define SPAWN_POS 1085.69824, 322.443970, 644.222046
 
 
+CON_COMMAND( respawn )
+{
+	g_pGame->aLocalPlayer->Respawn();
+}
+
+
 Player::Player():
 	mX(0), mY(0),
 	aFlags(0),
@@ -32,7 +38,9 @@ Player::Player():
 	aTransform = {};
 	aDirection = {};
 
+#if !NO_BULLET_PHYSICS
 	apPhysObj = NULL;
+#endif
 }
 
 Player::~Player()
@@ -47,11 +55,11 @@ void Player::Spawn()
 
 	aTransform.position = {SPAWN_POS};
 
-	PhysicsObjectInfo physInfo;
+#if !NO_BULLET_PHYSICS
+	PhysicsObjectInfo physInfo( ShapeType::Box );
 	physInfo.mass = PLAYER_MASS;
 	physInfo.transform = aTransform;
 	//physInfo.callbacks = true;
-	physInfo.shapeType = ShapeType::Box;
 	//physInfo.collisionType = CollisionType::Kinematic;
 	physInfo.bounds = {16, 72, 16};
 
@@ -62,8 +70,12 @@ void Player::Spawn()
 	// enable Continuous Collision Detection
 	//apPhysObj->aRigidBody.setCcdMotionThreshold( 1e-7 );
 	//apPhysObj->aRigidBody.setCcdSweptSphereRadius( 0.5f );
+#endif
 
 	SetMoveType( MoveType::Walk );
+
+	// won't change for now
+	aViewOffset = {0, 56, 0};
 }
 
 
@@ -78,9 +90,10 @@ void Player::Respawn()
 	mX = 0.f;
 	mY = 0.f;
 
-	// crashes physics engine, yay
-	//if ( apRigidBody )
-	//	apRigidBody->setWorldTransform( toBt( aTransform ) );
+#if !NO_BULLET_PHYSICS
+	if ( apPhysObj )
+		apPhysObj->SetWorldTransform( aTransform );
+#endif
 }
 
 
@@ -92,18 +105,9 @@ void Player::Update( float dt )
 
 	switch ( aMoveType )
 	{
-		case MoveType::Walk:
-			WalkMove();
-			break;
-
-		case MoveType::Fly:
-			FlyMove();
-			break;
-
-		case MoveType::NoClip:
-		default:
-			NoClipMove();
-			break;
+		case MoveType::Walk:    WalkMove();     break;
+		case MoveType::Fly:     FlyMove();      break;
+		case MoveType::NoClip:  NoClipMove();   break;
 	}
 
 	UpdateView();
@@ -143,9 +147,8 @@ void Player::UpdateView(  )
 
 	aDirection.Update( forward*yRot, up*xRot, right*yRot );
 
-	// temp
 	Transform transform = aTransform;
-	transform.position.y += 56;  // view offset
+	transform.position += aViewOffset;
 
 	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( transform ) );
 }
@@ -155,7 +158,7 @@ void Player::UpdateInputs(  )
 {
 	aMove = {0, 0, 0};
 
-	// blech
+	// only way i can think of removing this is when i start to setup networking and prediction
 	const Uint8* state = SDL_GetKeyboardState( NULL );
 	const float forwardSpeed = state[SDL_SCANCODE_LSHIFT] ? FORWARD_SPEED * 2.0f : FORWARD_SPEED;
 	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? SIDE_SPEED * 2.0f : SIDE_SPEED;
@@ -175,7 +178,9 @@ void Player::UpdateInputs(  )
 
 	if ( jump && !wasJumpButtonPressed && IsOnGround() )
 	{
+#if !NO_BULLET_PHYSICS
 		apPhysObj->ApplyImpulse( {0, JUMP_FORCE, 0} );
+#endif
 		aVelocity.y += JUMP_FORCE;
 	}
 
@@ -184,9 +189,8 @@ void Player::UpdateInputs(  )
 	//if ( state[SDL_SCANCODE_SPACE] ) aMove.y = FORWARD_SPEED;
 	// if ( state[SDL_SCANCODE_LCTRL] ) aMove.y -= FORWARD_SPEED;
 
-	// TODO: move aMouseDelta to input system
-	mX += g_pGame->aMouseDelta.x * 0.1f;
-	mY -= g_pGame->aMouseDelta.y * 0.1f;
+	mX += g_pGame->apInput->GetMouseDelta().x * 0.1f;
+	mY -= g_pGame->apInput->GetMouseDelta().y * 0.1f;
 
 	auto constrain = [](float num) -> float
 	{
@@ -241,27 +245,20 @@ void Player::SetMoveType( MoveType type )
 	{
 		case MoveType::NoClip:
 		{
-			// no gravity for noclip
 			EnableGravity( false );
 			SetCollisionEnabled( false );
-			break;
 		}
 
 		case MoveType::Fly:
 		{
-			// no gravity for flying
 			EnableGravity( false );
 			SetCollisionEnabled( true );
-			break;
 		}
 
 		case MoveType::Walk:
-		default:
 		{
-			// add gravity
 			EnableGravity( true );
 			SetCollisionEnabled( true );
-			break;
 		}
 	}
 }
@@ -269,24 +266,33 @@ void Player::SetMoveType( MoveType type )
 
 void Player::SetCollisionEnabled( bool enable )
 {
+#if !NO_BULLET_PHYSICS
 	apPhysObj->SetCollisionEnabled( enable );
+#endif
 }
 
 
 void Player::EnableGravity( bool enabled )
 {
+#if !NO_BULLET_PHYSICS
 	apPhysObj->SetGravity( enabled ? g_pGame->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
+#endif
 }
 
 
 void Player::UpdatePosition(  )
 {
+#if !NO_BULLET_PHYSICS
 	aTransform = apPhysObj->GetWorldTransform();
+#else
+	SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+#endif
 }
 
 
 bool Player::IsOnGround(  )
 {
+#if !NO_BULLET_PHYSICS
 	btVector3 btFrom = toBt( GetPos() );
 	btVector3 btTo( GetPos().x, -10000.0, GetPos().z );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
@@ -304,6 +310,9 @@ bool Player::IsOnGround(  )
 	}
 
 	return false;
+#else
+	return true;
+#endif
 
 	/*
 	// maybe useful code
@@ -383,7 +392,11 @@ void Player::NoClipMove(  )
 {
 	BaseFlyMove(  );
 
+#if !NO_BULLET_PHYSICS
 	apPhysObj->SetLinearVelocity( aVelocity );
+#else
+	UpdatePosition(  );
+#endif
 }
 
 
@@ -391,7 +404,11 @@ void Player::FlyMove(  )
 {
 	BaseFlyMove(  );
 
+#if !NO_BULLET_PHYSICS
 	apPhysObj->SetLinearVelocity( aVelocity );
+#else
+	UpdatePosition(  );
+#endif
 }
 
 
@@ -415,11 +432,16 @@ void Player::WalkMove(  )
 	else
 	{	// not on ground, so little effect on velocity
 		Accelerate( wishspeed, wishvel, true );
+#if !NO_BULLET_PHYSICS
 		aVelocity.y = apPhysObj->GetLinearVelocity().y;
+#endif
 	}
 
-	//SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+#if !NO_BULLET_PHYSICS
 	apPhysObj->SetLinearVelocity( aVelocity );
+#else
+	UpdatePosition(  );
+#endif
 }
 
 

@@ -95,13 +95,16 @@ public:
 	glm::vec3 aOrigin;
 	glm::vec3 aVelocity;
 	glm::vec3 aMove;
+	glm::vec3 aViewOffset;
 	float maxSpeed;
 
 	float mX, mY;
 	Direction aDirection;
 	Transform aTransform;
 
+#if !NO_BULLET_PHYSICS
 	PhysicsObject* apPhysObj;
+#endif
 };
 
 

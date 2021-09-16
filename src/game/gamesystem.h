@@ -1,10 +1,14 @@
 #pragma once
 
 #include "../../chocolate/inc/shared/system.h"
+#include "../../chocolate/inc/shared/baseinput.h"
 #include "../../chocolate/inc/core/graphics.h"
 #include "../../chocolate/inc/types/renderertypes.h"
 
 #include "physics.h"
+//#include "player.h"
+
+class Player;
 
 
 class GameSystem : public BaseSystem
@@ -16,6 +20,11 @@ public:
 	~GameSystem (  );
 
 	virtual void Init(  );
+
+	virtual void LoadModules(  );
+	virtual void LoadWorld(  );
+	virtual void CreateEntities(  );
+
 	virtual void InitConsoleCommands(  );
 	virtual void Update( float frameTime );
 	virtual void SetupModels( float frameTime );
@@ -28,14 +37,15 @@ public:
 
 	BaseGuiSystem* apGui = NULL;
 	BaseGraphicsSystem* apGraphics = NULL;
+	BaseInputSystem* apInput = NULL;
 
 	std::vector< Model* > aModels;
 
-	PhysicsEnvironment* apPhysEnv;
-	//std::vector< Collider* > aColliders;
+	Player* aLocalPlayer = NULL;
 
-	glm::vec2 aMouseDelta;
-	glm::vec2 aMousePos;
+#if !NO_BULLET_PHYSICS
+	PhysicsEnvironment* apPhysEnv;
+#endif
 
 	float aFrameTime;
 

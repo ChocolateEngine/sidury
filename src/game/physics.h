@@ -1,5 +1,9 @@
 #pragma once
 
+#define NO_BULLET_PHYSICS 1
+
+#if !NO_BULLET_PHYSICS
+
 #include <glm/glm.hpp>
 //#include <glm/gtx/hash.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -73,14 +77,34 @@ enum class CollisionType
 
 struct PhysicsObjectInfo
 {
-	ModelData* modelData = nullptr;
-	glm::vec3 bounds;
-	ShapeType shapeType = ShapeType::Invalid;
-	CollisionType collisionType = CollisionType::Solid;
-	float mass = 0.f;
-	Transform transform = {};
-	bool callbacks = false;
-	bool optimizeConvex = true;
+	PhysicsObjectInfo( ShapeType shapeType )
+	{
+		this->shapeType = shapeType;
+	}
+
+	// Only used for when making a Convex or a Concave collision mesh
+	ModelData*          modelData = nullptr;
+
+	// Set a starting position/rotation/scale
+	Transform           transform = {};
+
+	// Only used if not a model
+	glm::vec3           bounds = {0, 0, 0};
+
+	// Must be set for every shape (put in a constructor maybe?)
+	ShapeType           shapeType = ShapeType::Invalid;
+
+	// May be subject to change
+	CollisionType       collisionType = CollisionType::Solid;
+
+	// A mass of 0.0 will not have localInertia calculated on creation
+	float               mass = 0.f;
+
+	// does nothing yet
+	bool                callbacks = false;
+
+	// Tell the physics engine to optimize this convex collision mesh
+	bool                optimizeConvex = true;
 };
 
 
@@ -214,3 +238,4 @@ public:
 	btDiscreteDynamicsWorld* apWorld;
 };
 
+#endif
