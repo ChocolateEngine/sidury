@@ -17,6 +17,7 @@ ConVar jump_force( "jump_force", "500" );
 ConVar sv_gravity( "sv_gravity", "800" );
 // ConVar ground_pos( "ground_pos", "-48.8" );  // 250 for source_scale
 ConVar ground_pos( "ground_pos", "250" );  // 250 for source_scale
+ConVar sensitivity("sensitivity", "0.1");
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
@@ -216,8 +217,8 @@ void Player::UpdateInputs(  )
 
 	wasJumpButtonPressed = jumped;
 
-	mX += g_pGame->apInput->GetMouseDelta().x * 0.1f;
-	mY -= g_pGame->apInput->GetMouseDelta().y * 0.1f;
+	mX += g_pGame->apInput->GetMouseDelta().x * sensitivity.GetFloat();
+	mY -= g_pGame->apInput->GetMouseDelta().y * sensitivity.GetFloat();
 
 	auto constrain = [](float num) -> float
 	{
