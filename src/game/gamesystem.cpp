@@ -215,7 +215,10 @@ void GameSystem::Update( float frameTime )
 
 	ResetInputs(  );
 
-	//CenterMouseOnScreen(  );
+	if ( apInput->WindowHasFocus() )
+	{
+		CenterMouseOnScreen(  );
+	}
 }
 
 
