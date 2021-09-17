@@ -73,6 +73,7 @@ public:
 	void WalkMove(  );
 
 	void AddFriction(  );
+	void AddGravity(  );
 	void Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
 	enum class MoveType

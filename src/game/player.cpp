@@ -14,10 +14,22 @@ ConVar accel_speed( "accel_speed", "10" );
 ConVar sv_friction( "sv_friction", "8" );  // 4.f
 ConVar jump_force( "jump_force", "500" );
 
+ConVar sv_gravity( "sv_gravity", "800" );
+// ConVar ground_pos( "ground_pos", "-48.8" );  // 250 for source_scale
+ConVar ground_pos( "ground_pos", "250" );  // 250 for source_scale
+
+// multiplies the final velocity by this amount when setting the player position,
+// a workaround for quake movement values not working correctly when lowered
+ConVar velocity_scale( "velocity_scale", "0.025" );
+
 #define PLAYER_MASS 200.f
 
 // TEMP
-#define SPAWN_POS 1085.69824, 322.443970, 644.222046
+// #define SPAWN_POS 1085.69824, 260, 644.222046
+#define SPAWN_POS 1085.69824 * velocity_scale.GetFloat(), 260 * velocity_scale.GetFloat(), 644.222046 * velocity_scale.GetFloat()
+// #define SPAWN_POS 1085.69824 * velocity_scale.GetFloat(), -46, 644.222046 * velocity_scale.GetFloat()
+// #define SPAWN_POS 10.8569824, -2.60, 6.44222046
+// #define SPAWN_POS -26.5, -45, -8.2
 
 
 CON_COMMAND( respawn )
@@ -148,7 +160,7 @@ void Player::UpdateView(  )
 	aDirection.Update( forward*yRot, up*xRot, right*yRot );
 
 	Transform transform = aTransform;
-	transform.position += aViewOffset;
+	transform.position += aViewOffset * velocity_scale.GetFloat();
 
 	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( transform ) );
 }
@@ -160,9 +172,18 @@ void Player::UpdateInputs(  )
 
 	// only way i can think of removing this is when i start to setup networking and prediction
 	const Uint8* state = SDL_GetKeyboardState( NULL );
-	const float forwardSpeed = state[SDL_SCANCODE_LSHIFT] ? forward_speed.GetFloat() * 2.0f : forward_speed.GetFloat();
-	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? side_speed.GetFloat() * 2.0f : side_speed.GetFloat();
-	maxSpeed = state[SDL_SCANCODE_LSHIFT] ? max_speed.GetFloat() * 2.0f : max_speed.GetFloat();
+
+	float moveScale = 1.0f;
+
+	if ( state[SDL_SCANCODE_LCTRL] )
+		moveScale = .3;
+
+	else if ( state[SDL_SCANCODE_LSHIFT] )
+		moveScale = 2;
+
+	const float forwardSpeed = forward_speed.GetFloat() * moveScale;
+	const float sideSpeed = side_speed.GetFloat() * moveScale;
+	maxSpeed = max_speed.GetFloat() * moveScale;
 
 	if ( state[SDL_SCANCODE_W] ) aMove.x = forwardSpeed;
 	if ( state[SDL_SCANCODE_S] ) aMove.x += -forwardSpeed;
@@ -170,21 +191,30 @@ void Player::UpdateInputs(  )
 	if ( state[SDL_SCANCODE_D] ) aMove.z += sideSpeed;
 
 	// HACK:
+	// why is this so complicated???
 	static bool wasJumpButtonPressed = false;
 	bool jump = false;
 
 	if ( state[SDL_SCANCODE_SPACE] )
 		jump = true; 
 
-	if ( jump && !wasJumpButtonPressed && IsOnGround() )
+	static bool jumped = false;
+
+	if ( jump && IsOnGround() && !jumped )
 	{
 #if !NO_BULLET_PHYSICS
 		apPhysObj->ApplyImpulse( {0, jump_force.GetFloat(), 0} );
+#else
 		aVelocity.y += jump_force.GetFloat();
 #endif
+		jumped = true;
+	}
+	else
+	{
+		jumped = false;
 	}
 
-	wasJumpButtonPressed = jump;
+	wasJumpButtonPressed = jumped;
 
 	mX += g_pGame->apInput->GetMouseDelta().x * 0.1f;
 	mY -= g_pGame->apInput->GetMouseDelta().y * 0.1f;
@@ -282,7 +312,11 @@ void Player::UpdatePosition(  )
 #if !NO_BULLET_PHYSICS
 	aTransform = apPhysObj->GetWorldTransform();
 #else
-	SetPos( GetPos() + aVelocity * g_pGame->aFrameTime );
+	SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime );
+
+	// blech
+	if ( IsOnGround() && aMoveType != MoveType::NoClip )
+		aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
 #endif
 }
 
@@ -308,7 +342,7 @@ bool Player::IsOnGround(  )
 
 	return false;
 #else
-	return true;
+	return GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
 #endif
 
 	/*
@@ -423,15 +457,16 @@ void Player::WalkMove(  )
 
 	if ( IsOnGround() )
 	{
+		// blech
+		aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+
 		AddFriction(  );
 		Accelerate( wishspeed, wishdir, false );
 	}
 	else
 	{	// not on ground, so little effect on velocity
 		Accelerate( wishspeed, wishvel, true );
-#if !NO_BULLET_PHYSICS
-		aVelocity.y = apPhysObj->GetLinearVelocity().y;
-#endif
+		AddGravity(  );
 	}
 
 #if !NO_BULLET_PHYSICS
@@ -494,4 +529,13 @@ void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 		aVelocity[i] += addspeed * wishDir[i];
 }
 
+
+void Player::AddGravity(  )
+{
+#if !NO_BULLET_PHYSICS
+	aVelocity.y = apPhysObj->GetLinearVelocity().y;
+#else
+	aVelocity.y -= sv_gravity.GetFloat() * g_pGame->aFrameTime;
+#endif
+}
 
