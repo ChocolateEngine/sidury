@@ -132,11 +132,11 @@ void GameSystem::CreateEntities(  )
 		for (int j = 0; j < 3; j++)
 		{
 			// set a random spawn position in the world
-			g_physEnts[i]->mdl->GetModelData().aPos[j] = ( float )( rand(  ) / ( float )( RAND_MAX / 10.0f ) );
+			g_physEnts[i]->mdl->GetModelData().aTransform.position[j] = ( float )( rand(  ) / ( float )( RAND_MAX / 10.0f ) );
 		}
 
 		// raise it up in the air
-		g_physEnts[i]->mdl->GetModelData().aPos.y += 500.f;
+		g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 500.f;
 
 #if !NO_BULLET_PHYSICS
 		physInfo.transform.position = g_physEnts[i]->mdl->GetModelData().aPos;

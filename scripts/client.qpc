@@ -67,12 +67,18 @@ requires
 
 files
 {
-	folder "core"
+	folder "engine"
 	{
 		"../src/core/*.cpp"
 		"../chocolate/src/shared/*.cpp"
-		"../chocolate/src/types/*.cpp"
+		//"../chocolate/src/types/*.cpp"
 		"../inc/core/*.h"
+		
+		// bruh
+		"../chocolate/src/types/transform.cpp"
+		
+		//"../chocolate/src/core/renderer/*.cpp"
+		//"../chocolate/inc/core/renderer/*.h"
 	}
 	
 	folder "game"

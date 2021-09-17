@@ -5,16 +5,16 @@
 #include <algorithm>
 
 
-// will replace with convars later when implemented
-#define FORWARD_SPEED 400.f
-#define SIDE_SPEED 400.f  // 350.f
+ConVar forward_speed( "forward_speed", "400" );
+ConVar side_speed( "side_speed", "400" );  // 350.f
 
-#define MAX_SPEED 400.f  // 320.f
-#define STOP_SPEED 100.f
-#define ACCEL_SPEED 10.f
-#define FRICTION 8.f // 4.f
+ConVar max_speed( "max_speed", "400" );  // 320.f
+ConVar stop_speed( "stop_speed", "100" );
+ConVar accel_speed( "accel_speed", "10" );
+ConVar sv_friction( "sv_friction", "8" );  // 4.f
+ConVar jump_force( "jump_force", "500" );
+
 #define PLAYER_MASS 200.f
-#define JUMP_FORCE 500.f
 
 // TEMP
 #define SPAWN_POS 1085.69824, 322.443970, 644.222046
@@ -160,9 +160,9 @@ void Player::UpdateInputs(  )
 
 	// only way i can think of removing this is when i start to setup networking and prediction
 	const Uint8* state = SDL_GetKeyboardState( NULL );
-	const float forwardSpeed = state[SDL_SCANCODE_LSHIFT] ? FORWARD_SPEED * 2.0f : FORWARD_SPEED;
-	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? SIDE_SPEED * 2.0f : SIDE_SPEED;
-	maxSpeed = state[SDL_SCANCODE_LSHIFT] ? MAX_SPEED * 2.0f : MAX_SPEED;
+	const float forwardSpeed = state[SDL_SCANCODE_LSHIFT] ? forward_speed.GetFloat() * 2.0f : forward_speed.GetFloat();
+	const float sideSpeed = state[SDL_SCANCODE_LSHIFT] ? side_speed.GetFloat() * 2.0f : side_speed.GetFloat();
+	maxSpeed = state[SDL_SCANCODE_LSHIFT] ? max_speed.GetFloat() * 2.0f : max_speed.GetFloat();
 
 	if ( state[SDL_SCANCODE_W] ) aMove.x = forwardSpeed;
 	if ( state[SDL_SCANCODE_S] ) aMove.x += -forwardSpeed;
@@ -179,15 +179,12 @@ void Player::UpdateInputs(  )
 	if ( jump && !wasJumpButtonPressed && IsOnGround() )
 	{
 #if !NO_BULLET_PHYSICS
-		apPhysObj->ApplyImpulse( {0, JUMP_FORCE, 0} );
+		apPhysObj->ApplyImpulse( {0, jump_force.GetFloat(), 0} );
+		aVelocity.y += jump_force.GetFloat();
 #endif
-		aVelocity.y += JUMP_FORCE;
 	}
 
 	wasJumpButtonPressed = jump;
-
-	//if ( state[SDL_SCANCODE_SPACE] ) aMove.y = FORWARD_SPEED;
-	// if ( state[SDL_SCANCODE_LCTRL] ) aMove.y -= FORWARD_SPEED;
 
 	mX += g_pGame->apInput->GetMouseDelta().x * 0.1f;
 	mY -= g_pGame->apInput->GetMouseDelta().y * 0.1f;
@@ -468,12 +465,12 @@ void Player::AddFriction()
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
 
 	//if (trace.fraction == 1.0)
-	//	friction = FRICTION*sv_edgefriction.value;
+	//	friction = sv_friction.GetFloat() * sv_edgefriction.value;
 	//else
-		friction = FRICTION;
+		friction = sv_friction.GetFloat();
 
 	// apply friction
-	float control = speed < STOP_SPEED ? STOP_SPEED : speed;
+	float control = speed < stop_speed.GetFloat() ? stop_speed.GetFloat() : speed;
 	float newspeed = glm::max( 0.f, speed - g_pGame->aFrameTime * control * friction );
 
 	newspeed /= speed;
@@ -491,7 +488,7 @@ void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 	if ( addspeed <= 0.f )
 		return;
 
-	addspeed = glm::min( addspeed, ACCEL_SPEED * g_pGame->aFrameTime * wishSpeed );
+	addspeed = glm::min( addspeed, accel_speed.GetFloat() * g_pGame->aFrameTime * wishSpeed );
 
 	for ( int i = 0; i < 3; i++ )
 		aVelocity[i] += addspeed * wishDir[i];
