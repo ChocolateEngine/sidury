@@ -243,10 +243,6 @@ void GameSystem::CheckPaused(  )
 	}
 }
 
-ConVar river_x("river_x", "0");
-ConVar river_y("river_y", "8.15");
-ConVar river_z("river_z", "0");
-
 ConVar proto_x("proto_x", "550");
 ConVar proto_y("proto_y", "240");
 ConVar proto_z("proto_z", "-360");
