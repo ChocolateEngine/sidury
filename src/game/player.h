@@ -59,12 +59,19 @@ public:
 	void SetPos( const glm::vec3& origin );
 	const glm::vec3& GetPos(  );
 
+	void SetPosVel( const glm::vec3& origin );
+
+	// returns velocity multiplied by frametime
+	const glm::vec3& GetFrameTimeVelocity(  );
+
 	// ==================================
 	// movement
 	// ==================================
 	void DetermineMoveType(  );
 	void UpdatePosition(  );
+
 	bool IsOnGround(  );
+	void DoRayCollision(  );
 
 	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
 	void BaseFlyMove(  );

@@ -15,13 +15,16 @@ ConVar sv_friction( "sv_friction", "8" );  // 4.f
 ConVar jump_force( "jump_force", "500" );
 
 ConVar sv_gravity( "sv_gravity", "800" );
-// ConVar ground_pos( "ground_pos", "-48.8" );  // 250 for source_scale
-ConVar ground_pos( "ground_pos", "250" );  // 250 for source_scale
+ConVar ground_pos( "ground_pos", "250" );
 ConVar sensitivity("sensitivity", "0.1");
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
+#if NO_BULLET_PHYSICS
 ConVar velocity_scale( "velocity_scale", "0.025" );
+#else
+ConVar velocity_scale( "velocity_scale", "1.0" );
+#endif
 
 #define PLAYER_MASS 200.f
 
@@ -37,6 +40,14 @@ CON_COMMAND( respawn )
 {
 	g_pGame->aLocalPlayer->Respawn();
 }
+
+
+#define GET_KEY( key ) g_pGame->apInput->GetKeyState(key)
+
+#define IS_KEY_PRESSED( key ) g_pGame->apInput->IsKeyPressed(key)
+#define IS_KEY_RELEASED( key ) !g_pGame->apInput->IsKeyPressed(key)
+#define IS_KEY_JUST_PRESSED( key ) g_pGame->apInput->IsKeyJustPressed(key)
+#define IS_KEY_JUST_RELEASED( key ) g_pGame->apInput->IsKeyJustReleased(key)
 
 
 Player::Player():
@@ -78,7 +89,8 @@ void Player::Spawn()
 
 	apPhysObj = g_pGame->apPhysEnv->CreatePhysicsObject( physInfo );
 	apPhysObj->SetAlwaysActive( true );
-	//apPhysObj->SetWorldTransform( aTransform );
+	apPhysObj->SetContinuousCollisionEnabled( true );
+	apPhysObj->SetWorldTransform( aTransform );
 
 	// enable Continuous Collision Detection
 	//apPhysObj->aRigidBody.setCcdMotionThreshold( 1e-7 );
@@ -137,6 +149,16 @@ const glm::vec3& Player::GetPos(  )
 	return aTransform.position;
 }
 
+void Player::SetPosVel( const glm::vec3& origin )
+{
+	aTransform.position = GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime;
+}
+
+const glm::vec3& Player::GetFrameTimeVelocity(  )
+{
+	return aVelocity * g_pGame->aFrameTime;
+}
+
 /*void Player::SetAng( const glm::vec3& angle )
 {
 	aTransform.position = origin;
@@ -171,33 +193,27 @@ void Player::UpdateInputs(  )
 {
 	aMove = {0, 0, 0};
 
-	// only way i can think of removing this is when i start to setup networking and prediction
-	const Uint8* state = SDL_GetKeyboardState( NULL );
-
 	float moveScale = 1.0f;
 
-	if ( state[SDL_SCANCODE_LCTRL] )
+	if ( IS_KEY_PRESSED(SDL_SCANCODE_LCTRL) )
 		moveScale = .3;
 
-	else if ( state[SDL_SCANCODE_LSHIFT] )
+	else if ( IS_KEY_PRESSED(SDL_SCANCODE_LSHIFT) )
 		moveScale = 2;
 
 	const float forwardSpeed = forward_speed.GetFloat() * moveScale;
 	const float sideSpeed = side_speed.GetFloat() * moveScale;
 	maxSpeed = max_speed.GetFloat() * moveScale;
 
-	if ( state[SDL_SCANCODE_W] ) aMove.x = forwardSpeed;
-	if ( state[SDL_SCANCODE_S] ) aMove.x += -forwardSpeed;
-	if ( state[SDL_SCANCODE_A] ) aMove.z = -sideSpeed;
-	if ( state[SDL_SCANCODE_D] ) aMove.z += sideSpeed;
+	if ( IS_KEY_PRESSED(SDL_SCANCODE_W) ) aMove.x = forwardSpeed;
+	if ( IS_KEY_PRESSED(SDL_SCANCODE_S) ) aMove.x += -forwardSpeed;
+	if ( IS_KEY_PRESSED(SDL_SCANCODE_A) ) aMove.z = -sideSpeed;
+	if ( IS_KEY_PRESSED(SDL_SCANCODE_D) ) aMove.z += sideSpeed;
 
 	// HACK:
 	// why is this so complicated???
 	static bool wasJumpButtonPressed = false;
-	bool jump = false;
-
-	if ( state[SDL_SCANCODE_SPACE] )
-		jump = true; 
+	bool jump = IS_KEY_PRESSED(SDL_SCANCODE_SPACE);
 
 	static bool jumped = false;
 
@@ -205,9 +221,8 @@ void Player::UpdateInputs(  )
 	{
 #if !NO_BULLET_PHYSICS
 		apPhysObj->ApplyImpulse( {0, jump_force.GetFloat(), 0} );
-#else
-		aVelocity.y += jump_force.GetFloat();
 #endif
+		aVelocity.y += jump_force.GetFloat();
 		jumped = true;
 	}
 	else
@@ -247,21 +262,11 @@ float VectorNormalize(glm::vec3& v)
 
 void Player::DetermineMoveType(  )
 {
-	// will setup properly later, not sure if it will stay in here though
-	// right now have a lazy way to toggle noclip
-	static bool wasNoClipButtonPressed = false;
-	bool toggleNoClip = false;
-
-	const Uint8* state = SDL_GetKeyboardState( NULL );
-	if ( state[SDL_SCANCODE_V] )
-		toggleNoClip = true; 
-
-	if ( toggleNoClip && !wasNoClipButtonPressed )
-	{
+	if ( IS_KEY_JUST_PRESSED(SDL_SCANCODE_V) )
 		SetMoveType( aMoveType == MoveType::NoClip ? MoveType::Walk : MoveType::NoClip );
-	}
 
-	wasNoClipButtonPressed = toggleNoClip;
+	if ( IS_KEY_JUST_PRESSED(SDL_SCANCODE_B) )
+		SetMoveType( aMoveType == MoveType::Fly ? MoveType::Walk : MoveType::Fly );
 }
 
 
@@ -275,18 +280,21 @@ void Player::SetMoveType( MoveType type )
 		{
 			EnableGravity( false );
 			SetCollisionEnabled( false );
+			break;
 		}
 
 		case MoveType::Fly:
 		{
 			EnableGravity( false );
 			SetCollisionEnabled( true );
+			break;
 		}
 
 		case MoveType::Walk:
 		{
 			EnableGravity( true );
 			SetCollisionEnabled( true );
+			break;
 		}
 	}
 }
@@ -311,13 +319,48 @@ void Player::EnableGravity( bool enabled )
 void Player::UpdatePosition(  )
 {
 #if !NO_BULLET_PHYSICS
-	aTransform = apPhysObj->GetWorldTransform();
+	//if ( aMoveType == MoveType::Fly )
+		aTransform = apPhysObj->GetWorldTransform();
 #else
 	SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime );
 
 	// blech
-	if ( IsOnGround() && aMoveType != MoveType::NoClip )
-		aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+	//if ( IsOnGround() && aMoveType != MoveType::NoClip )
+	//	aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+#endif
+}
+
+
+// temporarily using bullet directly until i abstract this
+void Player::DoRayCollision(  )
+{
+#if !NO_BULLET_PHYSICS
+	// temp to avoid a crash intantly?
+	if ( aVelocity.x == 0.f && aVelocity.y == 0.f && aVelocity.z == 0.f )
+		return;
+
+	btVector3 btFrom = toBt( GetPos() );
+	btVector3 btTo = toBt( GetPos() * GetFrameTimeVelocity() );
+	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
+
+	g_pGame->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+
+	if ( res.hasHit() )
+	{
+		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
+		if ( dist < 300.f )  // 500.f, 3000.f
+		{
+			return;
+		}
+	}
+	else
+	{
+		//UpdatePosition(  );
+	}
+
+	// SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime );
+	// SetPos( fromBt( res.m_hitPointWorld ) );
+
 #endif
 }
 
@@ -441,6 +484,8 @@ void Player::FlyMove(  )
 #else
 	UpdatePosition(  );
 #endif
+
+	DoRayCollision(  );
 }
 
 
@@ -459,7 +504,9 @@ void Player::WalkMove(  )
 	if ( IsOnGround() )
 	{
 		// blech
+#if NO_BULLET_PHYSICS
 		aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+#endif
 
 		AddFriction(  );
 		Accelerate( wishspeed, wishdir, false );
@@ -475,6 +522,8 @@ void Player::WalkMove(  )
 #else
 	UpdatePosition(  );
 #endif
+
+	DoRayCollision(  );
 }
 
 

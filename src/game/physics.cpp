@@ -51,8 +51,14 @@ Transform& PhysicsObject::GetWorldTransform(  )
 void PhysicsObject::SetWorldTransform( const Transform& transform )
 {
 	aTransform = transform;
+	
+	apRigidBody->getWorldTransform().setOrigin( toBt(aTransform.position) );
 
-	apRigidBody->setWorldTransform( toBt(aTransform) );
+	apRigidBody->getMotionState()->setWorldTransform( toBt(aTransform) );
+
+	apRigidBody->setLinearVelocity( btVector3(0, 0, 0) );
+	apRigidBody->setAngularVelocity( btVector3(0, 0, 0) );
+	apRigidBody->clearForces(  );
 }
 
 
@@ -77,6 +83,20 @@ void PhysicsObject::SetCollisionEnabled( bool enable )
 		apRigidBody->setCollisionFlags( apRigidBody->getCollisionFlags() & ~btCollisionObject::CF_NO_CONTACT_RESPONSE );
 	else
 		apRigidBody->setCollisionFlags( apRigidBody->getCollisionFlags() | btCollisionObject::CF_NO_CONTACT_RESPONSE );
+}
+
+
+void PhysicsObject::SetContinuousCollisionEnabled( bool enable )
+{
+	if ( enable )
+	{
+		apRigidBody->setCcdMotionThreshold( 1e-7 );
+		apRigidBody->setCcdSweptSphereRadius( 0.5f );
+	}
+	else
+	{
+		// idk how to turn it off lmao
+	}
 }
 
 
@@ -124,7 +144,8 @@ void PhysicsObject::ApplyForce( const glm::vec3& force )
 
 void PhysicsObject::ApplyImpulse( const glm::vec3& impulse )
 {
-	apRigidBody->applyCentralImpulse( toBt(impulse) );
+	// apRigidBody->applyCentralImpulse( toBt(impulse) );
+	apRigidBody->setLinearVelocity( apRigidBody->getLinearVelocity() + toBt(impulse) );
 }
 
 
@@ -257,7 +278,7 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 
 void PhysicsEnvironment::Simulate(  )
 {
-	apWorld->stepSimulation( g_pGame->aFrameTime );
+	apWorld->stepSimulation( g_pGame->aFrameTime, 100, 1 / 240.0 );
 }
 
 
@@ -306,6 +327,11 @@ PhysicsObject* PhysicsEnvironment::CreatePhysicsObject( PhysicsObjectInfo& physI
 
 	aCollisionShapes.push_back( phys->apCollisionShape );
 	aPhysObjs.push_back( phys );
+
+	if ( physInfo.shapeType == ShapeType::Concave )
+	{
+		phys->apRigidBody->setFriction( btScalar(0.9) );
+	}
 
 	phys->apCollisionShape->setUserPointer( phys );
 	phys->apRigidBody->setUserPointer( phys );
@@ -384,9 +410,6 @@ void PhysicsEnvironment::DeleteRigidBody( btRigidBody* body )
 }
 
 
-#define MESH_SCALE 1.f
-
-
 btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo& physInfo )
 {
 	if ( physInfo.modelData == nullptr )
@@ -396,16 +419,16 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 
 	btTransform transform;
 	transform.setIdentity();
-	transform.setOrigin( toBt(model.aPos) );
+	transform.setOrigin( toBt(model.aTransform.position) );
 
 	btAlignedObjectArray<btVector3> convertedVerts;
 	convertedVerts.reserve( model.aVertexCount );
 	for (int i = 0; i < model.aVertexCount; i++)
 	{
 		convertedVerts.push_back(btVector3(
-			model.apVertices[i].pos[0] * MESH_SCALE,
-			model.apVertices[i].pos[1] * MESH_SCALE,
-			model.apVertices[i].pos[2] * MESH_SCALE));
+			model.apVertices[i].pos[0] * model.aTransform.scale.x,
+			model.apVertices[i].pos[1] * model.aTransform.scale.y,
+			model.apVertices[i].pos[2] * model.aTransform.scale.z));
 	}
 
 	btTriangleMesh* meshInterface = new btTriangleMesh();

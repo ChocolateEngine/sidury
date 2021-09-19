@@ -91,6 +91,7 @@ void GameSystem::Init(  )
 	BaseClass::Init(  );
 
 	LoadModules(  );
+	RegisterKeys(  );
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 
@@ -99,6 +100,22 @@ void GameSystem::Init(  )
 	// create a player
 	aLocalPlayer = new Player;
 	aLocalPlayer->Spawn();
+}
+
+
+void GameSystem::RegisterKeys(  )
+{
+	apInput->RegisterKey( SDL_SCANCODE_W );
+	apInput->RegisterKey( SDL_SCANCODE_S );
+	apInput->RegisterKey( SDL_SCANCODE_A );
+	apInput->RegisterKey( SDL_SCANCODE_D );
+
+	apInput->RegisterKey( SDL_SCANCODE_LCTRL );
+	apInput->RegisterKey( SDL_SCANCODE_LSHIFT );
+	apInput->RegisterKey( SDL_SCANCODE_SPACE );
+	
+	apInput->RegisterKey( SDL_SCANCODE_V ); // noclip
+	apInput->RegisterKey( SDL_SCANCODE_B ); // flight
 }
 
 
@@ -126,14 +143,15 @@ void GameSystem::LoadWorld(  )
 	aModels.push_back( g_riverhouse->mdl );
 
 #if !NO_BULLET_PHYSICS
-	//PhysicsObjectInfo physInfo( ShapeType::Concave );
-	//physInfo.modelData = &g_riverhouse->mdl->GetModelData();
+	PhysicsObjectInfo physInfo( ShapeType::Concave );
+	physInfo.modelData = &g_riverhouse->mdl->GetModelData();
 
 	// just have the ground be a box for now since collision on the riverhouse mesh is too jank still
-	PhysicsObjectInfo physInfo( ShapeType::Box );
-	physInfo.bounds = {1500, 200, 1500};
+	//PhysicsObjectInfo physInfo( ShapeType::Box );
+	//physInfo.bounds = {1500, 200, 1500};
 
 	g_riverhouse->physObj = apPhysEnv->CreatePhysicsObject( physInfo );
+	g_riverhouse->physObj->SetContinuousCollisionEnabled( true );
 #endif
 
 	CreateEntities(  );
@@ -169,7 +187,7 @@ void GameSystem::CreateEntities(  )
 		g_physEnts[i]->mdl->GetModelData().aTransform.position.x = 5.f;
 
 #if !NO_BULLET_PHYSICS
-		physInfo.transform.position = g_physEnts[i]->mdl->GetModelData().aPos;
+		physInfo.transform.position = g_physEnts[i]->mdl->GetModelData().aTransform.position;
 
 		//physInfo.modelData = &g_riverhouse->mdl->GetModelData();
 

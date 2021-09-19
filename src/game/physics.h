@@ -122,6 +122,7 @@ struct PhysicsObject: public btMotionState
 	void                  Activate( bool active );
 	void                  SetAlwaysActive( bool alwaysActive );
 	void                  SetCollisionEnabled( bool enable );
+	void                  SetContinuousCollisionEnabled( bool enable );
 
 	void                  SetLinearVelocity( const glm::vec3& velocity );
 	void                  SetAngularVelocity( const glm::vec3& velocity );
@@ -150,7 +151,8 @@ protected:
 	void getWorldTransform(btTransform& worldTransform) const final;
 	void setWorldTransform(const btTransform& worldTransform) final;
 
-private:
+public:
+// private:
 	btCollisionShape* apCollisionShape = nullptr;
 	//btRigidBody&      aRigidBody;
 	btRigidBody*       apRigidBody = nullptr;

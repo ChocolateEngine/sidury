@@ -23,6 +23,7 @@ public:
 
 	virtual void LoadModules(  );
 	virtual void LoadWorld(  );
+	virtual void RegisterKeys(  );
 	virtual void CreateEntities(  );
 
 	virtual void InitConsoleCommands(  );
