@@ -1,6 +1,8 @@
 macro PROJECT_NAME "Sidury"
 macro OUT_NAME "sidury"
 
+macro LAUNCHER 1
+
 include "../chocolate/scripts/core.qpc"
 
 macro BASE_DEBUG_ARGS ""

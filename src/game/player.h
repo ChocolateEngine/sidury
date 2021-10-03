@@ -43,6 +43,46 @@ struct Direction
 };
 
 
+enum class StepType
+{
+	Dirt,
+};
+
+
+enum class StepSpeed
+{
+	Sneak,
+	Walk,
+	Run,
+};
+
+
+class Player;
+
+
+#define VIEW_LERP_CLASS 0
+
+#if VIEW_LERP_CLASS
+class ViewLerp
+{
+public:
+	ViewLerp( Player* player );
+	~ViewLerp(  );
+
+	glm::vec3 LerpView(  );
+
+	Player* apPlayer;
+
+	bool inLerp = false;
+	float prevViewHeight = 0.f;
+
+	glm::vec3 lerpGoal = {};
+	glm::vec3 lerpOut = {};
+	glm::vec3 lerpPrev = {};
+};
+#endif
+
+
 class Player
 {
 public:
@@ -55,6 +95,9 @@ public:
 
 	void UpdateInputs(  );
 	void UpdateView(  );
+	glm::vec3 LerpView( const glm::vec3& newView );
+	float GetViewHeight(  );
+	float GetViewHeightLerp(  );
 
 	void SetPos( const glm::vec3& origin );
 	const glm::vec3& GetPos(  );
@@ -62,7 +105,7 @@ public:
 	void SetPosVel( const glm::vec3& origin );
 
 	// returns velocity multiplied by frametime
-	const glm::vec3& GetFrameTimeVelocity(  );
+	glm::vec3 GetFrameTimeVelocity(  );
 
 	// ==================================
 	// movement
@@ -70,7 +113,10 @@ public:
 	void DetermineMoveType(  );
 	void UpdatePosition(  );
 
+	void PlayStepSound(  );
+
 	bool IsOnGround(  );
+	bool WasOnGround(  );
 	void DoRayCollision(  );
 
 	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
@@ -102,13 +148,21 @@ public:
 
 	glm::vec3 aOrigin;
 	glm::vec3 aVelocity;
+	glm::vec3 aPrevVelocity;
 	glm::vec3 aMove;
 	glm::vec3 aViewOffset;
-	float maxSpeed;
+	glm::vec3 aPrevViewOffset;
+	float aMaxSpeed;
+
+	bool aOnGround = false;
+	bool aWasOnGround = false;
 
 	float mX, mY;
 	Direction aDirection;
 	Transform aTransform;
+	
+	double aLastStepTime = 0.f;
+	AudioStream* apStepSound = nullptr; // uh
 
 #if !NO_BULLET_PHYSICS
 	PhysicsObject* apPhysObj;

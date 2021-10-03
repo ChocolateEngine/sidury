@@ -202,8 +202,8 @@ inline void contactCallback(btPersistentManifold* const& manifold)
 void TickCallback( btDynamicsWorld* world, btScalar timeStep )
 {
 	// process manifolds
-	for ( uint32_t i = 0; i < g_pGame->apPhysEnv->apWorld->getDispatcher()->getNumManifolds(); i++ ) {
-		const auto manifold = g_pGame->apPhysEnv->apWorld->getDispatcher()->getManifoldByIndexInternal(i);
+	for ( uint32_t i = 0; i < game->apPhysEnv->apWorld->getDispatcher()->getNumManifolds(); i++ ) {
+		const auto manifold = game->apPhysEnv->apWorld->getDispatcher()->getManifoldByIndexInternal(i);
 
 		PhysicsObject* firstCollider = (PhysicsObject*)manifold->getBody0()->getUserPointer();
 		PhysicsObject* secondCollider = (PhysicsObject*)manifold->getBody1()->getUserPointer();
@@ -278,7 +278,7 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 
 void PhysicsEnvironment::Simulate(  )
 {
-	apWorld->stepSimulation( g_pGame->aFrameTime, 100, 1 / 240.0 );
+	apWorld->stepSimulation( game->aFrameTime, 100, 1 / 240.0 );
 }
 
 

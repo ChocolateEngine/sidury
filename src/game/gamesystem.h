@@ -2,6 +2,7 @@
 
 #include "../../chocolate/inc/shared/system.h"
 #include "../../chocolate/inc/shared/baseinput.h"
+#include "../../chocolate/inc/shared/baseaudio.h"
 #include "../../chocolate/inc/core/graphics.h"
 #include "../../chocolate/inc/types/renderertypes.h"
 
@@ -31,6 +32,7 @@ public:
 	virtual void SetupModels( float frameTime );
 	virtual void CheckPaused(  );
 	virtual void ResetInputs(  );
+	virtual void UpdateAudio(  );
 
 	void SetViewMatrix( const glm::mat4& viewMatrix );
 
@@ -39,6 +41,7 @@ public:
 	BaseGuiSystem* apGui = NULL;
 	BaseGraphicsSystem* apGraphics = NULL;
 	BaseInputSystem* apInput = NULL;
+	BaseAudioSystem* apAudio = NULL;
 
 	std::vector< Model* > aModels;
 
@@ -48,7 +51,8 @@ public:
 	PhysicsEnvironment* apPhysEnv;
 #endif
 
-	float aFrameTime;
+	float aFrameTime = 0.f;
+	double aCurTime = 0.f;  // really should be size_t, but then that would be a little weird with using it
 
 	View aView;
 
@@ -57,5 +61,5 @@ public:
 };
 
 
-extern GameSystem* g_pGame;
+extern GameSystem* game;
 

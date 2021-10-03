@@ -1,59 +1,104 @@
 #include "player.h"
+#include "../../chocolate/inc/shared/util.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 #include <algorithm>
 
 
-ConVar forward_speed( "forward_speed", "400" );
-ConVar side_speed( "side_speed", "400" );  // 350.f
+ConVar in_forward( "in_forward", 0 );
+ConVar in_side( "in_side", 0 );
+ConVar in_duck( "in_duck", 0 );
+ConVar in_sprint( "in_sprint", 0 );
 
-ConVar max_speed( "max_speed", "400" );  // 320.f
-ConVar stop_speed( "stop_speed", "100" );
-ConVar accel_speed( "accel_speed", "10" );
-ConVar sv_friction( "sv_friction", "8" );  // 4.f
-ConVar jump_force( "jump_force", "500" );
+extern ConVar sv_timescale;
 
-ConVar sv_gravity( "sv_gravity", "800" );
-ConVar ground_pos( "ground_pos", "250" );
-ConVar sensitivity("sensitivity", "0.1");
+ConVar forward_speed( "sv_forward_speed", 400 );
+ConVar side_speed( "sv_side_speed", 400 );  // 350.f
+
+ConVar max_speed( "sv_max_speed", 400 );  // 320.f
+ConVar stop_speed( "sv_stop_speed", 100 );
+ConVar accel_speed( "sv_accel_speed", 10 );
+ConVar sv_friction( "sv_friction", 8 );  // 4.f
+ConVar jump_force( "sv_jump_force", 500 );
+
+ConVar sv_new_movement( "sv_new_movement", 1 );
+
+// lerp the friction maybe?
+ConVar sv_friction_new( "sv_friction_new", 8 );  // 4.f
+
+ConVar sv_gravity( "sv_gravity", 1200 );
+ConVar ground_pos( "ground_pos", 250 );
+ConVar sensitivity("in_sensitivity", 0.1 );
+
+ConVar cl_view_height( "cl_view_height", 56 );
+ConVar cl_view_height_duck( "cl_view_height_duck", 24 );
+ConVar cl_view_height_lerp( "cl_view_height_lerp", 0.015 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
 #if NO_BULLET_PHYSICS
-ConVar velocity_scale( "velocity_scale", "0.025" );
+ConVar velocity_scale( "velocity_scale", 0.025 );
 #else
-ConVar velocity_scale( "velocity_scale", "1.0" );
+ConVar velocity_scale( "velocity_scale", 1.0 );
 #endif
 
 #define PLAYER_MASS 200.f
 
 // TEMP
 // #define SPAWN_POS 1085.69824, 260, 644.222046
-#define SPAWN_POS 1085.69824 * velocity_scale.GetFloat(), 260 * velocity_scale.GetFloat(), 644.222046 * velocity_scale.GetFloat()
-// #define SPAWN_POS 1085.69824 * velocity_scale.GetFloat(), -46, 644.222046 * velocity_scale.GetFloat()
+#define SPAWN_POS 1085.69824 * velocity_scale, 260 * velocity_scale, 644.222046 * velocity_scale
+// #define SPAWN_POS 1085.69824 * velocity_scale, -46, 644.222046 * velocity_scale
 // #define SPAWN_POS 10.8569824, -2.60, 6.44222046
 // #define SPAWN_POS -26.5, -45, -8.2
 
 
 CON_COMMAND( respawn )
 {
-	g_pGame->aLocalPlayer->Respawn();
+	game->aLocalPlayer->Respawn();
 }
 
 
-#define GET_KEY( key ) g_pGame->apInput->GetKeyState(key)
+#define GET_KEY( key ) game->apInput->GetKeyState(key)
 
-#define IS_KEY_PRESSED( key ) g_pGame->apInput->IsKeyPressed(key)
-#define IS_KEY_RELEASED( key ) !g_pGame->apInput->IsKeyPressed(key)
-#define IS_KEY_JUST_PRESSED( key ) g_pGame->apInput->IsKeyJustPressed(key)
-#define IS_KEY_JUST_RELEASED( key ) g_pGame->apInput->IsKeyJustReleased(key)
+#define KEY_PRESSED( key ) game->apInput->KeyPressed(key)
+#define KEY_RELEASED( key ) game->apInput->KeyReleased(key)
+#define KEY_JUST_PRESSED( key ) game->apInput->KeyJustPressed(key)
+#define KEY_JUST_RELEASED( key ) game->apInput->KeyJustReleased(key)
+
+
+float VectorNormalize(glm::vec3& v);
+
+
+// ============================================================
+
+#if VIEW_LERP_CLASS
+
+ViewLerp::ViewLerp( Player* player )
+{
+	apPlayer = player;
+}
+
+ViewLerp::~ViewLerp()
+{
+}
+
+
+glm::vec3 ViewLerp::LerpView()
+{
+
+}
+
+#endif
+
+// ============================================================
 
 
 Player::Player():
 	mX(0), mY(0),
 	aFlags(0),
-	maxSpeed(0),
+	aMaxSpeed(0),
 	aMove(0, 0, 0),
 	aVelocity(0, 0, 0),
 	aMoveType(MoveType::Walk),
@@ -87,7 +132,7 @@ void Player::Spawn()
 	//physInfo.collisionType = CollisionType::Kinematic;
 	physInfo.bounds = {16, 72, 16};
 
-	apPhysObj = g_pGame->apPhysEnv->CreatePhysicsObject( physInfo );
+	apPhysObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
 	apPhysObj->SetAlwaysActive( true );
 	apPhysObj->SetContinuousCollisionEnabled( true );
 	apPhysObj->SetWorldTransform( aTransform );
@@ -99,8 +144,8 @@ void Player::Spawn()
 
 	SetMoveType( MoveType::Walk );
 
-	// won't change for now
-	aViewOffset = {0, 56, 0};
+	aViewOffset = {0, cl_view_height, 0};
+	aPrevViewOffset = aViewOffset;
 }
 
 
@@ -134,8 +179,6 @@ void Player::Update( float dt )
 		case MoveType::Fly:     FlyMove();      break;
 		case MoveType::NoClip:  NoClipMove();   break;
 	}
-
-	UpdateView();
 }
 
 
@@ -151,12 +194,12 @@ const glm::vec3& Player::GetPos(  )
 
 void Player::SetPosVel( const glm::vec3& origin )
 {
-	aTransform.position = GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime;
+	aTransform.position = GetPos() + (aVelocity * velocity_scale.GetFloat()) * game->aFrameTime;
 }
 
-const glm::vec3& Player::GetFrameTimeVelocity(  )
+glm::vec3 Player::GetFrameTimeVelocity(  )
 {
-	return aVelocity * g_pGame->aFrameTime;
+	return aVelocity * game->aFrameTime;
 }
 
 /*void Player::SetAng( const glm::vec3& angle )
@@ -185,8 +228,12 @@ void Player::UpdateView(  )
 	Transform transform = aTransform;
 	transform.position += aViewOffset * velocity_scale.GetFloat();
 
-	g_pGame->SetViewMatrix( ToFirstPersonCameraTransformation( transform ) );
+	game->SetViewMatrix( ToFirstPersonCameraTransformation( transform ) );
 }
+
+
+// asd0ojiodw
+glm::vec3 g_targetViewHeight = {};
 
 
 void Player::UpdateInputs(  )
@@ -195,34 +242,34 @@ void Player::UpdateInputs(  )
 
 	float moveScale = 1.0f;
 
-	if ( IS_KEY_PRESSED(SDL_SCANCODE_LCTRL) )
+	if ( KEY_PRESSED(SDL_SCANCODE_LCTRL) || in_duck )
 		moveScale = .3;
 
-	else if ( IS_KEY_PRESSED(SDL_SCANCODE_LSHIFT) )
+	else if ( KEY_PRESSED(SDL_SCANCODE_LSHIFT) )
 		moveScale = 2;
 
-	const float forwardSpeed = forward_speed.GetFloat() * moveScale;
-	const float sideSpeed = side_speed.GetFloat() * moveScale;
-	maxSpeed = max_speed.GetFloat() * moveScale;
+	const float forwardSpeed = forward_speed * moveScale;
+	const float sideSpeed = side_speed * moveScale;
+	aMaxSpeed = max_speed * moveScale;
 
-	if ( IS_KEY_PRESSED(SDL_SCANCODE_W) ) aMove.x = forwardSpeed;
-	if ( IS_KEY_PRESSED(SDL_SCANCODE_S) ) aMove.x += -forwardSpeed;
-	if ( IS_KEY_PRESSED(SDL_SCANCODE_A) ) aMove.z = -sideSpeed;
-	if ( IS_KEY_PRESSED(SDL_SCANCODE_D) ) aMove.z += sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() ) aMove.x = forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_S) ) aMove.x += -forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_A) ) aMove.z = -sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_D) ) aMove.z += sideSpeed;
 
 	// HACK:
 	// why is this so complicated???
 	static bool wasJumpButtonPressed = false;
-	bool jump = IS_KEY_PRESSED(SDL_SCANCODE_SPACE);
+	bool jump = KEY_PRESSED(SDL_SCANCODE_SPACE);
 
 	static bool jumped = false;
 
 	if ( jump && IsOnGround() && !jumped )
 	{
 #if !NO_BULLET_PHYSICS
-		apPhysObj->ApplyImpulse( {0, jump_force.GetFloat(), 0} );
+		apPhysObj->ApplyImpulse( {0, jump_force, 0} );
 #endif
-		aVelocity.y += jump_force.GetFloat();
+		aVelocity.y += jump_force;
 		jumped = true;
 	}
 	else
@@ -232,8 +279,8 @@ void Player::UpdateInputs(  )
 
 	wasJumpButtonPressed = jumped;
 
-	mX += g_pGame->apInput->GetMouseDelta().x * sensitivity.GetFloat();
-	mY -= g_pGame->apInput->GetMouseDelta().y * sensitivity.GetFloat();
+	mX += sensitivity * game->apInput->GetMouseDelta().x;
+	mY -= sensitivity * game->apInput->GetMouseDelta().y;
 
 	auto constrain = [](float num) -> float
 	{
@@ -243,6 +290,71 @@ void Player::UpdateInputs(  )
 
 	mX = constrain(mX);
 	mY = std::clamp(mY, -90.0f, 90.0f);
+
+
+	// uh, idk where to put this lol
+
+	float viewNorm = cl_view_height;
+
+	// TODO: make a view offset lerp handler class or some shit, idk
+	// that way we don't duplicate code, and have it work for multiplayer
+
+	static float targetViewHeight = GetViewHeight();
+	static glm::vec3 prevViewHeight = {0, GetViewHeight(), 0};
+
+	static glm::vec3 duckLerpGoal = prevViewHeight;
+	static glm::vec3 duckLerp = prevViewHeight;
+	static glm::vec3 prevDuckLerp = prevViewHeight;
+
+	// NOTE: this doesn't work properly when jumping mid duck and landing
+	// try and get this to round up a little faster while lerping to the target pos at the same speed?
+	if ( IsOnGround() && aMoveType == MoveType::Walk )
+	{
+		if ( targetViewHeight != GetViewHeight() )
+		{
+			prevDuckLerp = duckLerp;
+			duckLerp = {0, GetViewHeight(), 0};
+			duckLerpGoal = {0, GetViewHeight(), 0};
+		}
+
+		float test = 0.f; // glm::max(duckLerp.y, prevDuckLerp.y) - glm::min(duckLerp.y, prevDuckLerp.y) / 1000.f;
+
+		duckLerp = glm::lerp( prevDuckLerp, duckLerpGoal, GetViewHeightLerp() + test );
+		prevDuckLerp = duckLerp;
+
+		duckLerp.y = Round( duckLerp.y );
+		// floating point inprecision smh my head
+		aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetViewHeightLerp() + test );
+
+		targetViewHeight = GetViewHeight();
+	}
+	else
+	{
+		aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetViewHeightLerp() );
+	}
+
+	prevViewHeight = aViewOffset;
+	aPrevViewOffset = aViewOffset;
+}
+
+
+glm::vec3 Player::LerpView( const glm::vec3& newView )
+{
+	return glm::lerp( aPrevViewOffset, newView, GetViewHeightLerp() );
+}
+
+
+float Player::GetViewHeight(  )
+{
+	if ( KEY_PRESSED(SDL_SCANCODE_LCTRL) || in_duck )
+		return cl_view_height_duck;
+
+	return cl_view_height;
+}
+
+float Player::GetViewHeightLerp(  )
+{
+	return cl_view_height_lerp * sv_timescale;
 }
 
 
@@ -262,10 +374,10 @@ float VectorNormalize(glm::vec3& v)
 
 void Player::DetermineMoveType(  )
 {
-	if ( IS_KEY_JUST_PRESSED(SDL_SCANCODE_V) )
+	if ( KEY_JUST_PRESSED(SDL_SCANCODE_V) )
 		SetMoveType( aMoveType == MoveType::NoClip ? MoveType::Walk : MoveType::NoClip );
 
-	if ( IS_KEY_JUST_PRESSED(SDL_SCANCODE_B) )
+	if ( KEY_JUST_PRESSED(SDL_SCANCODE_B) )
 		SetMoveType( aMoveType == MoveType::Fly ? MoveType::Walk : MoveType::Fly );
 }
 
@@ -311,7 +423,7 @@ void Player::SetCollisionEnabled( bool enable )
 void Player::EnableGravity( bool enabled )
 {
 #if !NO_BULLET_PHYSICS
-	apPhysObj->SetGravity( enabled ? g_pGame->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
+	apPhysObj->SetGravity( enabled ? game->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
 #endif
 }
 
@@ -322,7 +434,7 @@ void Player::UpdatePosition(  )
 	//if ( aMoveType == MoveType::Fly )
 		aTransform = apPhysObj->GetWorldTransform();
 #else
-	SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime );
+	SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * game->aFrameTime );
 
 	// blech
 	//if ( IsOnGround() && aMoveType != MoveType::NoClip )
@@ -343,7 +455,7 @@ void Player::DoRayCollision(  )
 	btVector3 btTo = toBt( GetPos() * GetFrameTimeVelocity() );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
-	g_pGame->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
 
 	if ( res.hasHit() )
 	{
@@ -358,7 +470,7 @@ void Player::DoRayCollision(  )
 		//UpdatePosition(  );
 	}
 
-	// SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * g_pGame->aFrameTime );
+	// SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * game->aFrameTime );
 	// SetPos( fromBt( res.m_hitPointWorld ) );
 
 #endif
@@ -372,13 +484,14 @@ bool Player::IsOnGround(  )
 	btVector3 btTo( GetPos().x, -10000.0, GetPos().z );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
-	g_pGame->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
 
 	if ( res.hasHit() )
 	{
 		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
 		if ( dist < 300.f )  // 500.f, 3000.f
 		{
+			aOnGround = true;
 			return true;
 		}
 		
@@ -386,8 +499,11 @@ bool Player::IsOnGround(  )
 
 	return false;
 #else
-	return GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
+	// aOnGround = GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
+	aOnGround = GetPos().y <= ground_pos * velocity_scale;
 #endif
+
+	return aOnGround;
 
 	/*
 	// maybe useful code
@@ -428,18 +544,82 @@ bool Player::IsOnGround(  )
 }
 
 
+bool Player::WasOnGround()
+{
+	return aWasOnGround;
+}
+
 float Player::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 {
 	wishdir = wishvel;
 	float wishspeed = VectorNormalize( wishdir );
 
-	if ( wishspeed > maxSpeed )
+	if ( wishspeed > aMaxSpeed )
 	{
-		wishvel = wishvel * maxSpeed/wishspeed;
-		wishspeed = maxSpeed;
+		wishvel = wishvel * aMaxSpeed/wishspeed;
+		wishspeed = aMaxSpeed;
 	}
 
 	return wishspeed;
+}
+
+
+ConVar cl_stepspeed("cl_stepspeed", "200");
+ConVar cl_steptime("cl_steptime", "0.25");
+ConVar cl_stepduration("cl_stepduration", "0.22");
+
+
+void Player::PlayStepSound(  )
+{
+	auto FreeSound = [ & ]( bool force = false )
+	{
+		if ( apStepSound && apStepSound->Valid() )
+		{
+			if ( game->aCurTime - aLastStepTime > cl_stepduration || force )
+			{
+				game->apAudio->FreeSound( &apStepSound );
+				game->apGui->DebugMessage( 7, "Freed Step Sound" );
+			}
+		}
+	};
+
+	//glm::vec2 groundVel = {aVelocity.x, aVelocity.z};
+	float speed = glm::length(aVelocity);
+
+	if ( speed < cl_stepspeed )
+	{
+		FreeSound();
+		return;
+	}
+	
+	FreeSound();
+
+	if ( !IsOnGround() )
+		return;
+
+	if ( game->aCurTime - aLastStepTime < cl_steptime )
+		return;
+
+	FreeSound();
+
+	char soundName[128];
+	// this sound just breaks it right now and idk why
+	//int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
+	//snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
+	snprintf(soundName, 128, "sound/robots_cropped.ogg");
+
+	if ( game->apAudio->LoadSound( soundName, &apStepSound ) )
+	{
+		apStepSound->vol = 0.5f;
+		apStepSound->inWorld = false;
+
+		game->apAudio->PlaySound( apStepSound );
+
+		game->apGui->DebugMessage( 8, "Played Step Sound" );
+		game->apGui->DebugMessage( 9, "Step Sound Time: %.4f", game->aCurTime - aLastStepTime );
+
+		aLastStepTime = game->aCurTime;
+	}
 }
 
 
@@ -489,6 +669,12 @@ void Player::FlyMove(  )
 }
 
 
+CONVAR( cl_smooth_landing, 1 );
+CONVAR( cl_fall_lerp, 0.015 );
+CONVAR( cl_fall_scale, 4000 );
+CONVAR( cl_fall_up_scale, 50 );
+
+
 void Player::WalkMove(  )
 {
 	glm::vec3 wishvel = aDirection.forward*aMove.x + aDirection.right*aMove.z;
@@ -501,11 +687,13 @@ void Player::WalkMove(  )
 	glm::vec3 wishdir(0,0,0);
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	if ( IsOnGround() )
+	bool onGround = IsOnGround();
+
+	if ( onGround )
 	{
 		// blech
 #if NO_BULLET_PHYSICS
-		aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+		//aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
 #endif
 
 		AddFriction(  );
@@ -524,6 +712,134 @@ void Player::WalkMove(  )
 #endif
 
 	DoRayCollision(  );
+
+	PlayStepSound(  );
+
+	// do a smooth bounce landing when 
+	// if ( onGround != IsOnGround() && onGround == false )
+	
+
+#if 0
+	float viewNorm = cl_view_height.GetFloat();
+	float viewLerp = GetViewHeightLerp();
+
+	// take the previous velocity speed and lerp that here?
+	static glm::vec3 fallVelocity = {};
+	static glm::vec3 prevFallVelocity = {};
+	static bool inSmoothLanding = false;
+
+	// DOESN'T WORK AS INTENDED
+	// i think the crouch check is bouncing it back up, because this isn't bringing it back up
+	// and it never hits exactly 0.f on the y value
+	// also if you land while holding crouch you just sink into the ground
+	if ( IsOnGround() && KEY_RELEASED(SDL_SCANCODE_LCTRL) )
+	{
+		if ( !inSmoothLanding && !onGround )
+		{
+			inSmoothLanding = true;
+			fallVelocity = {0, aVelocity.y, 0};
+			prevFallVelocity = fallVelocity;
+		}
+
+		if ( fallVelocity.y != 0.f )
+		{
+			fallVelocity = glm::lerp( prevFallVelocity, {0, 0, 0}, GetViewHeightLerp() );
+			aViewOffset.y += fallVelocity.y / cl_fall_scale.GetFloat();
+			prevFallVelocity = fallVelocity;
+		}
+		else
+		{
+			// now bounce back up
+			aViewOffset = LerpView({0, GetViewHeight(), 0});
+		}
+
+		if ( aViewOffset.y == GetViewHeight() )
+		{
+			inSmoothLanding = false;
+		}
+
+		aVelocity.y = 0;
+	}
+	else
+	{
+		inSmoothLanding = false;
+	}
+
+	aPrevViewOffset = aViewOffset;
+#elif 1
+	float viewNorm = cl_view_height.GetFloat();
+	float viewLerp = GetViewHeightLerp();
+
+	static glm::vec3 prevViewHeight = {};
+	static glm::vec3 fallViewOffset = {};
+
+	if ( cl_smooth_landing )
+	{
+		static glm::vec3 duckLerpGoal = {};
+		static glm::vec3 duckLerp = {0, aVelocity.y, 0};
+		static glm::vec3 prevDuckLerp = {0, aVelocity.y, 0};
+
+		// NOTE: this doesn't work properly when jumping mid duck and landing
+		// meh, works well enough with the current values for now
+		if ( IsOnGround() )
+		{
+			if ( !onGround )
+			{
+				duckLerp = {0, aVelocity.y, 0};
+				duckLerpGoal = {0, aVelocity.y, 0};
+				prevDuckLerp = duckLerp;
+			}
+		}
+
+		//prevDuckLerp.y = Round( prevDuckLerp.y );
+		// if ( duckLerp.y != 0.f )
+		//if ( glm::round(duckLerp.y * 0.01f) != 0.f )
+		// if ( glm::round(duckLerp.y) >= cl_fall_up_threshold )
+		// if ( aVelocity.y != 0.f )
+		{
+			// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetViewHeightLerp() );
+			// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetViewHeightLerp() );
+			// acts like a trampoline, hmm
+			duckLerp = glm::lerp( prevDuckLerp, (-prevViewHeight) * cl_fall_up_scale.GetFloat(), GetViewHeightLerp() );
+
+			fallViewOffset.y += duckLerp.y / cl_fall_scale.GetFloat();
+			prevDuckLerp = duckLerp;
+		}
+		//else
+		{
+			// now bounce back up
+			// aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetViewHeightLerp() );
+			//fallViewOffset = glm::lerp( prevViewHeight, {0, 0, 0}, GetViewHeightLerp() );
+		}
+
+		if ( IsOnGround() )
+		{
+			aVelocity.y = 0;
+		}
+		else
+		{
+			//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetViewHeightLerp() );
+		}
+
+	}
+	else
+	{
+		// lerp it back to 0 just in case
+		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, GetViewHeightLerp() );
+
+		if ( IsOnGround() )
+			aVelocity.y = 0;
+	}
+
+	prevViewHeight = fallViewOffset;
+	aViewOffset += fallViewOffset;
+
+#else
+	if ( IsOnGround() )
+	{
+		aVelocity.y = 0.f;
+	}
+#endif
 }
 
 
@@ -552,11 +868,11 @@ void Player::AddFriction()
 	//if (trace.fraction == 1.0)
 	//	friction = sv_friction.GetFloat() * sv_edgefriction.value;
 	//else
-		friction = sv_friction.GetFloat();
+		friction = sv_friction;
 
 	// apply friction
-	float control = speed < stop_speed.GetFloat() ? stop_speed.GetFloat() : speed;
-	float newspeed = glm::max( 0.f, speed - g_pGame->aFrameTime * control * friction );
+	float control = speed < stop_speed ? stop_speed : speed;
+	float newspeed = glm::max( 0.f, speed - game->aFrameTime * control * friction );
 
 	newspeed /= speed;
 	aVelocity = vel * newspeed;
@@ -573,7 +889,7 @@ void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 	if ( addspeed <= 0.f )
 		return;
 
-	addspeed = glm::min( addspeed, accel_speed.GetFloat() * g_pGame->aFrameTime * wishSpeed );
+	addspeed = glm::min( addspeed, accel_speed * game->aFrameTime * wishSpeed );
 
 	for ( int i = 0; i < 3; i++ )
 		aVelocity[i] += addspeed * wishDir[i];
@@ -585,7 +901,7 @@ void Player::AddGravity(  )
 #if !NO_BULLET_PHYSICS
 	aVelocity.y = apPhysObj->GetLinearVelocity().y;
 #else
-	aVelocity.y -= sv_gravity.GetFloat() * g_pGame->aFrameTime;
+	aVelocity.y -= sv_gravity * game->aFrameTime;
 #endif
 }
 

@@ -21,13 +21,14 @@ config
 	{
 		inc_dirs
 		{
-			"../chocolate/inc"
 			"../src/game"
 			"$BULLET_DIR$/src"
+			"../chocolate/thirdparty/speedykeyv"
 		}
 		
 		defines
 		{
+			//"_ITERATOR_DEBUG_LEVEL=0" [$DEBUG$ && $MSVC$]
 		}
 	}
 
@@ -37,7 +38,6 @@ config
 		lib_dirs
 		{
 			"$VK_DIR$/Lib" [$WINDOWS$]
-			"../chocolate/lib"
 			"$BULLET_DIR$/build/lib/$CONFIG$" [$WINDOWS$]  // idk what it would be on linux yet
 		}
 		
@@ -79,6 +79,12 @@ files
 		
 		//"../chocolate/src/core/renderer/*.cpp"
 		//"../chocolate/inc/core/renderer/*.h"
+	}
+	
+	folder "thirdparty"
+	{
+		"../chocolate/thirdparty/speedykeyv/KeyValue.cpp"
+		"../chocolate/thirdparty/speedykeyv/KeyValue.h"
 	}
 	
 	folder "game"
