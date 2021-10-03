@@ -1,6 +1,6 @@
 cc		:=	g++
-cflags		:=	-Wall -Wextra -std=c++20 -fPIC -c
-lflags		:=	-Wall -Wextra -std=c++20 -shared
+cflags		:=	-std=c++20 -fPIC -c
+lflags		:=	-std=c++20 -shared
 
 src		:=	src
 lib		:=	lib
@@ -45,11 +45,11 @@ gameloader:
 	$(cc) $(src)/gameloader.c -O2 -ldl -o $(gamedir)/riff
 
 engine_release:
-	cd $(enginedir) && make release
+	cd $(enginedir) && make release -j 123
 	mv $(enginebin)/engine.so $(bin)/engine.so
 
 engine_debug:
-	cd $(enginedir) && make debug
+	cd $(enginedir) && make debug -j 123
 	mv $(enginebin)/engine.so $(bin)/engine.so
 
 run:	all
