@@ -13,7 +13,7 @@ CONVAR( in_side, 0 );
 CONVAR( in_duck, 0 );
 CONVAR( in_sprint, 0 );
 
-extern ConVar e_timescale;
+extern ConVarRef e_timescale;
 
 ConVar forward_speed( "sv_forward_speed", 400 );
 ConVar side_speed( "sv_side_speed", 400 );  // 350.f
@@ -22,16 +22,16 @@ ConVar max_speed( "sv_max_speed", 400 );  // 320.f
 ConVar stop_speed( "sv_stop_speed", 100 );
 ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar sv_friction( "sv_friction", 8 );  // 4.f
-ConVar jump_force( "sv_jump_force", 500 );
+ConVar jump_force( "sv_jump_force", 250 );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
 //CONVAR( sv_friction_new, 8 );  // 4.f
 
-CONVAR( sv_gravity, 1200 );
+CONVAR( sv_gravity, 800 );
 CONVAR( ground_pos, 250 );
 
-ConVar sensitivity("in_sensitivity", 0.1 );
+CONVAR( in_sensitivity, 0.1 );
 
 CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
@@ -45,6 +45,9 @@ CONVAR( cl_smooth_land, 1 );
 CONVAR( cl_smooth_land_lerp, 0.015 );
 CONVAR( cl_smooth_land_scale, 4000 );
 CONVAR( cl_smooth_land_up_scale, 50 );
+
+// temp
+CONVAR( cl_lerp_scale, 1 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
@@ -204,6 +207,21 @@ void Player::Update( float dt )
 }
 
 
+void Player::DisplayPlayerStats(  )
+{
+	glm::vec3 scaledVelocity = aVelocity * velocity_scale.GetFloat();
+	float scaledSpeed = glm::length( glm::vec2(scaledVelocity.x, scaledVelocity.z) );
+	float speed = glm::length( glm::vec2(aVelocity.x, aVelocity.z) );
+
+	game->apGui->DebugMessage( 0, "Player Pos:    %s", Vec2Str(aTransform.position).c_str() );
+	game->apGui->DebugMessage( 1, "Player Rot:    %s", Quat2Str(aTransform.rotation).c_str() );
+	game->apGui->DebugMessage( 2, "Player Vel:    %s", Vec2Str(scaledVelocity).c_str() );
+
+	game->apGui->DebugMessage( 4, "Player Speed:  %.4f (%.4f Unscaled)", scaledSpeed, speed );
+	game->apGui->DebugMessage( 5, "View Offset:   %.6f (%.6f Unscaled)", aViewOffset.y * velocity_scale, aViewOffset.y );
+}
+
+
 void Player::SetPos( const glm::vec3& origin )
 {
 	aTransform.position = origin;
@@ -297,8 +315,8 @@ void Player::UpdateInputs(  )
 
 	wasJumpButtonPressed = jumped;
 
-	mX += sensitivity * game->apInput->GetMouseDelta().x;
-	mY -= sensitivity * game->apInput->GetMouseDelta().y;
+	mX += in_sensitivity * game->apInput->GetMouseDelta().x;
+	mY -= in_sensitivity * game->apInput->GetMouseDelta().y;
 
 	auto constrain = [](float num) -> float
 	{
@@ -327,7 +345,7 @@ void Player::DoSmoothDuck(  )
 	static float duckLerp = targetViewHeight;
 	static float prevDuckLerp = targetViewHeight;
 
-	float viewHeightLerp = cl_view_height_lerp * e_timescale;
+	float viewHeightLerp = cl_view_height_lerp * cl_lerp_scale * e_timescale;
 
 	// NOTE: this doesn't work properly when jumping mid duck and landing
 	// try and get this to round up a little faster while lerping to the target pos at the same speed?
@@ -704,89 +722,51 @@ void Player::WalkMove(  )
 	DoRayCollision(  );
 
 	PlayStepSound(  );
+	DoSmoothLand( onGround );
 
-#if 1
+	if ( IsOnGround() )
+		aVelocity.y = 0;
+}
 
+
+void Player::DoSmoothLand( bool wasOnGround )
+{
 	static glm::vec3 prevViewHeight = {};
 	static glm::vec3 fallViewOffset = {};
 
-	auto GetLandingLerp = [&]() -> float { return cl_smooth_land_lerp * e_timescale; };
+	static float duckLerp = aVelocity.y * velocity_scale;
+	static float prevDuckLerp = aVelocity.y * velocity_scale;
+
+	float landLerp = cl_smooth_land_lerp * cl_lerp_scale * e_timescale;
+	float landScale = cl_smooth_land_scale * velocity_scale;
+	float landUpScale = cl_smooth_land_up_scale * velocity_scale;
 
 	if ( cl_smooth_land )
 	{
-		//static glm::vec3 duckLerp = {0, aVelocity.y, 0};
-		//static glm::vec3 prevDuckLerp = {0, aVelocity.y, 0};
-		
-		static float duckLerp = aVelocity.y;
-		static float prevDuckLerp = aVelocity.y;
-
 		// NOTE: this doesn't work properly when jumping mid duck and landing
 		// meh, works well enough with the current values for now
-		if ( IsOnGround() )
+		if ( IsOnGround() && !wasOnGround )
 		{
-			if ( !onGround )
-			{
-				//duckLerp = {0, aVelocity.y, 0};
-				//duckLerpGoal = {0, aVelocity.y, 0};
-
-				duckLerp = aVelocity.y;
-				//duckLerpGoal = aVelocity.y;
-
-				prevDuckLerp = duckLerp;
-			}
-		}
-
-		//prevDuckLerp.y = Round( prevDuckLerp.y );
-		// if ( duckLerp.y != 0.f )
-		//if ( glm::round(duckLerp.y * 0.01f) != 0.f )
-		// if ( glm::round(duckLerp.y) >= cl_fall_up_threshold )
-		// if ( aVelocity.y != 0.f )
-		{
-			// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
-			// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetLandingLerp() );
-			// acts like a trampoline, hmm
-			//duckLerp = glm::lerp( prevDuckLerp, (-prevViewHeight) * cl_smooth_landing_up_scale.GetFloat(), GetLandingLerp() );
-			duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight.y) * cl_smooth_land_up_scale.GetFloat(), GetLandingLerp() );
-
-			//fallViewOffset.y += duckLerp.y / cl_smooth_landing_scale.GetFloat();
-			fallViewOffset.y += duckLerp / cl_smooth_land_scale.GetFloat();
+			duckLerp = aVelocity.y * velocity_scale;
 			prevDuckLerp = duckLerp;
 		}
-		//else
-		{
-			// now bounce back up
-			// aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetLandingLerp() );
-			//fallViewOffset = glm::lerp( prevViewHeight, {0, 0, 0}, GetLandingLerp() );
-		}
 
-		if ( IsOnGround() )
-		{
-			aVelocity.y = 0;
-		}
-		else
-		{
-			//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetLandingLerp() );
-		}
+		// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
+		// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetLandingLerp() );
+		// acts like a trampoline, hmm
+		duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight.y) * landUpScale, landLerp );
 
+		fallViewOffset.y += duckLerp / landScale;
+		prevDuckLerp = duckLerp;
 	}
 	else
 	{
 		// lerp it back to 0 just in case
-		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, GetLandingLerp() );
-
-		if ( IsOnGround() )
-			aVelocity.y = 0;
+		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, landLerp );
 	}
 
 	prevViewHeight = fallViewOffset;
 	aViewOffset += fallViewOffset;
-
-#else
-	if ( IsOnGround() )
-	{
-		aVelocity.y = 0.f;
-	}
-#endif
 }
 
 

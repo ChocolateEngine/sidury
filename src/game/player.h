@@ -92,6 +92,7 @@ public:
 	void Spawn(  );
 	void Respawn(  );
 	void Update( float dt );
+	void DisplayPlayerStats(  );
 
 	void UpdateInputs(  );
 	void UpdateView(  );
@@ -116,13 +117,15 @@ public:
 	bool IsOnGround(  );
 	bool WasOnGround(  );
 	void DoRayCollision(  );
-	void DoSmoothDuck(  );
 
 	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
 	void BaseFlyMove(  );
 	void NoClipMove(  );
 	void FlyMove(  );
 	void WalkMove(  );
+
+	void DoSmoothDuck(  );
+	void DoSmoothLand( bool wasOnGround );
 
 	void AddFriction(  );
 	void AddGravity(  );

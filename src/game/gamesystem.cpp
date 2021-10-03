@@ -19,7 +19,8 @@ void CenterMouseOnScreen(  )
 
 
 CONVAR( cl_fov, 100 );
-CONVAR( e_timescale, 1 );
+// CONVAR( e_timescale, 1 );
+ConVarRef e_timescale( "e_timescale" );
 
 
 struct ModelPhysTest
@@ -220,6 +221,10 @@ Model* g_streamModel = nullptr;
 
 
 ConVar snd_cube_scale("snd_cube_scale", "0.05");
+extern ConVar velocity_scale;
+
+
+
 
 
 void GameSystem::Update( float frameTime )
@@ -231,11 +236,15 @@ void GameSystem::Update( float frameTime )
 	CheckPaused(  );
 
 	if ( aPaused )
+	{
+		ResetInputs(  );
+		aLocalPlayer->UpdateView();
+		aLocalPlayer->DisplayPlayerStats();
 		return;
+	}
 
 	aCurTime += aFrameTime;
 
-	// uhh
 	aLocalPlayer->Update( frameTime );
 	aLocalPlayer->UpdateView();  // shit
 
@@ -246,10 +255,7 @@ void GameSystem::Update( float frameTime )
 	aLocalPlayer->UpdatePosition(  );
 #endif
 
-	apGui->DebugMessage( 0, "Player Pos:  %s", Vec2Str(aLocalPlayer->aTransform.position).c_str() );
-	apGui->DebugMessage( 1, "Player Rot:  %s", Quat2Str(aLocalPlayer->aTransform.rotation).c_str() );
-	apGui->DebugMessage( 2, "Player Vel:  %s", Vec2Str(aLocalPlayer->aVelocity).c_str() );
-	apGui->DebugMessage( 3, "View Offset: %s", Vec2Str(aLocalPlayer->aViewOffset).c_str() );
+	aLocalPlayer->DisplayPlayerStats(  );
 
 	SetupModels( frameTime );
 
@@ -280,12 +286,6 @@ void GameSystem::CheckPaused(  )
 	}
 
 	apAudio->SetPaused( aPaused );
-
-	if ( aPaused )
-	{
-		ResetInputs(  );
-		aLocalPlayer->UpdateView();
-	}
 }
 
 ConVar proto_x("proto_x", "550");
