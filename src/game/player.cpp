@@ -5,14 +5,15 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <algorithm>
+#include <cmath>
 
 
-ConVar in_forward( "in_forward", 0 );
-ConVar in_side( "in_side", 0 );
-ConVar in_duck( "in_duck", 0 );
-ConVar in_sprint( "in_sprint", 0 );
+CONVAR( in_forward, 0 );
+CONVAR( in_side, 0 );
+CONVAR( in_duck, 0 );
+CONVAR( in_sprint, 0 );
 
-extern ConVar sv_timescale;
+extern ConVar e_timescale;
 
 ConVar forward_speed( "sv_forward_speed", 400 );
 ConVar side_speed( "sv_side_speed", 400 );  // 350.f
@@ -23,28 +24,37 @@ ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar sv_friction( "sv_friction", 8 );  // 4.f
 ConVar jump_force( "sv_jump_force", 500 );
 
-ConVar sv_new_movement( "sv_new_movement", 1 );
-
 // lerp the friction maybe?
-ConVar sv_friction_new( "sv_friction_new", 8 );  // 4.f
+//CONVAR( sv_new_movement, 1 );
+//CONVAR( sv_friction_new, 8 );  // 4.f
 
-ConVar sv_gravity( "sv_gravity", 1200 );
-ConVar ground_pos( "ground_pos", 250 );
+CONVAR( sv_gravity, 1200 );
+CONVAR( ground_pos, 250 );
+
 ConVar sensitivity("in_sensitivity", 0.1 );
 
-ConVar cl_view_height( "cl_view_height", 56 );
-ConVar cl_view_height_duck( "cl_view_height_duck", 24 );
-ConVar cl_view_height_lerp( "cl_view_height_lerp", 0.015 );
+CONVAR( cl_stepspeed, 200 );
+CONVAR( cl_steptime, 0.25 );
+CONVAR( cl_stepduration, 0.22 );
+
+CONVAR( cl_view_height, 56 );
+CONVAR( cl_view_height_duck, 24 );
+CONVAR( cl_view_height_lerp, 0.015 );
+
+CONVAR( cl_smooth_land, 1 );
+CONVAR( cl_smooth_land_lerp, 0.015 );
+CONVAR( cl_smooth_land_scale, 4000 );
+CONVAR( cl_smooth_land_up_scale, 50 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
 #if NO_BULLET_PHYSICS
-ConVar velocity_scale( "velocity_scale", 0.025 );
+CONVAR( velocity_scale, 0.025 );
 #else
-ConVar velocity_scale( "velocity_scale", 1.0 );
+CONVAR( velocity_scale, 1.0 );
 #endif
 
-#define PLAYER_MASS 200.f
+constexpr float PLAYER_MASS = 200.f;
 
 // TEMP
 // #define SPAWN_POS 1085.69824, 260, 644.222046
@@ -68,7 +78,17 @@ CON_COMMAND( respawn )
 #define KEY_JUST_RELEASED( key ) game->apInput->KeyJustReleased(key)
 
 
-float VectorNormalize(glm::vec3& v);
+// glm::normalize doesn't return a float
+// move to util.cpp?
+float vec3_norm(glm::vec3& v)
+{
+	float length = sqrt(glm::dot(v, v));
+
+	if (length)
+		v *= 1/length;
+
+	return length;
+}
 
 
 // ============================================================
@@ -145,7 +165,6 @@ void Player::Spawn()
 	SetMoveType( MoveType::Walk );
 
 	aViewOffset = {0, cl_view_height, 0};
-	aPrevViewOffset = aViewOffset;
 }
 
 
@@ -170,6 +189,9 @@ void Player::Respawn()
 void Player::Update( float dt )
 {
 	UpdateInputs();
+
+	// should be in WalkMove only, but i need this here when toggling noclip mid-duck
+	DoSmoothDuck();
 
 	DetermineMoveType();
 
@@ -232,10 +254,6 @@ void Player::UpdateView(  )
 }
 
 
-// asd0ojiodw
-glm::vec3 g_targetViewHeight = {};
-
-
 void Player::UpdateInputs(  )
 {
 	aMove = {0, 0, 0};
@@ -290,21 +308,26 @@ void Player::UpdateInputs(  )
 
 	mX = constrain(mX);
 	mY = std::clamp(mY, -90.0f, 90.0f);
+}
 
 
-	// uh, idk where to put this lol
-
-	float viewNorm = cl_view_height;
-
+void Player::DoSmoothDuck(  )
+{
 	// TODO: make a view offset lerp handler class or some shit, idk
 	// that way we don't duplicate code, and have it work for multiplayer
 
 	static float targetViewHeight = GetViewHeight();
 	static glm::vec3 prevViewHeight = {0, GetViewHeight(), 0};
 
-	static glm::vec3 duckLerpGoal = prevViewHeight;
-	static glm::vec3 duckLerp = prevViewHeight;
-	static glm::vec3 prevDuckLerp = prevViewHeight;
+	//static glm::vec3 duckLerpGoal = prevViewHeight;
+	//static glm::vec3 duckLerp = prevViewHeight;
+	//static glm::vec3 prevDuckLerp = prevViewHeight;
+
+	static float duckLerpGoal = targetViewHeight;
+	static float duckLerp = targetViewHeight;
+	static float prevDuckLerp = targetViewHeight;
+
+	float viewHeightLerp = cl_view_height_lerp * e_timescale;
 
 	// NOTE: this doesn't work properly when jumping mid duck and landing
 	// try and get this to round up a little faster while lerping to the target pos at the same speed?
@@ -313,34 +336,31 @@ void Player::UpdateInputs(  )
 		if ( targetViewHeight != GetViewHeight() )
 		{
 			prevDuckLerp = duckLerp;
-			duckLerp = {0, GetViewHeight(), 0};
-			duckLerpGoal = {0, GetViewHeight(), 0};
+			//duckLerp = {0, GetViewHeight(), 0};
+			//duckLerpGoal = {0, GetViewHeight(), 0};
+			duckLerp = GetViewHeight();
+			duckLerpGoal = GetViewHeight();
 		}
 
-		float test = 0.f; // glm::max(duckLerp.y, prevDuckLerp.y) - glm::min(duckLerp.y, prevDuckLerp.y) / 1000.f;
-
-		duckLerp = glm::lerp( prevDuckLerp, duckLerpGoal, GetViewHeightLerp() + test );
+		// duckLerp = glm::lerp( prevDuckLerp, duckLerpGoal, viewHeightLerp );
+		duckLerp = std::lerp( prevDuckLerp, duckLerpGoal, viewHeightLerp );
 		prevDuckLerp = duckLerp;
 
-		duckLerp.y = Round( duckLerp.y );
+		//duckLerp.y = Round( duckLerp.y );
+		duckLerp = Round( duckLerp );
 		// floating point inprecision smh my head
-		aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetViewHeightLerp() + test );
+		//aViewOffset = glm::lerp( prevViewHeight, duckLerp, viewHeightLerp );
+		aViewOffset.y = std::lerp( prevViewHeight.y, duckLerp, viewHeightLerp );
 
 		targetViewHeight = GetViewHeight();
 	}
 	else
 	{
-		aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetViewHeightLerp() );
+		//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, viewHeightLerp );
+		aViewOffset.y = std::lerp( prevViewHeight.y, targetViewHeight, viewHeightLerp );
 	}
 
 	prevViewHeight = aViewOffset;
-	aPrevViewOffset = aViewOffset;
-}
-
-
-glm::vec3 Player::LerpView( const glm::vec3& newView )
-{
-	return glm::lerp( aPrevViewOffset, newView, GetViewHeightLerp() );
 }
 
 
@@ -350,25 +370,6 @@ float Player::GetViewHeight(  )
 		return cl_view_height_duck;
 
 	return cl_view_height;
-}
-
-float Player::GetViewHeightLerp(  )
-{
-	return cl_view_height_lerp * sv_timescale;
-}
-
-
-// glm::normalize doesn't return a float
-float VectorNormalize(glm::vec3& v)
-{
-	float bruh = glm::lxNorm(v, 2);
-
-	float length = sqrt(glm::dot(v, v));
-
-	if (length)
-		v *= 1/length;
-
-	return length;
 }
 
 
@@ -552,7 +553,7 @@ bool Player::WasOnGround()
 float Player::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 {
 	wishdir = wishvel;
-	float wishspeed = VectorNormalize( wishdir );
+	float wishspeed = vec3_norm( wishdir );
 
 	if ( wishspeed > aMaxSpeed )
 	{
@@ -562,11 +563,6 @@ float Player::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 
 	return wishspeed;
 }
-
-
-ConVar cl_stepspeed("cl_stepspeed", "200");
-ConVar cl_steptime("cl_steptime", "0.25");
-ConVar cl_stepduration("cl_stepduration", "0.22");
 
 
 void Player::PlayStepSound(  )
@@ -669,12 +665,6 @@ void Player::FlyMove(  )
 }
 
 
-CONVAR( cl_smooth_landing, 1 );
-CONVAR( cl_fall_lerp, 0.015 );
-CONVAR( cl_fall_scale, 4000 );
-CONVAR( cl_fall_up_scale, 50 );
-
-
 void Player::WalkMove(  )
 {
 	glm::vec3 wishvel = aDirection.forward*aMove.x + aDirection.right*aMove.z;
@@ -715,69 +705,20 @@ void Player::WalkMove(  )
 
 	PlayStepSound(  );
 
-	// do a smooth bounce landing when 
-	// if ( onGround != IsOnGround() && onGround == false )
-	
-
-#if 0
-	float viewNorm = cl_view_height.GetFloat();
-	float viewLerp = GetViewHeightLerp();
-
-	// take the previous velocity speed and lerp that here?
-	static glm::vec3 fallVelocity = {};
-	static glm::vec3 prevFallVelocity = {};
-	static bool inSmoothLanding = false;
-
-	// DOESN'T WORK AS INTENDED
-	// i think the crouch check is bouncing it back up, because this isn't bringing it back up
-	// and it never hits exactly 0.f on the y value
-	// also if you land while holding crouch you just sink into the ground
-	if ( IsOnGround() && KEY_RELEASED(SDL_SCANCODE_LCTRL) )
-	{
-		if ( !inSmoothLanding && !onGround )
-		{
-			inSmoothLanding = true;
-			fallVelocity = {0, aVelocity.y, 0};
-			prevFallVelocity = fallVelocity;
-		}
-
-		if ( fallVelocity.y != 0.f )
-		{
-			fallVelocity = glm::lerp( prevFallVelocity, {0, 0, 0}, GetViewHeightLerp() );
-			aViewOffset.y += fallVelocity.y / cl_fall_scale.GetFloat();
-			prevFallVelocity = fallVelocity;
-		}
-		else
-		{
-			// now bounce back up
-			aViewOffset = LerpView({0, GetViewHeight(), 0});
-		}
-
-		if ( aViewOffset.y == GetViewHeight() )
-		{
-			inSmoothLanding = false;
-		}
-
-		aVelocity.y = 0;
-	}
-	else
-	{
-		inSmoothLanding = false;
-	}
-
-	aPrevViewOffset = aViewOffset;
-#elif 1
-	float viewNorm = cl_view_height.GetFloat();
-	float viewLerp = GetViewHeightLerp();
+#if 1
 
 	static glm::vec3 prevViewHeight = {};
 	static glm::vec3 fallViewOffset = {};
 
-	if ( cl_smooth_landing )
+	auto GetLandingLerp = [&]() -> float { return cl_smooth_land_lerp * e_timescale; };
+
+	if ( cl_smooth_land )
 	{
-		static glm::vec3 duckLerpGoal = {};
-		static glm::vec3 duckLerp = {0, aVelocity.y, 0};
-		static glm::vec3 prevDuckLerp = {0, aVelocity.y, 0};
+		//static glm::vec3 duckLerp = {0, aVelocity.y, 0};
+		//static glm::vec3 prevDuckLerp = {0, aVelocity.y, 0};
+		
+		static float duckLerp = aVelocity.y;
+		static float prevDuckLerp = aVelocity.y;
 
 		// NOTE: this doesn't work properly when jumping mid duck and landing
 		// meh, works well enough with the current values for now
@@ -785,8 +726,12 @@ void Player::WalkMove(  )
 		{
 			if ( !onGround )
 			{
-				duckLerp = {0, aVelocity.y, 0};
-				duckLerpGoal = {0, aVelocity.y, 0};
+				//duckLerp = {0, aVelocity.y, 0};
+				//duckLerpGoal = {0, aVelocity.y, 0};
+
+				duckLerp = aVelocity.y;
+				//duckLerpGoal = aVelocity.y;
+
 				prevDuckLerp = duckLerp;
 			}
 		}
@@ -797,19 +742,21 @@ void Player::WalkMove(  )
 		// if ( glm::round(duckLerp.y) >= cl_fall_up_threshold )
 		// if ( aVelocity.y != 0.f )
 		{
-			// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetViewHeightLerp() );
-			// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetViewHeightLerp() );
+			// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
+			// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetLandingLerp() );
 			// acts like a trampoline, hmm
-			duckLerp = glm::lerp( prevDuckLerp, (-prevViewHeight) * cl_fall_up_scale.GetFloat(), GetViewHeightLerp() );
+			//duckLerp = glm::lerp( prevDuckLerp, (-prevViewHeight) * cl_smooth_landing_up_scale.GetFloat(), GetLandingLerp() );
+			duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight.y) * cl_smooth_land_up_scale.GetFloat(), GetLandingLerp() );
 
-			fallViewOffset.y += duckLerp.y / cl_fall_scale.GetFloat();
+			//fallViewOffset.y += duckLerp.y / cl_smooth_landing_scale.GetFloat();
+			fallViewOffset.y += duckLerp / cl_smooth_land_scale.GetFloat();
 			prevDuckLerp = duckLerp;
 		}
 		//else
 		{
 			// now bounce back up
-			// aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetViewHeightLerp() );
-			//fallViewOffset = glm::lerp( prevViewHeight, {0, 0, 0}, GetViewHeightLerp() );
+			// aViewOffset = glm::lerp( prevViewHeight, duckLerp, GetLandingLerp() );
+			//fallViewOffset = glm::lerp( prevViewHeight, {0, 0, 0}, GetLandingLerp() );
 		}
 
 		if ( IsOnGround() )
@@ -818,14 +765,14 @@ void Player::WalkMove(  )
 		}
 		else
 		{
-			//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetViewHeightLerp() );
+			//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, GetLandingLerp() );
 		}
 
 	}
 	else
 	{
 		// lerp it back to 0 just in case
-		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, GetViewHeightLerp() );
+		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, GetLandingLerp() );
 
 		if ( IsOnGround() )
 			aVelocity.y = 0;
@@ -881,7 +828,7 @@ void Player::AddFriction()
 
 void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 {
-	float baseWishSpeed = inAir ? glm::min( 30.f, VectorNormalize( wishDir ) ) : wishSpeed;
+	float baseWishSpeed = inAir ? glm::min( 30.f, vec3_norm( wishDir ) ) : wishSpeed;
 
 	float currentspeed = glm::dot( aVelocity, wishDir );
 	float addspeed = baseWishSpeed - currentspeed;

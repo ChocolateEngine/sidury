@@ -95,9 +95,7 @@ public:
 
 	void UpdateInputs(  );
 	void UpdateView(  );
-	glm::vec3 LerpView( const glm::vec3& newView );
 	float GetViewHeight(  );
-	float GetViewHeightLerp(  );
 
 	void SetPos( const glm::vec3& origin );
 	const glm::vec3& GetPos(  );
@@ -118,6 +116,7 @@ public:
 	bool IsOnGround(  );
 	bool WasOnGround(  );
 	void DoRayCollision(  );
+	void DoSmoothDuck(  );
 
 	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
 	void BaseFlyMove(  );
@@ -148,10 +147,8 @@ public:
 
 	glm::vec3 aOrigin;
 	glm::vec3 aVelocity;
-	glm::vec3 aPrevVelocity;
 	glm::vec3 aMove;
 	glm::vec3 aViewOffset;
-	glm::vec3 aPrevViewOffset;
 	float aMaxSpeed;
 
 	bool aOnGround = false;

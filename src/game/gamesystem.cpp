@@ -18,8 +18,8 @@ void CenterMouseOnScreen(  )
 }
 
 
-ConVar cl_fov( "cl_fov", 100 );
-ConVar sv_timescale( "sv_timescale", 1 );
+CONVAR( cl_fov, 100 );
+CONVAR( e_timescale, 1 );
 
 
 struct ModelPhysTest
@@ -226,7 +226,7 @@ void GameSystem::Update( float frameTime )
 {
 	BaseClass::Update( frameTime );
 
-	aFrameTime = frameTime * sv_timescale;
+	aFrameTime = frameTime * e_timescale;
 
 	CheckPaused(  );
 
