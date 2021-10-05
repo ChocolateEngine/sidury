@@ -6,10 +6,6 @@
 #include "physics.h"
 
 
-#define FL_NONE 0
-#define FL_ONGROUND 1
-
-
 // should probably move into transform
 struct Direction
 {
@@ -83,6 +79,16 @@ public:
 #endif
 
 
+enum PlayerFlags_
+{
+	PlyNone = 0,
+	PlyOnGround,
+	PlyInSprint,
+	PlyInDuck
+};
+
+typedef unsigned char PlayerFlags;
+
 class Player
 {
 public:
@@ -119,6 +125,11 @@ public:
 	void DoRayCollision(  );
 
 	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
+	float GetMaxSpeed(  );
+	float GetMaxSpeedBase(  );
+	float GetMaxSprintSpeed(  );
+	float GetMaxDuckSpeed(  );
+
 	void BaseFlyMove(  );
 	void NoClipMove(  );
 	void FlyMove(  );
@@ -126,6 +137,8 @@ public:
 
 	void DoSmoothDuck(  );
 	void DoSmoothLand( bool wasOnGround );
+	void DoViewBob(  );
+	void DoViewTilt(  );
 
 	void AddFriction(  );
 	void AddGravity(  );
@@ -144,18 +157,25 @@ public:
 	// void SetGravity( const glm::vec3& gravity );
 	void EnableGravity( bool enabled );
 
+	inline bool IsInSprint(  ) { return aPlayerFlags & PlyInSprint; }
+	inline bool IsInDuck(  ) { return aPlayerFlags & PlyInDuck; }
+
+	inline bool WasInSprint(  ) { return aPrevPlayerFlags & PlyInSprint; }
+	inline bool WasInDuck(  ) { return aPrevPlayerFlags & PlyInDuck; }
+
 	MoveType aMoveType;
 
 	int aFlags;
 
-	glm::vec3 aOrigin;
-	glm::vec3 aVelocity;
-	glm::vec3 aMove;
-	glm::vec3 aViewOffset;
-	float aMaxSpeed;
+	glm::vec3 aOrigin = {};
+	glm::vec3 aVelocity = {};
+	glm::vec3 aMove = {};
+	glm::vec3 aViewOffset = {};
+	glm::vec3 aViewAngOffset = {};
+	float aMaxSpeed = 0.f;
 
-	bool aOnGround = false;
-	bool aWasOnGround = false;
+	PlayerFlags aPlayerFlags = PlyNone;
+	PlayerFlags aPrevPlayerFlags = PlyNone;
 
 	float mX, mY;
 	Direction aDirection;
