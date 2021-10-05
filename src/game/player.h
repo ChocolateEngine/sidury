@@ -6,39 +6,6 @@
 #include "physics.h"
 
 
-// should probably move into transform
-struct Direction
-{
-	Direction():
-		forward(0, 0, 0),
-		back(0, 0, 0),
-		up(0, 0, 0),
-		down(0, 0, 0),
-		right(0, 0, 0),
-		left(0, 0, 0)
-	{
-	}
-
-	void Update( const glm::vec3& forward, const glm::vec3& up, const glm::vec3& right)
-	{
-		this->forward = forward;
-		this->up = up;
-		this->right = right;
-
-		back = -forward;
-		down = -up;
-		left = -right;
-	}
-
-	glm::vec3 forward;
-	glm::vec3 back;
-	glm::vec3 up;
-	glm::vec3 down;
-	glm::vec3 right;
-	glm::vec3 left;
-};
-
-
 enum class StepType
 {
 	Dirt,
@@ -95,55 +62,6 @@ public:
 	Player(  );
 	~Player(  );
 
-	void Spawn(  );
-	void Respawn(  );
-	void Update( float dt );
-	void DisplayPlayerStats(  );
-
-	void UpdateInputs(  );
-	void UpdateView(  );
-	float GetViewHeight(  );
-
-	void SetPos( const glm::vec3& origin );
-	const glm::vec3& GetPos(  );
-
-	void SetPosVel( const glm::vec3& origin );
-
-	// returns velocity multiplied by frametime
-	glm::vec3 GetFrameTimeVelocity(  );
-
-	// ==================================
-	// movement
-	// ==================================
-	void DetermineMoveType(  );
-	void UpdatePosition(  );
-
-	void PlayStepSound(  );
-
-	bool IsOnGround(  );
-	bool WasOnGround(  );
-	void DoRayCollision(  );
-
-	float GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
-	float GetMaxSpeed(  );
-	float GetMaxSpeedBase(  );
-	float GetMaxSprintSpeed(  );
-	float GetMaxDuckSpeed(  );
-
-	void BaseFlyMove(  );
-	void NoClipMove(  );
-	void FlyMove(  );
-	void WalkMove(  );
-
-	void DoSmoothDuck(  );
-	void DoSmoothLand( bool wasOnGround );
-	void DoViewBob(  );
-	void DoViewTilt(  );
-
-	void AddFriction(  );
-	void AddGravity(  );
-	void Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
-
 	enum class MoveType
 	{
 		Walk,
@@ -152,20 +70,80 @@ public:
 		Fly,
 	};
 
-	void SetMoveType( MoveType type );
-	void SetCollisionEnabled( bool enable );
-	// void SetGravity( const glm::vec3& gravity );
-	void EnableGravity( bool enabled );
+	// =============================================================
+	// General
+	// =============================================================
 
-	inline bool IsInSprint(  ) { return aPlayerFlags & PlyInSprint; }
-	inline bool IsInDuck(  ) { return aPlayerFlags & PlyInDuck; }
+	void                    Spawn(  );
+	void                    Respawn(  );
+	void                    Update( float dt );
 
-	inline bool WasInSprint(  ) { return aPrevPlayerFlags & PlyInSprint; }
-	inline bool WasInDuck(  ) { return aPrevPlayerFlags & PlyInDuck; }
+	void                    UpdateInputs(  );
+	void                    UpdateView(  );
 
-	MoveType aMoveType;
+	void                    DisplayPlayerStats(  );
+	float                   GetViewHeight(  );
 
-	int aFlags;
+	void                    SetPos( const glm::vec3& origin );
+	const glm::vec3&        GetPos(  ) const;
+
+	void                    SetAng( const glm::vec3& angles );
+	const glm::vec3&        GetAng(  ) const;
+
+	void                    SetPosVel( const glm::vec3& origin );
+
+	/* Returns velocity multiplied by frametime */
+	glm::vec3               GetFrameTimeVelocity(  );
+
+	// =============================================================
+	// Movement
+	// =============================================================
+
+	void                    DetermineMoveType(  );
+	void                    UpdatePosition(  );
+
+	void                    PlayStepSound(  );
+
+	bool                    IsOnGround(  );
+	bool                    WasOnGround(  );
+	void                    DoRayCollision(  );
+
+	float                   GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
+	float                   GetMaxSpeed(  );
+	float                   GetMaxSpeedBase(  );
+	float                   GetMaxSprintSpeed(  );
+	float                   GetMaxDuckSpeed(  );
+
+	void                    BaseFlyMove(  );
+	void                    NoClipMove(  );
+	void                    FlyMove(  );
+	void                    WalkMove(  );
+
+	void                    DoSmoothDuck(  );
+	void                    DoSmoothLand( bool wasOnGround );
+	void                    DoViewBob(  );
+	void                    DoViewTilt(  );
+
+	void                    AddFriction(  );
+	void                    AddGravity(  );
+	void                    Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
+
+	void                    SetMoveType( MoveType type );
+	void                    SetCollisionEnabled( bool enable );
+	// void                    SetGravity( const glm::vec3& gravity );
+	void                    EnableGravity( bool enabled );
+
+	inline bool             IsInSprint(  )      { return aPlayerFlags & PlyInSprint; }
+	inline bool             IsInDuck(  )        { return aPlayerFlags & PlyInDuck; }
+
+	inline bool             WasInSprint(  )     { return aPrevPlayerFlags & PlyInSprint; }
+	inline bool             WasInDuck(  )       { return aPrevPlayerFlags & PlyInDuck; }
+
+	// =============================================================
+	// Vars
+	// =============================================================
+
+	MoveType aMoveType = MoveType::Walk;
 
 	glm::vec3 aOrigin = {};
 	glm::vec3 aVelocity = {};
@@ -177,9 +155,12 @@ public:
 	PlayerFlags aPlayerFlags = PlyNone;
 	PlayerFlags aPrevPlayerFlags = PlyNone;
 
-	float mX, mY;
-	Direction aDirection;
-	Transform aTransform;
+	float mX, mY = 0.f;
+	Transform aTransform = {};
+
+	glm::vec3 aForward = {};
+	glm::vec3 aUp = {};
+	glm::vec3 aRight = {};
 	
 	double aLastStepTime = 0.f;
 	AudioStream* apStepSound = nullptr; // uh

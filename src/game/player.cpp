@@ -14,7 +14,7 @@ CONVAR( in_duck, 0 );
 CONVAR( in_sprint, 0 );
 CONVAR( in_jump, 0 );
 
-extern ConVarRef e_timescale;
+extern ConVarRef en_timescale;
 
 ConVar forward_speed( "sv_forward_speed", 300 );
 ConVar side_speed( "sv_side_speed", 300 );  // 350.f
@@ -35,7 +35,12 @@ ConVar jump_force( "sv_jump_force", 250 );
 CONVAR( sv_gravity, 800 );
 CONVAR( ground_pos, 250 );
 
+// hack until i add config file support
+#ifdef _MSC_VER
+CONVAR( in_sensitivity, 0.025 );
+#else
 CONVAR( in_sensitivity, 0.1 );
+#endif
 
 CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
@@ -122,18 +127,8 @@ glm::vec3 ViewLerp::LerpView()
 // ============================================================
 
 
-Player::Player():
-	mX(0), mY(0),
-	aFlags(0),
-	aMaxSpeed(0),
-	aMove(0, 0, 0),
-	aVelocity(0, 0, 0),
-	aMoveType(MoveType::Walk),
-	aOrigin(0, 0, 0)
+Player::Player()
 {
-	aTransform = {};
-	aDirection = {};
-
 #if !NO_BULLET_PHYSICS
 	apPhysObj = NULL;
 #endif
@@ -179,7 +174,7 @@ void Player::Respawn()
 {
 	// HACK FOR RIVERHOUSE SPAWN POS
 	aTransform.aPos = {SPAWN_POS};
-	aTransform.rotation = {0, 0, 0, 0};
+	aTransform.aAng = {0, 0, 0};
 	aVelocity = {0, 0, 0};
 	aOrigin = {0, 0, 0};
 	aMove = {0, 0, 0};
@@ -233,10 +228,21 @@ void Player::SetPos( const glm::vec3& origin )
 	aTransform.aPos = origin;
 }
 
-const glm::vec3& Player::GetPos(  )
+const glm::vec3& Player::GetPos(  ) const
 {
 	return aTransform.aPos;
 }
+
+void Player::SetAng( const glm::vec3& angles )
+{
+	aTransform.aAng = angles;
+}
+
+const glm::vec3& Player::GetAng(  ) const
+{
+	return aTransform.aAng;
+}
+
 
 void Player::SetPosVel( const glm::vec3& origin )
 {
@@ -248,40 +254,11 @@ glm::vec3 Player::GetFrameTimeVelocity(  )
 	return aVelocity * game->aFrameTime;
 }
 
-/*void Player::SetAng( const glm::vec3& angle )
-{
-	aTransform.position = origin;
-}
-
-const glm::vec3& Player::GetAng(  )
-{
-	return aTransform.position;
-}*/
-
 
 void Player::UpdateView(  )
 {
-	float& pitch = aTransform.aAng[PITCH];
-	float& yaw = aTransform.aAng[YAW];
-	float& roll = aTransform.aAng[ROLL];
-
-	pitch = -mY;
-	yaw = mX;
-
-	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::vec3 forward = glm::vec3(0.0f, 0.0f, -1.0f);
-	glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
-
-	// keeping the old way for now still
-	glm::quat xRot = glm::angleAxis(glm::radians(mY), glm::normalize(glm::vec3(-1.0f, 0.0f, 0.0f)));
-	glm::quat yRot = glm::angleAxis(glm::radians(mX), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
-	aTransform.rotation = xRot * yRot;
-
-	aDirection.Update( forward*yRot, up*xRot, right*yRot );
-
-	//game->apGui->DebugMessage( 8,  "Old Forward Direction:  %s", Vec2Str(aDirection.forward).c_str() );
-	//game->apGui->DebugMessage( 9,  "Old Up Direction:       %s", Vec2Str(aDirection.up).c_str() );
-	//game->apGui->DebugMessage( 10, "Old Right Direction:    %s", Vec2Str(aDirection.right).c_str() );
+	aTransform.aAng[PITCH] = -mY;
+	aTransform.aAng[YAW] = mX;
 
 	/* Copy the player transformation, and apply the view offsets to it */
 	Transform transform = aTransform;
@@ -290,19 +267,8 @@ void Player::UpdateView(  )
 
 	glm::mat4 viewMatrix = transform.ToViewMatrix(  );
 
-	game->SetViewMatrix( transform.ToViewMatrix(  ) );
-
-	forward = -glm::normalize( glm::vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]) );
-	up = glm::normalize( glm::vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]) );
-	right = glm::normalize( glm::vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]) );
-
-	// moves in the right direction, but the values look slightly different
-	aDirection.Update( forward, up, right );
-
-	// slightly offset from what it was before
-	//game->apGui->DebugMessage( 12, "New Forward Direction:  %s", Vec2Str(forward).c_str() );
-	//game->apGui->DebugMessage( 13, "New Up Direction:       %s", Vec2Str(up).c_str() );
-	//game->apGui->DebugMessage( 14, "New Right Direction:    %s", Vec2Str(right).c_str() );
+	game->SetViewMatrix( viewMatrix );
+	GetDirectionVectors( viewMatrix, aForward, aUp, aRight );
 }
 
 
@@ -388,7 +354,7 @@ void Player::DoSmoothDuck(  )
 	static float duckLerp = targetViewHeight;
 	static float prevDuckLerp = targetViewHeight;
 
-	float viewHeightLerp = cl_view_height_lerp * cl_lerp_scale * e_timescale;
+	float viewHeightLerp = cl_view_height_lerp * cl_lerp_scale * en_timescale;
 
 	// NOTE: this doesn't work properly when jumping mid duck and landing
 	// try and get this to round up a little faster while lerping to the target pos at the same speed?
@@ -713,11 +679,11 @@ void Player::BaseFlyMove(  )
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[i] = aDirection.forward[i]*aDirection.up[1]*aMove.x + aDirection.right[i]*aMove.z;
+		wishvel[i] = aForward[i]*aUp[1]*aMove.x + aRight[i]*aMove.z;
 
 	// vertical movement
 	// why is this super slow when looking near 80 degrees down or up and higher and when not sprinting?
-	wishvel[1] = aDirection.up[2]*aMove.x;
+	wishvel[1] = aUp[2]*aMove.x;
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
@@ -754,7 +720,7 @@ void Player::FlyMove(  )
 
 void Player::WalkMove(  )
 {
-	glm::vec3 wishvel = aDirection.forward*aMove.x + aDirection.right*aMove.z;
+	glm::vec3 wishvel = aForward*aMove.x + aRight*aMove.z;
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
 	//	wishvel[1] = aMove.y;
@@ -809,7 +775,7 @@ void Player::DoSmoothLand( bool wasOnGround )
 	static float duckLerp = aVelocity.y * velocity_scale;
 	static float prevDuckLerp = aVelocity.y * velocity_scale;
 
-	float landLerp = cl_smooth_land_lerp * cl_lerp_scale * e_timescale;
+	float landLerp = cl_smooth_land_lerp * cl_lerp_scale * en_timescale;
 	float landScale = cl_smooth_land_scale * velocity_scale;
 	float landUpScale = cl_smooth_land_up_scale * velocity_scale;
 
@@ -917,12 +883,9 @@ void Player::DoViewBob(  )
 
 	// never reaches 0 so do this to get it to 0
 	static float sinMessFix = sin(cos(tan(cos(0))));
-	//static float sinMessFix = cos(tan(cos(0)));
 	
 	// using this math function mess instead of abs(sin(x)) and lerping it, since it gives a similar result
-	// though it may be too smooth now? idk
 	float output = cl_bob_magnitude * (sin(cos(tan(cos(sineInput)))) - sinMessFix);
-	//float output = cl_bob_magnitude * (cos(tan(cos(sineInput))) - sinMessFix);
 
 	// cos(tan(sin(x))) or cos(tan(cos(x)))
 	// sin(cos(tan(cos(x)))) * 1.2
@@ -980,7 +943,7 @@ void Player::DoViewTilt(  )
 	if ( cl_tilt == 0.f )
 		return;
 
-	float side = glm::dot(aVelocity, aDirection.right);
+	float side = glm::dot( aVelocity, aRight );
 	float sign = side < 0 ? -1 : 1;
 	float curVel = side * sign; 
 

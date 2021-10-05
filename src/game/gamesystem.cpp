@@ -22,7 +22,7 @@ CONVAR( r_fov, 100.f );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
 
-CONVARREF( e_timescale );
+CONVARREF( en_timescale );
 
 extern ConVar velocity_scale;
 
@@ -232,7 +232,8 @@ void GameSystem::Update( float frameTime )
 {
 	BaseClass::Update( frameTime );
 
-	aFrameTime = frameTime * e_timescale;
+	// move to engine?
+	aFrameTime = frameTime * en_timescale;
 
 	// scale the nearz and farz
 	aView.Set( 0, 0, aView.width, aView.height, r_nearz * velocity_scale, r_farz * velocity_scale, r_fov );
@@ -292,9 +293,13 @@ void GameSystem::CheckPaused(  )
 	apAudio->SetPaused( aPaused );
 }
 
-ConVar proto_x("proto_x", "550");
-ConVar proto_y("proto_y", "240");
-ConVar proto_z("proto_z", "-360");
+CONVAR( proto_x,  550 );
+CONVAR( proto_y,  240 );
+CONVAR( proto_z, -360 );
+
+CONVAR( proto_spin_p, 0 );
+CONVAR( proto_spin_y, 1 );
+CONVAR( proto_spin_r, 0 );
 
 
 // will be used in the future for when updating bones and stuff
@@ -307,14 +312,14 @@ void GameSystem::SetupModels( float frameTime )
 			proto_y * velocity_scale,
 			proto_z * velocity_scale
 		};
+		
+		g_proto->mdl->GetModelData().aTransform.aAng[PITCH] += proto_spin_p * aFrameTime;
+		g_proto->mdl->GetModelData().aTransform.aAng[YAW]   += proto_spin_y * aFrameTime;
+		g_proto->mdl->GetModelData().aTransform.aAng[ROLL]  += proto_spin_r * aFrameTime;
 	}
 
 	// scale the world
-	g_riverhouse->mdl->GetModelData().aTransform.aScale = {
-		velocity_scale,
-		velocity_scale,
-		velocity_scale
-	};
+	g_riverhouse->mdl->GetModelData().aTransform.aScale = glm::vec3(1.f) * velocity_scale.GetFloat();
 
 	if ( g_streamModel )
 	{
@@ -366,7 +371,7 @@ void GameSystem::UpdateAudio(  )
 		}
 	}
 
-	apAudio->SetListenerTransform( aLocalPlayer->GetPos(), aLocalPlayer->aTransform.rotation );
+	apAudio->SetListenerTransform( aLocalPlayer->GetPos(), aLocalPlayer->aTransform.aAng );
 }
 
 
