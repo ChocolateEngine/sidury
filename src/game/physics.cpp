@@ -37,7 +37,7 @@ void PhysicsObject::setWorldTransform( const btTransform& worldTransform )
 	//glm::mat4 globalMatrix;
 	//worldTransform.getOpenGLMatrix( (btScalar*)&globalMatrix[0] );
 
-	aTransform.position = globalPosition;
+	aTransform.aPos = globalPosition;
 	aTransform.rotation = globalRotation;
 }
 
@@ -52,7 +52,7 @@ void PhysicsObject::SetWorldTransform( const Transform& transform )
 {
 	aTransform = transform;
 	
-	apRigidBody->getWorldTransform().setOrigin( toBt(aTransform.position) );
+	apRigidBody->getWorldTransform().setOrigin( toBt(aTransform.aPos) );
 
 	apRigidBody->getMotionState()->setWorldTransform( toBt(aTransform) );
 
@@ -419,7 +419,7 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 
 	btTransform transform;
 	transform.setIdentity();
-	transform.setOrigin( toBt(model.aTransform.position) );
+	transform.setOrigin( toBt(model.aTransform.aPos) );
 
 	btAlignedObjectArray<btVector3> convertedVerts;
 	convertedVerts.reserve( model.aVertexCount );

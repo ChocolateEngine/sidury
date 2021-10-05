@@ -38,7 +38,7 @@ inline btVector3 toBt(const glm::vec3& from) {
 inline Transform fromBt(const btTransform& from)
 {
 	Transform to;
-	to.position = fromBt( from.getOrigin() );
+	to.aPos = fromBt( from.getOrigin() );
 	to.rotation = fromBt( from.getRotation() );
 	return to;
 }
@@ -46,7 +46,7 @@ inline Transform fromBt(const btTransform& from)
 inline btTransform toBt(const Transform& from)
 {
 	btTransform to;
-	to.setOrigin( toBt(from.position) );
+	to.setOrigin( toBt(from.aPos) );
 	to.setRotation( toBt(from.rotation) );
 	return to;
 }

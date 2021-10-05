@@ -18,9 +18,13 @@ void CenterMouseOnScreen(  )
 }
 
 
-CONVAR( cl_fov, 100 );
-// CONVAR( e_timescale, 1 );
-ConVarRef e_timescale( "e_timescale" );
+CONVAR( r_fov, 100.f );
+CONVAR( r_nearz, 1.f );
+CONVAR( r_farz, 10000.f );
+
+CONVARREF( e_timescale );
+
+extern ConVar velocity_scale;
 
 
 struct ModelPhysTest
@@ -61,7 +65,7 @@ GameSystem::GameSystem(  ):
 	aFrameTime(0.f),
 	// only large near and farz for riverhouse and quake movement
 	// aView( 0, 0, 200, 200, 1, 10000, 90 )
-	aView( 0, 0, 200, 200, 0.01, 200, cl_fov )
+	aView( 0, 0, 200, 200, r_nearz, r_farz, r_fov )
 {
 	game = this;
 }
@@ -146,7 +150,7 @@ void GameSystem::LoadWorld(  )
 {
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
-	g_riverhouse->mdl->GetModelData().aTransform.scale = {0.025, 0.025, 0.025};
+	g_riverhouse->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
 	aModels.push_back( g_riverhouse->mdl );
 
 #if !NO_BULLET_PHYSICS
@@ -191,10 +195,10 @@ void GameSystem::CreateEntities(  )
 		// raise it up in the air
 		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 500.f;
 		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 5.f;
-		g_physEnts[i]->mdl->GetModelData().aTransform.position.x = 5.f;
+		g_physEnts[i]->mdl->GetModelData().aTransform.aPos.x = 5.f;
 
 #if !NO_BULLET_PHYSICS
-		physInfo.transform.position = g_physEnts[i]->mdl->GetModelData().aTransform.position;
+		physInfo.transform.aPos = g_physEnts[i]->mdl->GetModelData().aTransform.aPos;
 
 		//physInfo.modelData = &g_riverhouse->mdl->GetModelData();
 
@@ -224,14 +228,14 @@ ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
 
 
-
-
-
 void GameSystem::Update( float frameTime )
 {
 	BaseClass::Update( frameTime );
 
 	aFrameTime = frameTime * e_timescale;
+
+	// scale the nearz and farz
+	aView.Set( 0, 0, aView.width, aView.height, r_nearz * velocity_scale, r_farz * velocity_scale, r_fov );
 
 	CheckPaused(  );
 
@@ -292,15 +296,13 @@ ConVar proto_x("proto_x", "550");
 ConVar proto_y("proto_y", "240");
 ConVar proto_z("proto_z", "-360");
 
-extern ConVar velocity_scale;
-
 
 // will be used in the future for when updating bones and stuff
 void GameSystem::SetupModels( float frameTime )
 {
 	if ( g_proto && g_proto->mdl )
 	{
-		g_proto->mdl->GetModelData().aTransform.position = {
+		g_proto->mdl->GetModelData().aTransform.aPos = {
 			proto_x * velocity_scale,
 			proto_y * velocity_scale,
 			proto_z * velocity_scale
@@ -308,7 +310,7 @@ void GameSystem::SetupModels( float frameTime )
 	}
 
 	// scale the world
-	g_riverhouse->mdl->GetModelData().aTransform.scale = {
+	g_riverhouse->mdl->GetModelData().aTransform.aScale = {
 		velocity_scale,
 		velocity_scale,
 		velocity_scale
@@ -316,11 +318,8 @@ void GameSystem::SetupModels( float frameTime )
 
 	if ( g_streamModel )
 	{
-		g_streamModel->GetModelData().aTransform.scale = {snd_cube_scale, snd_cube_scale, snd_cube_scale};
+		g_streamModel->GetModelData().aTransform.aScale = {snd_cube_scale, snd_cube_scale, snd_cube_scale};
 	}
-
-	// scale the nearz and farz
-	aView.Set( 0, 0, aView.width, aView.height, 1 * velocity_scale, 10000 * velocity_scale, cl_fov );
 }
 
 
@@ -375,10 +374,17 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 {
 	switch (e->type)
 	{
-		case SDL_WINDOWEVENT_SIZE_CHANGED:
+		case SDL_WINDOWEVENT:
 		{
-			apGraphics->GetWindowSize( &aView.width, &aView.height );
-			aView.ComputeProjection();
+			switch (e->window.event)
+			{
+				case SDL_WINDOWEVENT_SIZE_CHANGED:
+				{
+					apGraphics->GetWindowSize( &aView.width, &aView.height );
+					aView.ComputeProjection();
+					break;
+				}
+			}
 			break;
 		}
 
