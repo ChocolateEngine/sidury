@@ -679,11 +679,7 @@ void Player::BaseFlyMove(  )
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[i] = aForward[i]*aUp[1]*aMove.x + aRight[i]*aMove.z;
-
-	// vertical movement
-	// why is this super slow when looking near 80 degrees down or up and higher and when not sprinting?
-	wishvel[1] = aUp[2]*aMove.x;
+		wishvel[i] = aForward[i]*aMove.x + aRight[i]*aMove.z;
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
@@ -721,6 +717,7 @@ void Player::FlyMove(  )
 void Player::WalkMove(  )
 {
 	glm::vec3 wishvel = aForward*aMove.x + aRight*aMove.z;
+	//glm::vec3 wishvel = aForward*(-aUp[WORLD_UP])*aMove.x + aRight*aMove.z;
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
 	//	wishvel[1] = aMove.y;
