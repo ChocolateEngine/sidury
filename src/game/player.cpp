@@ -166,7 +166,7 @@ void Player::Spawn()
 
 	SetMoveType( MoveType::Walk );
 
-	aViewOffset = {0, cl_view_height, 0};
+	aViewOffset = {0, 0, cl_view_height};
 }
 
 
@@ -209,8 +209,8 @@ void Player::Update( float dt )
 void Player::DisplayPlayerStats(  )
 {
 	glm::vec3 scaledVelocity = aVelocity * velocity_scale.GetFloat();
-	float scaledSpeed = glm::length( glm::vec2(scaledVelocity.x, scaledVelocity.z) );
-	float speed = glm::length( glm::vec2(aVelocity.x, aVelocity.z) );
+	float scaledSpeed = glm::length( glm::vec2(scaledVelocity.x, scaledVelocity.y) );
+	float speed = glm::length( glm::vec2(aVelocity.x, aVelocity.y) );
 
 	game->apGui->DebugMessage( 0, "Player Pos:    %s", Vec2Str(aTransform.aPos).c_str() );
 	// game->apGui->DebugMessage( 1, "Player Rot:    %s", Quat2Str(aTransform.rotation).c_str() );
@@ -218,7 +218,7 @@ void Player::DisplayPlayerStats(  )
 	game->apGui->DebugMessage( 2, "Player Vel:    %s", Vec2Str(scaledVelocity).c_str() );
 
 	game->apGui->DebugMessage( 4, "Player Speed:  %.4f (%.4f Unscaled)", scaledSpeed, speed );
-	game->apGui->DebugMessage( 5, "View Offset:   %.6f (%.6f Unscaled)", aViewOffset.y * velocity_scale, aViewOffset.y );
+	game->apGui->DebugMessage( 5, "View Offset:   %.6f (%.6f Unscaled)", aViewOffset.z * velocity_scale, aViewOffset.z );
 	game->apGui->DebugMessage( 6, "Ang Offset:    %s", Vec2Str(aViewAngOffset).c_str() );
 }
 
@@ -260,7 +260,7 @@ void Player::UpdateView(  )
 	aTransform.aAng[PITCH] = -mY;
 	aTransform.aAng[YAW] = mX;
 
-	/* Copy the player transformation, and apply the view offsets to it */
+	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transform = aTransform;
 	transform.aPos += aViewOffset * velocity_scale.GetFloat();
 	transform.aAng += aViewAngOffset;
@@ -476,7 +476,7 @@ void Player::DoRayCollision(  )
 {
 #if !NO_BULLET_PHYSICS
 	// temp to avoid a crash intantly?
-	if ( aVelocity.x == 0.f && aVelocity.y == 0.f && aVelocity.z == 0.f )
+	if ( aVelocity.x == 0.f && aVelocity.y == 0.f && aVelocity.y == 0.f )
 		return;
 
 	btVector3 btFrom = toBt( GetPos() );
@@ -509,7 +509,7 @@ bool Player::IsOnGround(  )
 {
 #if !NO_BULLET_PHYSICS
 	btVector3 btFrom = toBt( GetPos() );
-	btVector3 btTo( GetPos().x, -10000.0, GetPos().z );
+	btVector3 btTo( GetPos().x, -10000.0, GetPos().y );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
 	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
@@ -632,7 +632,7 @@ void Player::PlayStepSound(  )
 		}
 	};
 
-	//glm::vec2 groundVel = {aVelocity.x, aVelocity.z};
+	//glm::vec2 groundVel = {aVelocity.x, aVelocity.y};
 	float speed = glm::length(aVelocity);
 
 	if ( speed < cl_stepspeed )
@@ -931,32 +931,52 @@ void Player::DoViewBob(  )
 }
 
 
-CONVAR( cl_tilt, 0.6 );
+CONVAR( cl_tilt, 0.8 );
 CONVAR( cl_tilt_speed, 0.1 );
+CONVAR( cl_tilt_threshold, 200 );
+
+CONVAR( cl_tilt_new, 1 );
+CONVAR( cl_tilt_lerp, 0.05 );
 
 
 void Player::DoViewTilt(  )
 {
-	if ( cl_tilt == 0.f )
+	if ( !cl_tilt_new.GetBool() )
+	{
+		float side = glm::dot( aVelocity, aRight );
+		float sign = side < 0 ? -1 : 1;
+
+		float speedFactor = glm::clamp( glm::max(0.f, side * sign - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f );
+
+		side = fabs(side);
+
+		if (side < cl_tilt_speed.GetFloat())
+			side = side * cl_tilt / cl_tilt_speed;
+		else
+			side = cl_tilt;
+
+		/* Lerp the tilt angle by how fast your going. */
+		float output = glm::mix( 0.f, side * sign, speedFactor );
+
+		aViewAngOffset = {0, 0, output};
 		return;
+	}
 
-	float side = glm::dot( aVelocity, aRight );
-	float sign = side < 0 ? -1 : 1;
-	float curVel = side * sign; 
+	// not too sure about this one, so im keeping the old one just in case
 
-	side = fabs(side);
+	static float prevTilt = 0.f;
 
-	if (side < cl_tilt_speed.GetFloat())
-		side = side * cl_tilt / cl_tilt_speed;
-	else
-		side = cl_tilt;
+	float output = glm::dot( aVelocity, aRight );
+	float side = output < 0 ? -1 : 1;
 
-	float speedFactor = glm::clamp( curVel / GetMaxSprintSpeed(), 0.f, 1.f );
+	output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
 
-	/* Lerp the tilt angle by how fast your going */
-	float output = glm::mix( 0.f, side * sign, speedFactor );
+	/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
+	output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * en_timescale );
 
 	aViewAngOffset = {0, 0, output};
+
+	prevTilt = output;
 }
 
 
@@ -968,7 +988,6 @@ void Player::AddFriction(  )
 
 	glm::vec3 vel = aVelocity;
 
-	//float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT]);
 	float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT] + vel[W_UP]*vel[W_UP]);
 	if (!speed)
 		return;
@@ -976,10 +995,8 @@ void Player::AddFriction(  )
 	// if the leading edge is over a dropoff, increase friction
 	start.x = stop.x = GetPos().x + vel.x / speed*16.f;
 	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*16.f;
-
-	// start.y = GetPos().y + sv_player->v.mins.y;
 	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*16.f;
-	//stop[W_UP] = start[W_UP] - 34;
+	// start.z = GetPos().z + sv_player->v.mins.z;
 
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
 
