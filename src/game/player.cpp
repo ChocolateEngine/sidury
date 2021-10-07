@@ -956,7 +956,7 @@ void Player::DoViewTilt(  )
 	/* Lerp the tilt angle by how fast your going */
 	float output = glm::mix( 0.f, side * sign, speedFactor );
 
-	aViewAngOffset = {0, output, 0};
+	aViewAngOffset = {0, 0, output};
 }
 
 
