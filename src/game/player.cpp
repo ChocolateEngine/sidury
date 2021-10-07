@@ -265,10 +265,10 @@ void Player::UpdateView(  )
 	transform.aPos += aViewOffset * velocity_scale.GetFloat();
 	transform.aAng += aViewAngOffset;
 
-	glm::mat4 viewMatrix = transform.ToViewMatrix(  );
+	glm::mat4 viewMatrix = transform.ToViewMatrixZ(  );
 
 	game->SetViewMatrix( viewMatrix );
-	GetDirectionVectors( viewMatrix, aForward, aUp, aRight );
+	GetDirectionVectors( viewMatrix, aForward, aRight, aUp );
 }
 
 
@@ -297,10 +297,10 @@ void Player::UpdateInputs(  )
 	const float sideSpeed = side_speed * moveScale;
 	aMaxSpeed = max_speed * moveScale;
 
-	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() ) aMove.x = forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_S) || in_forward == -1.f ) aMove.x += -forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_A) || in_side == -1.f ) aMove.z = -sideSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_D) || in_side.GetBool() ) aMove.z += sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() ) aMove[W_FORWARD] = forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_S) || in_forward == -1.f ) aMove[W_FORWARD] += -forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_A) || in_side == -1.f ) aMove[W_RIGHT] = -sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_D) || in_side.GetBool() ) aMove[W_RIGHT] += sideSpeed;
 
 	// HACK:
 	// why is this so complicated???
@@ -312,9 +312,9 @@ void Player::UpdateInputs(  )
 	if ( jump && IsOnGround() && !jumped )
 	{
 #if !NO_BULLET_PHYSICS
-		apPhysObj->ApplyImpulse( {0, jump_force, 0} );
+		apPhysObj->ApplyImpulse( {0, 0, jump_force} );
 #endif
-		aVelocity.y += jump_force;
+		aVelocity[W_UP] += jump_force;
 		jumped = true;
 	}
 	else
@@ -344,7 +344,7 @@ void Player::DoSmoothDuck(  )
 	// that way we don't duplicate code, and have it work for multiplayer
 
 	static float targetViewHeight = GetViewHeight();
-	static glm::vec3 prevViewHeight = {0, GetViewHeight(), 0};
+	static glm::vec3 prevViewHeight = {0, 0, GetViewHeight()};
 
 	//static glm::vec3 duckLerpGoal = prevViewHeight;
 	//static glm::vec3 duckLerp = prevViewHeight;
@@ -377,14 +377,14 @@ void Player::DoSmoothDuck(  )
 		duckLerp = Round( duckLerp );
 		// floating point inprecision smh my head
 		//aViewOffset = glm::lerp( prevViewHeight, duckLerp, viewHeightLerp );
-		aViewOffset.y = std::lerp( prevViewHeight.y, duckLerp, viewHeightLerp );
+		aViewOffset[W_UP] = std::lerp( prevViewHeight[W_UP], duckLerp, viewHeightLerp );
 
 		targetViewHeight = GetViewHeight();
 	}
 	else
 	{
 		//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, viewHeightLerp );
-		aViewOffset.y = std::lerp( prevViewHeight.y, targetViewHeight, viewHeightLerp );
+		aViewOffset[W_UP] = std::lerp( prevViewHeight[W_UP], targetViewHeight, viewHeightLerp );
 	}
 
 	prevViewHeight = aViewOffset;
@@ -528,7 +528,7 @@ bool Player::IsOnGround(  )
 	return false;
 #else
 	// aOnGround = GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
-	bool onGround = GetPos().y <= ground_pos * velocity_scale;
+	bool onGround = GetPos()[W_UP] <= ground_pos * velocity_scale;
 
 	if ( onGround )
 		aPlayerFlags |= PlyOnGround;
@@ -679,7 +679,7 @@ void Player::BaseFlyMove(  )
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[i] = aForward[i]*aMove.x + aRight[i]*aMove.z;
+		wishvel[i] = aForward[i]*aMove.x + aRight[i]*aMove[W_RIGHT];
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
@@ -716,13 +716,13 @@ void Player::FlyMove(  )
 
 void Player::WalkMove(  )
 {
-	glm::vec3 wishvel = aForward*aMove.x + aRight*aMove.z;
-	//glm::vec3 wishvel = aForward*(-aUp[WORLD_UP])*aMove.x + aRight*aMove.z;
+	// add forward and up so we don't stand still when looking down and trying to walk forward
+	glm::vec3 wishvel = (aForward+aUp)*aMove.x + aRight*aMove[W_RIGHT];
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
-	//	wishvel[1] = aMove.y;
+	//	wishvel[W_UP] = aMove.y;
 	//else
-		wishvel[1] = 0;
+		wishvel[W_UP] = 0;
 
 	glm::vec3 wishdir(0,0,0);
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
@@ -733,7 +733,7 @@ void Player::WalkMove(  )
 	{
 		// blech
 #if NO_BULLET_PHYSICS
-		//aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+		//aTransform.position.z = ground_pos.GetFloat() * velocity_scale.GetFloat();
 #endif
 
 		AddFriction(  );
@@ -760,7 +760,7 @@ void Player::WalkMove(  )
 	DoViewTilt(  );
 
 	if ( IsOnGround() )
-		aVelocity.y = 0;
+		aVelocity[W_UP] = 0;
 }
 
 
@@ -769,8 +769,8 @@ void Player::DoSmoothLand( bool wasOnGround )
 	static glm::vec3 prevViewHeight = {};
 	static glm::vec3 fallViewOffset = {};
 
-	static float duckLerp = aVelocity.y * velocity_scale;
-	static float prevDuckLerp = aVelocity.y * velocity_scale;
+	static float duckLerp = aVelocity[W_UP] * velocity_scale;
+	static float prevDuckLerp = aVelocity[W_UP] * velocity_scale;
 
 	float landLerp = cl_smooth_land_lerp * cl_lerp_scale * en_timescale;
 	float landScale = cl_smooth_land_scale * velocity_scale;
@@ -782,16 +782,16 @@ void Player::DoSmoothLand( bool wasOnGround )
 		// meh, works well enough with the current values for now
 		if ( IsOnGround() && !wasOnGround )
 		{
-			duckLerp = aVelocity.y * velocity_scale;
+			duckLerp = aVelocity[W_UP] * velocity_scale;
 			prevDuckLerp = duckLerp;
 		}
 
 		// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
 		// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetLandingLerp() );
 		// acts like a trampoline, hmm
-		duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight.y) * landUpScale, landLerp );
+		duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight[W_UP]) * landUpScale, landLerp );
 
-		fallViewOffset.y += duckLerp / landScale;
+		fallViewOffset[W_UP] += duckLerp / landScale;
 		prevDuckLerp = duckLerp;
 	}
 	else
@@ -827,7 +827,7 @@ void Player::DoViewBob(  )
 
 	static float timeSinceStartedWalking = game->aCurTime;
 
-	float curVel = glm::length( glm::vec2(aVelocity.x, aVelocity.z) ); 
+	float curVel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
 
 	if ( curVel == 0.f )
 		timeSinceStartedWalking = game->aCurTime;
@@ -919,7 +919,7 @@ void Player::DoViewBob(  )
 	// float freq = glm::clamp( (curVel / aMaxSpeed) * cl_bob_freq, 0.f, cl_bob_freq_max.GetFloat() );
 	// float freq = glm::clamp( curVel * cl_bob_freq, 0.f, cl_bob_freq_max.GetFloat() );
 
-	aViewOffset.y += output;
+	aViewOffset[W_UP] += output;
 
 	//prevViewBob = output;
 
@@ -956,7 +956,7 @@ void Player::DoViewTilt(  )
 	/* Lerp the tilt angle by how fast your going */
 	float output = glm::mix( 0.f, side * sign, speedFactor );
 
-	aViewAngOffset = {0, 0, output};
+	aViewAngOffset = {0, output, 0};
 }
 
 
@@ -968,17 +968,18 @@ void Player::AddFriction(  )
 
 	glm::vec3 vel = aVelocity;
 
-	float speed = sqrt(vel[0]*vel[0] + vel[2]*vel[2]);
+	//float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT]);
+	float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT] + vel[W_UP]*vel[W_UP]);
 	if (!speed)
 		return;
 
 	// if the leading edge is over a dropoff, increase friction
 	start.x = stop.x = GetPos().x + vel.x / speed*16.f;
-	start.z = stop.z = GetPos().z + vel.z / speed*16.f;
+	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*16.f;
 
 	// start.y = GetPos().y + sv_player->v.mins.y;
-	start.y = stop.y = GetPos().y + vel.y / speed*16.f;
-	stop[1] = start[1] - 34;
+	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*16.f;
+	//stop[W_UP] = start[W_UP] - 34;
 
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
 
@@ -1016,9 +1017,9 @@ void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 void Player::AddGravity(  )
 {
 #if !NO_BULLET_PHYSICS
-	aVelocity.y = apPhysObj->GetLinearVelocity().y;
+	aVelocity[W_UP] = apPhysObj->GetLinearVelocity().y;
 #else
-	aVelocity.y -= sv_gravity * game->aFrameTime;
+	aVelocity[W_UP] -= sv_gravity * game->aFrameTime;
 #endif
 }
 

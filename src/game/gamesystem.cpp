@@ -150,7 +150,12 @@ void GameSystem::LoadWorld(  )
 {
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
+	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_bsp_export.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	g_riverhouse->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
+
+	// rotate the world model to match Z up
+	g_riverhouse->mdl->GetModelData().aTransform.aAng.x = glm::radians(90.f);
+
 	aModels.push_back( g_riverhouse->mdl );
 
 #if !NO_BULLET_PHYSICS
@@ -298,8 +303,8 @@ CONVAR( proto_y,  240 );
 CONVAR( proto_z, -360 );
 
 CONVAR( proto_spin_p, 0 );
-CONVAR( proto_spin_y, 1 );
-CONVAR( proto_spin_r, 0 );
+CONVAR( proto_spin_y, 0 );
+CONVAR( proto_spin_r, 1 );
 
 
 // will be used in the future for when updating bones and stuff

@@ -6,6 +6,15 @@
 #include "../../chocolate/inc/core/graphics.h"
 #include "../../chocolate/inc/types/renderertypes.h"
 
+// world xyz
+constexpr int W_FORWARD = 0;
+constexpr int W_RIGHT = 1;
+constexpr int W_UP = 2;
+
+constexpr glm::vec3 vec3_forward(1, 0, 0);
+constexpr glm::vec3 vec3_right(0, 1, 0);
+constexpr glm::vec3 vec3_up(0, 0, 1);
+
 #include "physics.h"
 //#include "player.h"
 
