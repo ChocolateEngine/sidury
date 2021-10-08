@@ -806,128 +806,58 @@ void Player::DoSmoothLand( bool wasOnGround )
 
 
 CONVAR( cl_bob_enabled, 1 );
-CONVAR( cl_bob_magnitude, 8 );
-CONVAR( cl_bob_freq, 1.65 );
-CONVAR( cl_bob_time_scale, 4 );
-//CONVAR( cl_bob_freq_mult, 10 );
-
-// obsolete now?
-CONVAR( cl_bob_lerp_step, 0.75 );
-CONVAR( cl_bob_lerp, 0.5 );
-CONVAR( cl_bob_lerp_offset, 0 );
-CONVAR( cl_bob_lerp_threshold, 0.5 );
+CONVAR( cl_bob_magnitude, 3 );
+CONVAR( cl_bob_freq, 6 );
+CONVAR( cl_bob_speed_scale, 0.01 );  // idk what to call these 2 lol
+CONVAR( cl_bob_speed_factor_scale, 0.75 );
+CONVAR( cl_bob_exit_lerp, 0.1 );
 
 
-// comment hell right now because it's still not what i want yet
-// plus i need to add a small amount of "noise" with rand() to make it less artificial feeling
+// TODO: doesn't smoothly transition out of viewbob still
+// TODO: maybe make a minimum speed threshold and start lerping to 0
+//  or some check if your movements changed compared to the previous frame
+//  so if you start moving again faster than min speed, or movements change,
+//  you restart the view bob, or take a new step right there
 void Player::DoViewBob(  )
 {
-	if ( !cl_bob_enabled || !IsOnGround() )
+	if ( !cl_bob_enabled )
 		return;
 
-	static float timeSinceStartedWalking = game->aCurTime;
+	static float input = 0.f;
+	static float output = 0.f;
 
-	float curVel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
+	if ( !IsOnGround() )
+	{
+		// lerp back to 0 to not snap view the offset (not good enough) and reset input
+		input = 0.f;
+		output = glm::mix( output, 0.f, cl_bob_exit_lerp.GetFloat() );
+		aViewOffset[W_UP] += output;
+		return;
+	}
 
-	if ( curVel == 0.f )
-		timeSinceStartedWalking = game->aCurTime;
+	float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
 
-	static float timeSinceLastStep = game->aCurTime;
+	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 ) * cl_bob_speed_factor_scale;
 
-	float input = game->aCurTime - timeSinceStartedWalking;
-	// input += game->aFrameTime;
-	// float input = game->aCurTime - timeSinceLastStep;
-
-	// (-(glm::sin( sineInput ) ** 4) ) + 1 // 1 is whatever the max value can be so the lowest value goes to 0
-
-	float speedFactor = glm::clamp( curVel / GetMaxSprintSpeed(), 0.f, 1.f );
-
-	// when velocity changes, this gets offset a lot
-	// float sineInput = freq * cl_bob_freq_mult * input;
-
-	// oscilate between -1 and 1 in this math function?
-	// then we can just stretch it based on the speedFactor, or just normal velocity?
-	// -cos(x * M_PI)
-
-	// or go from to 0 to 1 here?
-	// abs(sin(x * M_PI))
-	
-	// or go from -0.5 to 0.5, where both is multiplied by speedFactor
-	// abs(cos(x * M_PI * 0.5f * speedFactor))
-
-	float sineInput = cl_bob_time_scale * input;
-
-	//sineInput *= M_PI * 0.5f * speedFactor;
-
-	// float freq = curVel * cl_bob_freq;
-	// float freq = glm::mod(curVel, 2.f) * cl_bob_freq;
-	// float freq = speedFactor * cl_bob_freq2;
-	float freq = speedFactor;
-	//float freq = glm::sin(speedFactor * cl_bob_freq2);
-
-	// IDEA subtract from time when changing speed somehow so that way we don't blast through it?
-
-	// sineInput = glm::sin(sineInput * freq) * freq;
-	// sineInput = glm::sin(sineInput) * freq;
-	sineInput = glm::sin(sineInput * cl_bob_freq) * freq;
-	// sineInput *= freq;
-	// sineInput = glm::sin(sineInput) * glm::sin(freq) * freq;
-
-	// float output = glm::abs( cl_bob_magnitude * sin(sineInput) );
-
-	// float output = glm::abs( cl_bob_magnitude * cos(sineInput) ) - cl_bob_magnitude;
-	//float output = glm::abs( cl_bob_magnitude * sin(sineInput) );
+	// scale by speed
+	input += game->aFrameTime * speedFactor * cl_bob_freq;
 
 	// never reaches 0 so do this to get it to 0
 	static float sinMessFix = sin(cos(tan(cos(0))));
 	
 	// using this math function mess instead of abs(sin(x)) and lerping it, since it gives a similar result
-	float output = cl_bob_magnitude * (sin(cos(tan(cos(sineInput)))) - sinMessFix);
+	// mmmmmmm cpu cycles go brrrrrr
+	output = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(input)))) - sinMessFix);
 
-	// cos(tan(sin(x))) or cos(tan(cos(x)))
-	// sin(cos(tan(cos(x)))) * 1.2
-
-	// log(x + 0.1) + 1
-
-	// adjust the height of the view bob based on speed
-	// output = freq * output;
-
-	static float stepTime = input;
-
+	// reset input
 	if ( output == 0.f )
-	{
-		stepTime = input;
-		timeSinceLastStep = input;
-	}
-
-	// when nearing 0, lerp it back up so it has a smooth transition in going back up
-	if ( cl_bob_lerp_step > output && curVel != 0.f )
-	{
-		// lerp the viewbob up a little bit
-		//output = glm::mix( output, cl_bob_lerp_step.GetFloat(), 0.5 );
-
-		// magic number corrects what the lerp is at rest
-		//output += cl_bob_lerp_offset - 0.3750;
-	}
-
-	// is there a way i can have this freq "slow down" the faster it gets? like -(x**2)?
-	
-	// AAAA this just makes the viewbob go exponentially faster the faster we move, i want the opposite !!!
-	//float bobSpeedDecrease = glm::clamp(glm::pow(curVel * 0.05f, 2.f), 0.f, 9999.f);
-	//float freq = bobSpeedDecrease * cl_bob_freq;
-
-	// float freq = glm::clamp( (curVel / aMaxSpeed) * cl_bob_freq, 0.f, cl_bob_freq_max.GetFloat() );
-	// float freq = glm::clamp( curVel * cl_bob_freq, 0.f, cl_bob_freq_max.GetFloat() );
+		input = 0.f;
 
 	aViewOffset[W_UP] += output;
 
-	//prevViewBob = output;
-
-	game->apGui->DebugMessage( 8, "Walk Time: %.8f", input );
-	game->apGui->DebugMessage( 9, "View Bob Offset: %.4f", output );
-	//game->apGui->DebugMessage( 21, "View Bob Freq: %.4f", freq );
-	game->apGui->DebugMessage( 10, "Sine Input: %.6f", sineInput );
-	//game->apGui->DebugMessage( 23, "Sine Input No Time: %.6f", (freq*cl_bob_freq_mult) );
+	game->apGui->DebugMessage( 8,  "Walk Time * Speed:  %.8f", input );
+	game->apGui->DebugMessage( 9,  "View Bob Offset:    %.4f", output );
+	game->apGui->DebugMessage( 10, "View Bob Speed:     %.6f", speedFactor );
 }
 
 
