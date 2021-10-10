@@ -151,7 +151,7 @@ void GameSystem::LoadWorld(  )
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_bsp_export.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
-	g_riverhouse->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
+	//g_riverhouse->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
 
 	// rotate the world model to match Z up
 	g_riverhouse->mdl->GetModelData().aTransform.aAng.x = glm::radians(90.f);
@@ -168,6 +168,13 @@ void GameSystem::LoadWorld(  )
 
 	g_riverhouse->physObj = apPhysEnv->CreatePhysicsObject( physInfo );
 	g_riverhouse->physObj->SetContinuousCollisionEnabled( true );
+
+	// uhhhhh
+	Transform worldTransform = g_riverhouse->mdl->GetModelData().aTransform;
+	worldTransform.aAng.x = 90.f;
+
+	g_riverhouse->physObj->SetWorldTransform( worldTransform );
+	//g_riverhouse->physObj->SetAngularFactor( {0, 0, 0} );
 #endif
 
 	CreateEntities(  );

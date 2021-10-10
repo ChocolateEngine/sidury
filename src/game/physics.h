@@ -35,11 +35,28 @@ inline btVector3 toBt(const glm::vec3& from) {
 	return btVector3(from.x, from.y, from.z);
 }
 
+inline btQuaternion toBtRot(const glm::vec3& from)
+{
+	glm::quat q = AngToQuat( glm::radians(from) );
+	//return btQuaternion(q.x, q.z, -q.y, q.w);
+	return btQuaternion(q.x, q.z, -q.y, q.w);
+	//return btQuaternion(q.x, -q.z, q.y, q.w);
+}
+
+inline glm::vec3 fromBtRot(const btQuaternion& from)
+{
+	//glm::quat q(from.getX(), -from.getZ(), from.getY(), from.getW());
+	glm::quat q(from.getX(), from.getZ(), from.getY(), from.getW());
+	//glm::quat q(from.getX(), from.getZ(), -from.getY(), from.getW());
+	return glm::degrees( QuatToAng(q) );
+}
+
 inline Transform fromBt(const btTransform& from)
 {
 	Transform to;
 	to.aPos = fromBt( from.getOrigin() );
-	to.rotation = fromBt( from.getRotation() );
+	//to.aAng = glm::eulerAngles( fromBt( from.getRotation() ) );
+	to.aAng = fromBtRot( from.getRotation() );
 	return to;
 }
 
@@ -47,7 +64,8 @@ inline btTransform toBt(const Transform& from)
 {
 	btTransform to;
 	to.setOrigin( toBt(from.aPos) );
-	to.setRotation( toBt(from.rotation) );
+	///to.setRotation( toBt( AngToQuat( glm::radians(from.aAng) ) ) );
+	to.setRotation( toBtRot( from.aAng ) );
 	return to;
 }
 
@@ -124,16 +142,24 @@ struct PhysicsObject: public btMotionState
 	void                  SetCollisionEnabled( bool enable );
 	void                  SetContinuousCollisionEnabled( bool enable );
 
+	void                  SetScale( const glm::vec3& scale );
+
 	void                  SetLinearVelocity( const glm::vec3& velocity );
 	void                  SetAngularVelocity( const glm::vec3& velocity );
 	const glm::vec3&      GetLinearVelocity(  );
 	const glm::vec3&      GetAngularVelocity(  );
+	void                  SetAngularFactor( const glm::vec3& ang );
+	void                  SetAngularFactor( float factor );
+	void                  SetSleepingThresholds( float min, float max );
+	void                  SetFriction( float val );
 
 	void                  SetGravity( const glm::vec3& gravity );
 	void                  SetGravity( float gravity );  // convenience function
 
 	void                  ApplyForce( const glm::vec3& force );
 	void                  ApplyImpulse( const glm::vec3& impulse );
+
+	int                   ContactTest();
 
 	//void                GetAabb( const Transform& t, glm::vec3& aabbMin, glm::vec3& aabbMax );
 	//void                GetBoundingSphere( glm::vec3& center, float& radius );
@@ -239,5 +265,7 @@ private:
 public:
 	btDiscreteDynamicsWorld* apWorld;
 };
+
+extern PhysicsEnvironment* physenv;
 
 #endif

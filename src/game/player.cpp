@@ -16,17 +16,21 @@ CONVAR( in_jump, 0 );
 
 extern ConVarRef en_timescale;
 
-ConVar forward_speed( "sv_forward_speed", 300 );
-ConVar side_speed( "sv_side_speed", 300 );  // 350.f
-
-CONVAR( sv_sprint_mult, 2.0 );
+CONVAR( sv_sprint_mult, 2.4 );
 CONVAR( sv_duck_mult, 0.5 );
 
-ConVar max_speed( "sv_max_speed", 300 );  // 320.f
-ConVar stop_speed( "sv_stop_speed", 100 );
+#define DEFAULT_SPEED 250.f // 300.f
+
+ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED );
+ConVar side_speed( "sv_side_speed", DEFAULT_SPEED );  // 350.f
+ConVar max_speed( "sv_max_speed", DEFAULT_SPEED );  // 320.f
+
+ConVar stop_speed( "sv_stop_speed", 50 );
 ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar sv_friction( "sv_friction", 8 );  // 4.f
 ConVar jump_force( "sv_jump_force", 250 );
+
+CONVAR( phys_friction, 0.1 );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
@@ -46,17 +50,23 @@ CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
+#if 1 //NO_BULLET_PHYSICS
 CONVAR( cl_view_height, 56 );
 CONVAR( cl_view_height_duck, 24 );
-CONVAR( cl_view_height_lerp, 0.015 );
+#else
+CONVAR( cl_view_height, 56 );
+CONVAR( cl_view_height_duck, 24 );
+/*#else
+CONVAR( cl_view_height, 40 );
+CONVAR( cl_view_height_duck, 12 );*/
+#endif
+
+CONVAR( cl_view_height_lerp, 15 );  // 0.015
 
 CONVAR( cl_smooth_land, 1 );
-CONVAR( cl_smooth_land_lerp, 0.015 );
-CONVAR( cl_smooth_land_scale, 4000 );
+CONVAR( cl_smooth_land_lerp, 20 );  // 0.015 // 150?
+CONVAR( cl_smooth_land_scale, 300 );
 CONVAR( cl_smooth_land_up_scale, 50 );
-
-// temp
-CONVAR( cl_lerp_scale, 1 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
@@ -79,6 +89,11 @@ constexpr float PLAYER_MASS = 200.f;
 CON_COMMAND( respawn )
 {
 	game->aLocalPlayer->Respawn();
+}
+
+CON_COMMAND( reset_velocity )
+{
+	game->aLocalPlayer->aVelocity = {0, 0, 0};
 }
 
 
@@ -127,6 +142,48 @@ glm::vec3 ViewLerp::LerpView()
 // ============================================================
 
 
+#if !NO_BULLET_PHYSICS
+class FindGround : public btCollisionWorld::ContactResultCallback
+{
+public:
+	btScalar addSingleResult(btManifoldPoint &cp,
+		const btCollisionObjectWrapper *colObj0, int partId0, int index0,
+		const btCollisionObjectWrapper *colObj1, int partId1, int index1)
+	{
+		//if (colObj0->m_collisionObject == mMe && !mHaveGround)
+		{
+			const btTransform &transform = mMe->getWorldTransform();
+			// Orthonormal basis (just rotations) => can just transpose to invert
+			btMatrix3x3 invBasis = transform.getBasis().transpose();
+			btVector3 localPoint = invBasis * (cp.m_positionWorldOnB - transform.getOrigin());
+			localPoint[2] += mShapeHalfHeight;
+			float r = localPoint.length();
+			float cosTheta = localPoint[2] / r;
+
+			//if (fabs(r - mController->mShapeRadius) <= mRadiusThreshold && cosTheta < mMaxCosGround)
+			if ( false )
+			{
+				mHaveGround = true;
+				mGroundPoint = cp.m_positionWorldOnB;
+			}
+		}
+		return 0;
+	}
+
+	btRigidBody *mMe;
+	// Assign some values, in some way
+	float mShapeHalfHeight;
+	float mRadiusThreshold;
+	float mMaxCosGround;
+	bool mHaveGround = false;
+	btVector3 mGroundPoint;
+};
+#endif
+
+
+// ============================================================
+
+
 Player::Player()
 {
 #if !NO_BULLET_PHYSICS
@@ -141,30 +198,29 @@ Player::~Player()
 
 void Player::Spawn()
 {
-	// should be below this code, but then the phys engine crashes
 	Respawn();
 
-	aTransform.aPos = {SPAWN_POS};
-
 #if !NO_BULLET_PHYSICS
-	PhysicsObjectInfo physInfo( ShapeType::Box );
+	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
 	physInfo.mass = PLAYER_MASS;
 	physInfo.transform = aTransform;
 	//physInfo.callbacks = true;
 	//physInfo.collisionType = CollisionType::Kinematic;
-	physInfo.bounds = {16, 72, 16};
+	physInfo.bounds = {14, 14, 32};
+	//physInfo.bounds = {14, 32, 14};  // bruh wtf why y up for this even though it's a btCylinderShapeZ
 
 	apPhysObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
 	apPhysObj->SetAlwaysActive( true );
 	apPhysObj->SetContinuousCollisionEnabled( true );
 	apPhysObj->SetWorldTransform( aTransform );
+	apPhysObj->SetLinearVelocity( {0, 0, 0} );
+	apPhysObj->SetAngularFactor( {0, 0, 0} );
+	//apPhysObj->SetSleepingThresholds( 0, 0 );
+	apPhysObj->SetFriction( phys_friction.GetFloat() );
 
-	// enable Continuous Collision Detection
-	//apPhysObj->aRigidBody.setCcdMotionThreshold( 1e-7 );
-	//apPhysObj->aRigidBody.setCcdSweptSphereRadius( 0.5f );
 #endif
 
-	SetMoveType( MoveType::Walk );
+	SetMoveType( MoveType::NoClip );
 
 	aViewOffset = {0, 0, cl_view_height};
 }
@@ -190,6 +246,21 @@ void Player::Respawn()
 
 void Player::Update( float dt )
 {
+#if !NO_BULLET_PHYSICS
+	// update velocity
+	aVelocity = apPhysObj->GetLinearVelocity();
+
+	//apPhysObj->SetSleepingThresholds( 0, 0 );
+	//apPhysObj->SetAngularFactor( 0 );
+	apPhysObj->SetFriction( phys_friction.GetFloat() );
+#endif
+
+	/*FindGround callback;
+	callback.mMe = apPhysObj->apRigidBody;
+	physenv->apWorld->contactTest(apPhysObj->apRigidBody, callback);
+	bool onGround = callback.mHaveGround;
+	glm::vec3 groundPoint = fromBt(callback.mGroundPoint);*/
+
 	UpdateInputs();
 
 	// should be in WalkMove only, but i need this here when toggling noclip mid-duck
@@ -265,10 +336,8 @@ void Player::UpdateView(  )
 	transform.aPos += aViewOffset * velocity_scale.GetFloat();
 	transform.aAng += aViewAngOffset;
 
-	glm::mat4 viewMatrix = transform.ToViewMatrixZ(  );
-
-	game->SetViewMatrix( viewMatrix );
-	GetDirectionVectors( viewMatrix, aForward, aRight, aUp );
+	game->SetViewMatrix( transform.ToViewMatrixZ(  ) );
+	GetDirectionVectors( aTransform.ToViewMatrixZ(  ), aForward, aRight, aUp );
 }
 
 
@@ -354,7 +423,7 @@ void Player::DoSmoothDuck(  )
 	static float duckLerp = targetViewHeight;
 	static float prevDuckLerp = targetViewHeight;
 
-	float viewHeightLerp = cl_view_height_lerp * cl_lerp_scale * en_timescale;
+	float viewHeightLerp = cl_view_height_lerp * game->aFrameTime;
 
 	// NOTE: this doesn't work properly when jumping mid duck and landing
 	// try and get this to round up a little faster while lerping to the target pos at the same speed?
@@ -460,7 +529,8 @@ void Player::UpdatePosition(  )
 {
 #if !NO_BULLET_PHYSICS
 	//if ( aMoveType == MoveType::Fly )
-		aTransform = apPhysObj->GetWorldTransform();
+		//aTransform = apPhysObj->GetWorldTransform();
+		aTransform.aPos = apPhysObj->GetWorldTransform().aPos;
 #else
 	SetPos( GetPos() + (aVelocity * velocity_scale.GetFloat()) * game->aFrameTime );
 
@@ -505,11 +575,15 @@ void Player::DoRayCollision(  )
 }
 
 
+CONVAR( phys_ground_dist, 1200 );  // 200 // 1050
+
+
 bool Player::IsOnGround(  )
 {
 #if !NO_BULLET_PHYSICS
 	btVector3 btFrom = toBt( GetPos() );
-	btVector3 btTo( GetPos().x, -10000.0, GetPos().y );
+	//btVector3 btTo( GetPos().x, -10000.0, GetPos().y );
+	btVector3 btTo( GetPos().x, GetPos().y, -10000.0 );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
 	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
@@ -517,15 +591,16 @@ bool Player::IsOnGround(  )
 	if ( res.hasHit() )
 	{
 		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
-		if ( dist < 300.f )  // 500.f, 3000.f
+		if ( dist < phys_ground_dist )
 		{
-			aOnGround = true;
-			return true;
+			aPlayerFlags |= PlyOnGround;
 		}
+		else
+			aPlayerFlags &= ~PlyOnGround;
 		
 	}
 
-	return false;
+	//return false;
 #else
 	// aOnGround = GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
 	bool onGround = GetPos()[W_UP] <= ground_pos * velocity_scale;
@@ -717,7 +792,14 @@ void Player::FlyMove(  )
 void Player::WalkMove(  )
 {
 	// add forward and up so we don't stand still when looking down and trying to walk forward
-	glm::vec3 wishvel = (aForward+aUp)*aMove.x + aRight*aMove[W_RIGHT];
+	//glm::vec3 wishvel = (aForward+aUp)*aMove.x + aRight*aMove[W_RIGHT];
+	
+	// HACKHACK:
+	glm::vec3 wishvel = {};
+	if (GetAng().x > 0)
+		wishvel = (aForward+aUp)*aMove.x + aRight*aMove[W_RIGHT];
+	else
+		wishvel = (aForward-aUp)*aMove.x + aRight*aMove[W_RIGHT];
 
 	//if ( (int)sv_player->v.movetype != MOVETYPE_WALK)
 	//	wishvel[W_UP] = aMove.y;
@@ -772,8 +854,8 @@ void Player::DoSmoothLand( bool wasOnGround )
 	static float duckLerp = aVelocity[W_UP] * velocity_scale;
 	static float prevDuckLerp = aVelocity[W_UP] * velocity_scale;
 
-	float landLerp = cl_smooth_land_lerp * cl_lerp_scale * en_timescale;
-	float landScale = cl_smooth_land_scale * velocity_scale;
+	float landLerp = cl_smooth_land_lerp * game->aFrameTime;
+	float landScale = cl_smooth_land_scale * velocity_scale * game->aFrameTime;
 	float landUpScale = cl_smooth_land_up_scale * velocity_scale;
 
 	if ( cl_smooth_land )
@@ -791,7 +873,7 @@ void Player::DoSmoothLand( bool wasOnGround )
 		// acts like a trampoline, hmm
 		duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight[W_UP]) * landUpScale, landLerp );
 
-		fallViewOffset[W_UP] += duckLerp / landScale;
+		fallViewOffset[W_UP] += duckLerp * landScale;
 		prevDuckLerp = duckLerp;
 	}
 	else
@@ -806,11 +888,11 @@ void Player::DoSmoothLand( bool wasOnGround )
 
 
 CONVAR( cl_bob_enabled, 1 );
-CONVAR( cl_bob_magnitude, 3 );
-CONVAR( cl_bob_freq, 6 );
-CONVAR( cl_bob_speed_scale, 0.01 );  // idk what to call these 2 lol
-CONVAR( cl_bob_speed_factor_scale, 0.75 );
+CONVAR( cl_bob_magnitude, 2 );
+CONVAR( cl_bob_freq, 4.5 );
+CONVAR( cl_bob_speed_scale, 0.013 );
 CONVAR( cl_bob_exit_lerp, 0.1 );
+CONVAR( cl_bob_exit_threshold, 0.1 );
 
 
 // TODO: doesn't smoothly transition out of viewbob still
@@ -823,40 +905,44 @@ void Player::DoViewBob(  )
 	if ( !cl_bob_enabled )
 		return;
 
-	static float input = 0.f;
-	static float output = 0.f;
+	//static glm::vec3 prevMove = aMove;
+	//static bool inExit = false;
 
-	if ( !IsOnGround() )
+	if ( !IsOnGround() /*|| aMove != prevMove || inExit*/ )
 	{
 		// lerp back to 0 to not snap view the offset (not good enough) and reset input
-		input = 0.f;
-		output = glm::mix( output, 0.f, cl_bob_exit_lerp.GetFloat() );
-		aViewOffset[W_UP] += output;
+		aWalkTime = 0.f;
+		aBobOffsetAmount = glm::mix( aBobOffsetAmount, 0.f, cl_bob_exit_lerp.GetFloat() );
+		aViewOffset[W_UP] += aBobOffsetAmount;
+		//inExit = aBobOffsetAmount > 0.01;
+		//prevMove = aMove;
 		return;
 	}
 
 	float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
 
-	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 ) * cl_bob_speed_factor_scale;
+	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 );
 
 	// scale by speed
-	input += game->aFrameTime * speedFactor * cl_bob_freq;
+	aWalkTime += game->aFrameTime * speedFactor * cl_bob_freq;
 
 	// never reaches 0 so do this to get it to 0
 	static float sinMessFix = sin(cos(tan(cos(0))));
 	
 	// using this math function mess instead of abs(sin(x)) and lerping it, since it gives a similar result
 	// mmmmmmm cpu cycles go brrrrrr
-	output = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(input)))) - sinMessFix);
+	aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(aWalkTime)))) - sinMessFix);
 
 	// reset input
-	if ( output == 0.f )
-		input = 0.f;
+	if ( aBobOffsetAmount == 0.f )
+		aWalkTime = 0.f;
 
-	aViewOffset[W_UP] += output;
+	aViewOffset[W_UP] += aBobOffsetAmount;
 
-	game->apGui->DebugMessage( 8,  "Walk Time * Speed:  %.8f", input );
-	game->apGui->DebugMessage( 9,  "View Bob Offset:    %.4f", output );
+	//prevMove = aMove;
+
+	game->apGui->DebugMessage( 8,  "Walk Time * Speed:  %.8f", aWalkTime );
+	game->apGui->DebugMessage( 9,  "View Bob Offset:    %.4f", aBobOffsetAmount );
 	game->apGui->DebugMessage( 10, "View Bob Speed:     %.6f", speedFactor );
 }
 
@@ -865,13 +951,17 @@ CONVAR( cl_tilt, 0.8 );
 CONVAR( cl_tilt_speed, 0.1 );
 CONVAR( cl_tilt_threshold, 200 );
 
-CONVAR( cl_tilt_new, 1 );
-CONVAR( cl_tilt_lerp, 0.05 );
+CONVAR( cl_tilt_type, 2 );
+CONVAR( cl_tilt_lerp, 5 );
+CONVAR( cl_tilt_lerp_new, 10 );
+CONVAR( cl_tilt_speed_scale, 0.043 );
+CONVAR( cl_tilt_scale, 0.2 );
+CONVAR( cl_tilt_threshold_new, 12 );
 
 
 void Player::DoViewTilt(  )
 {
-	if ( !cl_tilt_new.GetBool() )
+	if ( cl_tilt_type == 0.f )
 	{
 		float side = glm::dot( aVelocity, aRight );
 		float sign = side < 0 ? -1 : 1;
@@ -899,10 +989,20 @@ void Player::DoViewTilt(  )
 	float output = glm::dot( aVelocity, aRight );
 	float side = output < 0 ? -1 : 1;
 
-	output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
+	if ( cl_tilt_type == 2.f )
+	{
+		float speedFactor = glm::max(0.f, glm::log( glm::max(0.f, (fabs(output) * cl_tilt_speed_scale + 1) - cl_tilt_threshold_new) ));
 
-	/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
-	output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * en_timescale );
+		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
+		output = glm::mix( prevTilt, speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * game->aFrameTime );
+	}
+	else // type 1.f
+	{
+		output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
+
+		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
+		output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * game->aFrameTime );
+	}
 
 	aViewAngOffset = {0, 0, output};
 
@@ -964,7 +1064,7 @@ void Player::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 void Player::AddGravity(  )
 {
 #if !NO_BULLET_PHYSICS
-	aVelocity[W_UP] = apPhysObj->GetLinearVelocity().y;
+	//aVelocity[W_UP] = apPhysObj->GetLinearVelocity()[W_UP];
 #else
 	aVelocity[W_UP] -= sv_gravity * game->aFrameTime;
 #endif

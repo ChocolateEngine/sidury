@@ -162,6 +162,9 @@ public:
 	glm::vec3 aUp = {};
 	glm::vec3 aRight = {};
 	
+	float aWalkTime = 0.f;
+	float aBobOffsetAmount = 0.f;
+
 	double aLastStepTime = 0.f;
 	AudioStream* apStepSound = nullptr; // uh
 
