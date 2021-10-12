@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gamesystem.h"
-#include "util.h"
+#include "../../chocolate/inc/shared/util.h"
 #include "../../chocolate/inc/types/transform.h"
 #include "physics.h"
 
@@ -103,6 +103,7 @@ public:
 	void                    UpdatePosition(  );
 
 	void                    PlayStepSound(  );
+	void                    StopStepSound( bool force = false );  // Temp Hack for sound system
 
 	bool                    IsOnGround(  );
 	bool                    WasOnGround(  );

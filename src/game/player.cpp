@@ -25,7 +25,7 @@ ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED );
 ConVar side_speed( "sv_side_speed", DEFAULT_SPEED );  // 350.f
 ConVar max_speed( "sv_max_speed", DEFAULT_SPEED );  // 320.f
 
-ConVar stop_speed( "sv_stop_speed", 50 );
+ConVar stop_speed( "sv_stop_speed", 75 );
 ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar sv_friction( "sv_friction", 8 );  // 4.f
 ConVar jump_force( "sv_jump_force", 250 );
@@ -215,7 +215,7 @@ void Player::Spawn()
 	apPhysObj->SetWorldTransform( aTransform );
 	apPhysObj->SetLinearVelocity( {0, 0, 0} );
 	apPhysObj->SetAngularFactor( {0, 0, 0} );
-	//apPhysObj->SetSleepingThresholds( 0, 0 );
+	apPhysObj->SetSleepingThresholds( 0, 0 );
 	apPhysObj->SetFriction( phys_friction.GetFloat() );
 
 #endif
@@ -250,8 +250,8 @@ void Player::Update( float dt )
 	// update velocity
 	aVelocity = apPhysObj->GetLinearVelocity();
 
-	//apPhysObj->SetSleepingThresholds( 0, 0 );
-	//apPhysObj->SetAngularFactor( 0 );
+	apPhysObj->SetSleepingThresholds( 0, 0 );
+	apPhysObj->SetAngularFactor( 0 );
 	apPhysObj->SetFriction( phys_friction.GetFloat() );
 #endif
 
@@ -693,54 +693,49 @@ float Player::GetMaxDuckSpeed(  )
 }
 
 
+CONVAR( cl_step_sound_speed_vol, 0.001 );
+CONVAR( cl_step_sound_speed_offset, 1 );
+CONVAR( cl_step_sound_gravity_scale, 4 );
+CONVAR( cl_step_sound_min_speed, 0.075 );
+CONVAR( cl_step_sound, 1 );
+
+
+void Player::StopStepSound( bool force )
+{
+	if ( apStepSound && apStepSound->Valid() )
+	{
+		if ( game->aCurTime - aLastStepTime > cl_stepduration || force )
+		{
+			game->apAudio->FreeSound( &apStepSound );
+			game->apGui->DebugMessage( 7, "Freed Step Sound" );
+		}
+	}
+}
+
+
 void Player::PlayStepSound(  )
 {
-	auto FreeSound = [ & ]( bool force = false )
-	{
-		if ( apStepSound && apStepSound->Valid() )
-		{
-			if ( game->aCurTime - aLastStepTime > cl_stepduration || force )
-			{
-				game->apAudio->FreeSound( &apStepSound );
-				game->apGui->DebugMessage( 7, "Freed Step Sound" );
-			}
-		}
-	};
-
-	//glm::vec2 groundVel = {aVelocity.x, aVelocity.y};
-	float speed = glm::length(aVelocity);
-
-	if ( speed < cl_stepspeed )
-	{
-		FreeSound();
+	if ( !cl_step_sound.GetBool() )
 		return;
-	}
+
+	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
+	float vel = glm::length( glm::vec3(aVelocity.x, aVelocity.y, aVelocity.z * cl_step_sound_gravity_scale) ); 
+	float speedFactor = glm::min( glm::log( vel * cl_step_sound_speed_vol + cl_step_sound_speed_offset ), 1.f );
 	
-	FreeSound();
-
-	if ( !IsOnGround() )
+	if ( speedFactor < cl_step_sound_min_speed )
 		return;
 
-	if ( game->aCurTime - aLastStepTime < cl_steptime )
-		return;
-
-	FreeSound();
+	StopStepSound( true );
 
 	char soundName[128];
-	// this sound just breaks it right now and idk why
-	//int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
-	//snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
-	snprintf(soundName, 128, "sound/robots_cropped.ogg");
+	int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
+	snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
 
 	if ( game->apAudio->LoadSound( soundName, &apStepSound ) )
 	{
-		apStepSound->vol = 0.5f;
-		apStepSound->inWorld = false;
+		apStepSound->vol = speedFactor;
 
 		game->apAudio->PlaySound( apStepSound );
-
-		game->apGui->DebugMessage( 8, "Played Step Sound" );
-		game->apGui->DebugMessage( 9, "Step Sound Time: %.4f", game->aCurTime - aLastStepTime );
 
 		aLastStepTime = game->aCurTime;
 	}
@@ -835,9 +830,14 @@ void Player::WalkMove(  )
 
 	DoRayCollision(  );
 
-	PlayStepSound(  );
+	//PlayStepSound(  );
+	
+	StopStepSound(  );
 
+	// something is wrong with this here on bullet
+#if NO_BULLET_PHYSICS
 	DoSmoothLand( onGround );
+#endif
 	DoViewBob(  );
 	DoViewTilt(  );
 
@@ -866,6 +866,7 @@ void Player::DoSmoothLand( bool wasOnGround )
 		{
 			duckLerp = aVelocity[W_UP] * velocity_scale;
 			prevDuckLerp = duckLerp;
+			PlayStepSound();
 		}
 
 		// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
@@ -893,6 +894,7 @@ CONVAR( cl_bob_freq, 4.5 );
 CONVAR( cl_bob_speed_scale, 0.013 );
 CONVAR( cl_bob_exit_lerp, 0.1 );
 CONVAR( cl_bob_exit_threshold, 0.1 );
+CONVAR( cl_bob_sound_threshold, 0.1 );
 
 
 // TODO: doesn't smoothly transition out of viewbob still
@@ -919,6 +921,8 @@ void Player::DoViewBob(  )
 		return;
 	}
 
+	static bool playedStepSound = false;
+
 	float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
 
 	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 );
@@ -936,6 +940,19 @@ void Player::DoViewBob(  )
 	// reset input
 	if ( aBobOffsetAmount == 0.f )
 		aWalkTime = 0.f;
+
+	if ( aBobOffsetAmount <= cl_bob_sound_threshold )
+	{
+		if ( !playedStepSound )
+		{
+			PlayStepSound();
+			playedStepSound = true;
+		}
+	}
+	else
+	{
+		playedStepSound = false;
+	}
 
 	aViewOffset[W_UP] += aBobOffsetAmount;
 

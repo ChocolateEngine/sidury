@@ -150,6 +150,7 @@ void GameSystem::LoadWorld(  )
 {
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
+	//apGraphics->LoadModel( "D:/usr/Downloads/surf_kitsune2_go/br/d1_trainstation_02.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_bsp_export.obj", "materials/act_like_a_baka.jpg", g_riverhouse->mdl );
 	//g_riverhouse->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
 
@@ -171,7 +172,7 @@ void GameSystem::LoadWorld(  )
 
 	// uhhhhh
 	Transform worldTransform = g_riverhouse->mdl->GetModelData().aTransform;
-	worldTransform.aAng.x = 90.f;
+	worldTransform.aAng = glm::degrees(g_riverhouse->mdl->GetModelData().aTransform.aAng);
 
 	g_riverhouse->physObj->SetWorldTransform( worldTransform );
 	//g_riverhouse->physObj->SetAngularFactor( {0, 0, 0} );
@@ -345,6 +346,9 @@ void GameSystem::ResetInputs(  )
 }
 
 
+CONVAR( snd_test_vol, 0.25 );
+
+
 void GameSystem::UpdateAudio(  )
 {
 	if ( apInput->KeyJustPressed(SDL_SCANCODE_G) )
@@ -357,17 +361,17 @@ void GameSystem::UpdateAudio(  )
 				g_streamModel->GetModelData().aNoDraw = true;
 		}
 		// test sound
-		// stereo plays twice as fast as mono right now?
-		// else if ( apAudio->LoadSound("sound/rain2.ogg", &stream) )  
-		// else if ( apAudio->LoadSound("sound/endymion2.ogg", &stream) )  
+		//else if ( apAudio->LoadSound("sound/rain2.ogg", &stream) )  
+		else if ( apAudio->LoadSound("sound/endymion2.ogg", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion_mono.ogg", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion2.wav", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion_mono.wav", &stream) )  
-		else if ( apAudio->LoadSound("sound/robots_cropped.ogg", &stream) )  
+		//else if ( apAudio->LoadSound("sound/robots_cropped.ogg", &stream) )  
 		{
-			stream->vol = 1.0;
+			stream->vol = snd_test_vol;
 			stream->pos = aLocalPlayer->GetPos();  // play it where the player currently is
-			stream->inWorld = false;
+			//stream->effects = AudioEffectPreset_World;
+			stream->loop = true;
 
 			apAudio->PlaySound( stream );
 
@@ -381,6 +385,11 @@ void GameSystem::UpdateAudio(  )
 			g_streamModel->GetModelData().aNoDraw = false;  // !stream->inWorld
 			g_streamModel->SetPosition( aLocalPlayer->GetPos() );
 		}
+	}
+
+	if ( stream && stream->Valid() )
+	{
+		stream->vol = snd_test_vol;
 	}
 
 	apAudio->SetListenerTransform( aLocalPlayer->GetPos(), aLocalPlayer->aTransform.aAng );
