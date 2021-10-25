@@ -16,9 +16,7 @@ constexpr glm::vec3 vec3_right(0, 1, 0);
 constexpr glm::vec3 vec3_up(0, 0, 1);
 
 #include "physics.h"
-//#include "player.h"
-
-class Player;
+#include "entity.h"
 
 
 class GameSystem : public BaseSystem
@@ -32,7 +30,8 @@ public:
 	virtual void Init(  );
 
 	virtual void LoadModules(  );
-	virtual void LoadWorld(  );
+	virtual void UnloadWorld(  );
+	virtual void LoadWorld( const std::string& path, bool rotate );
 	virtual void RegisterKeys(  );
 	virtual void CreateEntities(  );
 
@@ -54,7 +53,7 @@ public:
 
 	std::vector< Model* > aModels;
 
-	Player* aLocalPlayer = NULL;
+	Entity aLocalPlayer = ENT_INVALID;
 
 #if !NO_BULLET_PHYSICS
 	PhysicsEnvironment* apPhysEnv;

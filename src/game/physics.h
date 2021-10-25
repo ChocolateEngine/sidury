@@ -1,6 +1,15 @@
 #pragma once
 
+#ifndef BULLET_PHYSICS
+#define BULLET_PHYSICS 0
+#define NO_BULLET_PHYSICS 1  // get rid of this macro
+#else
+#define NO_BULLET_PHYSICS !BULLET_PHYSICS
+#endif
+
+#ifndef NO_BULLET_PHYSICS
 #define NO_BULLET_PHYSICS 1
+#endif
 
 #if !NO_BULLET_PHYSICS
 

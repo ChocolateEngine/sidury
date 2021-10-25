@@ -3,85 +3,95 @@
 #include "gamesystem.h"
 #include "../../chocolate/inc/shared/util.h"
 #include "../../chocolate/inc/types/transform.h"
-#include "physics.h"
+#include "entity.h"
+//#include "physics.h"
 
 
-enum class StepType
+enum class SurfaceType
 {
 	Dirt,
 };
 
 
-enum class StepSpeed
-{
-	Sneak,
-	Walk,
-	Run,
-};
-
-
-class Player;
-
-
-#define VIEW_LERP_CLASS 0
-
-#if VIEW_LERP_CLASS
-class ViewLerp
-{
-public:
-	ViewLerp( Player* player );
-	~ViewLerp(  );
-
-	glm::vec3 LerpView(  );
-
-	Player* apPlayer;
-
-	bool inLerp = false;
-	float prevViewHeight = 0.f;
-
-	glm::vec3 lerpGoal = {};
-	glm::vec3 lerpOut = {};
-	glm::vec3 lerpPrev = {};
-};
-#endif
-
-
 enum PlayerFlags_
 {
-	PlyNone = 0,
-	PlyOnGround,
-	PlyInSprint,
-	PlyInDuck
+	PlyNone = (1 << 0),
+	PlyOnGround = (1 << 1),
+	PlyInSprint = (1 << 2),
+	PlyInDuck = (1 << 3),
 };
 
 typedef unsigned char PlayerFlags;
 
-class Player
+
+enum class PlayerMoveType
+{
+	Walk,
+	Water,
+	NoClip,
+	Fly,
+};
+
+
+// =======================================================
+// Components
+
+// TODO: Split up into more components, did this pretty lazily
+struct CPlayerMoveData
+{
+	PlayerMoveType aMoveType = PlayerMoveType::Walk;
+
+	PlayerFlags aPlayerFlags = PlyNone;
+	PlayerFlags aPrevPlayerFlags = PlyNone;
+
+	float aMaxSpeed = 0.f;
+
+	// Direction Vectors
+	glm::vec3 aForward = {};
+	glm::vec3 aUp = {};
+	glm::vec3 aRight = {};
+
+	// View Bobbing
+	float aWalkTime = 0.f;
+	float aBobOffsetAmount = 0.f;
+
+	// Smooth Duck
+	float aPrevViewHeight = 0.f;
+	float aTargetViewHeight = 0.f;
+	float aDuckLerpGoal = 0.f;
+	float aDuckLerp = 0.f;
+	float aPrevDuckLerp = 0.f;
+
+	// Step Sound
+	double aLastStepTime = 0.f;
+	AudioStream* apStepSound = nullptr;
+};
+
+
+struct CPlayerInfo
+{
+	Entity aEnt;
+	std::string aName = "";
+	bool aIsLocalPlayer = false;
+};
+
+
+// =======================================================
+// Systems - Logic that operates on the components
+
+
+// This is really just the old Player class just jammed into one "system"
+class PlayerMovement: public System
 {
 public:
-	Player(  );
-	~Player(  );
+	void                    OnPlayerSpawn( Entity player );
+	void                    OnPlayerRespawn( Entity player );
 
-	enum class MoveType
-	{
-		Walk,
-		Water,
-		NoClip,
-		Fly,
-	};
-
-	// =============================================================
-	// General
-	// =============================================================
-
-	void                    Spawn(  );
-	void                    Respawn(  );
-	void                    Update( float dt );
+	void                    MovePlayer( Entity player );
 
 	void                    UpdateInputs(  );
-	void                    UpdateView(  );
 
-	void                    DisplayPlayerStats(  );
+	void                    DisplayPlayerStats( Entity player ) const;
 	float                   GetViewHeight(  );
 
 	void                    SetPos( const glm::vec3& origin );
@@ -89,15 +99,6 @@ public:
 
 	void                    SetAng( const glm::vec3& angles );
 	const glm::vec3&        GetAng(  ) const;
-
-	void                    SetPosVel( const glm::vec3& origin );
-
-	/* Returns velocity multiplied by frametime */
-	glm::vec3               GetFrameTimeVelocity(  );
-
-	// =============================================================
-	// Movement
-	// =============================================================
 
 	void                    DetermineMoveType(  );
 	void                    UpdatePosition(  );
@@ -129,49 +130,54 @@ public:
 	void                    AddGravity(  );
 	void                    Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
-	void                    SetMoveType( MoveType type );
-	void                    SetCollisionEnabled( bool enable );
-	// void                    SetGravity( const glm::vec3& gravity );
-	void                    EnableGravity( bool enabled );
+	void                    SetMoveType( CPlayerMoveData& move, PlayerMoveType type );
+	//void                    SetCollisionEnabled( bool enable );
+	//void                    SetGravity( const glm::vec3& gravity );
+	//void                    EnableGravity( bool enabled );
 
-	inline bool             IsInSprint(  )      { return aPlayerFlags & PlyInSprint; }
-	inline bool             IsInDuck(  )        { return aPlayerFlags & PlyInDuck; }
+	inline bool             IsInSprint(  )      { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
+	inline bool             IsInDuck(  )        { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
 
-	inline bool             WasInSprint(  )     { return aPrevPlayerFlags & PlyInSprint; }
-	inline bool             WasInDuck(  )       { return aPrevPlayerFlags & PlyInDuck; }
+	inline bool             WasInSprint(  )     { return apMove ? apMove->aPrevPlayerFlags & PlyInSprint : false; }
+	inline bool             WasInDuck(  )       { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
-	// =============================================================
-	// Vars
-	// =============================================================
-
-	MoveType aMoveType = MoveType::Walk;
-
-	glm::vec3 aOrigin = {};
-	glm::vec3 aVelocity = {};
-	glm::vec3 aMove = {};
-	glm::vec3 aViewOffset = {};
-	glm::vec3 aViewAngOffset = {};
-	float aMaxSpeed = 0.f;
-
-	PlayerFlags aPlayerFlags = PlyNone;
-	PlayerFlags aPrevPlayerFlags = PlyNone;
-
-	float mX, mY = 0.f;
-	Transform aTransform = {};
-
-	glm::vec3 aForward = {};
-	glm::vec3 aUp = {};
-	glm::vec3 aRight = {};
-	
-	float aWalkTime = 0.f;
-	float aBobOffsetAmount = 0.f;
-
-	double aLastStepTime = 0.f;
-	AudioStream* apStepSound = nullptr; // uh
-
-#if !NO_BULLET_PHYSICS
-	PhysicsObject* apPhysObj;
-#endif
+	// store it for use in functions, save on GetComponent calls
+	CPlayerMoveData* apMove = nullptr;
+	CRigidBody* apRigidBody = nullptr;
+	Transform* apTransform = nullptr;
+	CCamera* apCamera = nullptr;
 };
 
+
+class PlayerManager: public System
+{
+public:
+	PlayerManager(  );
+	~PlayerManager(  );
+
+	void                    Init(  );
+	Entity                  Create(  );
+	void                    Spawn( Entity player );
+	void                    Respawn( Entity player );
+	void                    Update( float frameTime );  // ??
+
+	void                    UpdateView( Entity player );
+	void                    DoMouseLook( Entity player );
+
+	std::vector< Entity > aPlayerList;
+	
+	PlayerMovement* apMove = nullptr;
+};
+
+
+// convinence
+inline auto& GetPlayerMoveData( Entity ent )	    { return entities->GetComponent< CPlayerMoveData >( ent ); }
+inline auto& GetPlayerInfo( Entity ent )            { return entities->GetComponent< CPlayerInfo >( ent ); }
+inline auto& GetTransform( Entity ent )             { return entities->GetComponent< Transform >( ent ); }
+inline auto& GetCamera( Entity ent )                { return entities->GetComponent< CCamera >( ent ); }
+inline auto& GetRigidBody( Entity ent )             { return entities->GetComponent< CRigidBody >( ent ); }
+inline auto& GetModel( Entity ent )                 { return entities->GetComponent< Model >( ent ); }
+
+
+extern PlayerManager* players;
 
