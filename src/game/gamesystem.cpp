@@ -4,10 +4,14 @@
 #include "../../chocolate/inc/shared/util.h"
 #include "player.h"
 #include "entity.h"
+#include "../terrain/terrain.h"
 #include <algorithm>
 
 
 GameSystem* game = nullptr;
+
+// bruh
+IMaterialSystem* materialsystem = nullptr;
 
 #define SPAWN_PROTOGEN 0
 
@@ -54,7 +58,7 @@ void CreateProtogen()
 
 	auto& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
-	model->GetModelData().aTransform.aPos = transform.aPos;
+	model->GetModelData().SetPos( transform.aPos );
 
 	g_protos.push_back( proto );
 }
@@ -139,11 +143,13 @@ void GameSystem::Init(  )
 	entities = new EntityManager;
 	entities->Init();
 
-	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
+	// LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
 	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
 
 	// should be part of LoadWorld, but that will come later when we actually have a map format for this game
 	CreateEntities(  );
+
+	voxelworld->Init(  );
 
 	players = entities->RegisterSystem<PlayerManager>();
 	players->Init();
@@ -175,7 +181,8 @@ void GameSystem::RegisterKeys(  )
 	apInput->RegisterKey( SDL_SCANCODE_B ); // flight
 
 	apInput->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
-	apInput->RegisterKey( SDL_SCANCODE_R ); // create protogen
+	apInput->RegisterKey( SDL_SCANCODE_E ); // create protogen
+	apInput->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 }
 
 
@@ -193,6 +200,8 @@ void GameSystem::LoadModules(  )
 	apPhysEnv = new PhysicsEnvironment;
 	apPhysEnv->Init(  );
 #endif
+
+	materialsystem = apGraphics->GetMaterialSystem();
 }
 
 
@@ -219,7 +228,7 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 	//g_world->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
 
 	// rotate the world model to match Z up if we want to rotate it
-	g_world->mdl->GetModelData().aTransform.aAng.z = rotate ? 90.f : 0.f;
+	g_world->mdl->GetModelData().SetAng( {0, 0, rotate ? 90.f : 0.f} );
 
 	//aModels.push_back( g_world->mdl );
 
@@ -270,7 +279,7 @@ void GameSystem::CreateEntities(  )
 		// raise it up in the air
 		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 500.f;
 		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 5.f;
-		g_physEnts[i]->mdl->GetModelData().aTransform.aPos.x = 5.f;
+		//g_physEnts[i]->mdl->GetModelData().aTransform.aPos.x = 5.f;
 
 #if !NO_BULLET_PHYSICS
 		physInfo.transform.aPos = g_physEnts[i]->mdl->GetModelData().aTransform.aPos;
@@ -325,6 +334,7 @@ void GameSystem::Update( float frameTime )
 
 	aCurTime += aFrameTime;
 
+	voxelworld->Update( frameTime );
 	players->Update( aFrameTime );
 
 #if !NO_BULLET_PHYSICS
@@ -375,7 +385,7 @@ CONVAR( proto_spin_p, 0 );
 CONVAR( proto_spin_y, 90 );
 CONVAR( proto_spin_r, 0 );
 
-CONVAR( proto_ang, 3 );
+CONVAR( proto_look, 1 );
 
 
 // from vkquake
@@ -497,8 +507,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	if ( !aPaused )
 	{
-		if ( apInput->KeyJustPressed( SDL_SCANCODE_R ) )
-		//if ( apInput->KeyPressed( SDL_SCANCODE_R ) )
+		if ( apInput->KeyJustPressed( SDL_SCANCODE_E ) || apInput->KeyPressed( SDL_SCANCODE_R ) )
 		{
 			CreateProtogen(  );
 		}
@@ -511,43 +520,44 @@ void GameSystem::SetupModels( float frameTime )
 	//transform.aPos += camTransform.aPos;
 	//transform.aAng += camTransform.aAng;
 
-	bool bruh = false;
-
 	for ( auto& proto: g_protos )
 	{
 		auto& model = entities->GetComponent< Model >( proto );
-		Transform& protoTransform = model.GetModelData().aTransform;
+		Transform& protoTransform = model.GetModelData().GetTransform();
 
-		glm::vec3 forward{}, right{}, up{};
-		//AngleToVectors( protoTransform.aAng, forward, right, up );
-		AngleToVectors( playerTransform.aAng, forward, right, up );
-
-		glm::vec3 protoView = protoTransform.aPos;
-		//protoView.z += cl_view_height;
-
-		glm::vec3 direction = (protoView - transform.aPos);
-		// glm::vec3 rotationAxis = VectorToAngles( direction );
-		glm::vec3 rotationAxis = VectorToAngles( direction, up );
-
-		protoTransform.aAng = rotationAxis;
-		protoTransform.aAng[PITCH] = 0.f;
-		protoTransform.aAng[YAW] -= 90.f;
-		protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
-		//protoTransform.aAng[ROLL] = 90.f;
-
-		/*if ( !bruh )
+		if ( proto_look.GetBool() )
 		{
-			bruh = true;
-			apGui->DebugMessage( 20, "Proto Ang:  %s", Vec2Str(protoTransform.aAng).c_str() );
-		}*/
-	}
+			glm::vec3 forward{}, right{}, up{};
+			//AngleToVectors( protoTransform.aAng, forward, right, up );
+			AngleToVectors( playerTransform.aAng, forward, right, up );
 
+			glm::vec3 protoView = protoTransform.aPos;
+			//protoView.z += cl_view_height;
+
+			glm::vec3 direction = (protoView - transform.aPos);
+			// glm::vec3 rotationAxis = VectorToAngles( direction );
+			glm::vec3 rotationAxis = VectorToAngles( direction, up );
+
+			protoTransform.aAng = rotationAxis;
+			protoTransform.aAng[PITCH] = 0.f;
+			protoTransform.aAng[YAW] -= 90.f;
+			protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
+			//protoTransform.aAng[ROLL] = 90.f;
+		}
+
+		for ( auto& mesh: model.GetModelData().aMeshes )
+		{
+			mesh->aTransform = protoTransform;
+			materialsystem->AddRenderable( mesh );
+		}
+	}
+	
 	// scale the world
-	g_world->mdl->GetModelData().aTransform.aScale = glm::vec3(1.f) * velocity_scale.GetFloat();
+	g_world->mdl->GetModelData().SetScale( glm::vec3(1.f) * velocity_scale.GetFloat() );
 
 	if ( g_streamModel )
 	{
-		g_streamModel->GetModelData().aTransform.aScale = {snd_cube_scale, snd_cube_scale, snd_cube_scale};
+		g_streamModel->GetModelData().SetScale( {snd_cube_scale, snd_cube_scale, snd_cube_scale} );
 	}
 }
 
@@ -562,6 +572,9 @@ CONVAR( snd_test_vol, 0.25 );
 
 void GameSystem::UpdateAudio(  )
 {
+	if ( aPaused )
+		return;
+
 	auto& transform = entities->GetComponent< Transform >( aLocalPlayer );
 
 	if ( apInput->KeyJustPressed(SDL_SCANCODE_G) )
@@ -596,7 +609,7 @@ void GameSystem::UpdateAudio(  )
 			}
 
 			g_streamModel->GetModelData().aNoDraw = false;  // !stream->inWorld
-			g_streamModel->SetPosition( transform.aPos );
+			g_streamModel->GetModelData().SetPos( transform.aPos );
 		}
 	}
 

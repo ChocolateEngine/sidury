@@ -342,7 +342,7 @@ struct CGravity
 
 struct CCamera
 {
-	Transform aTransform = {};
+	TransformSmall aTransform = {};
 
 	glm::vec3 aForward = {};
 	glm::vec3 aUp = {};
@@ -354,7 +354,6 @@ class CSound
 {
 public:
 	AudioStream* apStream = nullptr;
-	Entity aEntity;
 };
 
 

@@ -21,7 +21,9 @@ config
 	{
 		inc_dirs
 		{
+			"../src"
 			"../src/game"
+			"../src/terrain"
 			"$BULLET_DIR$/src"
 			"../chocolate/thirdparty/speedykeyv"
 		}
@@ -91,6 +93,12 @@ files
 	{
 		"../src/game/*.cpp"
 		"../src/game/*.h"
+	}
+	
+	folder "terrain"
+	{
+		"../src/terrain/*.cpp"
+		"../src/terrain/*.h"
 	}
 }
 

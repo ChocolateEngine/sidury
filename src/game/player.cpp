@@ -16,10 +16,11 @@ CONVAR( in_jump, 0 );
 
 extern ConVarRef en_timescale;
 
-CONVAR( sv_sprint_mult, 2.4 );
+//CONVAR( sv_sprint_mult, 2.4 );
+CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
 CONVAR( sv_duck_mult, 0.5 );
 
-constexpr float DEFAULT_SPEED = 250.f; // 300.f
+constexpr float DEFAULT_SPEED = 250.f;
 
 ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED );
 ConVar side_speed( "sv_side_speed", DEFAULT_SPEED );  // 350.f
@@ -70,7 +71,7 @@ CONVAR( velocity_scale, 0.025 );
 CONVAR( velocity_scale, 1.0 );
 #endif
 
-CONVAR( cl_thirdperson, 1 );
+CONVAR( cl_thirdperson, 0 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
 CONVAR( cl_cam_z, -2.5 );
@@ -79,10 +80,13 @@ constexpr float PLAYER_MASS = 200.f;
 
 // TEMP
 // #define SPAWN_POS 1085.69824, 260, 644.222046
-#define SPAWN_POS 1085.69824 * velocity_scale, 260 * velocity_scale, 644.222046 * velocity_scale
+//#define SPAWN_POS 1085.69824 * velocity_scale, 260 * velocity_scale, 644.222046 * velocity_scale
 // #define SPAWN_POS 1085.69824 * velocity_scale, -46, 644.222046 * velocity_scale
 // #define SPAWN_POS 10.8569824, -2.60, 6.44222046
 // #define SPAWN_POS -26.5, -45, -8.2
+
+constexpr glm::vec3 SPAWN_POS = {0, 0, 0};
+constexpr glm::vec3 SPAWN_ANG = {0, 45, 0};
 
 
 CON_COMMAND( respawn )
@@ -189,10 +193,12 @@ void PlayerManager::Respawn( Entity player )
 {
 	auto& rigidBody = GetRigidBody( player );
 	auto& transform = GetTransform( player );
+	auto& camTransform = GetCamera( player ).aTransform;
 
 	// HACK FOR RIVERHOUSE SPAWN POS
-	transform.aPos = {SPAWN_POS};
-	transform.aAng = {0, 0, 0};
+	transform.aPos = SPAWN_POS;
+	transform.aAng = {0, SPAWN_ANG.y, 0};
+	camTransform.aAng = SPAWN_ANG;
 	rigidBody.aVel = {0, 0, 0};
 	rigidBody.aAccel = {0, 0, 0};
 
@@ -208,6 +214,16 @@ void PlayerManager::Update( float frameTime )
 		{
 			DoMouseLook( player );
 			apMove->MovePlayer( player );
+		}
+
+		auto& playerInfo = entities->GetComponent< CPlayerInfo >( player );
+
+		if ( cl_thirdperson.GetBool() || !playerInfo.aIsLocalPlayer )
+		{
+			auto& model = entities->GetComponent< Model >( player );
+
+			for ( auto& mesh: model.GetModelData().aMeshes )
+				materialsystem->AddRenderable( mesh );
 		}
 
 		UpdateView( player );
@@ -337,13 +353,19 @@ void PlayerMovement::MovePlayer( Entity player )
 		case PlayerMoveType::NoClip:  NoClipMove();   break;
 	}
 
-	auto& model = entities->GetComponent< Model >( player );
+	// CHANGE THIS IN THE FUTURE FOR NETWORKING
+	if ( cl_thirdperson.GetBool() )
+	{
+		auto& model = entities->GetComponent< Model >( player );
 
-	model.GetModelData().aNoDraw = !cl_thirdperson.GetBool();
-	model.GetModelData().aTransform = *apTransform;
-	model.GetModelData().aTransform.aAng[ROLL] += 90;
-	model.GetModelData().aTransform.aAng[YAW] *= -1;
-	model.GetModelData().aTransform.aAng[YAW] += 180;
+		for ( auto& mesh: model.GetModelData().aMeshes )
+		{
+			mesh->aTransform = *apTransform;
+			mesh->aTransform.aAng[ROLL] += 90;
+			mesh->aTransform.aAng[YAW] *= -1;
+			mesh->aTransform.aAng[YAW] += 180;
+		}
+	}
 }
 
 
@@ -1045,6 +1067,21 @@ void PlayerMovement::DoViewTilt(  )
 }
 
 
+CONVAR( sv_friction_idk, 16 );
+/*CONVAR( sv_friction_scale, 0.005 );
+CONVAR( sv_friction_scale2, 10 );
+CONVAR( sv_friction_offset, 6 );
+CONVAR( sv_friction_lerp, 5 );
+
+CONVAR( sv_friction_stop_lerp, 2 );
+CONVAR( sv_friction_scale3, 0.01 );
+CONVAR( sv_friction_scaleeee, 1 );
+
+CONVAR( sv_friction_power, 2 );*/
+
+
+// TODO: make your own version of this that uses this to find the friction value:
+// log(-playerSpeed) + 1
 void PlayerMovement::AddFriction(  )
 {
 	glm::vec3	start(0, 0, 0), stop(0, 0, 0);
@@ -1053,14 +1090,89 @@ void PlayerMovement::AddFriction(  )
 
 	glm::vec3 vel = apRigidBody->aVel;
 
+	glm::vec3 test = glm::sqrt(vel);
+	float test2 = glm::length(test);
+
 	float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT] + vel[W_UP]*vel[W_UP]);
 	if (!speed)
 		return;
 
+	float idk = sv_friction_idk;
+
 	// if the leading edge is over a dropoff, increase friction
-	start.x = stop.x = GetPos().x + vel.x / speed*16.f;
-	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*16.f;
-	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*16.f;
+#if 0
+
+	auto falloff = [&]( float vel ) -> float
+	{
+		float in = (vel/speed*idk) * sv_friction_scale + sv_friction_offset;
+		return std::lerp( in, 0, sv_friction_lerp * game->aFrameTime );
+	};
+
+	start.x = falloff( vel.x );
+	start.y = falloff( vel.y );
+	start.z = falloff( vel.z );
+
+	/*start.x = glm::log( vel.x + sv_friction_offset );
+	start.y = glm::log( vel.y + sv_friction_offset );
+	start.z = glm::log( vel.z + sv_friction_offset );*/
+
+	//start *= sv_friction_scale.GetFloat();
+
+	// apRigidBody->aVel = vel * start * game->aFrameTime;
+	apRigidBody->aVel = start * game->aFrameTime;
+
+#elif 0
+	/*start.x = glm::log( vel.x ) + sv_friction_offset.GetFloat();
+	start.y = glm::log( vel.y ) + sv_friction_offset.GetFloat();
+	start.z = glm::log( vel.z ) + sv_friction_offset.GetFloat();*/
+
+	auto falloff = [&]( float vel ) -> float
+	{
+		if ( vel == 0.f )
+			return 0.f;
+
+		float dir = vel > 0.f ? 1.f : -1.f;
+
+		// float in = (vel/speed*idk);
+		float in = vel;
+		return glm::pow( sv_friction_power.GetFloat(), in * sv_friction_scale + sv_friction_offset ) * dir;
+		//return glm::log( fabs(in * sv_friction_scale + sv_friction_offset) ) * dir;
+	};
+
+
+	start.x = falloff( vel.x );
+	start.y = falloff( vel.y );
+	start.z = falloff( vel.z );
+
+	/*start.x = glm::log( vel.x + sv_friction_offset );
+	start.y = glm::log( vel.y + sv_friction_offset );
+	start.z = glm::log( vel.z + sv_friction_offset );*/
+
+	start *= game->aFrameTime;
+
+	//apRigidBody->aVel = start * game->aFrameTime;
+	apRigidBody->aVel *= start * sv_friction_scale2.GetFloat();
+
+#elif 0
+	start.x = GetPos().x + vel.x / speed*idk;
+	start[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*idk;
+	start[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*idk;
+
+	friction = sv_friction_scale3;
+
+	// apply friction
+	// float control = speed < stop_speed ? stop_speed : speed;
+	float control = std::lerp( speed, 0, sv_friction_stop_lerp * game->aFrameTime );
+
+	// float newspeed = glm::max( 0.f, speed - game->aFrameTime * control * sv_friction );
+	float newspeed = glm::min( 1.f, glm::max( 0.f, control * friction ) );
+
+	//newspeed /= speed;
+	apRigidBody->aVel = vel * newspeed;
+#else
+	start.x = stop.x = GetPos().x + vel.x / speed*idk;
+	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*idk;
+	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*idk;
 	// start.z = GetPos().z + sv_player->v.mins.z;
 
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
@@ -1076,6 +1188,7 @@ void PlayerMovement::AddFriction(  )
 
 	newspeed /= speed;
 	apRigidBody->aVel = vel * newspeed;
+#endif
 }
 
 

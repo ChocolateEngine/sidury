@@ -16,6 +16,7 @@ int EntityManager::Init()
 
 	// Register Base Components
 	RegisterComponent< Transform >();
+	RegisterComponent< TransformSmall >();
 	//RegisterComponent< ModelData >();  // doesn't like this
 	RegisterComponent< CRigidBody >();
 	RegisterComponent< CGravity >();

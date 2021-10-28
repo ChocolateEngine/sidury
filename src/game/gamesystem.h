@@ -70,4 +70,4 @@ public:
 
 
 extern GameSystem* game;
-
+extern IMaterialSystem* materialsystem; // bruh
