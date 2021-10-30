@@ -1,8 +1,8 @@
 #pragma once
 
 #include "gamesystem.h"
-#include "../../chocolate/inc/shared/util.h"
-#include "../../chocolate/inc/types/transform.h"
+#include "util.h"
+#include "types/transform.h"
 #include "entity.h"
 //#include "physics.h"
 
@@ -90,6 +90,7 @@ public:
 	void                    MovePlayer( Entity player );
 
 	void                    UpdateInputs(  );
+	void                    UpdatePosition( Entity player );
 
 	void                    DisplayPlayerStats( Entity player ) const;
 	float                   GetViewHeight(  );
@@ -101,7 +102,6 @@ public:
 	const glm::vec3&        GetAng(  ) const;
 
 	void                    DetermineMoveType(  );
-	void                    UpdatePosition(  );
 
 	void                    PlayStepSound(  );
 	void                    StopStepSound( bool force = false );  // Temp Hack for sound system
@@ -131,9 +131,9 @@ public:
 	void                    Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
 	void                    SetMoveType( CPlayerMoveData& move, PlayerMoveType type );
-	//void                    SetCollisionEnabled( bool enable );
-	//void                    SetGravity( const glm::vec3& gravity );
-	//void                    EnableGravity( bool enabled );
+	void                    SetCollisionEnabled( bool enable );
+	void                    SetGravity( const glm::vec3& gravity );
+	void                    EnableGravity( bool enabled );
 
 	inline bool             IsInSprint(  )      { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
 	inline bool             IsInDuck(  )        { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
@@ -142,10 +142,12 @@ public:
 	inline bool             WasInDuck(  )       { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
 	// store it for use in functions, save on GetComponent calls
+	Entity aPlayer = ENT_INVALID;
 	CPlayerMoveData* apMove = nullptr;
 	CRigidBody* apRigidBody = nullptr;
 	Transform* apTransform = nullptr;
 	CCamera* apCamera = nullptr;
+	//PhysicsObject* apPhysObj = nullptr;
 };
 
 

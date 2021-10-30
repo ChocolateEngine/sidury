@@ -1,5 +1,5 @@
 #include "../../src/game/gamesystem.h"
-#include "../../chocolate/inc/shared/platform.h"
+#include "core/platform.h"
 
 #include <vector>
 

@@ -9,10 +9,9 @@
 #include <set>
 #include <memory>
 
-// TODO: move elsewhere later
-#include "../../chocolate/inc/types/transform.h"
-#include "../../chocolate/inc/types/modeldata.h"
-#include "../../chocolate/inc/shared/baseaudio.h"
+#include "types/transform.h"
+#include "graphics/imesh.h"
+#include "iaudio.h"
 #include "physics.h"
 
 
@@ -357,11 +356,4 @@ public:
 };
 
 
-#if BULLET_PHYSICS
-class CPhysicsObject: public PhysicsObject
-{
-public:
-	Entity aEntity;
-};
-#endif
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#define BULLET_PHYSICS 0
+
 #ifndef BULLET_PHYSICS
 #define BULLET_PHYSICS 0
 #define NO_BULLET_PHYSICS 1  // get rid of this macro
@@ -110,7 +112,8 @@ struct PhysicsObjectInfo
 	}
 
 	// Only used for when making a Convex or a Concave collision mesh
-	ModelData*          modelData = nullptr;
+	// ModelData*          modelData = nullptr;
+	IMesh*              mesh = nullptr;
 
 	// Set a starting position/rotation/scale
 	Transform           transform = {};
@@ -155,8 +158,8 @@ struct PhysicsObject: public btMotionState
 
 	void                  SetLinearVelocity( const glm::vec3& velocity );
 	void                  SetAngularVelocity( const glm::vec3& velocity );
-	const glm::vec3&      GetLinearVelocity(  );
-	const glm::vec3&      GetAngularVelocity(  );
+	glm::vec3             GetLinearVelocity(  );
+	glm::vec3             GetAngularVelocity(  );
 	void                  SetAngularFactor( const glm::vec3& ang );
 	void                  SetAngularFactor( float factor );
 	void                  SetSleepingThresholds( float min, float max );
@@ -247,7 +250,7 @@ public:
 
 	void                            SetGravity( const glm::vec3& gravity );
 	void                            SetGravity( float gravity );  // convenience function
-	const glm::vec3&                GetGravity(  );
+	glm::vec3                       GetGravity(  );
 
 	void                            RayTest( const glm::vec3& from, const glm::vec3& to, std::vector< RayHit* >& hits );
 

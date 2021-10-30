@@ -1,10 +1,11 @@
 #pragma once
 
-#include "../../chocolate/inc/shared/system.h"
-#include "../../chocolate/inc/shared/baseinput.h"
-#include "../../chocolate/inc/shared/baseaudio.h"
-#include "../../chocolate/inc/core/graphics.h"
-#include "../../chocolate/inc/types/renderertypes.h"
+#include "system.h"
+#include "iinput.h"
+#include "iaudio.h"
+#include "igui.h"
+#include "graphics/igraphics.h"
+#include "graphics/renderertypes.h"
 
 // world xyz
 constexpr int W_FORWARD = 0;

@@ -3,6 +3,9 @@
 
 
 #if !NO_BULLET_PHYSICS
+#include <BulletCollision/CollisionShapes/btTriangleShape.h>
+#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
+
 PhysicsEnvironment* physenv = nullptr;
 
 
@@ -141,13 +144,13 @@ void PhysicsObject::SetAngularVelocity( const glm::vec3& velocity )
 }
 
 
-const glm::vec3& PhysicsObject::GetLinearVelocity(  )
+glm::vec3 PhysicsObject::GetLinearVelocity(  )
 {
 	return fromBt( apRigidBody->getLinearVelocity() );
 }
 
 
-const glm::vec3& PhysicsObject::GetAngularVelocity(  )
+glm::vec3 PhysicsObject::GetAngularVelocity(  )
 {
 	return fromBt( apRigidBody->getAngularVelocity() );
 }
@@ -193,6 +196,60 @@ int PhysicsObject::ContactTest()
 
 
 // =========================================================
+// uhhh
+void contact_added_callback_obj(btManifoldPoint& cp, const btCollisionObject* colObj)
+{
+	const btCollisionShape *shape = colObj->getCollisionShape();
+
+	/*if (shape->getShapeType() != TRIANGLE_SHAPE_PROXYTYPE)
+		return;
+
+	const btTriangleShape *tshape = static_cast<const btTriangleShape*>(colObj->getCollisionShape());
+
+	// const btCollisionShape *parent = colObj->getRootCollisionShape();*/
+
+	const btCollisionShape *parent = colObj->getCollisionShape();
+	if (parent == NULL)
+		return;
+
+	if (parent->getShapeType() != TRIANGLE_MESH_SHAPE_PROXYTYPE) 
+		return;
+
+	btTransform orient = colObj->getWorldTransform();
+	orient.setOrigin( btVector3(0.0f,0.0f,0.0f ) );
+
+	//const btTriangleMeshShape *tshape = static_cast<const btTriangleMeshShape*>(colObj->getCollisionShape());
+
+	// lmao lol
+	PhysicsObject* physObj = (PhysicsObject*)colObj->getUserPointer();
+
+	if ( physObj->aPhysInfo.mesh == nullptr )
+		return;
+
+	// uh
+	btVector3 v1 = toBt(physObj->aPhysInfo.mesh->aVertices[0].pos);
+	btVector3 v2 = toBt(physObj->aPhysInfo.mesh->aVertices[1].pos);
+	btVector3 v3 = toBt(physObj->aPhysInfo.mesh->aVertices[2].pos);
+
+	//btVector3 v3 = tshape->m_vertices1[2];
+
+	/*btVector3 normal = (v2-v1).cross(v3-v1);
+
+	normal = orient * normal;
+	normal.normalize();
+
+	btScalar dot = normal.dot(cp.m_normalWorldOnB);
+	btScalar magnitude = cp.m_normalWorldOnB.length();
+	normal *= dot > 0 ? magnitude : -magnitude;*/
+
+	//cp.m_normalWorldOnB = (v2-v1).cross(v3-v1);
+
+	//cp.m_normalWorldOnB = normal;
+
+}
+
+
+// =========================================================
 
 
 std::vector< btPersistentManifold* > manifolds;
@@ -227,9 +284,12 @@ inline void contactCallback(btPersistentManifold* const& manifold)
 	PhysicsObject* firstCollider = (PhysicsObject*)manifold->getBody0()->getUserPointer();
 	PhysicsObject* secondCollider = (PhysicsObject*)manifold->getBody1()->getUserPointer();
 	
-	if (!firstCollider->aPhysInfo.callbacks && !secondCollider->aPhysInfo.callbacks)
-		return;
-	
+	//if (!firstCollider->aPhysInfo.callbacks && !secondCollider->aPhysInfo.callbacks)
+	//	return;
+
+	contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody0() );
+	contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody1() );
+
 	/*CollidingEvent collidingEvent;
 	collidingEvent.firstEntity = firstCollider->self;
 	collidingEvent.secondEntity = secondCollider->self;
@@ -312,6 +372,7 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 	apWorld = new btDiscreteDynamicsWorld( apDispatcher, apBroadphase, apSolver, apCollisionConfig );
 
 	apWorld->setGravity( btVector3(0, 0, -800) );
+	// apWorld->setGravity( btVector3(0, 0, -100) );
 
 	apWorld->setInternalTickCallback(&TickCallback, 0);
 
@@ -322,7 +383,11 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 
 void PhysicsEnvironment::Simulate(  )
 {
+#ifdef NDEBUG
 	apWorld->stepSimulation( game->aFrameTime, 100, 1 / 240.0 );
+#else
+	apWorld->stepSimulation( game->aFrameTime );
+#endif
 }
 
 
@@ -374,7 +439,8 @@ PhysicsObject* PhysicsEnvironment::CreatePhysicsObject( PhysicsObjectInfo& physI
 
 	if ( physInfo.shapeType == ShapeType::Concave )
 	{
-		phys->apRigidBody->setFriction( btScalar(0.9) );
+		// phys->apRigidBody->setFriction( btScalar(0.9) );
+		phys->apRigidBody->setFriction( btScalar(0.1) );
 	}
 
 	phys->apCollisionShape->setUserPointer( phys );
@@ -431,7 +497,8 @@ btRigidBody* PhysicsEnvironment::CreateRigidBody( PhysicsObject* physObj, Physic
 			break;
 	}
 
-	if ( physInfo.callbacks )
+	//if ( physInfo.callbacks )
+	if ( physInfo.mesh )
 		body->setCollisionFlags( body->getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK );
 
 #else
@@ -453,18 +520,19 @@ void PhysicsEnvironment::DeleteRigidBody( btRigidBody* body )
 	delete ms;
 }
 
+#define COLLISION_MARGIN 0.015 // 15 mm
 
 btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo& physInfo )
 {
-	if ( physInfo.modelData == nullptr )
+	if ( physInfo.mesh == nullptr )
 		return nullptr;
 
-	ModelData& model = *physInfo.modelData;
+	IMesh* mesh = physInfo.mesh;
 
 	btTransform transform;
 	transform.setIdentity();
-	transform.setOrigin( toBt(model.aTransform.aPos) );
-	transform.setRotation( toBtRot(model.aTransform.aAng) );
+	transform.setOrigin( toBt(physInfo.transform.aPos) );
+	transform.setRotation( toBtRot(physInfo.transform.aAng) );
 	//glm::vec3 ang = glm::radians( model.aTransform.aAng );
 	//transform.setRotation( toBt(AngToQuat( ang )) );
 
@@ -484,28 +552,31 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 	btTriangleMesh* meshInterface = new btTriangleMesh();
 	aMeshInterfaces.push_back( meshInterface );
 
-	for (int m = 0; m < model.aMeshes.size(); m++)
+	for (int i = 0; i < mesh->aIndices.size() / 3; i++)
+	//for (int i = 0; i < model.aIndices.size() / 3; i++)
 	{
-		Mesh* mesh = model.aMeshes[m];
+		//glm::vec3 v0 = model.aVertices[ model.aIndices[i * 3]     ].pos;
+		//glm::vec3 v1 = model.aVertices[ model.aIndices[i * 3 + 1] ].pos;
+		//glm::vec3 v2 = model.aVertices[ model.aIndices[i * 3 + 2] ].pos;
 
-		for (int i = 0; i < mesh->aIndices.size() / 3; i++)
-		//for (int i = 0; i < model.aIndices.size() / 3; i++)
-		{
-			//glm::vec3 v0 = model.aVertices[ model.aIndices[i * 3]     ].pos;
-			//glm::vec3 v1 = model.aVertices[ model.aIndices[i * 3 + 1] ].pos;
-			//glm::vec3 v2 = model.aVertices[ model.aIndices[i * 3 + 2] ].pos;
+		glm::vec3 v0 = mesh->aVertices[ mesh->aIndices[i * 3]     ].pos;
+		glm::vec3 v1 = mesh->aVertices[ mesh->aIndices[i * 3 + 1] ].pos;
+		glm::vec3 v2 = mesh->aVertices[ mesh->aIndices[i * 3 + 2] ].pos;
 
-			glm::vec3 v0 = mesh->aVertices[ mesh->aIndices[i * 3]     ].pos;
-			glm::vec3 v1 = mesh->aVertices[ mesh->aIndices[i * 3 + 1] ].pos;
-			glm::vec3 v2 = mesh->aVertices[ mesh->aIndices[i * 3 + 2] ].pos;
-
-			meshInterface->addTriangle(btVector3(v0[0], v0[1], v0[2]),
-										btVector3(v1[0], v1[1], v1[2]),
-										btVector3(v2[0], v2[1], v2[2]));
-		}
+		meshInterface->addTriangle(btVector3(v0[0], v0[1], v0[2]),
+									btVector3(v1[0], v1[1], v1[2]),
+									btVector3(v2[0], v2[1], v2[2]));
 	}
 
 	btBvhTriangleMeshShape* trimesh = new btBvhTriangleMeshShape( meshInterface, true, true );
+
+	// ?
+	trimesh->buildOptimizedBvh();
+	trimesh->setMargin( COLLISION_MARGIN );
+
+	btTriangleInfoMap *pMap = new btTriangleInfoMap;
+	btGenerateInternalEdgeInfo(trimesh, pMap);
+
 	aCollisionShapes.push_back( trimesh );
 
 	return trimesh;
@@ -514,14 +585,12 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 
 btConvexHullShape* PhysicsEnvironment::LoadModelConvex( PhysicsObjectInfo& physInfo )
 {
-	if ( physInfo.modelData == nullptr )
+	if ( physInfo.mesh == nullptr )
 		return nullptr;
 
-	ModelData& model = *physInfo.modelData;
+	IMesh* mesh = physInfo.mesh;
 
-	//btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(v->pos[0])), modelData.aVertexCount, sizeof(vertex_3d_t));
-	//btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(model.aVertices->pos[0])), model.aVertexCount, sizeof(vertex_3d_t));
-	btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(model.aVertices.data()->pos[0])), model.aVertices.size(), sizeof(vertex_3d_t));
+	btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(mesh->aVertices.data()->pos[0])), mesh->aVertices.size(), sizeof(vertex_3d_t));
 	aCollisionShapes.push_back( shape );
 
 	if ( physInfo.optimizeConvex )
@@ -549,7 +618,7 @@ void PhysicsEnvironment::SetGravity( float gravity )
 }
 
 
-const glm::vec3& PhysicsEnvironment::GetGravity(  )
+glm::vec3 PhysicsEnvironment::GetGravity(  )
 {
 	return fromBt( apWorld->getGravity() );
 }

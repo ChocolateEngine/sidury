@@ -1,10 +1,9 @@
 #include "gamesystem.h"
-//#include "../../chocolate/inc/core/engine.h"
-#include "../../chocolate/inc/shared/systemmanager.h"
-#include "../../chocolate/inc/shared/util.h"
+#include "core/systemmanager.h"
+#include "util.h"
 #include "player.h"
 #include "entity.h"
-#include "../terrain/terrain.h"
+#include "terrain/terrain.h"
 #include <algorithm>
 
 
@@ -232,7 +231,7 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 
 	//aModels.push_back( g_world->mdl );
 
-#if !NO_BULLET_PHYSICS
+#if 0 // !NO_BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Concave );
 	physInfo.modelData = &g_world->mdl->GetModelData();
 
@@ -255,6 +254,8 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 
 void GameSystem::CreateEntities(  )
 {
+#if 0  // outdated stuff
+
 #if !NO_BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Convex );
 	physInfo.collisionType = CollisionType::Kinematic;
@@ -293,6 +294,8 @@ void GameSystem::CreateEntities(  )
 
 #if SPAWN_PROTOGEN
 	CreateProtogen();
+#endif
+
 #endif
 }
 
@@ -341,7 +344,10 @@ void GameSystem::Update( float frameTime )
 	apPhysEnv->Simulate(  );
 
 	// stupid
-	aLocalPlayer->UpdatePosition(  );
+	for (auto& player: players->aPlayerList)
+	{
+		players->apMove->UpdatePosition( player );
+	}
 #endif
 
 	players->apMove->DisplayPlayerStats( aLocalPlayer );

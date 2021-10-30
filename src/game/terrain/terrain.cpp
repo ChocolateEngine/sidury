@@ -1,9 +1,10 @@
 #include "terrain.h"
 #include "noise.h"
-#include "gamesystem.h"
+#include "../gamesystem.h"
 
-#include "../../chocolate/inc/core/renderer/materialsystem.h"
-#include "../../chocolate/inc/shared/util.h"
+#include "graphics/imaterialsystem.h"
+#include "graphics/imaterial.h"
+#include "util.h"
 
 
 VoxelWorld* voxelworld = new VoxelWorld;
@@ -13,7 +14,7 @@ extern IMaterialSystem* materialsystem;
 
 
 // BLECH
-Material* g_matGrass = nullptr;
+IMaterial* g_matGrass = nullptr;
 
 
 enum Faces
@@ -81,10 +82,11 @@ void VoxelWorld::Init()
 	g_matGrass = materialsystem->CreateMaterial(  );
 
 	// Set Shaders
-	g_matGrass->apShader = materialsystem->GetShader( "basic_3d" );
+	g_matGrass->SetShader( "basic_3d" );
 
 	// Load Base Textures
-	g_matGrass->apDiffuse = materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" );
+	//g_matGrass->apDiffuse = materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" );
+	g_matGrass->SetDiffuse( materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" ) );
 
 	Print( "Size Of: glm::ivec3: %u", sizeof glm::ivec3 );
 	
@@ -249,7 +251,10 @@ void VoxelWorld::CreateWorld(  )
 
 	// Now Create the models for them
 	for ( Chunk* chunk: aChunks )
+	{
 		CreateChunkMesh( chunk );
+		chunk->CreatePhysicsMesh(  );
+	}
 
 	currentTime = std::chrono::high_resolution_clock::now(  );
 	time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count(  );
@@ -334,7 +339,7 @@ void VoxelWorld::CreateChunkMesh( Chunk* chunk )
 
 	ChunkMesh* mesh = new ChunkMesh;
 	materialsystem->RegisterRenderable( mesh );
-	game->apGraphics->InitMesh( mesh );
+	materialsystem->MeshInit( mesh );
 	mesh->apChunk = chunk;
 	chunk->aMesh = mesh;
 	//size_t index = 0;
@@ -507,6 +512,33 @@ size_t Chunk::GetId(  )
 ChunkMesh* Chunk::GetMesh(  )
 {
 	return aMesh;
+}
+
+
+void Chunk::CreatePhysicsMesh(  )
+{
+#if BULLET_PHYSICS
+	PhysicsObjectInfo physInfo( ShapeType::Concave );
+	physInfo.transform.aPos = aPos * (int)WORLD_SIZE;
+	physInfo.mesh = aMesh;
+
+	// just have the ground be a box for now since collision on the riverhouse mesh is too jank still
+	//PhysicsObjectInfo physInfo( ShapeType::Box );
+	//physInfo.bounds = {1500, 200, 1500};
+
+	apPhysObj = physenv->CreatePhysicsObject( physInfo );
+	apPhysObj->SetContinuousCollisionEnabled( true );
+
+	// uhhhhh
+	//Transform worldTransform = g_world->mdl->GetModelData().aTransform;
+	//worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().aTransform.aAng);
+
+	Transform& transform = apPhysObj->GetWorldTransform(  );
+	transform.aPos = aPos;
+	apPhysObj->SetWorldTransform( transform );
+
+	//apPhysObj->SetAngularFactor( {0, 0, 0} );
+#endif
 }
 
 

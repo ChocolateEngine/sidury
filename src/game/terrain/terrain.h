@@ -1,7 +1,9 @@
 #pragma once
 
-#include "../../chocolate/inc/types/modeldata.h"
-#include "../../chocolate/inc/shared/basegraphics.h"
+#include "graphics/imesh.h"
+#include "graphics/igraphics.h"
+
+#include "../physics.h"
 
 #include <glm/glm.hpp>
 
@@ -20,7 +22,11 @@ constexpr unsigned int WORLD_AREA = WORLD_SIZE * WORLD_SIZE;
 constexpr unsigned int WORLD_VOLUME = WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT;
 
 // constexpr float BLOCK_SCALE = .5f;
+#if BULLET_PHYSICS
+constexpr float BLOCK_SCALE = 50.0f;
+#else
 constexpr float BLOCK_SCALE = 1.0f;
+#endif
 
 using BlockID = unsigned int;
 
@@ -58,6 +64,8 @@ public:
 	size_t                  GetId(  );
 	ChunkMesh*              GetMesh(  );
 
+	void                    CreatePhysicsMesh(  );
+
 	BlockID                 GetBlock( const BlockPos& pos );
 	const BlockPos&         GetBlockPos( BlockID pos );
 
@@ -81,6 +89,10 @@ public:
 
 	// TODO: figure out how to make a combined UV for all textures so that way there is less draw calls
 	ChunkMesh*              aMesh = nullptr;
+
+#if BULLET_PHYSICS
+	PhysicsObject*                  apPhysObj = nullptr;
+#endif
 };
 
 

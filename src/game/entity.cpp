@@ -1,6 +1,6 @@
 #include "entity.h"
 #include "world.h"
-#include "../../chocolate/inc/shared/util.h"
+#include "util.h"
 
 
 EntityManager* entities = nullptr;
@@ -24,7 +24,7 @@ int EntityManager::Init()
 	RegisterComponent< CSound >();
 
 #if BULLET_PHYSICS
-	RegisterComponent< CPhysicsObject >();
+	RegisterComponent< PhysicsObject* >();
 #endif
 
 	return 0;

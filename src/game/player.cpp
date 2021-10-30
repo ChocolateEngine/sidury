@@ -1,5 +1,5 @@
 #include "player.h"
-#include "../../chocolate/inc/shared/util.h"
+#include "util.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -65,10 +65,11 @@ CONVAR( cl_smooth_land_view_offset, 0.5 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
-#if NO_BULLET_PHYSICS
+#if !BULLET_PHYSICS
 CONVAR( velocity_scale, 0.025 );
 #else
 CONVAR( velocity_scale, 1.0 );
+CONVAR( velocity_scale2, 0.01 );
 #endif
 
 CONVAR( cl_thirdperson, 0 );
@@ -126,6 +127,10 @@ float vec3_norm(glm::vec3& v)
 
 PlayerManager* players = nullptr;
 
+// HACKY HACKY HACK
+#if BULLET_PHYSICS
+PhysicsObject* apPhysObj = nullptr;
+#endif
 
 PlayerManager::PlayerManager()
 {
@@ -142,6 +147,7 @@ void PlayerManager::Init(  )
 	entities->RegisterComponent<CPlayerInfo>();
 	entities->RegisterComponent<Model*>();
 	entities->RegisterComponent<Model>();
+	//entities->RegisterComponent<PhysicsObject*>();
 
 	apMove = entities->RegisterSystem<PlayerMovement>();
 }
@@ -152,21 +158,11 @@ Entity PlayerManager::Create(  )
 	// Add Components
 	Entity player = entities->CreateEntity();
 
-	// not a fan of this 2nd argument style, but it is useful for models down there,
-	// but we could just return the new component when adding it and then change it
-#if 0
-	entities->AddComponent( player, CPlayerMoveData{} );
-	entities->AddComponent( player, CPlayerInfo{} );
-	entities->AddComponent( player, CRigidBody{} );
-	entities->AddComponent( player, Transform{} );
-	entities->AddComponent( player, CCamera{} );
-#else
 	entities->AddComponent< CPlayerMoveData >( player );
 	entities->AddComponent< CPlayerInfo >( player );
 	entities->AddComponent< CRigidBody >( player );
-	entities->AddComponent< Transform >( player );
+	Transform& transform = entities->AddComponent< Transform >( player );
 	entities->AddComponent< CCamera >( player );
-#endif
 
 	//Model* model = new Model;
 	//game->apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
@@ -174,6 +170,30 @@ Entity PlayerManager::Create(  )
 
 	Model* model = &entities->AddComponent< Model >( player );
 	game->apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
+
+#if BULLET_PHYSICS
+	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
+	physInfo.mass = PLAYER_MASS;
+	physInfo.transform = transform;
+	//physInfo.callbacks = true;
+	//physInfo.collisionType = CollisionType::Kinematic;
+	// physInfo.bounds = glm::vec3(14, 14, 32);  * velocity_scale.GetFloat();
+	//physInfo.bounds = glm::vec3(14, 14, 32) * 0.025f;
+	physInfo.bounds = glm::vec3(14, 14, 32);
+	//physInfo.bounds = {14, 32, 14};  // bruh wtf why y up for this even though it's a btCylinderShapeZ
+
+	// PhysicsObject* physObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
+	apPhysObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
+	apPhysObj->SetAlwaysActive( true );
+	apPhysObj->SetContinuousCollisionEnabled( true );
+	apPhysObj->SetWorldTransform( transform );
+	apPhysObj->SetLinearVelocity( {0, 0, 0} );
+	apPhysObj->SetAngularFactor( {0, 0, 0} );
+	apPhysObj->SetSleepingThresholds( 0, 0 );
+	apPhysObj->SetFriction( phys_friction.GetFloat() );
+
+	//entities->AddComponent( player, physObj );
+#endif
 
 	aPlayerList.push_back( player );
 
@@ -251,7 +271,7 @@ void PlayerManager::DoMouseLook( Entity player )
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 
-	const glm::vec2 mouse = in_sensitivity.GetFloat() * game->apInput->GetMouseDelta();
+	const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(game->apInput->GetMouseDelta());
 
 	// transform.aAng[PITCH] = -mouse.y;
 	camera.aTransform.aAng[PITCH] += mouse.y;
@@ -319,8 +339,9 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 
 #if !NO_BULLET_PHYSICS
-	if ( apPhysObj )
-		apPhysObj->SetWorldTransform( aTransform );
+	auto& transform = entities->GetComponent< Transform >( player );
+	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+	apPhysObj->SetWorldTransform( transform );
 #endif
 
 	// Init Smooth Duck
@@ -334,10 +355,21 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 
 void PlayerMovement::MovePlayer( Entity player )
 {
+	aPlayer = player;
 	apMove = &entities->GetComponent< CPlayerMoveData >( player );
 	apRigidBody = &entities->GetComponent< CRigidBody >( player );
 	apTransform = &entities->GetComponent< Transform >( player );
 	apCamera = &entities->GetComponent< CCamera >( player );
+	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
+
+#if !NO_BULLET_PHYSICS
+	// update velocity
+	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
+
+	//apPhysObj->SetSleepingThresholds( 0, 0 );
+	//apPhysObj->SetAngularFactor( 0 );
+	apPhysObj->SetFriction( phys_friction.GetFloat() );
+#endif
 
 	UpdateInputs();
 
@@ -360,7 +392,12 @@ void PlayerMovement::MovePlayer( Entity player )
 
 		for ( auto& mesh: model.GetModelData().aMeshes )
 		{
+#if BULLET_PHYSICS
+			//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+			//mesh->aTransform = physObj->GetWorldTransform();
+#else
 			mesh->aTransform = *apTransform;
+#endif
 			mesh->aTransform.aAng[ROLL] += 90;
 			mesh->aTransform.aAng[YAW] *= -1;
 			mesh->aTransform.aAng[YAW] += 180;
@@ -396,29 +433,29 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, PlayerMoveType type )
 	{
 		case PlayerMoveType::NoClip:
 		{
-		//	EnableGravity( false );
-		//	SetCollisionEnabled( false );
+			EnableGravity( false );
+			SetCollisionEnabled( false );
 			break;
 		}
 
 		case PlayerMoveType::Fly:
 		{
-		//	EnableGravity( false );
-		//	SetCollisionEnabled( true );
+			EnableGravity( false );
+			SetCollisionEnabled( true );
 			break;
 		}
 
 		case PlayerMoveType::Walk:
 		{
-		//	EnableGravity( true );
-		//	SetCollisionEnabled( true );
+			EnableGravity( true );
+			SetCollisionEnabled( true );
 			break;
 		}
 	}
 }
 
 
-/*void PlayerMovement::SetCollisionEnabled( bool enable )
+void PlayerMovement::SetCollisionEnabled( bool enable )
 {
 #if !NO_BULLET_PHYSICS
 	apPhysObj->SetCollisionEnabled( enable );
@@ -431,7 +468,7 @@ void PlayerMovement::EnableGravity( bool enabled )
 #if !NO_BULLET_PHYSICS
 	apPhysObj->SetGravity( enabled ? game->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
 #endif
-}*/
+}
 
 // ============================================================
 
@@ -535,6 +572,27 @@ void PlayerMovement::UpdateInputs(  )
 }
 
 
+void PlayerMovement::UpdatePosition( Entity player )
+{
+#if BULLET_PHYSICS
+	auto& transform = entities->GetComponent< Transform >( player );
+	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+
+	//if ( aMoveType == MoveType::Fly )
+		//aTransform = apPhysObj->GetWorldTransform();
+	//transform.aPos = physObj->GetWorldTransform().aPos;
+	transform.aPos = apPhysObj->GetWorldTransform().aPos;
+	//transform.aAng = physObj->GetWorldTransform().aAng;  // hmm
+#else
+	SetPos( GetPos() + (apRigidBody->aVel * velocity_scale.GetFloat()) * game->aFrameTime );
+
+	// blech
+	//if ( IsOnGround() && aMoveType != MoveType::NoClip )
+	//	aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
+#endif
+}
+
+
 void PlayerMovement::DoSmoothDuck(  )
 {
 	float viewHeightLerp = cl_view_height_lerp * game->aFrameTime;
@@ -572,26 +630,10 @@ void PlayerMovement::DoSmoothDuck(  )
 }
 
 
-void PlayerMovement::UpdatePosition(  )
-{
-#if !NO_BULLET_PHYSICS
-	//if ( aMoveType == MoveType::Fly )
-		//aTransform = apPhysObj->GetWorldTransform();
-		aTransform.aPos = apPhysObj->GetWorldTransform().aPos;
-#else
-	SetPos( GetPos() + (apRigidBody->aVel * velocity_scale.GetFloat()) * game->aFrameTime );
-
-	// blech
-	//if ( IsOnGround() && aMoveType != MoveType::NoClip )
-	//	aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
-#endif
-}
-
-
 // temporarily using bullet directly until i abstract this
 void PlayerMovement::DoRayCollision(  )
 {
-#if !NO_BULLET_PHYSICS
+#if 0 // !NO_BULLET_PHYSICS
 	// temp to avoid a crash intantly?
 	if ( aVelocity.x == 0.f && aVelocity.y == 0.f && aVelocity.y == 0.f )
 		return;
@@ -624,6 +666,64 @@ void PlayerMovement::DoRayCollision(  )
 
 CONVAR( phys_ground_dist, 1200 );  // 200 // 1050
 
+#if BULLET_PHYSICS
+PhysicsObject* GetGroundObject( Entity player )
+{
+	btDispatcher *pDispatcher = physenv->apWorld->getDispatcher();
+
+	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+
+	// Loop through the collision pair manifolds
+	int numManifolds = pDispatcher->getNumManifolds();
+	for (int i = 0; i < numManifolds; i++)
+	{
+		btPersistentManifold *pManifold = pDispatcher->getManifoldByIndexInternal(i);
+		if (pManifold->getNumContacts() <= 0)
+			continue;
+
+		const btCollisionObject *objA = pManifold->getBody0();
+		const btCollisionObject *objB = pManifold->getBody1();
+
+		const btCollisionShape *shapeA = objA->getCollisionShape();
+		const btCollisionShape *shapeB = objA->getCollisionShape();
+
+		// Skip if one object is static/kinematic
+		if (objA->isStaticOrKinematicObject() || objB->isStaticOrKinematicObject())
+			continue;
+
+		PhysicsObject *pPhysA = (PhysicsObject *)objA->getUserPointer();
+		PhysicsObject *pPhysB = (PhysicsObject *)objB->getUserPointer();
+
+		// Collision that involves us!
+		if ( shapeA == apPhysObj->apCollisionShape || shapeB == apPhysObj->apCollisionShape )
+		{
+			int ourID = apPhysObj->apCollisionShape == shapeA ? 0 : 1;
+
+			for (int i = 0; i < pManifold->getNumContacts(); i++)
+			{
+				btManifoldPoint &point = pManifold->getContactPoint(i);
+
+				btVector3 norm = point.m_normalWorldOnB; // Normal worldspace A->B
+				if (ourID == 1)
+				{
+					// Flip it because we're object B and we need norm B->A.
+					norm *= -1;
+				}
+
+				// HACK: Guessing which way is up (as currently defined in our implementation y is up)
+				// If the normal is up enough then assume it's some sort of ground
+				if (norm.z() > 0.8)
+				{
+					return ourID == 0 ? pPhysB : pPhysA;
+				}
+			}
+		}
+	}
+
+	return nullptr;
+}
+#endif
+
 
 bool PlayerMovement::IsOnGround(  )
 {
@@ -639,11 +739,9 @@ bool PlayerMovement::IsOnGround(  )
 	{
 		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
 		if ( dist < phys_ground_dist )
-		{
-			aPlayerFlags |= PlyOnGround;
-		}
+			apMove->aPlayerFlags |= PlyOnGround;
 		else
-			aPlayerFlags &= ~PlyOnGround;
+			apMove->aPlayerFlags &= ~PlyOnGround;
 		
 	}
 
@@ -805,14 +903,22 @@ void PlayerMovement::BaseFlyMove(  )
 }
 
 
+#define SET_VELOCITY() \
+glm::vec3 __vel{}; \
+for ( int i = 0; i < 3; i++ ) \
+	__vel[i] = apCamera->aForward[i]*apRigidBody->aAccel.x + apCamera->aRight[i]*apRigidBody->aAccel[W_RIGHT]; \
+apPhysObj->SetLinearVelocity( apPhysObj->GetLinearVelocity() + (__vel * velocity_scale2.GetFloat()) )
+
+
 void PlayerMovement::NoClipMove(  )
 {
 	BaseFlyMove(  );
 
 #if !NO_BULLET_PHYSICS
-	apPhysObj->SetLinearVelocity( aVelocity );
+	SET_VELOCITY();
+	// apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 #else
-	UpdatePosition(  );
+	UpdatePosition( aPlayer );
 #endif
 }
 
@@ -822,9 +928,10 @@ void PlayerMovement::FlyMove(  )
 	BaseFlyMove(  );
 
 #if !NO_BULLET_PHYSICS
-	apPhysObj->SetLinearVelocity( aVelocity );
+	SET_VELOCITY();
+	// apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 #else
-	UpdatePosition(  );
+	UpdatePosition( aPlayer );
 #endif
 
 	DoRayCollision(  );
@@ -843,11 +950,6 @@ void PlayerMovement::WalkMove(  )
 
 	if ( onGround )
 	{
-		// blech
-#if NO_BULLET_PHYSICS
-		//aTransform.position.z = ground_pos.GetFloat() * velocity_scale.GetFloat();
-#endif
-
 		AddFriction(  );
 		Accelerate( wishspeed, wishdir, false );
 	}
@@ -857,10 +959,15 @@ void PlayerMovement::WalkMove(  )
 		AddGravity(  );
 	}
 
-#if !NO_BULLET_PHYSICS
-	apPhysObj->SetLinearVelocity( aVelocity );
+#if BULLET_PHYSICS
+	SET_VELOCITY();
+	// apPhysObj->SetLinearVelocity( apRigidBody->aVel );
+
+	// uhhh
+	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
+
 #else
-	UpdatePosition(  );
+	UpdatePosition( aPlayer );
 #endif
 
 	DoRayCollision(  );
@@ -871,12 +978,11 @@ void PlayerMovement::WalkMove(  )
 		PlayStepSound();
 
 	// something is wrong with this here on bullet
-#if NO_BULLET_PHYSICS
+#if !BULLET_PHYSICS
 	DoSmoothLand( onGround );
-#endif
-
 	DoViewBob(  );
 	DoViewTilt(  );
+#endif
 
 	if ( IsOnGround() )
 		apRigidBody->aVel[W_UP] = 0;
