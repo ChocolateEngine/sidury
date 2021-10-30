@@ -21,19 +21,6 @@ int load_object( Module* mod, const char* path )
 	char pathExt[512];
 	snprintf(pathExt, 512, "%s%s", path, EXT_DLL );
 
-	/*mod = SDL_LoadObject( pathExt );
-
-	//if ( !mod )
-	if ( !mod )
-	{
-		fprintf( stderr, "Failed to load %s: %s\n", pathExt, SDL_GetError(  ) );
-		//sys_print_last_error( "Failed to load %s", path );
-		return -1;
-	}
-
-	return 0;
-	*/
-
 	if ( *mod = SDL_LoadObject( pathExt ) )
 		return 0;
 
@@ -45,11 +32,11 @@ int load_object( Module* mod, const char* path )
 	return -1;
 }
 
-int main
-	(  )
+
+int main( int argc, char *argv[] )
 {
 	void ( *engine_start )(  );
-	void ( *init_console )(  );
+	void ( *core_init )( int argc, char *argv[] );
 
 #ifdef _WIN32
 	// SetDllDirectoryA()
@@ -58,15 +45,15 @@ int main
 	if ( load_object( &core, "bin/core" ) == -1 )
 		return -1;
 
-	*( void** )( &init_console ) = SDL_LoadFunction( core, "init_console" );
-	if ( !init_console )
+	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
+	if ( !core_init )
 	{
 		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
 		SDL_UnloadObject( core );
 		return -1;
 	}
 
-	init_console();
+	core_init( argc, argv );
 
 	if ( load_object( &imgui, "bin/imgui" ) == -1 )
 		return -1;
