@@ -3,6 +3,10 @@
 
 #include <glm/gtc/noise.hpp>
 
+#include <iostream>
+#include <cstdint>
+#include <cstring>
+
 /*
 float trilinearInterpolation(float blf, float blb, float brf, float brb,
                                 float tlf, float tlb, float trf, float trb,
