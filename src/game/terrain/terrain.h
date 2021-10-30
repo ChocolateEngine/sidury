@@ -16,7 +16,7 @@ constexpr unsigned int CHUNK_SIZE = 100;  // 100  // 20 - raised for less draw c
 constexpr unsigned int CHUNK_AREA = CHUNK_SIZE * CHUNK_SIZE;
 constexpr unsigned int CHUNK_VOLUME = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
-constexpr unsigned int WORLD_SIZE = 5;
+constexpr unsigned int WORLD_SIZE = 1;
 constexpr unsigned int WORLD_HEIGHT = 1;
 constexpr unsigned int WORLD_AREA = WORLD_SIZE * WORLD_SIZE;
 constexpr unsigned int WORLD_VOLUME = WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT;
