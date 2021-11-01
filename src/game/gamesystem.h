@@ -7,6 +7,8 @@
 #include "graphics/igraphics.h"
 #include "graphics/renderertypes.h"
 
+#include "shims.h"
+
 // world xyz
 constexpr int W_FORWARD = 0;
 constexpr int W_RIGHT = 1;
@@ -18,7 +20,6 @@ constexpr glm::vec3 vec3_up(0, 0, 1);
 
 #include "physics.h"
 #include "entity.h"
-
 
 class GameSystem : public BaseSystem
 {
@@ -46,11 +47,6 @@ public:
 	void SetViewMatrix( const glm::mat4& viewMatrix );
 
 	virtual void HandleSDLEvent( SDL_Event* e );
-
-	BaseGuiSystem* apGui = NULL;
-	BaseGraphicsSystem* apGraphics = NULL;
-	BaseInputSystem* apInput = NULL;
-	BaseAudioSystem* apAudio = NULL;
 
 	std::vector< Model* > aModels;
 

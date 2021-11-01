@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "shims.h"
 
 CONVAR( in_forward, 0 );
 CONVAR( in_side, 0 );
@@ -102,12 +103,12 @@ CON_COMMAND( reset_velocity )
 }
 
 
-#define GET_KEY( key ) game->apInput->GetKeyState(key)
+#define GET_KEY( key ) GetKeyState(key)
 
-#define KEY_PRESSED( key ) game->apInput->KeyPressed(key)
-#define KEY_RELEASED( key ) game->apInput->KeyReleased(key)
-#define KEY_JUST_PRESSED( key ) game->apInput->KeyJustPressed(key)
-#define KEY_JUST_RELEASED( key ) game->apInput->KeyJustReleased(key)
+#define KEY_PRESSED( key ) KeyPressed(key)
+#define KEY_RELEASED( key ) KeyReleased(key)
+#define KEY_JUST_PRESSED( key ) KeyJustPressed(key)
+#define KEY_JUST_RELEASED( key ) KeyJustReleased(key)
 
 
 // glm::normalize doesn't return a float
@@ -169,7 +170,7 @@ Entity PlayerManager::Create(  )
 	//entities->AddComponent( player, model );
 
 	Model* model = &entities->AddComponent< Model >( player );
-	game->apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
+        LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
 
 #if BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
@@ -271,7 +272,7 @@ void PlayerManager::DoMouseLook( Entity player )
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 
-	const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(game->apInput->GetMouseDelta());
+	const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(GetMouseDelta());
 
 	// transform.aAng[PITCH] = -mouse.y;
 	camera.aTransform.aAng[PITCH] += mouse.y;
@@ -484,16 +485,16 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	float scaledSpeed = glm::length( glm::vec2(scaledVelocity.x, scaledVelocity.y) );
 	float speed = glm::length( glm::vec2(rigidBody.aVel.x, rigidBody.aVel.y) );
 
-	game->apGui->DebugMessage( 0, "Player Pos:    %s", Vec2Str(transform.aPos).c_str() );
-	game->apGui->DebugMessage( 1, "Player Ang:    %s", Vec2Str(transform.aAng).c_str() );
-	game->apGui->DebugMessage( 2, "Player Vel:    %s", Vec2Str(scaledVelocity).c_str() );
-	game->apGui->DebugMessage( 3, "Player Speed:  %.4f (%.4f Unscaled)", scaledSpeed, speed );
+        DebugMessage( 0, "Player Pos:    %s", Vec2Str(transform.aPos).c_str() );
+        DebugMessage( 1, "Player Ang:    %s", Vec2Str(transform.aAng).c_str() );
+        DebugMessage( 2, "Player Vel:    %s", Vec2Str(scaledVelocity).c_str() );
+        DebugMessage( 3, "Player Speed:  %.4f (%.4f Unscaled)", scaledSpeed, speed );
 
 	//game->apGui->DebugMessage( 5, "View Offset:   %.6f (%.6f Unscaled)", move.aViewOffset.z * velocity_scale, move.aViewOffset.z );
 	//game->apGui->DebugMessage( 6, "Ang Offset:    %s", Vec2Str(move.aViewAngOffset).c_str() );
 
-	game->apGui->DebugMessage( 5, "View Pos:      %s", Vec2Str(camTransform.aPos).c_str() );
-	game->apGui->DebugMessage( 6, "View Ang:      %s", Vec2Str(camTransform.aAng).c_str() );
+        DebugMessage( 5, "View Pos:      %s", Vec2Str(camTransform.aPos).c_str() );
+        DebugMessage( 6, "View Ang:      %s", Vec2Str(camTransform.aAng).c_str() );
 }
 
 
@@ -851,8 +852,8 @@ void PlayerMovement::StopStepSound( bool force )
 	{
 		if ( game->aCurTime - apMove->aLastStepTime > cl_stepduration || force )
 		{
-			game->apAudio->FreeSound( &apMove->apStepSound );
-			game->apGui->DebugMessage( 7, "Freed Step Sound" );
+		        FreeSound( &apMove->apStepSound );
+			DebugMessage( 7, "Freed Step Sound" );
 		}
 	}
 }
@@ -876,11 +877,11 @@ void PlayerMovement::PlayStepSound(  )
 	int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
 	snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
 
-	if ( game->apAudio->LoadSound( soundName, &apMove->apStepSound ) )
+	if ( LoadSound( soundName, &apMove->apStepSound ) )
 	{
 		apMove->apStepSound->vol = speedFactor;
 
-		game->apAudio->PlaySound( apMove->apStepSound );
+	        PlaySound( apMove->apStepSound );
 
 		apMove->aLastStepTime = game->aCurTime;
 	}
@@ -1104,9 +1105,9 @@ void PlayerMovement::DoViewBob(  )
 
 	apCamera->aTransform.aPos[W_UP] += apMove->aBobOffsetAmount;
 
-	game->apGui->DebugMessage( 8,  "Walk Time * Speed:  %.8f", apMove->aWalkTime );
-	game->apGui->DebugMessage( 9,  "View Bob Offset:    %.4f", apMove->aBobOffsetAmount );
-	game->apGui->DebugMessage( 10, "View Bob Speed:     %.6f", speedFactor );
+        DebugMessage( 8,  "Walk Time * Speed:  %.8f", apMove->aWalkTime );
+        DebugMessage( 9,  "View Bob Offset:    %.4f", apMove->aBobOffsetAmount );
+        DebugMessage( 10, "View Bob Speed:     %.6f", speedFactor );
 }
 
 

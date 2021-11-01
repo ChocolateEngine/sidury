@@ -58,10 +58,10 @@ int main( int argc, char *argv[] )
 	if ( load_object( &imgui, "bin/imgui" ) == -1 )
 		return -1;
 
-	if ( load_object( &engine, "bin/engine" ) == -1 )
+	if ( load_object( &engine, "bin/client" ) == -1 )
 		return -1;
 
-	*( void** )( &engine_start ) = SDL_LoadFunction( engine, "engine_start" );
+	*( void** )( &engine_start ) = SDL_LoadFunction( engine, "game_init" );
 	if ( !engine_start )
 	{
 		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );

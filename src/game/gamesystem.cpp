@@ -6,6 +6,7 @@
 #include "terrain/terrain.h"
 #include <algorithm>
 
+#include "shims.h"
 
 GameSystem* game = nullptr;
 
@@ -17,19 +18,17 @@ IMaterialSystem* materialsystem = nullptr;
 void CenterMouseOnScreen(  )
 {
 	int w, h;
-	SDL_GetWindowSize( game->apGraphics->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( game->apGraphics->GetWindow(), w/2, h/2 );
+	SDL_GetWindowSize( GetWindow(), &w, &h );
+	SDL_WarpMouseInWindow( GetWindow(), w/2, h/2 );
 }
-
 
 CONVAR( r_fov, 100.f );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
 
-CONVARREF( en_timescale );
+extern ConVar en_timescale;
 
 extern ConVar velocity_scale;
-
 
 struct ModelPhysTest
 {
@@ -53,7 +52,7 @@ void CreateProtogen()
 	Entity proto = entities->CreateEntity();
 	Model* model = &entities->AddComponent< Model >( proto );
 
-	game->apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", model );
+        LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", model );
 
 	auto& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
@@ -167,32 +166,27 @@ void GameSystem::Init(  )
 
 void GameSystem::RegisterKeys(  )
 {
-	apInput->RegisterKey( SDL_SCANCODE_W );
-	apInput->RegisterKey( SDL_SCANCODE_S );
-	apInput->RegisterKey( SDL_SCANCODE_A );
-	apInput->RegisterKey( SDL_SCANCODE_D );
+	RegisterKey( SDL_SCANCODE_W );
+	RegisterKey( SDL_SCANCODE_S );
+	RegisterKey( SDL_SCANCODE_A );
+	RegisterKey( SDL_SCANCODE_D );
 
-	apInput->RegisterKey( SDL_SCANCODE_LCTRL );
-	apInput->RegisterKey( SDL_SCANCODE_LSHIFT );
-	apInput->RegisterKey( SDL_SCANCODE_SPACE );
+	RegisterKey( SDL_SCANCODE_LCTRL );
+	RegisterKey( SDL_SCANCODE_LSHIFT );
+	RegisterKey( SDL_SCANCODE_SPACE );
 	
-	apInput->RegisterKey( SDL_SCANCODE_V ); // noclip
-	apInput->RegisterKey( SDL_SCANCODE_B ); // flight
+	RegisterKey( SDL_SCANCODE_V ); // noclip
+	RegisterKey( SDL_SCANCODE_B ); // flight
 
-	apInput->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
-	apInput->RegisterKey( SDL_SCANCODE_E ); // create protogen
-	apInput->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
+	RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
+	RegisterKey( SDL_SCANCODE_E ); // create protogen
+	RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 }
 
 
 void GameSystem::LoadModules(  )
 {
-	GET_SYSTEM_CHECK( apGui, BaseGuiSystem );
-	GET_SYSTEM_CHECK( apGraphics, BaseGraphicsSystem );
-	GET_SYSTEM_CHECK( apInput, BaseInputSystem );
-	GET_SYSTEM_CHECK( apAudio, BaseAudioSystem );
-
-	apGraphics->GetWindowSize( &aView.width, &aView.height );
+	GetWindowSize( &aView.width, &aView.height );
 	aView.ComputeProjection();
 
 #if !NO_BULLET_PHYSICS
@@ -200,13 +194,13 @@ void GameSystem::LoadModules(  )
 	apPhysEnv->Init(  );
 #endif
 
-	materialsystem = apGraphics->GetMaterialSystem();
+	materialsystem = GetMaterialSystem();
 }
 
 
 void GameSystem::UnloadWorld()
 {
-	apGraphics->UnloadModel( g_world->mdl );
+	//UnloadModel( g_world->mdl );
 	//vec_remove( aModels, g_world->mdl );
 	//g_world->mdl = nullptr;
 }
@@ -217,7 +211,7 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 	//if ( g_world->mdl )
 	//	UnloadWorld();
 
-	apGraphics->LoadModel( path, "materials/act_like_a_baka.jpg", g_world->mdl );
+	LoadModel( path, "materials/act_like_a_baka.jpg", g_world->mdl );
 
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
 	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
@@ -268,7 +262,7 @@ void GameSystem::CreateEntities(  )
 	{
 		g_physEnts.push_back( new ModelPhysTest{ new Model, NULL } );
 		aModels.push_back( g_physEnts[i]->mdl );
-		apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/1aaaaaaa.jpg", g_physEnts[i]->mdl );
+		LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/1aaaaaaa.jpg", g_physEnts[i]->mdl );
 		// apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", g_physEnts[i]->mdl );
 
 		for (int j = 0; j < 3; j++)
@@ -358,7 +352,11 @@ void GameSystem::Update( float frameTime )
 
 	UpdateAudio(  );
 
-	if ( apInput->WindowHasFocus() && !aPaused )
+        static std::vector< SDL_Event >* events = GetEvents(  );
+	for ( auto& event : *events )
+	        HandleSDLEvent( &event );
+
+	if ( WindowHasFocus() && !aPaused )
 	{
 		CenterMouseOnScreen(  );
 	}
@@ -368,7 +366,7 @@ void GameSystem::Update( float frameTime )
 void GameSystem::CheckPaused(  )
 {
 	bool wasPaused = aPaused;
-	aPaused = apGui->IsConsoleShown();
+	aPaused = IsConsoleShown();
 
 	if ( wasPaused != aPaused )
 	{
@@ -380,7 +378,7 @@ void GameSystem::CheckPaused(  )
 		}
 	}
 
-	apAudio->SetPaused( aPaused );
+	SetPaused( aPaused );
 }
 
 CONVAR( proto_x,  550 );
@@ -513,7 +511,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	if ( !aPaused )
 	{
-		if ( apInput->KeyJustPressed( SDL_SCANCODE_E ) || apInput->KeyPressed( SDL_SCANCODE_R ) )
+		if ( KeyJustPressed( SDL_SCANCODE_E ) || KeyPressed( SDL_SCANCODE_R ) )
 		{
 			CreateProtogen(  );
 		}
@@ -583,18 +581,18 @@ void GameSystem::UpdateAudio(  )
 
 	auto& transform = entities->GetComponent< Transform >( aLocalPlayer );
 
-	if ( apInput->KeyJustPressed(SDL_SCANCODE_G) )
+	if ( KeyJustPressed(SDL_SCANCODE_G) )
 	{
 		if ( stream && stream->Valid() )
 		{
-			apAudio->FreeSound( &stream );
+		        FreeSound( &stream );
 
 			if ( g_streamModel )
 				g_streamModel->GetModelData().aNoDraw = true;
 		}
 		// test sound
 		//else if ( apAudio->LoadSound("sound/rain2.ogg", &stream) )  
-		else if ( apAudio->LoadSound("sound/endymion2.ogg", &stream) )  
+		else if ( LoadSound("sound/endymion2.ogg", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion_mono.ogg", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion2.wav", &stream) )  
 		//else if ( apAudio->LoadSound("sound/endymion_mono.wav", &stream) )  
@@ -605,12 +603,12 @@ void GameSystem::UpdateAudio(  )
 			//stream->effects = AudioEffectPreset_World;
 			stream->loop = true;
 
-			apAudio->PlaySound( stream );
+		        PlaySound( stream );
 
 			if ( g_streamModel == nullptr )
 			{
 				g_streamModel = new Model;
-				apGraphics->LoadModel( "materials/models/cube.obj", "", g_streamModel );
+				LoadModel( "materials/models/cube.obj", "", g_streamModel );
 				//aModels.push_back( g_streamModel );
 			}
 
@@ -624,7 +622,7 @@ void GameSystem::UpdateAudio(  )
 		stream->vol = snd_test_vol;
 	}
 
-	apAudio->SetListenerTransform( transform.aPos, transform.aAng );
+        SetListenerTransform( &transform.aPos, &transform.aAng );
 }
 
 
@@ -638,13 +636,19 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					apGraphics->GetWindowSize( &aView.width, &aView.height );
+					GetWindowSize( &aView.width, &aView.height );
 					aView.ComputeProjection();
 					break;
 				}
 			}
 			break;
 		}
+
+	case SDL_KEYDOWN:
+	{
+		if ( e->key.keysym.sym == SDLK_BACKQUOTE )
+			ShowConsole(  );
+	}
 
 		default:
 		{
@@ -657,6 +661,6 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 void GameSystem::SetViewMatrix( const glm::mat4& viewMatrix )
 {
 	aView.viewMatrix = viewMatrix;
-	apGraphics->SetView( aView );
+	SetView( &aView );
 }
 
