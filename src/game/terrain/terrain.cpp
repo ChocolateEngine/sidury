@@ -6,7 +6,6 @@
 #include "graphics/imaterial.h"
 #include "util.h"
 
-
 VoxelWorld* voxelworld = new VoxelWorld;
 
 extern GameSystem* game;
@@ -87,8 +86,6 @@ void VoxelWorld::Init()
 	// Load Base Textures
 	//g_matGrass->apDiffuse = materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" );
 	g_matGrass->SetDiffuse( materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" ) );
-
-	Print( "Size Of: glm::ivec3: %u", sizeof glm::ivec3 );
 	
 	// Now Create the world
 	CreateWorld(  );
