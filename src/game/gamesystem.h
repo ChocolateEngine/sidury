@@ -12,9 +12,13 @@ constexpr int W_FORWARD = 0;
 constexpr int W_RIGHT = 1;
 constexpr int W_UP = 2;
 
-constexpr glm::vec3 vec3_forward(1, 0, 0);
-constexpr glm::vec3 vec3_right(0, 1, 0);
-constexpr glm::vec3 vec3_up(0, 0, 1);
+//constexpr glm::vec3 vec3_forward(1, 0, 0);
+//constexpr glm::vec3 vec3_right(0, 1, 0);
+//constexpr glm::vec3 vec3_up(0, 0, 1);
+
+const glm::vec3 vec3_forward(1, 0, 0);
+const glm::vec3 vec3_right(0, 1, 0);
+const glm::vec3 vec3_up(0, 0, 1);
 
 #include "physics.h"
 #include "entity.h"
@@ -36,7 +40,6 @@ public:
 	virtual void RegisterKeys(  );
 	virtual void CreateEntities(  );
 
-	virtual void InitConsoleCommands(  );
 	virtual void Update( float frameTime );
 	virtual void SetupModels( float frameTime );
 	virtual void CheckPaused(  );

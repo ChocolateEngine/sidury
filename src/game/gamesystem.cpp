@@ -4,6 +4,7 @@
 #include "player.h"
 #include "entity.h"
 #include "terrain/terrain.h"
+#include "graphics/sprite.h"
 #include <algorithm>
 
 
@@ -130,6 +131,9 @@ GameSystem::~GameSystem(  )
 }
 
 
+Sprite* gpSprite = nullptr;
+
+
 void GameSystem::Init(  )
 {
 	BaseClass::Init(  );
@@ -162,6 +166,12 @@ void GameSystem::Init(  )
 	players->Spawn( aLocalPlayer );
 
 	Print( "Game Loaded!\n" );
+
+	gpSprite = new Sprite;
+
+	apGraphics->LoadSprite( "materials/1aaaaaaa.jpg", gpSprite );
+
+	materialsystem->RegisterRenderable( gpSprite );
 }
 
 
@@ -182,6 +192,8 @@ void GameSystem::RegisterKeys(  )
 	apInput->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
 	apInput->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	apInput->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
+
+	//apInput->RegisterKey( SDL_SCANCODE_G ); // create a sprite
 }
 
 
@@ -300,12 +312,6 @@ void GameSystem::CreateEntities(  )
 }
 
 
-void GameSystem::InitConsoleCommands(  )
-{
-	BaseClass::InitConsoleCommands(  );
-}
-
-
 // testing
 AudioStream *stream = nullptr;
 Model* g_streamModel = nullptr;
@@ -351,6 +357,8 @@ void GameSystem::Update( float frameTime )
 #endif
 
 	players->apMove->DisplayPlayerStats( aLocalPlayer );
+
+	//materialsystem->AddRenderable( gpSprite );
 
 	SetupModels( frameTime );
 
@@ -399,17 +407,17 @@ glm::vec3 VectorToAngles( const glm::vec3& forward )
 {
 	glm::vec3 angles;
 
-	if (forward[0] == 0 && forward[1] == 0)
+	if (forward.x == 0 && forward.y == 0)
 	{
 		// either vertically up or down
-		angles[PITCH] = (forward[2] > 0) ? -90 : 90;
+		angles[PITCH] = (forward.z > 0) ? -90 : 90;
 		angles[YAW] = 0;
 		angles[ROLL] = 0;
 	}
 	else
 	{
-		angles[PITCH] = -atan2(forward[2], sqrt( glm::dot(forward, forward) ));
-		angles[YAW] = atan2(forward[1], forward[0]);
+		angles[PITCH] = -atan2(forward.z, sqrt( glm::dot(forward, forward) ));
+		angles[YAW] = atan2(forward.y, forward.x);
 		angles[ROLL] = 0;
 
 		angles = glm::degrees( angles );
@@ -423,7 +431,7 @@ glm::vec3 VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 {
 	glm::vec3 angles;
 
-	if (forward[0] == 0 && forward[1] == 0)
+	if (forward.x == 0 && forward.y == 0)
 	{
 		// either vertically up or down
 		if (forward[2] > 0)
@@ -440,18 +448,18 @@ glm::vec3 VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 	}
 	else
 	{
-		angles[PITCH] = -atan2(forward[2], sqrt( glm::dot(forward, forward) ));
-		angles[YAW] = atan2(forward[1], forward[0]);
+		angles[PITCH] = -atan2(forward.z, sqrt( glm::dot(forward, forward) ));
+		angles[YAW] = atan2(forward.y, forward.x);
 
 		float cp = cos(angles[PITCH]), sp = sin(angles[PITCH]);
 		float cy = cos(angles[YAW]), sy = sin(angles[YAW]);
 		glm::vec3 tleft, tup;
-		tleft[0] = -sy;
-		tleft[1] = cy;
-		tleft[2] = 0;
-		tup[0] = sp*cy;
-		tup[1] = sp*sy;
-		tup[2] = cp;
+		tleft.x = -sy;
+		tleft.y = cy;
+		tleft.z = 0;
+		tup.x = sp*cy;
+		tup.y = sp*sy;
+		tup.z = cp;
 		angles[ROLL] = -atan2( glm::dot(up, tleft), glm::dot(up, tup) );
 
 		angles = glm::degrees( angles );
@@ -553,6 +561,10 @@ void GameSystem::SetupModels( float frameTime )
 
 		for ( auto& mesh: model.GetModelData().aMeshes )
 		{
+			protoTransform.aPrevPos = mesh->aTransform.aPrevPos;
+			protoTransform.aPrevAng = mesh->aTransform.aPrevAng;
+			protoTransform.aMatrix = mesh->aTransform.aMatrix;
+
 			mesh->aTransform = protoTransform;
 			materialsystem->AddRenderable( mesh );
 		}
@@ -593,12 +605,12 @@ void GameSystem::UpdateAudio(  )
 				g_streamModel->GetModelData().aNoDraw = true;
 		}
 		// test sound
-		//else if ( apAudio->LoadSound("sound/rain2.ogg", &stream) )  
-		else if ( apAudio->LoadSound("sound/endymion2.ogg", &stream) )  
-		//else if ( apAudio->LoadSound("sound/endymion_mono.ogg", &stream) )  
-		//else if ( apAudio->LoadSound("sound/endymion2.wav", &stream) )  
-		//else if ( apAudio->LoadSound("sound/endymion_mono.wav", &stream) )  
-		//else if ( apAudio->LoadSound("sound/robots_cropped.ogg", &stream) )  
+		//else if ( stream = apAudio->LoadSound("sound/rain2.ogg") )  
+		else if ( stream = apAudio->LoadSound("sound/endymion2.ogg" ) )  
+		//else if ( stream = apAudio->LoadSound("sound/endymion_mono.ogg") )  
+		//else if ( stream = apAudio->LoadSound("sound/endymion2.wav") )  
+		//else if ( stream = apAudio->LoadSound("sound/endymion_mono.wav") )  
+		//else if ( stream = apAudio->LoadSound("sound/robots_cropped.ogg") )  
 		{
 			stream->vol = snd_test_vol;
 			stream->pos = transform.aPos;  // play it where the player currently is

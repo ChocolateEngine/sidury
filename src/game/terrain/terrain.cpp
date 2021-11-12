@@ -28,7 +28,7 @@ enum Faces
 };
 
 
-constexpr BlockPosS FaceDirs[6] = {
+const BlockPosS FaceDirs[6] = {
 	{  0,  0,  1 },  // Above
 	{  0,  0, -1 },  // Below
 	{ -1,  0,  0 },  // Left
@@ -58,7 +58,7 @@ constexpr uchar FaceDirsVec[6] = {
 };
 
 
-constexpr glm::vec3 FaceNorm[6] = {
+const glm::vec3 FaceNorm[6] = {
 	{  0,  0,  1 },  // Above
 	{  0,  0, -1 },  // Below
 	//{ -1,  0,  0 },  // Left
@@ -70,7 +70,7 @@ constexpr glm::vec3 FaceNorm[6] = {
 };
 
 
-constexpr glm::vec2 uvGrass[2][3] = {
+const glm::vec2 uvGrass[2][3] = {
 	{ { 1, 1 }, { 0, 1 }, { 0, 0 } },
 	{ { 1, 0 }, { 1, 1 }, { 0, 0 } }
 };

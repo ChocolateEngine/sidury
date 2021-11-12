@@ -86,8 +86,11 @@ constexpr float PLAYER_MASS = 200.f;
 // #define SPAWN_POS 10.8569824, -2.60, 6.44222046
 // #define SPAWN_POS -26.5, -45, -8.2
 
-constexpr glm::vec3 SPAWN_POS = {0, 0, 0};
-constexpr glm::vec3 SPAWN_ANG = {0, 45, 0};
+//constexpr glm::vec3 SPAWN_POS = {0, 0, 0};
+//constexpr glm::vec3 SPAWN_ANG = {0, 45, 0};
+
+const glm::vec3 SPAWN_POS = {0, 0, 0};
+const glm::vec3 SPAWN_ANG = {0, 45, 0};
 
 
 CON_COMMAND( respawn )
@@ -876,7 +879,7 @@ void PlayerMovement::PlayStepSound(  )
 	int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
 	snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
 
-	if ( game->apAudio->LoadSound( soundName, &apMove->apStepSound ) )
+	if ( apMove->apStepSound = game->apAudio->LoadSound(soundName) )
 	{
 		apMove->apStepSound->vol = speedFactor;
 
