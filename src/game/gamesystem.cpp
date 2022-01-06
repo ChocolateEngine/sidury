@@ -561,10 +561,6 @@ void GameSystem::SetupModels( float frameTime )
 
 		for ( auto& mesh: model.GetModelData().aMeshes )
 		{
-			protoTransform.aPrevPos = mesh->aTransform.aPrevPos;
-			protoTransform.aPrevAng = mesh->aTransform.aPrevAng;
-			protoTransform.aMatrix = mesh->aTransform.aMatrix;
-
 			mesh->aTransform = protoTransform;
 			materialsystem->AddRenderable( mesh );
 		}
