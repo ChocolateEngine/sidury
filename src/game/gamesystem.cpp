@@ -146,13 +146,13 @@ void GameSystem::Init(  )
 	entities = new EntityManager;
 	entities->Init();
 
-	// LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
+	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
 	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
 
 	// should be part of LoadWorld, but that will come later when we actually have a map format for this game
 	CreateEntities(  );
 
-	voxelworld->Init(  );
+	// voxelworld->Init(  );
 
 	players = entities->RegisterSystem<PlayerManager>();
 	players->Init();
@@ -343,7 +343,12 @@ void GameSystem::Update( float frameTime )
 
 	aCurTime += aFrameTime;
 
-	voxelworld->Update( frameTime );
+	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
+	{
+		materialsystem->AddRenderable( mesh );
+	}
+
+	//voxelworld->Update( frameTime );
 	players->Update( aFrameTime );
 
 #if !NO_BULLET_PHYSICS
@@ -357,8 +362,6 @@ void GameSystem::Update( float frameTime )
 #endif
 
 	players->apMove->DisplayPlayerStats( aLocalPlayer );
-
-	//materialsystem->AddRenderable( gpSprite );
 
 	SetupModels( frameTime );
 

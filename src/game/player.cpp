@@ -16,8 +16,8 @@ CONVAR( in_jump, 0 );
 
 extern ConVarRef en_timescale;
 
-//CONVAR( sv_sprint_mult, 2.4 );
-CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
+CONVAR( sv_sprint_mult, 2.4 );
+//CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
 CONVAR( sv_duck_mult, 0.5 );
 
 constexpr float DEFAULT_SPEED = 250.f;
@@ -1088,6 +1088,8 @@ void PlayerMovement::DoViewBob(  )
 	// mmmmmmm cpu cycles go brrrrrr
 	apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime)))) - sinMessFix);
 
+	// apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * ( 0.6*(1-cos( 2*sin(apMove->aWalkTime) )) );
+
 	// reset input
 	if ( apMove->aBobOffsetAmount == 0.f )
 		apMove->aWalkTime = 0.f;
@@ -1198,9 +1200,6 @@ void PlayerMovement::AddFriction(  )
 	//trace_t	trace;
 
 	glm::vec3 vel = apRigidBody->aVel;
-
-	glm::vec3 test = glm::sqrt(vel);
-	float test2 = glm::length(test);
 
 	float speed = sqrt(vel[0]*vel[0] + vel[W_RIGHT]*vel[W_RIGHT] + vel[W_UP]*vel[W_UP]);
 	if (!speed)

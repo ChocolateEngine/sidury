@@ -4,7 +4,7 @@
 #include "util.h"
 #include "types/transform.h"
 #include "entity.h"
-//#include "physics.h"
+#include "physics.h"
 
 
 enum class SurfaceType
