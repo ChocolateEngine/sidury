@@ -35,8 +35,8 @@ int load_object( Module* mod, const char* path )
 
 int main( int argc, char *argv[] )
 {
-	void ( *engine_start )( const char* gamePath );
-	void ( *core_init )( int argc, char *argv[] );
+	void ( *engine_start )();
+	void ( *core_init )( int argc, char *argv[], const char* gamePath );
 
 #ifdef _WIN32
 	// SetDllDirectoryA()
@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 		return -1;
 	}
 
-	core_init( argc, argv );
+	core_init( argc, argv, "sidury" );
 
 	if ( load_object( &imgui, "bin/imgui" ) == -1 )
 		return -1;
@@ -69,7 +69,7 @@ int main( int argc, char *argv[] )
 		return -1;
 	}
 
-	engine_start( "sidury" );
+	engine_start();
 	SDL_UnloadObject( engine );
 
 	return 0;

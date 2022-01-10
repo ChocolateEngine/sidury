@@ -1,4 +1,4 @@
-message( "Current Project: Launcher" )
+message( "Current Project: Sidury Launcher" )
 
 set(
 	SRC_FILES
@@ -6,18 +6,10 @@ set(
 	${CH_PUBLIC}/core/platform.c  # temp
 )
 
-#file(
-#	GLOB_RECURSE PUBLIC_FILES CONFIGURE_DEPENDS
-#	${CH_PUBLIC}/*.cpp
-#	${CH_PUBLIC}/*.h
-#	${CH_PUBLIC}/core/*.h
-#)
-
-#add_executable( Launcher ${SRC_FILES} ${PUBLIC_FILES} )
-add_executable( Launcher ${SRC_FILES} )
+add_executable( SiduryLauncher ${SRC_FILES} )
 
 set_target_properties(
-	Launcher PROPERTIES
+	SiduryLauncher PROPERTIES
 	OUTPUT_NAME sidury
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}
 	RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}
@@ -27,5 +19,5 @@ set_target_properties(
 )
 
 # Set as startup project in visual studio
-set_property( DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT Launcher )
+set_property( DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT SiduryLauncher )
 

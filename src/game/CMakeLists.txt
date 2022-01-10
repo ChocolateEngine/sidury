@@ -1,4 +1,4 @@
-message( "Current Project: Client" )
+message( "Current Project: Sidury Client" )
 
 file(
 	GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
@@ -20,12 +20,12 @@ include( ${CH_ROOT}/scripts/vulkan.cmake )
 
 link_libraries( Core )
 
-add_library( Client SHARED ${SRC_FILES} ${PUBLIC_FILES} )
+add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} )
 
-add_dependencies( Client "Core" )
+add_dependencies( SiduryClient "Core" )
 
 set_target_properties(
-	Client PROPERTIES
+	SiduryClient PROPERTIES
 	OUTPUT_NAME client
 
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
