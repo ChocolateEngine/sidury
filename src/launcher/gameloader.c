@@ -35,7 +35,7 @@ int load_object( Module* mod, const char* path )
 
 int main( int argc, char *argv[] )
 {
-	void ( *engine_start )(  );
+	void ( *engine_start )( const char* gamePath );
 	void ( *core_init )( int argc, char *argv[] );
 
 #ifdef _WIN32
@@ -69,7 +69,7 @@ int main( int argc, char *argv[] )
 		return -1;
 	}
 
-	engine_start(  );
+	engine_start( "sidury" );
 	SDL_UnloadObject( engine );
 
 	return 0;

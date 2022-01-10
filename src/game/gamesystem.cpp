@@ -10,7 +10,11 @@
 
 GameSystem* game = nullptr;
 
-// bruh
+BaseGuiSystem* gui = nullptr;
+BaseGraphicsSystem* graphics = nullptr;
+BaseInputSystem* input = nullptr;
+BaseAudioSystem* audio = nullptr;
+
 IMaterialSystem* materialsystem = nullptr;
 
 #define SPAWN_PROTOGEN 0
@@ -18,8 +22,8 @@ IMaterialSystem* materialsystem = nullptr;
 void CenterMouseOnScreen(  )
 {
 	int w, h;
-	SDL_GetWindowSize( game->apGraphics->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( game->apGraphics->GetWindow(), w/2, h/2 );
+	SDL_GetWindowSize( graphics->GetWindow(), &w, &h );
+	SDL_WarpMouseInWindow( graphics->GetWindow(), w/2, h/2 );
 }
 
 
@@ -35,8 +39,8 @@ extern ConVar velocity_scale;
 struct ModelPhysTest
 {
 	Model* mdl;
-#if !NO_BULLET_PHYSICS
-	PhysicsObject* physObj;
+#if BULLET_PHYSICS
+	std::vector<PhysicsObject*> physObj;
 #else
 	int* physObj;
 #endif
@@ -44,7 +48,7 @@ struct ModelPhysTest
 
 
 const int physEntCount = 0;
-ModelPhysTest* g_world = new ModelPhysTest{new Model, NULL};
+ModelPhysTest* g_world = new ModelPhysTest{new Model, {}};
 std::vector< Entity > g_protos;
 std::vector< ModelPhysTest* > g_physEnts;
 
@@ -54,7 +58,7 @@ void CreateProtogen()
 	Entity proto = entities->CreateEntity();
 	Model* model = &entities->AddComponent< Model >( proto );
 
-	game->apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", model );
+	graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", model );
 
 	auto& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
@@ -146,7 +150,16 @@ void GameSystem::Init(  )
 	entities = new EntityManager;
 	entities->Init();
 
-	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
+
+	// TEST
+	//IMaterial* testMat = materialsystem->CreateMaterial();
+	//testMat->SetShader( "basic_3d" );
+	//testMat->SetDiffuse( materialsystem->CreateTexture( testMat, "skybox-dxt.ktx" ) );
+
+
+	// LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", false );
+	LoadWorld( "D:/sourceengine/vmf2obj/br/d1_trainstation_02.obj", false );
+	// LoadWorld( "materials/models/riverhouse/riverhouse.obj", true );
 	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
 
 	// should be part of LoadWorld, but that will come later when we actually have a map format for this game
@@ -169,7 +182,7 @@ void GameSystem::Init(  )
 
 	gpSprite = new Sprite;
 
-	apGraphics->LoadSprite( "materials/1aaaaaaa.jpg", gpSprite );
+	graphics->LoadSprite( "materials/1aaaaaaa.jpg", gpSprite );
 
 	materialsystem->RegisterRenderable( gpSprite );
 }
@@ -177,34 +190,34 @@ void GameSystem::Init(  )
 
 void GameSystem::RegisterKeys(  )
 {
-	apInput->RegisterKey( SDL_SCANCODE_W );
-	apInput->RegisterKey( SDL_SCANCODE_S );
-	apInput->RegisterKey( SDL_SCANCODE_A );
-	apInput->RegisterKey( SDL_SCANCODE_D );
+	input->RegisterKey( SDL_SCANCODE_W );
+	input->RegisterKey( SDL_SCANCODE_S );
+	input->RegisterKey( SDL_SCANCODE_A );
+	input->RegisterKey( SDL_SCANCODE_D );
 
-	apInput->RegisterKey( SDL_SCANCODE_LCTRL );
-	apInput->RegisterKey( SDL_SCANCODE_LSHIFT );
-	apInput->RegisterKey( SDL_SCANCODE_SPACE );
+	input->RegisterKey( SDL_SCANCODE_LCTRL );
+	input->RegisterKey( SDL_SCANCODE_LSHIFT );
+	input->RegisterKey( SDL_SCANCODE_SPACE );
 	
-	apInput->RegisterKey( SDL_SCANCODE_V ); // noclip
-	apInput->RegisterKey( SDL_SCANCODE_B ); // flight
+	input->RegisterKey( SDL_SCANCODE_V ); // noclip
+	input->RegisterKey( SDL_SCANCODE_B ); // flight
 
-	apInput->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
-	apInput->RegisterKey( SDL_SCANCODE_E ); // create protogen
-	apInput->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
+	input->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
+	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
+	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
-	//apInput->RegisterKey( SDL_SCANCODE_G ); // create a sprite
+	//input->RegisterKey( SDL_SCANCODE_G ); // create a sprite
 }
 
 
 void GameSystem::LoadModules(  )
 {
-	GET_SYSTEM_CHECK( apGui, BaseGuiSystem );
-	GET_SYSTEM_CHECK( apGraphics, BaseGraphicsSystem );
-	GET_SYSTEM_CHECK( apInput, BaseInputSystem );
-	GET_SYSTEM_CHECK( apAudio, BaseAudioSystem );
+	GET_SYSTEM_CHECK( gui, BaseGuiSystem );
+	GET_SYSTEM_CHECK( graphics, BaseGraphicsSystem );
+	GET_SYSTEM_CHECK( input, BaseInputSystem );
+	GET_SYSTEM_CHECK( audio, BaseAudioSystem );
 
-	apGraphics->GetWindowSize( &aView.width, &aView.height );
+	graphics->GetWindowSize( &aView.width, &aView.height );
 	aView.ComputeProjection();
 
 #if !NO_BULLET_PHYSICS
@@ -212,13 +225,14 @@ void GameSystem::LoadModules(  )
 	apPhysEnv->Init(  );
 #endif
 
-	materialsystem = apGraphics->GetMaterialSystem();
+	// stupid
+	materialsystem = graphics->GetMaterialSystem();
 }
 
 
 void GameSystem::UnloadWorld()
 {
-	apGraphics->UnloadModel( g_world->mdl );
+	graphics->UnloadModel( g_world->mdl );
 	//vec_remove( aModels, g_world->mdl );
 	//g_world->mdl = nullptr;
 }
@@ -229,7 +243,7 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 	//if ( g_world->mdl )
 	//	UnloadWorld();
 
-	apGraphics->LoadModel( path, "materials/act_like_a_baka.jpg", g_world->mdl );
+	graphics->LoadModel( path, "materials/act_like_a_baka.jpg", g_world->mdl );
 
 	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
 	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
@@ -243,23 +257,29 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 
 	//aModels.push_back( g_world->mdl );
 
-#if 0 // !NO_BULLET_PHYSICS
-	PhysicsObjectInfo physInfo( ShapeType::Concave );
-	physInfo.modelData = &g_world->mdl->GetModelData();
+#if BULLET_PHYSICS
 
-	// just have the ground be a box for now since collision on the riverhouse mesh is too jank still
-	//PhysicsObjectInfo physInfo( ShapeType::Box );
-	//physInfo.bounds = {1500, 200, 1500};
+	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
+	{
+		PhysicsObjectInfo physInfo( ShapeType::Concave );
+		physInfo.mesh = mesh;
 
-	g_world->physObj = apPhysEnv->CreatePhysicsObject( physInfo );
-	g_world->physObj->SetContinuousCollisionEnabled( true );
+		// just have the ground be a box for now since collision on the riverhouse mesh is too jank still
+		//PhysicsObjectInfo physInfo( ShapeType::Box );
+		//physInfo.bounds = {1500, 200, 1500};
 
-	// uhhhhh
-	Transform worldTransform = g_world->mdl->GetModelData().aTransform;
-	worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().aTransform.aAng);
+		PhysicsObject* physObj = apPhysEnv->CreatePhysicsObject( physInfo );
+		physObj->SetContinuousCollisionEnabled( true );
 
-	g_world->physObj->SetWorldTransform( worldTransform );
-	//g_world->physObj->SetAngularFactor( {0, 0, 0} );
+		// uhhhhh
+		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
+		//worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().GetTransform().aAng);
+
+		physObj->SetWorldTransform( worldTransform );
+		//physObj->SetAngularFactor( {0, 0, 0} );
+
+		g_world->physObj.push_back( physObj );
+	}
 #endif
 }
 
@@ -369,7 +389,7 @@ void GameSystem::Update( float frameTime )
 
 	UpdateAudio(  );
 
-	if ( apInput->WindowHasFocus() && !aPaused )
+	if ( input->WindowHasFocus() && !aPaused )
 	{
 		CenterMouseOnScreen(  );
 	}
@@ -379,7 +399,7 @@ void GameSystem::Update( float frameTime )
 void GameSystem::CheckPaused(  )
 {
 	bool wasPaused = aPaused;
-	aPaused = apGui->IsConsoleShown();
+	aPaused = gui->IsConsoleShown();
 
 	if ( wasPaused != aPaused )
 	{
@@ -391,7 +411,7 @@ void GameSystem::CheckPaused(  )
 		}
 	}
 
-	apAudio->SetPaused( aPaused );
+	audio->SetPaused( aPaused );
 }
 
 CONVAR( proto_x,  550 );
@@ -524,7 +544,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	if ( !aPaused )
 	{
-		if ( apInput->KeyJustPressed( SDL_SCANCODE_E ) || apInput->KeyPressed( SDL_SCANCODE_R ) )
+		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
 		{
 			CreateProtogen(  );
 		}
@@ -594,34 +614,34 @@ void GameSystem::UpdateAudio(  )
 
 	auto& transform = entities->GetComponent< Transform >( aLocalPlayer );
 
-	if ( apInput->KeyJustPressed(SDL_SCANCODE_G) )
+	if ( input->KeyJustPressed(SDL_SCANCODE_G) )
 	{
 		if ( stream && stream->Valid() )
 		{
-			apAudio->FreeSound( &stream );
+			audio->FreeSound( &stream );
 
 			if ( g_streamModel )
 				g_streamModel->GetModelData().aNoDraw = true;
 		}
 		// test sound
-		//else if ( stream = apAudio->LoadSound("sound/rain2.ogg") )  
-		else if ( stream = apAudio->LoadSound("sound/endymion2.ogg" ) )  
-		//else if ( stream = apAudio->LoadSound("sound/endymion_mono.ogg") )  
-		//else if ( stream = apAudio->LoadSound("sound/endymion2.wav") )  
-		//else if ( stream = apAudio->LoadSound("sound/endymion_mono.wav") )  
-		//else if ( stream = apAudio->LoadSound("sound/robots_cropped.ogg") )  
+		//else if ( stream = audio->LoadSound("sound/rain2.ogg") )  
+		else if ( stream = audio->LoadSound("sound/endymion2.ogg" ) )  
+		//else if ( stream = audio->LoadSound("sound/endymion_mono.ogg") )  
+		//else if ( stream = audio->LoadSound("sound/endymion2.wav") )  
+		//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )  
+		//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )  
 		{
 			stream->vol = snd_test_vol;
 			stream->pos = transform.aPos;  // play it where the player currently is
 			//stream->effects = AudioEffectPreset_World;
 			stream->loop = true;
 
-			apAudio->PlaySound( stream );
+			audio->PlaySound( stream );
 
 			if ( g_streamModel == nullptr )
 			{
 				g_streamModel = new Model;
-				apGraphics->LoadModel( "materials/models/cube.obj", "", g_streamModel );
+				graphics->LoadModel( "materials/models/cube.obj", "", g_streamModel );
 				//aModels.push_back( g_streamModel );
 			}
 
@@ -635,7 +655,7 @@ void GameSystem::UpdateAudio(  )
 		stream->vol = snd_test_vol;
 	}
 
-	apAudio->SetListenerTransform( transform.aPos, transform.aAng );
+	audio->SetListenerTransform( transform.aPos, transform.aAng );
 }
 
 
@@ -649,7 +669,7 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					apGraphics->GetWindowSize( &aView.width, &aView.height );
+					graphics->GetWindowSize( &aView.width, &aView.height );
 					aView.ComputeProjection();
 					break;
 				}
@@ -668,6 +688,6 @@ void GameSystem::HandleSDLEvent( SDL_Event* e )
 void GameSystem::SetViewMatrix( const glm::mat4& viewMatrix )
 {
 	aView.viewMatrix = viewMatrix;
-	apGraphics->SetView( aView );
+	graphics->SetView( aView );
 }
 

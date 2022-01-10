@@ -15,6 +15,7 @@ file(
 	${CH_PUBLIC}/core/*.h
 )
 
+#include( ${CH_ROOT}/scripts/bullet.cmake )
 include( ${CH_ROOT}/scripts/vulkan.cmake )
 
 link_libraries( Core )
@@ -26,4 +27,13 @@ add_dependencies( Client "Core" )
 set_target_properties(
 	Client PROPERTIES
 	OUTPUT_NAME client
+
+	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
+	RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin
+	RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}/sidury/bin
+
+	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
+	LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin
+	LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}/sidury/bin
 )
+

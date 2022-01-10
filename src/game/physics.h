@@ -20,9 +20,9 @@
 #include <glm/gtx/quaternion.hpp>
 //#include <glm/gtx/transform.hpp>
 
-#include "../../chocolate/inc/types/transform.h"
-#include "../../chocolate/inc/types/renderertypes.h"
-#include "../../chocolate/inc/types/modeldata.h"
+#include "types/transform.h"
+#include "graphics/renderertypes.h"
+#include "graphics/imesh.h"
 
 #include <LinearMath/btMotionState.h>
 #include <LinearMath/btTransform.h>

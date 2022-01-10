@@ -287,8 +287,9 @@ inline void contactCallback(btPersistentManifold* const& manifold)
 	//if (!firstCollider->aPhysInfo.callbacks && !secondCollider->aPhysInfo.callbacks)
 	//	return;
 
-	contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody0() );
-	contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody1() );
+	// was enabled
+	//contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody0() );
+	//contact_added_callback_obj( manifold->getContactPoint(0), manifold->getBody1() );
 
 	/*CollidingEvent collidingEvent;
 	collidingEvent.firstEntity = firstCollider->self;

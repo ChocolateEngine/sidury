@@ -24,6 +24,12 @@ const glm::vec3 vec3_up(0, 0, 1);
 #include "entity.h"
 
 
+extern BaseGuiSystem* gui;
+extern BaseGraphicsSystem* graphics;
+extern BaseInputSystem* input;
+extern BaseAudioSystem* audio;
+
+
 class GameSystem : public BaseSystem
 {
 public:
@@ -49,11 +55,6 @@ public:
 	void SetViewMatrix( const glm::mat4& viewMatrix );
 
 	virtual void HandleSDLEvent( SDL_Event* e );
-
-	BaseGuiSystem* apGui = NULL;
-	BaseGraphicsSystem* apGraphics = NULL;
-	BaseInputSystem* apInput = NULL;
-	BaseAudioSystem* apAudio = NULL;
 
 	std::vector< Model* > aModels;
 
