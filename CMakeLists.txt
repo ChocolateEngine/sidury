@@ -6,7 +6,7 @@ project( Sidury )
 
 # Add Chocolate Framework DLLs
 # add_subdirectory( ../chocolate ${CMAKE_CURRENT_LIST_DIR} )
-add_subdirectory( ../chocolate ../chocolate )
+add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../chocolate ${CMAKE_CURRENT_LIST_DIR}/../chocolate )
 
 # grab the globals and put them here
 get_property( CH_ROOT GLOBAL PROPERTY CH_ROOT )

@@ -6,6 +6,8 @@
 Module core = 0;
 Module imgui = 0;
 Module engine = 0;
+Module graphics = 0;
+Module aduio = 0;
 
 
 void unload_objects(  )
@@ -41,7 +43,14 @@ int main( int argc, char *argv[] )
 #ifdef _WIN32
 	// SetDllDirectoryA()
 #endif
-
+        if ( load_object( &aduio, "bin/aduio" ) == -1 )
+		return -1;
+	if ( load_object( &imgui, "bin/imgui" ) == -1 )
+		return -1;
+	if ( load_object( &graphics, "bin/graphics" ) == -1 )
+		return -1;
+	if ( load_object( &engine, "bin/engine" ) == -1 )
+		return -1;
 	if ( load_object( &core, "bin/core" ) == -1 )
 		return -1;
 
@@ -53,13 +62,7 @@ int main( int argc, char *argv[] )
 		return -1;
 	}
 
-	core_init( argc, argv, "sidury" );
-
-	if ( load_object( &imgui, "bin/imgui" ) == -1 )
-		return -1;
-
-	if ( load_object( &engine, "bin/engine" ) == -1 )
-		return -1;
+	core_init( argc, argv, "sidury" );	
 
 	*( void** )( &engine_start ) = SDL_LoadFunction( engine, "engine_start" );
 	if ( !engine_start )

@@ -10,7 +10,7 @@ add_executable( SiduryLauncher ${SRC_FILES} )
 
 set_target_properties(
 	SiduryLauncher PROPERTIES
-	OUTPUT_NAME sidury
+	OUTPUT_NAME sidurylauncher
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}
 	RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}
 	RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}
