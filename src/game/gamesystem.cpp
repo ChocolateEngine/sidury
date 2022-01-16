@@ -140,8 +140,6 @@ Sprite* gpSprite = nullptr;
 
 void GameSystem::Init(  )
 {
-	BaseClass::Init(  );
-
 	LoadModules(  );
 	RegisterKeys(  );
 
@@ -343,8 +341,6 @@ extern ConVar velocity_scale;
 
 void GameSystem::Update( float frameTime )
 {
-	BaseClass::Update( frameTime );
-
 	// move to engine?
 	aFrameTime = frameTime * en_timescale;
 
