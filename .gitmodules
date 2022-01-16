@@ -1,4 +1,0 @@
-[submodule "chocolate"]
-	path = chocolate
-	url = https://github.com/p0lyh3dron/chocolate.git
-	branch = qpc
