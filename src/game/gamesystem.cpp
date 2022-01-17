@@ -31,7 +31,7 @@ CONVAR( r_fov, 100.f );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
 
-CONVARREF( en_timescale );
+extern ConVar en_timescale;
 
 extern ConVar velocity_scale;
 
