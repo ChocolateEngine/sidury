@@ -58,7 +58,7 @@ void CreateProtogen()
 	Entity proto = entities->CreateEntity();
 	Model* model = &entities->AddComponent< Model >( proto );
 
-	graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", model );
+	graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj", "materials/1aaaaaaa.jpg", model );
 
 	auto& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 

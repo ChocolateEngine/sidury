@@ -85,7 +85,13 @@ void VoxelWorld::Init()
 
 	// Load Base Textures
 	//g_matGrass->apDiffuse = materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" );
-	g_matGrass->SetDiffuse( materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" ) );
+	// g_matGrass->SetDiffuse( materialsystem->CreateTexture( g_matGrass, "materials/models/riverhouse/dirtfloor001a.png" ) );
+
+	g_matGrass->AddVar(
+		"diffuse",
+		"materials/models/riverhouse/dirtfloor001a.png",
+		materialsystem->CreateTexture(g_matGrass, "materials/models/riverhouse/dirtfloor001a.png")
+	);
 	
 	// Now Create the world
 	CreateWorld(  );
