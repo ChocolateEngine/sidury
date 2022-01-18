@@ -155,8 +155,8 @@ void GameSystem::Init(  )
 	//testMat->SetDiffuse( materialsystem->CreateTexture( testMat, "skybox-dxt.ktx" ) );
 
 
-	LoadWorld( "D:/sourceengine/vmf2obj/hl1/c1a0.obj", true );
-	// LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
+	// LoadWorld( "D:/sourceengine/vmf2obj/hl1/c1a0.obj", true );
+	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
 	// LoadWorld( "D:/sourceengine/vmf2obj/br/d1_trainstation_02.obj", false );
 	// LoadWorld( "materials/models/riverhouse/riverhouse.obj", true );
 	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
