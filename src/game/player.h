@@ -46,11 +46,6 @@ struct CPlayerMoveData
 
 	float aMaxSpeed = 0.f;
 
-	// Direction Vectors
-	glm::vec3 aForward = {};
-	glm::vec3 aUp = {};
-	glm::vec3 aRight = {};
-
 	// View Bobbing
 	float aWalkTime = 0.f;
 	float aBobOffsetAmount = 0.f;
@@ -126,6 +121,7 @@ public:
 	void                    DoViewBob(  );
 	void                    DoViewTilt(  );
 
+	// TODO: remove these first 2 when physics finally works to a decent degree
 	void                    AddFriction(  );
 	void                    AddGravity(  );
 	void                    Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
@@ -147,6 +143,7 @@ public:
 	CRigidBody* apRigidBody = nullptr;
 	Transform* apTransform = nullptr;
 	CCamera* apCamera = nullptr;
+	CDirection* apDir = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;
 };
 

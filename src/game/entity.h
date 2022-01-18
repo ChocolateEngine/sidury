@@ -339,13 +339,18 @@ struct CGravity
 };
 
 
-struct CCamera
+// Direction Vectors
+struct CDirection
 {
-	TransformSmall aTransform = {};
-
 	glm::vec3 aForward = {};
 	glm::vec3 aUp = {};
 	glm::vec3 aRight = {};
+};
+
+
+struct CCamera: public CDirection
+{
+	TransformSmall aTransform = {};
 };
 
 
@@ -355,5 +360,8 @@ public:
 	AudioStream* apStream = nullptr;
 };
 
+
+// convinence
+inline auto &GetDirection( Entity ent ) { return entities->GetComponent< CDirection >( ent ); }
 
 

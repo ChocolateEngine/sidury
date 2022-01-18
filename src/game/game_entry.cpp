@@ -18,7 +18,7 @@ extern "C"
 {
 	void DLL_EXPORT game_init()
 	{
-	        Module pHandle;
+		Module pHandle;
 		Engine *( *cengine_get )() = 0;
 
 		std::string path = filesys->FindFile( std::string( "engine" ) + EXT_DLL );
@@ -63,12 +63,13 @@ extern "C"
 
 				// framerate is above max
 				if (time < minFrameTime)
-					return;
+					continue;
 			}
 
 			gamesystem->Update( time );
+			console->Update();
 
-			engine->Update( time );
+			//engine->Update( time );
 
 			startTime = currentTime;
 		}

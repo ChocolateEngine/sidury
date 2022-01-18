@@ -1,19 +1,10 @@
 #pragma once
 
-#define BULLET_PHYSICS 0
-
 #ifndef BULLET_PHYSICS
 #define BULLET_PHYSICS 0
-#define NO_BULLET_PHYSICS 1  // get rid of this macro
-#else
-#define NO_BULLET_PHYSICS !BULLET_PHYSICS
 #endif
 
-#ifndef NO_BULLET_PHYSICS
-#define NO_BULLET_PHYSICS 1
-#endif
-
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 
 #include <glm/glm.hpp>
 //#include <glm/gtx/hash.hpp>
@@ -48,9 +39,11 @@ inline btVector3 toBt(const glm::vec3& from) {
 
 inline btQuaternion toBtRot(const glm::vec3& from)
 {
-	glm::quat q = AngToQuat( glm::radians(from) );
+	//glm::quat q = AngToQuat( glm::radians(from) );
+	glm::quat q = AngToQuat( from );  // glm::toQuat( from );
+	return btQuaternion( q.x, q.y, q.z, q.w );
 	//return btQuaternion(q.x, q.z, -q.y, q.w);
-	return btQuaternion(q.x, q.z, -q.y, q.w);
+	// return btQuaternion(q.x, q.z, -q.y, q.w);
 	//return btQuaternion(q.x, -q.z, q.y, q.w);
 }
 

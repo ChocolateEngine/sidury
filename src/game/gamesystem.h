@@ -47,6 +47,8 @@ public:
 	virtual void CreateEntities(  );
 
 	virtual void Update( float frameTime );
+	virtual void GameUpdate( float frameTime );
+
 	virtual void SetupModels( float frameTime );
 	virtual void CheckPaused(  );
 	virtual void ResetInputs(  );
@@ -60,7 +62,7 @@ public:
 
 	Entity aLocalPlayer = ENT_INVALID;
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	PhysicsEnvironment* apPhysEnv;
 #endif
 

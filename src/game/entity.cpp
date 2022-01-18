@@ -22,6 +22,7 @@ int EntityManager::Init()
 	RegisterComponent< CGravity >();
 	RegisterComponent< CCamera >();
 	RegisterComponent< CSound >();
+	RegisterComponent< CDirection >();
 
 #if BULLET_PHYSICS
 	RegisterComponent< PhysicsObject* >();

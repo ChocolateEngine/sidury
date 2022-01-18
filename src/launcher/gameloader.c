@@ -4,11 +4,14 @@
 #include <SDL2/SDL_loadso.h>
 
 Module core = 0;
+Module imgui = 0;
 Module client = 0;
 
-void unload_objects(  )
+
+void unload_objects()
 {
 	if ( core )     SDL_UnloadObject( core );
+	if ( imgui )    SDL_UnloadObject( imgui );
 	if ( client )   SDL_UnloadObject( client );
 }
 
@@ -35,31 +38,33 @@ int main( int argc, char *argv[] )
 	void ( *game_init )() = 0;
 	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
 
-	if ( load_object( &client, "sidury/bin/client" ) == -1 )
-		return -1;
 	if ( load_object( &core, "bin/core" ) == -1 )
+		return -1;
+	if ( load_object( &imgui, "bin/imgui" ) == -1 )
+		return -1;
+	if ( load_object( &client, "sidury/bin/client" ) == -1 )
 		return -1;
 
 	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
 	if ( !core_init )
 	{
 		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
-		SDL_UnloadObject( core );
+		unload_objects();
 		return -1;
 	}
 
-	core_init( argc, argv, "sidury" );	
+	core_init( argc, argv, "sidury" );
 
 	*( void** )( &game_init ) = SDL_LoadFunction( client, "game_init" );
 	if ( !game_init )
 	{
 		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
-		SDL_UnloadObject( client );
+		unload_objects();
 		return -1;
 	}
 
-        game_init();
-	SDL_UnloadObject( client );
+	game_init();
+	unload_objects();
 
 	return 0;
 }

@@ -2,7 +2,7 @@
 #include "player.h"
 
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 #include <BulletCollision/CollisionShapes/btTriangleShape.h>
 #include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 
@@ -56,7 +56,12 @@ void PhysicsObject::SetWorldTransform( const Transform& transform )
 	apRigidBody->getWorldTransform().setOrigin( toBt(aTransform.aPos) );
 	apRigidBody->getWorldTransform().setRotation( toBtRot(aTransform.aAng) ); // TEST MAY CRASH
 
-	apRigidBody->getMotionState()->setWorldTransform( toBt(aTransform) );
+	//apRigidBody->getMotionState()->setWorldTransform( toBt(aTransform) );
+	btTransform bulletTransform;
+	apRigidBody->getMotionState()->getWorldTransform( bulletTransform );
+
+	bulletTransform.setOrigin( toBt( aTransform.aPos ) );
+	bulletTransform.setRotation( toBtRot( aTransform.aAng ) );
 
 	apRigidBody->setLinearVelocity( btVector3(0, 0, 0) );
 	apRigidBody->setAngularVelocity( btVector3(0, 0, 0) );
@@ -649,4 +654,4 @@ void PhysicsEnvironment::RayTest( const glm::vec3& from, const glm::vec3& to, st
 }
 
 
-#endif // !NO_BULLET_PHYSICS
+#endif // BULLET_PHYSICS

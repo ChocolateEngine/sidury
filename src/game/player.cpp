@@ -166,13 +166,14 @@ Entity PlayerManager::Create(  )
 	entities->AddComponent< CRigidBody >( player );
 	Transform& transform = entities->AddComponent< Transform >( player );
 	entities->AddComponent< CCamera >( player );
+	entities->AddComponent< CDirection >( player );
 
 	//Model* model = new Model;
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
 	//entities->AddComponent( player, model );
 
 	Model* model = &entities->AddComponent< Model >( player );
-	graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
+	graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj", "", model );
 
 #if BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
@@ -290,10 +291,11 @@ void PlayerManager::UpdateView( Entity player )
 	auto& move = GetPlayerMoveData( player );
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
+	auto& dir = GetDirection( player );
 
 	ClampAngles( transform, camera );
 
-	GetDirectionVectors( transform.ToViewMatrixZ(  ), move.aForward, move.aRight, move.aUp );
+	GetDirectionVectors( transform.ToViewMatrixZ(  ), dir.aForward, dir.aRight, dir.aUp );
 
 	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transformView = transform;
@@ -341,7 +343,7 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 {
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	auto& transform = entities->GetComponent< Transform >( player );
 	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
 	apPhysObj->SetWorldTransform( transform );
@@ -363,9 +365,10 @@ void PlayerMovement::MovePlayer( Entity player )
 	apRigidBody = &entities->GetComponent< CRigidBody >( player );
 	apTransform = &entities->GetComponent< Transform >( player );
 	apCamera = &entities->GetComponent< CCamera >( player );
+	apDir = &entities->GetComponent< CDirection >( player );
 	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	// update velocity
 	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
 
@@ -460,7 +463,7 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, PlayerMoveType type )
 
 void PlayerMovement::SetCollisionEnabled( bool enable )
 {
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	apPhysObj->SetCollisionEnabled( enable );
 #endif
 }
@@ -468,7 +471,7 @@ void PlayerMovement::SetCollisionEnabled( bool enable )
 
 void PlayerMovement::EnableGravity( bool enabled )
 {
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	apPhysObj->SetGravity( enabled ? game->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
 #endif
 }
@@ -560,7 +563,7 @@ void PlayerMovement::UpdateInputs(  )
 
 	if ( jump && IsOnGround() && !jumped )
 	{
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 		apPhysObj->ApplyImpulse( {0, 0, jump_force} );
 #endif
 		apRigidBody->aVel[W_UP] += jump_force;
@@ -636,7 +639,7 @@ void PlayerMovement::DoSmoothDuck(  )
 // temporarily using bullet directly until i abstract this
 void PlayerMovement::DoRayCollision(  )
 {
-#if 0 // !NO_BULLET_PHYSICS
+#if 0 // BULLET_PHYSICS
 	// temp to avoid a crash intantly?
 	if ( aVelocity.x == 0.f && aVelocity.y == 0.f && aVelocity.y == 0.f )
 		return;
@@ -730,7 +733,7 @@ PhysicsObject* GetGroundObject( Entity player )
 
 bool PlayerMovement::IsOnGround(  )
 {
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	btVector3 btFrom = toBt( GetPos() );
 	//btVector3 btTo( GetPos().x, -10000.0, GetPos().y );
 	btVector3 btTo( GetPos().x, GetPos().y, -10000.0 );
@@ -917,7 +920,7 @@ void PlayerMovement::NoClipMove(  )
 {
 	BaseFlyMove(  );
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	//SET_VELOCITY();
 	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 #else
@@ -930,7 +933,7 @@ void PlayerMovement::FlyMove(  )
 {
 	BaseFlyMove(  );
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	//SET_VELOCITY();
 	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 #else
@@ -943,7 +946,7 @@ void PlayerMovement::FlyMove(  )
 
 void PlayerMovement::WalkMove(  )
 {
-	glm::vec3 wishvel = apMove->aForward*apRigidBody->aAccel.x + apMove->aRight*apRigidBody->aAccel[W_RIGHT];
+	glm::vec3 wishvel = apDir->aForward*apRigidBody->aAccel.x + apDir->aRight*apRigidBody->aAccel[W_RIGHT];
 	wishvel[W_UP] = 0.f;
 
 	glm::vec3 wishdir(0,0,0);
@@ -959,7 +962,11 @@ void PlayerMovement::WalkMove(  )
 	else
 	{	// not on ground, so little effect on velocity
 		Accelerate( wishspeed, wishvel, true );
-		AddGravity(  );
+
+#if !BULLET_PHYSICS
+		// Apply Gravity
+		apRigidBody->aVel[W_UP] -= sv_gravity * game->aFrameTime;
+#endif
 	}
 
 #if BULLET_PHYSICS
@@ -1119,7 +1126,7 @@ CONVAR( cl_tilt, 0.8 );
 CONVAR( cl_tilt_speed, 0.1 );
 CONVAR( cl_tilt_threshold, 200 );
 
-CONVAR( cl_tilt_type, 2 );
+CONVAR( cl_tilt_type, 1 );
 CONVAR( cl_tilt_lerp, 5 );
 CONVAR( cl_tilt_lerp_new, 10 );
 CONVAR( cl_tilt_speed_scale, 0.043 );
@@ -1129,42 +1136,22 @@ CONVAR( cl_tilt_threshold_new, 12 );
 
 void PlayerMovement::DoViewTilt(  )
 {
-	if ( cl_tilt_type == 0.f )
-	{
-		float side = glm::dot( apRigidBody->aVel, apMove->aRight );
-		float sign = side < 0 ? -1 : 1;
-
-		float speedFactor = glm::clamp( glm::max(0.f, side * sign - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f );
-
-		side = fabs(side);
-
-		if (side < cl_tilt_speed.GetFloat())
-			side = side * cl_tilt / cl_tilt_speed;
-		else
-			side = cl_tilt;
-
-		/* Lerp the tilt angle by how fast your going. */
-		float output = glm::mix( 0.f, side * sign, speedFactor );
-
-		apCamera->aTransform.aAng[ROLL] = output;
+	if ( cl_tilt == false )
 		return;
-	}
-
-	// not too sure about this one, so im keeping the old one just in case
 
 	static float prevTilt = 0.f;
 
-	float output = glm::dot( apRigidBody->aVel, apMove->aRight );
+	float output = glm::dot( apRigidBody->aVel, apDir->aRight );
 	float side = output < 0 ? -1 : 1;
 
-	if ( cl_tilt_type == 2.f )
+	if ( cl_tilt_type == 1.f )
 	{
 		float speedFactor = glm::max(0.f, glm::log( glm::max(0.f, (fabs(output) * cl_tilt_speed_scale + 1) - cl_tilt_threshold_new) ));
 
 		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
 		output = glm::mix( prevTilt, speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * game->aFrameTime );
 	}
-	else // type 1.f
+	else // type 0
 	{
 		output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
 
@@ -1179,6 +1166,9 @@ void PlayerMovement::DoViewTilt(  )
 
 
 CONVAR( sv_friction_idk, 16 );
+
+CONVAR( sv_friction2, 800 );
+
 /*CONVAR( sv_friction_scale, 0.005 );
 CONVAR( sv_friction_scale2, 10 );
 CONVAR( sv_friction_offset, 6 );
@@ -1195,6 +1185,18 @@ CONVAR( sv_friction_power, 2 );*/
 // log(-playerSpeed) + 1
 void PlayerMovement::AddFriction(  )
 {
+#if 0
+
+	glm::vec3 vel = apRigidBody->aVel;
+
+	float speed = vel.length();
+	if ( !speed )
+		return;
+
+	vel /= sv_friction2;
+	apRigidBody->aVel = vel;
+
+#else
 	glm::vec3	start(0, 0, 0), stop(0, 0, 0);
 	float	friction;
 	//trace_t	trace;
@@ -1208,76 +1210,6 @@ void PlayerMovement::AddFriction(  )
 	float idk = sv_friction_idk;
 
 	// if the leading edge is over a dropoff, increase friction
-#if 0
-
-	auto falloff = [&]( float vel ) -> float
-	{
-		float in = (vel/speed*idk) * sv_friction_scale + sv_friction_offset;
-		return std::lerp( in, 0, sv_friction_lerp * game->aFrameTime );
-	};
-
-	start.x = falloff( vel.x );
-	start.y = falloff( vel.y );
-	start.z = falloff( vel.z );
-
-	/*start.x = glm::log( vel.x + sv_friction_offset );
-	start.y = glm::log( vel.y + sv_friction_offset );
-	start.z = glm::log( vel.z + sv_friction_offset );*/
-
-	//start *= sv_friction_scale.GetFloat();
-
-	// apRigidBody->aVel = vel * start * game->aFrameTime;
-	apRigidBody->aVel = start * game->aFrameTime;
-
-#elif 0
-	/*start.x = glm::log( vel.x ) + sv_friction_offset.GetFloat();
-	start.y = glm::log( vel.y ) + sv_friction_offset.GetFloat();
-	start.z = glm::log( vel.z ) + sv_friction_offset.GetFloat();*/
-
-	auto falloff = [&]( float vel ) -> float
-	{
-		if ( vel == 0.f )
-			return 0.f;
-
-		float dir = vel > 0.f ? 1.f : -1.f;
-
-		// float in = (vel/speed*idk);
-		float in = vel;
-		return glm::pow( sv_friction_power.GetFloat(), in * sv_friction_scale + sv_friction_offset ) * dir;
-		//return glm::log( fabs(in * sv_friction_scale + sv_friction_offset) ) * dir;
-	};
-
-
-	start.x = falloff( vel.x );
-	start.y = falloff( vel.y );
-	start.z = falloff( vel.z );
-
-	/*start.x = glm::log( vel.x + sv_friction_offset );
-	start.y = glm::log( vel.y + sv_friction_offset );
-	start.z = glm::log( vel.z + sv_friction_offset );*/
-
-	start *= game->aFrameTime;
-
-	//apRigidBody->aVel = start * game->aFrameTime;
-	apRigidBody->aVel *= start * sv_friction_scale2.GetFloat();
-
-#elif 0
-	start.x = GetPos().x + vel.x / speed*idk;
-	start[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*idk;
-	start[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*idk;
-
-	friction = sv_friction_scale3;
-
-	// apply friction
-	// float control = speed < stop_speed ? stop_speed : speed;
-	float control = std::lerp( speed, 0, sv_friction_stop_lerp * game->aFrameTime );
-
-	// float newspeed = glm::max( 0.f, speed - game->aFrameTime * control * sv_friction );
-	float newspeed = glm::min( 1.f, glm::max( 0.f, control * friction ) );
-
-	//newspeed /= speed;
-	apRigidBody->aVel = vel * newspeed;
-#else
 	start.x = stop.x = GetPos().x + vel.x / speed*idk;
 	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*idk;
 	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*idk;
@@ -1320,7 +1252,7 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 
 void PlayerMovement::AddGravity(  )
 {
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	//apRigidBody->aVel[W_UP] = apPhysObj->GetLinearVelocity()[W_UP];
 #else
 	apRigidBody->aVel[W_UP] -= sv_gravity * game->aFrameTime;

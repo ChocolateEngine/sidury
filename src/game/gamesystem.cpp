@@ -106,7 +106,7 @@ GameSystem::GameSystem(  ):
 
 GameSystem::~GameSystem(  )
 {
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	if ( apPhysEnv )
 		delete apPhysEnv;
 #endif
@@ -155,7 +155,8 @@ void GameSystem::Init(  )
 	//testMat->SetDiffuse( materialsystem->CreateTexture( testMat, "skybox-dxt.ktx" ) );
 
 
-	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
+	LoadWorld( "D:/sourceengine/vmf2obj/hl1/c1a0.obj", true );
+	// LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
 	// LoadWorld( "D:/sourceengine/vmf2obj/br/d1_trainstation_02.obj", false );
 	// LoadWorld( "materials/models/riverhouse/riverhouse.obj", true );
 	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
@@ -218,7 +219,7 @@ void GameSystem::LoadModules(  )
 	graphics->GetWindowSize( &aView.width, &aView.height );
 	aView.ComputeProjection();
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	apPhysEnv = new PhysicsEnvironment;
 	apPhysEnv->Init(  );
 #endif
@@ -271,7 +272,9 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 
 		// uhhhhh
 		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
-		//worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().GetTransform().aAng);
+		// worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().GetTransform().aAng);
+		worldTransform.aAng = glm::radians(g_world->mdl->GetModelData().GetTransform().aAng);
+		// worldTransform.aAng = g_world->mdl->GetModelData().GetTransform().aAng;
 
 		physObj->SetWorldTransform( worldTransform );
 		//physObj->SetAngularFactor( {0, 0, 0} );
@@ -286,7 +289,7 @@ void GameSystem::CreateEntities(  )
 {
 #if 0  // outdated stuff
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Convex );
 	physInfo.collisionType = CollisionType::Kinematic;
 	physInfo.mass = 20.f;
@@ -312,7 +315,7 @@ void GameSystem::CreateEntities(  )
 		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 5.f;
 		//g_physEnts[i]->mdl->GetModelData().aTransform.aPos.x = 5.f;
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 		physInfo.transform.aPos = g_physEnts[i]->mdl->GetModelData().aTransform.aPos;
 
 		//physInfo.modelData = &g_world->mdl->GetModelData();
@@ -339,7 +342,19 @@ ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
 
 
+// TODO: figure out a better way to do this, god
 void GameSystem::Update( float frameTime )
+{
+	input->Update( frameTime );
+
+	GameUpdate( frameTime );
+
+	graphics->Update( frameTime );  // updates gui internally
+	audio->Update( frameTime );
+}
+
+
+void GameSystem::GameUpdate( float frameTime )
 {
 	// move to engine?
 	aFrameTime = frameTime * en_timescale;
@@ -364,10 +379,27 @@ void GameSystem::Update( float frameTime )
 		materialsystem->AddRenderable( mesh );
 	}
 
+#if BULLET_PHYSICS
+
+	for ( auto &physObj : g_world->physObj )
+	{
+		physObj->SetContinuousCollisionEnabled( true );
+
+		// uhhhhh
+		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
+		//worldTransform.aAng = glm::degrees( g_world->mdl->GetModelData().GetTransform().aAng );
+		worldTransform.aAng = glm::radians( g_world->mdl->GetModelData().GetTransform().aAng );
+		//worldTransform.aAng = g_world->mdl->GetModelData().GetTransform().aAng;
+
+		physObj->SetWorldTransform( worldTransform );
+		//physObj->SetAngularFactor( {0, 0, 0} );
+	}
+#endif
+
 	//voxelworld->Update( frameTime );
 	players->Update( aFrameTime );
 
-#if !NO_BULLET_PHYSICS
+#if BULLET_PHYSICS
 	apPhysEnv->Simulate(  );
 
 	// stupid
