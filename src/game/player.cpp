@@ -1122,7 +1122,7 @@ void PlayerMovement::DoViewBob(  )
 }
 
 
-CONVAR( cl_tilt, 0.8 );
+CONVAR( cl_tilt, 1 );
 CONVAR( cl_tilt_speed, 0.1 );
 CONVAR( cl_tilt_threshold, 200 );
 
