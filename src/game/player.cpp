@@ -849,6 +849,17 @@ CONVAR( cl_step_sound_speed_offset, 1 );
 CONVAR( cl_step_sound_gravity_scale, 4 );
 CONVAR( cl_step_sound_min_speed, 0.075 );
 CONVAR( cl_step_sound, 1 );
+CONVAR( cl_impact_sound, 1 );
+
+
+std::string PlayerMovement::GetStepSound()
+{
+	char soundName[128];
+	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
+	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
+
+	return soundName;
+}
 
 
 void PlayerMovement::StopStepSound( bool force )
@@ -858,7 +869,7 @@ void PlayerMovement::StopStepSound( bool force )
 		if ( game->aCurTime - apMove->aLastStepTime > cl_stepduration || force )
 		{
 			audio->FreeSound( &apMove->apStepSound );
-			gui->DebugMessage( 7, "Freed Step Sound" );
+			//gui->DebugMessage( 7, "Freed Step Sound" );
 		}
 	}
 }
@@ -878,17 +889,46 @@ void PlayerMovement::PlayStepSound(  )
 
 	StopStepSound( true );
 
-	char soundName[128];
-	int soundIndex = ( rand(  ) / ( RAND_MAX / 40.0f ) ) + 1;
-	snprintf(soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex);
-
-	if ( apMove->apStepSound = audio->LoadSound(soundName) )
+	if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
 	{
 		apMove->apStepSound->vol = speedFactor;
 
 		audio->PlaySound( apMove->apStepSound );
 
 		apMove->aLastStepTime = game->aCurTime;
+	}
+}
+
+
+// really need to be able to play multiple impact sounds at a time
+void PlayerMovement::StopImpactSound()
+{
+	if ( apMove->apImpactSound && apMove->apImpactSound->Valid() )
+	{
+		audio->FreeSound( &apMove->apImpactSound );
+	}
+}
+
+
+void PlayerMovement::PlayImpactSound()
+{
+	if ( !cl_impact_sound.GetBool() )
+		return;
+
+	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
+	float vel = glm::length( glm::vec3( apRigidBody->aVel.x, apRigidBody->aVel.y, apRigidBody->aVel.z * cl_step_sound_gravity_scale ) );
+	float speedFactor = glm::min( glm::log( vel * cl_step_sound_speed_vol + cl_step_sound_speed_offset ), 1.f );
+
+	if ( speedFactor < cl_step_sound_min_speed )
+		return;
+
+	StopImpactSound();
+
+	if ( apMove->apImpactSound = audio->LoadSound( GetStepSound().c_str() ) )
+	{
+		apMove->apImpactSound->vol = speedFactor;
+
+		audio->PlaySound( apMove->apImpactSound );
 	}
 }
 
@@ -944,6 +984,9 @@ void PlayerMovement::FlyMove(  )
 }
 
 
+CONVAR( cl_land_sound_threshold, 0.1 );
+
+
 void PlayerMovement::WalkMove(  )
 {
 	glm::vec3 wishvel = apDir->aForward*apRigidBody->aAccel.x + apDir->aRight*apRigidBody->aAccel[W_RIGHT];
@@ -985,7 +1028,13 @@ void PlayerMovement::WalkMove(  )
 	StopStepSound(  );
 
 	if ( IsOnGround() && !onGround )
-		PlayStepSound();
+	{
+		PlayImpactSound();
+
+		//glm::vec2 vel( apRigidBody->aVel.x, apRigidBody->aVel.y );
+		//if ( glm::length( vel ) < cl_land_sound_threshold )
+		//	PlayStepSound();
+	}
 
 	// something is wrong with this here on bullet
 #if !BULLET_PHYSICS
@@ -1053,6 +1102,7 @@ CONVAR( cl_bob_speed_scale, 0.013 );
 CONVAR( cl_bob_exit_lerp, 0.1 );
 CONVAR( cl_bob_exit_threshold, 0.1 );
 CONVAR( cl_bob_sound_threshold, 0.1 );
+CONVAR( cl_bob_offset, 0.25 );
 
 
 // TODO: doesn't smoothly transition out of viewbob still
@@ -1089,11 +1139,13 @@ void PlayerMovement::DoViewBob(  )
 	apMove->aWalkTime += game->aFrameTime * speedFactor * cl_bob_freq;
 
 	// never reaches 0 so do this to get it to 0
-	static float sinMessFix = sin(cos(tan(cos(0))));
+	// static float sinMessFix = sin(cos(tan(cos(0))));
+	float sinMessFix = sin(cos(tan(cos(0)))) + cl_bob_offset;
 	
 	// using this math function mess instead of abs(sin(x)) and lerping it, since it gives a similar result
 	// mmmmmmm cpu cycles go brrrrrr
-	apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime)))) - sinMessFix);
+	// apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime)))) - sinMessFix);
+	apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime - 0.6f)))) - sinMessFix);
 
 	// apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * ( 0.6*(1-cos( 2*sin(apMove->aWalkTime) )) );
 
@@ -1103,7 +1155,7 @@ void PlayerMovement::DoViewBob(  )
 
 	if ( apMove->aBobOffsetAmount <= cl_bob_sound_threshold )
 	{
-		if ( !playedStepSound )
+		if ( !playedStepSound && vel > cl_land_sound_threshold )
 		{
 			PlayStepSound();
 			playedStepSound = true;

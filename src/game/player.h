@@ -60,6 +60,7 @@ struct CPlayerMoveData
 	// Step Sound
 	double aLastStepTime = 0.f;
 	AudioStream* apStepSound = nullptr;
+	AudioStream* apImpactSound = nullptr;
 };
 
 
@@ -98,8 +99,14 @@ public:
 
 	void                    DetermineMoveType(  );
 
+	std::string             GetStepSound(  );
+
 	void                    PlayStepSound(  );
 	void                    StopStepSound( bool force = false );  // Temp Hack for sound system
+
+	// Sound for colliding onto stuff or landing on the ground
+	void                    PlayImpactSound(  );
+	void                    StopImpactSound(  );  // Temp Hack for sound system
 
 	bool                    IsOnGround(  );
 	bool                    WasOnGround(  );
