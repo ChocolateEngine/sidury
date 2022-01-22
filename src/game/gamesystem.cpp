@@ -353,6 +353,7 @@ void GameSystem::Update( float frameTime )
 	audio->Update( frameTime );
 }
 
+static void *gpCurrLine = 0;
 
 void GameSystem::GameUpdate( float frameTime )
 {
@@ -373,6 +374,14 @@ void GameSystem::GameUpdate( float frameTime )
 	}
 
 	aCurTime += aFrameTime;
+
+	glm::vec3 pos = entities->GetComponent< Transform >( aLocalPlayer ).aPos;
+
+	if ( gpCurrLine ) {
+		graphics->FreeLine( gpCurrLine );
+		gpCurrLine = 0;
+	}
+	gpCurrLine = graphics->DrawLine( glm::vec3( 0.f, 0.f, 100.f ), pos, pos );
 
 	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
 	{
