@@ -62,10 +62,6 @@ public:
 
 	Entity aLocalPlayer = ENT_INVALID;
 
-#if BULLET_PHYSICS
-	PhysicsEnvironment* apPhysEnv;
-#endif
-
 	float aFrameTime = 0.f;
 	double aCurTime = 0.f;  // really should be size_t, but then that would be a little weird with using it
 
@@ -74,7 +70,6 @@ public:
 	// make a timescale option?
 	bool aPaused;
 };
-
 
 extern GameSystem* game;
 extern IMaterialSystem* materialsystem; // bruh

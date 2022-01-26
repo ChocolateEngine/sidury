@@ -10,7 +10,7 @@
 GameSystem *gamesystem = new GameSystem;
 Engine     *engine     = 0;
 
-CONVAR( en_max_frametime, 0.2 );
+CONVAR( en_max_frametime, 0.1 );  // 0.2
 CONVAR( en_timescale, 1 );
 CONVAR( en_fps_max, 0 );
 

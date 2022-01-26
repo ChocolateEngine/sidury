@@ -37,10 +37,12 @@ inline btVector3 toBt(const glm::vec3& from) {
 	return btVector3(from.x, from.y, from.z);
 }
 
+
 inline btQuaternion toBtRot(const glm::vec3& from)
 {
 	//glm::quat q = AngToQuat( glm::radians(from) );
-	glm::quat q = AngToQuat( from );  // glm::toQuat( from );
+	// glm::quat q = AngToQuat( from );  // glm::toQuat( from );
+	glm::quat q = from;  // glm::toQuat( from );
 	return btQuaternion( q.x, q.y, q.z, q.w );
 	//return btQuaternion(q.x, q.z, -q.y, q.w);
 	// return btQuaternion(q.x, q.z, -q.y, q.w);
@@ -49,11 +51,14 @@ inline btQuaternion toBtRot(const glm::vec3& from)
 
 inline glm::vec3 fromBtRot(const btQuaternion& from)
 {
-	//glm::quat q(from.getX(), -from.getZ(), from.getY(), from.getW());
-	glm::quat q(from.getX(), from.getZ(), from.getY(), from.getW());
-	//glm::quat q(from.getX(), from.getZ(), -from.getY(), from.getW());
-	return glm::degrees( QuatToAng(q) );
+	glm::quat q( from.w(), from.x(), from.y(), from.z());
+
+	// uh
+	// q = glm::normalize( q );
+
+	return glm::degrees( ToEulerAngles(q) );
 }
+
 
 inline Transform fromBt(const btTransform& from)
 {
@@ -85,6 +90,9 @@ enum class ShapeType
 	Concave,
 	Convex
 };
+
+
+std::string ShapeType2Str( ShapeType type );
 
 
 enum class CollisionType
@@ -135,6 +143,7 @@ struct PhysicsObjectInfo
 struct PhysicsObject: public btMotionState
 {
 	PhysicsObject(  );
+	PhysicsObject( PhysicsObjectInfo &physInfo );
 	~PhysicsObject(  );
 
 	//bool                  Valid(  );
@@ -228,6 +237,31 @@ struct RayHit
 };
 
 
+class PhysDebugDraw: public btIDebugDraw
+{
+public:
+	std::vector< void * > aLines;
+	int aDebugMode = DBG_NoDebug;
+
+	void OnNewFrame();
+
+	void DrawLine( const glm::vec3 &from, const glm::vec3 &to, const glm::vec3 &color );
+
+	// overrides
+	virtual void drawLine( const btVector3 &from, const btVector3 &to, const btVector3 &color ) override;
+
+	virtual void drawContactPoint( const btVector3 &PointOnB, const btVector3 &normalOnB, btScalar distance, int lifeTime, const btVector3 &color ) override;
+
+	virtual void reportErrorWarning( const char *warningString ) override;
+
+	virtual void draw3dText( const btVector3 &location, const char *textString ) override;
+
+	virtual void setDebugMode( int debugMode ) override;
+
+	virtual int getDebugMode() const override;
+};
+
+
 class PhysicsEnvironment
 {
 public:
@@ -239,7 +273,8 @@ public:
 	void                            Simulate(  );
 
 	PhysicsObject*                  CreatePhysicsObject( PhysicsObjectInfo& physInfo );
-	void                            DeletePhysicsObject( PhysicsObject* body );
+	bool                            CreatePhysicsObject( PhysicsObject *phys, PhysicsObjectInfo &physInfo );
+	void                            DeletePhysicsObject( PhysicsObject *body );
 
 	void                            SetGravity( const glm::vec3& gravity );
 	void                            SetGravity( float gravity );  // convenience function
@@ -265,6 +300,8 @@ private:
 	btCollisionDispatcher* apDispatcher;
 	btConstraintSolver* apSolver;
 	btDefaultCollisionConfiguration* apCollisionConfig;
+
+	PhysDebugDraw *apDebugDraw;
 
 	// temporary
 public:

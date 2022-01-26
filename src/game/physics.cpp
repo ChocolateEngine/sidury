@@ -9,9 +9,39 @@
 PhysicsEnvironment* physenv = nullptr;
 
 
+CONVAR( phys_dbg, 1 );
+
+CONVAR( phys_dbg_wireframe, 1 );
+CONVAR( phys_dbg_aabb, 0 );
+CONVAR( phys_dbg_features_text, 0 );
+CONVAR( phys_dbg_contact_points, 0 );
+CONVAR( phys_dbg_no_deactivation, 0 );
+CONVAR( phys_dbg_no_help_text, 0 );
+CONVAR( phys_dbg_help_text, 0 );
+CONVAR( phys_dbg_profile_timings, 0 );
+CONVAR( phys_dbg_enable_sat_comparison, 0 );
+CONVAR( phys_dbg_disable_lcp, 0 );
+CONVAR( phys_dbg_enable_ccd, 0 );
+CONVAR( phys_dbg_draw_constraints, 0 );
+CONVAR( phys_dbg_draw_constraint_limits, 0 );
+CONVAR( phys_dbg_fast_wireframe, 0 );
+CONVAR( phys_dbg_draw_normals, 0 );
+CONVAR( phys_dbg_draw_frames, 0 );
+
+CONVAR( phys_fast, 0 );
+CONVAR( phys_gravity, -800 );
+
+
 PhysicsObject::PhysicsObject(  ):
 	aPhysInfo( ShapeType::Invalid )
 {
+}
+
+
+PhysicsObject::PhysicsObject( PhysicsObjectInfo &physInfo ):
+	aPhysInfo( ShapeType::Invalid )
+{
+	physenv->CreatePhysicsObject( this, physInfo );
 }
 
 
@@ -257,6 +287,83 @@ void contact_added_callback_obj(btManifoldPoint& cp, const btCollisionObject* co
 // =========================================================
 
 
+void PhysDebugDraw::OnNewFrame()
+{
+
+}
+
+
+void PhysDebugDraw::DrawLine( const glm::vec3 &from, const glm::vec3 &to, const glm::vec3 &color )
+{
+	graphics->DrawLine( from, to, color );
+}
+
+void PhysDebugDraw::drawLine( const btVector3 &from, const btVector3 &to, const btVector3 &color )
+{
+	graphics->DrawLine( fromBt( from ), fromBt( to ), fromBt( color ) );
+}
+
+
+void PhysDebugDraw::drawContactPoint( const btVector3 &PointOnB, const btVector3 &normalOnB, btScalar distance, int lifeTime, const btVector3 &color )
+{
+	// DEMEZ: uh look into this later lol
+	glm::vec3 endPoint = fromBt( PointOnB );
+	endPoint += fromBt( normalOnB * distance );
+
+	graphics->DrawLine( fromBt( PointOnB ), endPoint, fromBt( color ) );
+}
+
+void PhysDebugDraw::draw3dText( const btVector3 &location, const char *textString )
+{
+	// DEMEZ: no 3d text system setup just yet
+}
+
+void PhysDebugDraw::reportErrorWarning( const char *warningString )
+{
+	Print( "[BulletPhysics] Warning: %s\n", warningString );
+}
+
+
+void PhysDebugDraw::setDebugMode( int debugMode )
+{
+	aDebugMode = debugMode;
+}
+
+int PhysDebugDraw::getDebugMode() const
+{
+	return aDebugMode;
+}
+
+
+// =========================================================
+
+
+std::string ShapeType2Str( ShapeType type )
+{
+	switch ( type )
+	{
+		case ShapeType::Plane:
+			return "Plane";
+		case ShapeType::Box:
+			return "Box";
+		case ShapeType::Cylinder:
+			return "Cylinder";
+		case ShapeType::Sphere:
+			return "Sphere";
+		case ShapeType::Capsule:
+			return "Capsule";
+		case ShapeType::Concave:
+			return "Concave";
+		case ShapeType::Convex:
+			return "Convex";
+		default:
+			break;
+	};
+
+	return "UNKNOWN SHAPE TYPE: " + std::to_string( (int)type );
+}
+
+
 std::vector< btPersistentManifold* > manifolds;
 
 inline void ReadContactPoint( const btManifoldPoint& from, ContactEvent::Contact* to )
@@ -310,8 +417,8 @@ inline void contactCallback(btPersistentManifold* const& manifold)
 void TickCallback( btDynamicsWorld* world, btScalar timeStep )
 {
 	// process manifolds
-	for ( uint32_t i = 0; i < game->apPhysEnv->apWorld->getDispatcher()->getNumManifolds(); i++ ) {
-		const auto manifold = game->apPhysEnv->apWorld->getDispatcher()->getManifoldByIndexInternal(i);
+	for ( uint32_t i = 0; i < physenv->apWorld->getDispatcher()->getNumManifolds(); i++ ) {
+		const auto manifold = physenv->apWorld->getDispatcher()->getManifoldByIndexInternal(i);
 
 		PhysicsObject* firstCollider = (PhysicsObject*)manifold->getBody0()->getUserPointer();
 		PhysicsObject* secondCollider = (PhysicsObject*)manifold->getBody1()->getUserPointer();
@@ -343,7 +450,6 @@ PhysicsEnvironment::PhysicsEnvironment(  )
 	physenv = this;
 }
 
-
 PhysicsEnvironment::~PhysicsEnvironment(  )
 {
 	physenv = nullptr;
@@ -353,6 +459,10 @@ PhysicsEnvironment::~PhysicsEnvironment(  )
 void PhysicsEnvironment::Init(  )
 {
 	CreatePhysicsWorld(  );
+	apDebugDraw = new PhysDebugDraw;
+	apDebugDraw->setDebugMode( btIDebugDraw::DBG_NoDebug );
+
+	apWorld->setDebugDrawer( apDebugDraw );
 }
 
 
@@ -377,7 +487,7 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 
 	apWorld = new btDiscreteDynamicsWorld( apDispatcher, apBroadphase, apSolver, apCollisionConfig );
 
-	apWorld->setGravity( btVector3(0, 0, -800) );
+	apWorld->setGravity( btVector3(0, 0, phys_gravity) );
 	// apWorld->setGravity( btVector3(0, 0, -100) );
 
 	apWorld->setInternalTickCallback(&TickCallback, 0);
@@ -389,11 +499,40 @@ void PhysicsEnvironment::CreatePhysicsWorld(  )
 
 void PhysicsEnvironment::Simulate(  )
 {
-#ifdef NDEBUG
-	apWorld->stepSimulation( game->aFrameTime, 100, 1 / 240.0 );
-#else
-	apWorld->stepSimulation( game->aFrameTime );
-#endif
+	// player keeps sinking despite a gravity of 0 on the player in fly or noclip mode?
+	// apWorld->setGravity( btVector3( 0, 0, phys_gravity ) );
+
+	apDebugDraw->OnNewFrame();
+
+#define SET_DBG_MODE( cvar, draw_mode ) \
+	apDebugDraw->setDebugMode( cvar ? apDebugDraw->getDebugMode() | btIDebugDraw::draw_mode : apDebugDraw->getDebugMode() & ~btIDebugDraw::draw_mode )
+
+	SET_DBG_MODE( phys_dbg_wireframe, DBG_DrawWireframe );
+	SET_DBG_MODE( phys_dbg_aabb, DBG_DrawAabb );
+	SET_DBG_MODE( phys_dbg_features_text, DBG_DrawFeaturesText );
+	SET_DBG_MODE( phys_dbg_contact_points, DBG_DrawContactPoints );
+	SET_DBG_MODE( phys_dbg_no_deactivation, DBG_NoDeactivation );
+	SET_DBG_MODE( phys_dbg_no_help_text, DBG_NoHelpText );
+	SET_DBG_MODE( phys_dbg_help_text, DBG_DrawText );
+	SET_DBG_MODE( phys_dbg_profile_timings, DBG_ProfileTimings );
+	SET_DBG_MODE( phys_dbg_enable_sat_comparison, DBG_EnableSatComparison );
+	SET_DBG_MODE( phys_dbg_disable_lcp, DBG_DisableBulletLCP );
+	SET_DBG_MODE( phys_dbg_enable_ccd, DBG_EnableCCD );
+	SET_DBG_MODE( phys_dbg_draw_constraints, DBG_DrawConstraints );
+	SET_DBG_MODE( phys_dbg_draw_constraint_limits, DBG_DrawConstraintLimits );
+	SET_DBG_MODE( phys_dbg_fast_wireframe, DBG_FastWireframe );
+	SET_DBG_MODE( phys_dbg_draw_normals, DBG_DrawNormals );
+	SET_DBG_MODE( phys_dbg_draw_frames, DBG_DrawFrames );
+
+#undef SET_DBG_MODE
+
+	if ( phys_fast )
+		apWorld->stepSimulation( game->aFrameTime );
+	else
+		apWorld->stepSimulation( game->aFrameTime, 100, 1 / 240.0 );
+
+	if ( phys_dbg )
+		apWorld->debugDrawWorld();
 }
 
 
@@ -454,7 +593,72 @@ PhysicsObject* PhysicsEnvironment::CreatePhysicsObject( PhysicsObjectInfo& physI
 
 	//phys->SetWorldTransform( physInfo.transform );
 
+	if ( physInfo.collisionType == CollisionType::Kinematic )
+	{
+		phys->SetGravity( GetGravity() );
+	}
+
 	return phys;
+}
+
+
+bool PhysicsEnvironment::CreatePhysicsObject( PhysicsObject *phys, PhysicsObjectInfo &physInfo )
+{
+	btCollisionShape *collisionShape = nullptr;
+
+	switch ( physInfo.shapeType )
+	{
+		case ShapeType::Sphere:
+			collisionShape = new btSphereShape( physInfo.bounds.x * .5f );
+			break;
+		case ShapeType::Box:
+			// phys->apCollisionShape = new btBoxShape(btVector3(halfExtents.x * .5f, halfExtents.y * .5f, halfExtents.y * .5f));
+			collisionShape = new btBoxShape( toBt( physInfo.bounds ) );
+			break;
+		case ShapeType::Plane:
+			collisionShape = new btStaticPlaneShape( btVector3( 0, 0, 1 ), 1 );
+			break;
+		case ShapeType::Capsule:
+			collisionShape = new btCapsuleShapeZ( physInfo.bounds.x * .5f, physInfo.bounds.y );
+			break;
+		case ShapeType::Cylinder:
+			//phys->apCollisionShape = new btCylinderShapeZ(btVector3(shapeInfo.a * .5f, shapeInfo.a * .5f, shapeInfo.b * .5f));
+			collisionShape = new btCylinderShapeZ( toBt( physInfo.bounds ) );
+			break;
+			//case ShapeType::Cone:
+			//	collisionShape = new btConeShapeZ(physInfo.bounds.a * .5f, physInfo.bounds.b);
+			//	break;
+		case ShapeType::Concave:
+			collisionShape = LoadModelConCave( physInfo );
+			break;
+		case ShapeType::Convex:
+			collisionShape = LoadModelConvex( physInfo );
+			break;
+	}
+
+	if ( collisionShape == nullptr )
+		return false;
+
+	phys->apCollisionShape = collisionShape;
+	phys->aPhysInfo = physInfo;
+	phys->aType = physInfo.shapeType;
+	phys->apRigidBody = CreateRigidBody( phys, physInfo, phys->apCollisionShape );
+
+	aCollisionShapes.push_back( phys->apCollisionShape );
+	aPhysObjs.push_back( phys );
+
+	if ( physInfo.shapeType == ShapeType::Concave )
+	{
+		// phys->apRigidBody->setFriction( btScalar(0.9) );
+		phys->apRigidBody->setFriction( btScalar( 0.1 ) );
+	}
+
+	phys->apCollisionShape->setUserPointer( phys );
+	phys->apRigidBody->setUserPointer( phys );
+
+	//phys->SetWorldTransform( physInfo.transform );
+
+	return true;
 }
 
 
@@ -526,7 +730,10 @@ void PhysicsEnvironment::DeleteRigidBody( btRigidBody* body )
 	delete ms;
 }
 
-#define COLLISION_MARGIN 0.015 // 15 mm
+//#define COLLISION_MARGIN 0.015 // 15 mm
+//#define COLLISION_MARGIN 0.0015 // 15 mm
+//#define COLLISION_MARGIN 1.5 // 15 mm
+#define COLLISION_MARGIN 15 // this does fix the tripping over edges issue, but it pushes out the collision of everything
 
 btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo& physInfo )
 {

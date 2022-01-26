@@ -1,6 +1,7 @@
 #include "gamesystem.h"
 #include "core/systemmanager.h"
 #include "util.h"
+#include "physics.h"
 #include "player.h"
 #include "entity.h"
 #include "terrain/terrain.h"
@@ -31,6 +32,13 @@ CONVAR( r_fov, 100.f );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
 
+CONVAR( phys_rot_x, 90 );
+CONVAR( phys_rot_y, 0 );
+CONVAR( phys_rot_z, 0 );
+CONVAR( phys_friction, 10 );
+CONVAR( dbg_global_axis, 1 );
+CONVAR( dbg_global_axis_size, 15 );
+
 extern ConVar en_timescale;
 
 extern ConVar velocity_scale;
@@ -50,6 +58,7 @@ struct ModelPhysTest
 const int physEntCount = 0;
 ModelPhysTest* g_world = new ModelPhysTest{new Model, {}};
 std::vector< Entity > g_protos;
+std::vector< Entity > g_otherEnts;
 std::vector< ModelPhysTest* > g_physEnts;
 
 
@@ -67,9 +76,63 @@ void CreateProtogen()
 	g_protos.push_back( proto );
 }
 
+
+void CreatePhysEntity()
+{
+	Entity physEnt = entities->CreateEntity();
+	Model *model = &entities->AddComponent< Model >( physEnt );
+
+	graphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/1aaaaaaa.jpg", model );
+
+	Transform transform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	transform.aAng = {};
+	transform.aScale = {1, 1, 1};
+
+	// uhhh
+#if 0
+	std::vector< PhysicsObject * > physObjs;
+	for ( auto &mesh : model->GetModelData().aMeshes )
+	{
+		PhysicsObjectInfo physInfo( ShapeType::Convex );
+		physInfo.mesh = mesh;
+		physInfo.mass = 40.f;
+		physInfo.collisionType = CollisionType::Kinematic;
+
+		physObjs.push_back( physenv->CreatePhysicsObject( physInfo ) );
+	}
+
+	entities->AddComponent< std::vector< PhysicsObject * > >( physEnt, physObjs );
+#else
+	PhysicsObjectInfo physInfo( ShapeType::Box );
+	physInfo.bounds = {20, 20, 20};
+	physInfo.mass = 40.f;
+	// physInfo.collisionType = CollisionType::Kinematic;
+	physInfo.transform = transform;  // doesn't even work? bruh
+
+	PhysicsObject* phys = physenv->CreatePhysicsObject( physInfo );
+	phys->SetWorldTransform( transform );
+	phys->SetAlwaysActive( true );
+	phys->SetContinuousCollisionEnabled( true );
+	phys->SetSleepingThresholds( 0, 0 );
+	phys->SetFriction( phys_friction );
+
+	entities->AddComponent< PhysicsObject * >( physEnt, phys );
+#endif
+
+	model->GetModelData().SetPos( transform.aPos );
+
+	g_otherEnts.push_back( physEnt );
+}
+
+
 CON_COMMAND( create_proto )
 {
 	CreateProtogen();
+}
+
+CON_COMMAND( create_phys_test )
+{
+	CreatePhysEntity();
 }
 
 
@@ -107,8 +170,8 @@ GameSystem::GameSystem(  ):
 GameSystem::~GameSystem(  )
 {
 #if BULLET_PHYSICS
-	if ( apPhysEnv )
-		delete apPhysEnv;
+	if ( physenv )
+		delete physenv;
 #endif
 
 	//if ( aLocalPlayer )
@@ -220,8 +283,8 @@ void GameSystem::LoadModules(  )
 	aView.ComputeProjection();
 
 #if BULLET_PHYSICS
-	apPhysEnv = new PhysicsEnvironment;
-	apPhysEnv->Init(  );
+	physenv = new PhysicsEnvironment;
+	physenv->Init(  );
 #endif
 
 	// stupid
@@ -267,7 +330,7 @@ void GameSystem::LoadWorld( const std::string& path, bool rotate )
 		//PhysicsObjectInfo physInfo( ShapeType::Box );
 		//physInfo.bounds = {1500, 200, 1500};
 
-		PhysicsObject* physObj = apPhysEnv->CreatePhysicsObject( physInfo );
+		PhysicsObject* physObj = physenv->CreatePhysicsObject( physInfo );
 		physObj->SetContinuousCollisionEnabled( true );
 
 		// uhhhhh
@@ -375,14 +438,6 @@ void GameSystem::GameUpdate( float frameTime )
 
 	aCurTime += aFrameTime;
 
-	glm::vec3 pos = entities->GetComponent< Transform >( aLocalPlayer ).aPos;
-
-	if ( gpCurrLine ) {
-		graphics->FreeLine( gpCurrLine );
-		gpCurrLine = 0;
-	}
-	gpCurrLine = graphics->DrawLine( glm::vec3( 0.f, 0.f, 100.f ), pos, pos );
-
 	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
 	{
 		materialsystem->AddRenderable( mesh );
@@ -396,20 +451,62 @@ void GameSystem::GameUpdate( float frameTime )
 
 		// uhhhhh
 		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
-		//worldTransform.aAng = glm::degrees( g_world->mdl->GetModelData().GetTransform().aAng );
-		worldTransform.aAng = glm::radians( g_world->mdl->GetModelData().GetTransform().aAng );
-		//worldTransform.aAng = g_world->mdl->GetModelData().GetTransform().aAng;
+		worldTransform.aAng = {phys_rot_x, phys_rot_y, phys_rot_z};
+		worldTransform.aAng = glm::radians( worldTransform.aAng );
+
+		// glm::vec3 ang = glm::radians( g_world->mdl->GetModelData().GetTransform().aAng );
+		// worldTransform.aAng = {ang.z, ang.y, ang.x};
 
 		physObj->SetWorldTransform( worldTransform );
 		//physObj->SetAngularFactor( {0, 0, 0} );
 	}
 #endif
 
+	// WORLD GLOBAL AXIS
+	if ( dbg_global_axis )
+	{
+		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size, 0, 0}, {1, 0, 0} );
+		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size, 0}, {0, 1, 0} );
+		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size}, {0, 0, 1} );
+	}
+
 	//voxelworld->Update( frameTime );
 	players->Update( aFrameTime );
 
 #if BULLET_PHYSICS
-	apPhysEnv->Simulate(  );
+	physenv->Simulate(  );
+
+	// blech
+	for ( auto &ent : g_otherEnts )
+	{
+		Model *model = &entities->GetComponent< Model >( ent );
+
+		if ( !model )
+			continue;
+
+		// Model *physObjList = &entities->GetComponent< Model >( ent );
+
+		// Transform& transform = entities->GetComponent< Transform >( ent );
+		Transform &transform = model->GetModelData().GetTransform();
+		PhysicsObject* phys = entities->GetComponent< PhysicsObject* >( ent );
+
+		if ( phys )
+		{
+			phys->SetFriction( phys_friction );
+
+			transform.aPos = phys->GetWorldTransform().aPos;
+			transform.aAng = phys->GetWorldTransform().aAng;
+
+			model->GetModelData().SetTransform( transform );
+
+			gui->DebugMessage( 13, "Phys Obj Ang: %s", Vec2Str( transform.aAng ).c_str() );
+		}
+
+		for ( auto &mesh : model->GetModelData().aMeshes )
+		{
+			materialsystem->AddRenderable( mesh );
+		}
+	}
 
 	// stupid
 	for (auto& player: players->aPlayerList)

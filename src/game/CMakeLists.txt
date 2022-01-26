@@ -15,7 +15,7 @@ file(
 	${CH_PUBLIC}/core/*.h
 )
 
-#include( ${CH_ROOT}/scripts/bullet.cmake )
+include( ${CH_ROOT}/scripts/bullet.cmake )
 include( ${CH_ROOT}/scripts/vulkan.cmake )
 
 link_libraries( Core )

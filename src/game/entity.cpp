@@ -26,6 +26,11 @@ int EntityManager::Init()
 
 #if BULLET_PHYSICS
 	RegisterComponent< PhysicsObject* >();
+
+	// HACK HACK HACK
+	// so this ECS doesn't support multiple of the same component on this,
+	// so i'll just allow a vector of these physics objects for now
+	RegisterComponent< std::vector<PhysicsObject*> >();
 #endif
 
 	return 0;

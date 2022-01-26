@@ -26,13 +26,20 @@ ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED );
 ConVar side_speed( "sv_side_speed", DEFAULT_SPEED );  // 350.f
 ConVar max_speed( "sv_max_speed", DEFAULT_SPEED );  // 320.f
 
-ConVar stop_speed( "sv_stop_speed", 75 );
 ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar accel_speed_air( "sv_accel_speed_air", 30 );
-ConVar sv_friction( "sv_friction", 8 );  // 4.f
 ConVar jump_force( "sv_jump_force", 250 );
 
-CONVAR( phys_friction, 0.1 );
+#if BULLET_PHYSICS
+ConVar stop_speed( "sv_stop_speed", 25 );
+#else
+ConVar stop_speed( "sv_stop_speed", 75 );
+#endif
+
+CONVAR( sv_friction, 8 );  // 4.f
+CONVAR( sv_friction_enable, 1 );
+
+CONVAR( phys_friction_player, 2 );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
@@ -52,9 +59,10 @@ CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
-CONVAR( cl_view_height, 67 );  // 56
-CONVAR( cl_view_height_duck, 36 );  // 24
+CONVAR( cl_view_height, 67 );  // 67
+CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
+CONVAR( cl_view_height_offset, -40 );  // 0.015
 
 CONVAR( cl_smooth_land, 1 );
 CONVAR( cl_smooth_land_lerp, 30 );  // 0.015 // 150?
@@ -67,15 +75,19 @@ CONVAR( cl_smooth_land_view_offset, 0.5 );
 // a workaround for quake movement values not working correctly when lowered
 #if !BULLET_PHYSICS
 CONVAR( velocity_scale, 0.025 );
+CONVAR( player_model_scale, 1 );
+CONVAR( cl_cam_z, -2.5 );
 #else
 CONVAR( velocity_scale, 1.0 );
 CONVAR( velocity_scale2, 0.01 );
+CONVAR( player_model_scale, 25 );
+CONVAR( cl_cam_z, -150 );
 #endif
 
 CONVAR( cl_thirdperson, 0 );
+CONVAR( cl_playermodel_enable, 0 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
-CONVAR( cl_cam_z, -2.5 );
 
 constexpr float PLAYER_MASS = 200.f;
 
@@ -183,18 +195,22 @@ Entity PlayerManager::Create(  )
 	//physInfo.collisionType = CollisionType::Kinematic;
 	// physInfo.bounds = glm::vec3(14, 14, 32);  * velocity_scale.GetFloat();
 	//physInfo.bounds = glm::vec3(14, 14, 32) * 0.025f;
-	physInfo.bounds = glm::vec3(14, 14, 32);
+
+	// physInfo.bounds = glm::vec3(14, 14, 32);
+	// was 14, decreased for now with the colision margin
+	physInfo.bounds = glm::vec3(6, 6, 32);
+
 	//physInfo.bounds = {14, 32, 14};  // bruh wtf why y up for this even though it's a btCylinderShapeZ
 
 	// PhysicsObject* physObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
-	apPhysObj = game->apPhysEnv->CreatePhysicsObject( physInfo );
+	apPhysObj = physenv->CreatePhysicsObject( physInfo );
 	apPhysObj->SetAlwaysActive( true );
 	apPhysObj->SetContinuousCollisionEnabled( true );
 	apPhysObj->SetWorldTransform( transform );
 	apPhysObj->SetLinearVelocity( {0, 0, 0} );
 	apPhysObj->SetAngularFactor( {0, 0, 0} );
 	apPhysObj->SetSleepingThresholds( 0, 0 );
-	apPhysObj->SetFriction( phys_friction.GetFloat() );
+	apPhysObj->SetFriction( phys_friction_player );
 
 	//entities->AddComponent( player, physObj );
 #endif
@@ -242,9 +258,12 @@ void PlayerManager::Update( float frameTime )
 
 		auto& playerInfo = entities->GetComponent< CPlayerInfo >( player );
 
-		if ( cl_thirdperson.GetBool() || !playerInfo.aIsLocalPlayer )
+		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
 			auto& model = entities->GetComponent< Model >( player );
+			auto& transform = entities->GetComponent< Transform >( player );
+			model.GetModelData().SetTransform( transform );
+			model.GetModelData().SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
 
 			for ( auto& mesh: model.GetModelData().aMeshes )
 				materialsystem->AddRenderable( mesh );
@@ -299,7 +318,7 @@ void PlayerManager::UpdateView( Entity player )
 
 	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transformView = transform;
-	transformView.aPos += camera.aTransform.aPos * velocity_scale.GetFloat();
+	transformView.aPos += (camera.aTransform.aPos + glm::vec3(1, 1, cl_view_height_offset)) * velocity_scale.GetFloat();
 	transformView.aAng = camera.aTransform.aAng;
 	//Transform transformView = transform;
 	//transformView.aPos += move.aViewOffset * velocity_scale.GetFloat();
@@ -344,8 +363,9 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 
 #if BULLET_PHYSICS
-	auto& transform = entities->GetComponent< Transform >( player );
+	Transform transform = entities->GetComponent< Transform >( player );
 	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+	transform.aAng = {};
 	apPhysObj->SetWorldTransform( transform );
 #endif
 
@@ -374,7 +394,7 @@ void PlayerMovement::MovePlayer( Entity player )
 
 	//apPhysObj->SetSleepingThresholds( 0, 0 );
 	//apPhysObj->SetAngularFactor( 0 );
-	apPhysObj->SetFriction( phys_friction.GetFloat() );
+	apPhysObj->SetFriction( phys_friction_player );
 #endif
 
 	UpdateInputs();
@@ -472,7 +492,7 @@ void PlayerMovement::SetCollisionEnabled( bool enable )
 void PlayerMovement::EnableGravity( bool enabled )
 {
 #if BULLET_PHYSICS
-	apPhysObj->SetGravity( enabled ? game->apPhysEnv->GetGravity() : glm::vec3(0, 0, 0) );
+	apPhysObj->SetGravity( enabled ? physenv->GetGravity() : glm::vec3(0, 0, 0) );
 #endif
 }
 
@@ -561,12 +581,12 @@ void PlayerMovement::UpdateInputs(  )
 
 	static bool jumped = false;
 
-	if ( jump && IsOnGround() && !jumped )
+	if ( jump && IsOnGround() && !wasJumpButtonPressed )
 	{
 #if BULLET_PHYSICS
-		apPhysObj->ApplyImpulse( {0, 0, jump_force} );
+		// apPhysObj->ApplyImpulse( {0, 0, jump_force} );
 #endif
-		apRigidBody->aVel[W_UP] += jump_force;
+		apRigidBody->aVel[W_UP] = jump_force;
 		jumped = true;
 	}
 	else
@@ -648,7 +668,7 @@ void PlayerMovement::DoRayCollision(  )
 	btVector3 btTo = toBt( GetPos() * GetFrameTimeVelocity() );
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
-	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+	physenv->apWorld->rayTest( btFrom, btTo, res );
 
 	if ( res.hasHit() )
 	{
@@ -670,7 +690,8 @@ void PlayerMovement::DoRayCollision(  )
 }
 
 
-CONVAR( phys_ground_dist, 1200 );  // 200 // 1050
+// CONVAR( phys_ground_dist, 1200 );  // 200 // 1050
+CONVAR( phys_ground_dist, 2500 );  // 200 // 1050
 
 #if BULLET_PHYSICS
 PhysicsObject* GetGroundObject( Entity player )
@@ -731,20 +752,30 @@ PhysicsObject* GetGroundObject( Entity player )
 #endif
 
 
+CONVAR( phys_ground_thres, 0.4 );
+CONVAR( phys_ground_dist2, 0 );
+
+
+// TODO: improve this
 bool PlayerMovement::IsOnGround(  )
 {
+#if 1
 #if BULLET_PHYSICS
 	btVector3 btFrom = toBt( GetPos() );
 	//btVector3 btTo( GetPos().x, -10000.0, GetPos().y );
-	btVector3 btTo( GetPos().x, GetPos().y, -10000.0 );
+	//btVector3 btTo( GetPos().x, GetPos().y, -10000.0 );
+	btVector3 btTo( GetPos().x, GetPos().y, GetPos().z - phys_ground_dist );
+
+	graphics->DrawLine( GetPos(), fromBt( btTo ), glm::vec3( 0, 0, 1 ) );
+
 	btCollisionWorld::ClosestRayResultCallback res( btFrom, btTo );
 
-	game->apPhysEnv->apWorld->rayTest( btFrom, btTo, res );
+	physenv->apWorld->rayTest( btFrom, btTo, res );
 
 	if ( res.hasHit() )
 	{
 		btScalar dist = res.m_hitPointWorld.distance2( btFrom );
-		if ( dist < phys_ground_dist )
+		if ( dist <= phys_ground_dist )
 			apMove->aPlayerFlags |= PlyOnGround;
 		else
 			apMove->aPlayerFlags &= ~PlyOnGround;
@@ -765,42 +796,60 @@ bool PlayerMovement::IsOnGround(  )
 
 	return apMove->aPlayerFlags & PlyOnGround;
 
-	/*
+#else
+
 	// maybe useful code
 	// https://gamedev.stackexchange.com/questions/58012/detect-when-a-bullet-rigidbody-is-on-ground
 	
 	// Go through collisions
-	int numManifolds = btDispatcher->getNumManifolds();
-    for (int i = 0; i < numManifolds; i++)
+	// Works, but is oddly bouncy from weird normals on edges
+	int numManifolds = physenv->apWorld->getDispatcher()->getNumManifolds();
+
+    for ( int i = 0; i < numManifolds; i++ )
     {
-        btPersistentManifold* contactManifold = btWorld->getDispatcher()->getManifoldByIndexInternal(i);
+        btPersistentManifold* contactManifold = physenv->apWorld->getDispatcher()->getManifoldByIndexInternal(i);
         btCollisionObject* obA = const_cast<btCollisionObject*>(contactManifold->getBody0());
         btCollisionObject* obB = const_cast<btCollisionObject*>(contactManifold->getBody1());
 
-        GameObject* gameObjA = static_cast<GameObject*>(obA->getUserPointer());
-        GameObject* gameObjB = static_cast<GameObject*>(obB->getUserPointer());
-		if (gameObjA->name == "Camera" || gameObjB->name == "Camera" have some way to check if one of the objects is the rigidbody you want ) {
-		int numContacts = contactManifold->getNumContacts();
-		for (int j = 0; j < numContacts; j++)
+		PhysicsObject *physObjA = (PhysicsObject *)obA->getUserPointer();
+		PhysicsObject *physObjB = (PhysicsObject *)obB->getUserPointer();
+
+		if ( physObjA == apPhysObj || physObjB == apPhysObj )
 		{
-			btManifoldPoint& pt = contactManifold->getContactPoint(j);
-			if (pt.getDistance() < 0.f)
+			gui->DebugMessage( 16, "Player Contact: A: %s  B: %s",
+				ShapeType2Str( physObjA->aType ).c_str(),
+				ShapeType2Str( physObjB->aType ).c_str() );
+
+			int numContacts = contactManifold->getNumContacts();
+			for (int j = 0; j < numContacts; j++)
 			{
-				glm::vec3 normal;
+				btManifoldPoint& pt = contactManifold->getContactPoint(j);
+				// if ( pt.getDistance() < 0.f )
+				if ( pt.getDistance() < phys_ground_dist2 )
+				{
+					glm::vec3 normal;
 
-				if (gameObjB->name == "Camera") //Check each object to see if it's the rigid body and determine the correct normal.
-					normal = -pt.m_normalWorldOnB;
-				else
-					normal = pt.m_normalWorldOnB;
+					if ( physObjA == apPhysObj ) //Check each object to see if it's the rigid body and determine the correct normal.
+						normal = fromBt(pt.m_normalWorldOnB);
+					else
+						normal = fromBt(-pt.m_normalWorldOnB);
 
-				// put the threshold here where 0.4f is
-				if (normal.y > 0.4f ) {
-					// The character controller is on the ground
+					gui->DebugMessage( 15, "Contact Normal: %s", Vec2Str( normal ).c_str() );
+
+					// put the threshold here where 0.4f is
+					if ( normal.y > phys_ground_thres )
+						// The character controller is on the ground
+						apMove->aPlayerFlags |= PlyOnGround;
+					else
+						apMove->aPlayerFlags &= ~PlyOnGround;
 				}
 			}
 		}
 	}
-	*/
+
+	return apMove->aPlayerFlags & PlyOnGround;
+
+#endif
 }
 
 
@@ -995,11 +1044,15 @@ void PlayerMovement::WalkMove(  )
 	glm::vec3 wishdir(0,0,0);
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	bool onGround = IsOnGround();
+	static bool onGround = IsOnGround();
 
 	if ( onGround )
 	{
-		AddFriction(  );
+#if 1 // !BULLET_PHYSICS
+		// bullet friction is kinda meh
+		if ( sv_friction_enable )
+			AddFriction(  );
+#endif
 		Accelerate( wishspeed, wishdir, false );
 	}
 	else
@@ -1039,12 +1092,15 @@ void PlayerMovement::WalkMove(  )
 	// something is wrong with this here on bullet
 #if !BULLET_PHYSICS
 	DoSmoothLand( onGround );
+#endif
+
 	DoViewBob(  );
 	DoViewTilt(  );
-#endif
 
 	if ( IsOnGround() )
 		apRigidBody->aVel[W_UP] = 0;
+
+	onGround = IsOnGround();
 }
 
 
