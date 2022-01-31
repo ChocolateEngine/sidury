@@ -114,7 +114,9 @@ struct PhysicsObjectInfo
 
 	// Only used for when making a Convex or a Concave collision mesh
 	// ModelData*          modelData = nullptr;
-	IMesh*              mesh = nullptr;
+	// IMesh*              mesh = nullptr;
+	std::vector< vertex_3d_t >  vertices;
+	std::vector< uint32_t >     indices;
 
 	// Set a starting position/rotation/scale
 	Transform           transform = {};

@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include "graphics/imesh.h"
 #include "graphics/igraphics.h"
 
@@ -131,3 +133,4 @@ public:
 
 extern VoxelWorld* voxelworld;
 
+#endif

@@ -13,6 +13,8 @@ file(
 	${CH_PUBLIC}/*.cpp
 	${CH_PUBLIC}/*.h
 	${CH_PUBLIC}/core/*.h
+	${CH_THIRDPARTY}/speedykeyv/KeyValue.cpp
+	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
 include( ${CH_ROOT}/scripts/bullet.cmake )
@@ -26,7 +28,8 @@ add_dependencies( SiduryClient "Core" )
 
 set_target_properties(
 	SiduryClient PROPERTIES
-	OUTPUT_NAME client
+	RUNTIME_OUTPUT_NAME client
+	LIBRARY_OUTPUT_NAME client
 
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
 	RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin

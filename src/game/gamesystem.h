@@ -30,6 +30,13 @@ extern BaseInputSystem* input;
 extern BaseAudioSystem* audio;
 
 
+enum class GameState
+{
+	Menu,
+	Running,
+};
+
+
 class GameSystem : public BaseSystem
 {
 public:
@@ -38,25 +45,24 @@ public:
 	GameSystem (  );
 	~GameSystem (  );
 
-	virtual void Init(  );
+	void Init(  );
 
-	virtual void LoadModules(  );
-	virtual void UnloadWorld(  );
-	virtual void LoadWorld( const std::string& path, bool rotate );
-	virtual void RegisterKeys(  );
-	virtual void CreateEntities(  );
+	void LoadModules(  );
+	void RegisterKeys(  );
 
-	virtual void Update( float frameTime );
-	virtual void GameUpdate( float frameTime );
+	bool InMap();
 
-	virtual void SetupModels( float frameTime );
-	virtual void CheckPaused(  );
-	virtual void ResetInputs(  );
-	virtual void UpdateAudio(  );
+	void Update( float frameTime );
+	void GameUpdate( float frameTime );
+
+	void SetupModels( float frameTime );
+	void CheckPaused(  );
+	void ResetInputs(  );
+	void UpdateAudio(  );
 
 	void SetViewMatrix( const glm::mat4& viewMatrix );
 
-	virtual void HandleSDLEvent( SDL_Event* e );
+	void HandleSDLEvent( SDL_Event* e );
 
 	std::vector< Model* > aModels;
 

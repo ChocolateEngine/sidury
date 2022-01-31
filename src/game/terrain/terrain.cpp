@@ -1,3 +1,5 @@
+#if 0
+
 #include "terrain.h"
 #include "noise.h"
 #include "../gamesystem.h"
@@ -585,3 +587,4 @@ void Chunk::SetBlockType( BlockID id, BlockType type )
 
 
 
+#endif

@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include <stdint.h>
 #include <inttypes.h>
 
@@ -69,3 +71,5 @@ std::array<int, CHUNK_AREA> CreateChunkHeightMap( const glm::ivec3& position, in
 float GenerateSeed( const std::string& input );
 
 float perlin( float x, float y );
+
+#endif

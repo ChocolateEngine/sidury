@@ -59,8 +59,12 @@ struct CPlayerMoveData
 
 	// Step Sound
 	double aLastStepTime = 0.f;
-	AudioStream* apStepSound = nullptr;
-	AudioStream* apImpactSound = nullptr;
+
+	// AudioStream* apStepSound = nullptr;
+	// AudioStream* apImpactSound = nullptr;
+
+	std::vector< AudioStream* > aStepSounds;
+	std::vector< AudioStream* > aImpactSounds;
 };
 
 
@@ -99,7 +103,8 @@ public:
 
 	void                    DetermineMoveType(  );
 
-	std::string             GetStepSound(  );
+	// std::string             GetStepSound(  );
+	AudioStream*            GetStepSound(  );
 
 	void                    PlayStepSound(  );
 	void                    StopStepSound( bool force = false );  // Temp Hack for sound system

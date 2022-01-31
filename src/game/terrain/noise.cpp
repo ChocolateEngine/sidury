@@ -1,3 +1,5 @@
+#if 0
+
 #include "terrain.h"
 #include "noise.h"
 
@@ -112,3 +114,4 @@ float GenerateSeed( const std::string& input )
     return seedFloat;
 }
 
+#endif

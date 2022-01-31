@@ -6,6 +6,7 @@
 #include "entity.h"
 #include "terrain/terrain.h"
 #include "graphics/sprite.h"
+#include "mapmanager.h"
 #include <algorithm>
 
 
@@ -39,6 +40,8 @@ CONVAR( phys_friction, 10 );
 CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 
+CONVAR( vrcmdl_scale, 40 );
+
 extern ConVar en_timescale;
 
 extern ConVar velocity_scale;
@@ -65,13 +68,14 @@ std::vector< ModelPhysTest* > g_physEnts;
 void CreateProtogen()
 {
 	Entity proto = entities->CreateEntity();
-	Model* model = &entities->AddComponent< Model >( proto );
 
-	graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj", "materials/1aaaaaaa.jpg", model );
+	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
+	entities->AddComponent< Model* >( proto, model );
 
-	auto& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	auto transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
-	model->GetModelData().SetPos( transform.aPos );
+	model->SetPos( transform.aPos );
+	model->SetScale( {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale} );
 
 	g_protos.push_back( proto );
 }
@@ -80,9 +84,9 @@ void CreateProtogen()
 void CreatePhysEntity()
 {
 	Entity physEnt = entities->CreateEntity();
-	Model *model = &entities->AddComponent< Model >( physEnt );
 
-	graphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/1aaaaaaa.jpg", model );
+	Model* model = graphics->LoadModel( "materials/models/riverhouse/riverhouse.obj" );
+	entities->AddComponent< Model* >( physEnt, model );
 
 	Transform transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 	transform.aAng = {};
@@ -102,6 +106,22 @@ void CreatePhysEntity()
 	}
 
 	entities->AddComponent< std::vector< PhysicsObject * > >( physEnt, physObjs );
+#elif 1
+	PhysicsObjectInfo physInfo( ShapeType::Convex );
+	physInfo.vertices = model->aVertices;
+	physInfo.indices = model->aIndices;
+	physInfo.mass = 40.f;
+	// physInfo.collisionType = CollisionType::Kinematic;
+	physInfo.transform = transform;  // doesn't even work? bruh
+
+	PhysicsObject* phys = physenv->CreatePhysicsObject( physInfo );
+	phys->SetWorldTransform( transform );
+	phys->SetAlwaysActive( true );
+	phys->SetContinuousCollisionEnabled( true );
+	phys->SetSleepingThresholds( 0, 0 );
+	phys->SetFriction( phys_friction );
+
+	entities->AddComponent< PhysicsObject * >( physEnt, phys );
 #else
 	PhysicsObjectInfo physInfo( ShapeType::Box );
 	physInfo.bounds = {20, 20, 20};
@@ -119,7 +139,7 @@ void CreatePhysEntity()
 	entities->AddComponent< PhysicsObject * >( physEnt, phys );
 #endif
 
-	model->GetModelData().SetPos( transform.aPos );
+	model->SetPos( transform.aPos );
 
 	g_otherEnts.push_back( physEnt );
 }
@@ -133,26 +153,6 @@ CON_COMMAND( create_proto )
 CON_COMMAND( create_phys_test )
 {
 	CreatePhysEntity();
-}
-
-
-CON_COMMAND( load_world )
-{
-	if ( args.size() == 0 )
-	{
-		Print( "No Arguments! Args: \"Model Path\" \"1\" (optional value to rotate the world)\"" );
-	}
-
-	bool rotate = args.size() > 2 && args[1] == "1";
-
-	game->LoadWorld( args[0], rotate );
-}
-
-
-// TEMP
-CON_COMMAND( load_surf_utopia )
-{
-	game->LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
 }
 
 
@@ -198,9 +198,6 @@ GameSystem::~GameSystem(  )
 }
 
 
-Sprite* gpSprite = nullptr;
-
-
 void GameSystem::Init(  )
 {
 	LoadModules(  );
@@ -210,22 +207,6 @@ void GameSystem::Init(  )
 
 	entities = new EntityManager;
 	entities->Init();
-
-
-	// TEST
-	//IMaterial* testMat = materialsystem->CreateMaterial();
-	//testMat->SetShader( "basic_3d" );
-	//testMat->SetDiffuse( materialsystem->CreateTexture( testMat, "skybox-dxt.ktx" ) );
-
-
-	// LoadWorld( "D:/sourceengine/vmf2obj/hl1/c1a0.obj", true );
-	LoadWorld( "materials/models/riverhouse/riverhouse_source_scale.obj", true );
-	// LoadWorld( "D:/sourceengine/vmf2obj/br/d1_trainstation_02.obj", false );
-	// LoadWorld( "materials/models/riverhouse/riverhouse.obj", true );
-	// LoadWorld( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", false );
-
-	// should be part of LoadWorld, but that will come later when we actually have a map format for this game
-	CreateEntities(  );
 
 	// voxelworld->Init(  );
 
@@ -241,12 +222,6 @@ void GameSystem::Init(  )
 	players->Spawn( aLocalPlayer );
 
 	Print( "Game Loaded!\n" );
-
-	gpSprite = new Sprite;
-
-	graphics->LoadSprite( "materials/1aaaaaaa.jpg", gpSprite );
-
-	materialsystem->RegisterRenderable( gpSprite );
 }
 
 
@@ -289,110 +264,14 @@ void GameSystem::LoadModules(  )
 
 	// stupid
 	materialsystem = graphics->GetMaterialSystem();
+
+	mapmanager = new MapManager;
 }
 
 
-void GameSystem::UnloadWorld()
+bool GameSystem::InMap()
 {
-	graphics->UnloadModel( g_world->mdl );
-	//vec_remove( aModels, g_world->mdl );
-	//g_world->mdl = nullptr;
-}
-
-
-void GameSystem::LoadWorld( const std::string& path, bool rotate )
-{
-	//if ( g_world->mdl )
-	//	UnloadWorld();
-
-	graphics->LoadModel( path, "materials/act_like_a_baka.jpg", g_world->mdl );
-
-	// apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
-	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_source_scale.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
-	//apGraphics->LoadModel( "D:\\tmp\\surf_utopia_decompile\\surf_utopia_v3_d.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
-	//apGraphics->LoadModel( "D:/usr/Downloads/surf_kitsune2_go/br/d1_trainstation_02.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
-	//apGraphics->LoadModel( "materials/models/riverhouse/riverhouse_bsp_export.obj", "materials/act_like_a_baka.jpg", g_world->mdl );
-	//g_world->mdl->GetModelData().aTransform.aScale = {0.025, 0.025, 0.025};
-
-	// rotate the world model to match Z up if we want to rotate it
-	g_world->mdl->GetModelData().SetAng( {0, 0, rotate ? 90.f : 0.f} );
-
-	//aModels.push_back( g_world->mdl );
-
-#if BULLET_PHYSICS
-
-	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
-	{
-		PhysicsObjectInfo physInfo( ShapeType::Concave );
-		physInfo.mesh = mesh;
-
-		// just have the ground be a box for now since collision on the riverhouse mesh is too jank still
-		//PhysicsObjectInfo physInfo( ShapeType::Box );
-		//physInfo.bounds = {1500, 200, 1500};
-
-		PhysicsObject* physObj = physenv->CreatePhysicsObject( physInfo );
-		physObj->SetContinuousCollisionEnabled( true );
-
-		// uhhhhh
-		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
-		// worldTransform.aAng = glm::degrees(g_world->mdl->GetModelData().GetTransform().aAng);
-		worldTransform.aAng = glm::radians(g_world->mdl->GetModelData().GetTransform().aAng);
-		// worldTransform.aAng = g_world->mdl->GetModelData().GetTransform().aAng;
-
-		physObj->SetWorldTransform( worldTransform );
-		//physObj->SetAngularFactor( {0, 0, 0} );
-
-		g_world->physObj.push_back( physObj );
-	}
-#endif
-}
-
-
-void GameSystem::CreateEntities(  )
-{
-#if 0  // outdated stuff
-
-#if BULLET_PHYSICS
-	PhysicsObjectInfo physInfo( ShapeType::Convex );
-	physInfo.collisionType = CollisionType::Kinematic;
-	physInfo.mass = 20.f;
-#endif
-
-	// Create a ton of phys objects to test physics
-	float r = 0.f;
-	for ( int i = 0; i < physEntCount; i++ )
-	{
-		g_physEnts.push_back( new ModelPhysTest{ new Model, NULL } );
-		aModels.push_back( g_physEnts[i]->mdl );
-		apGraphics->LoadModel( "materials/models/riverhouse/riverhouse.obj", "materials/1aaaaaaa.jpg", g_physEnts[i]->mdl );
-		// apGraphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "materials/1aaaaaaa.jpg", g_physEnts[i]->mdl );
-
-		for (int j = 0; j < 3; j++)
-		{
-			// set a random spawn position in the world
-			//g_physEnts[i]->mdl->GetModelData().aTransform.position[j] = ( float )( rand(  ) / ( float )( RAND_MAX / 10.0f ) );
-		}
-
-		// raise it up in the air
-		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 500.f;
-		// g_physEnts[i]->mdl->GetModelData().aTransform.position.y += 5.f;
-		//g_physEnts[i]->mdl->GetModelData().aTransform.aPos.x = 5.f;
-
-#if BULLET_PHYSICS
-		physInfo.transform.aPos = g_physEnts[i]->mdl->GetModelData().aTransform.aPos;
-
-		//physInfo.modelData = &g_world->mdl->GetModelData();
-
-		//g_physEnts[i]->physObj = apPhysEnv->CreatePhysicsObject( physInfo );
-		//g_physEnts[i]->physObj->SetAlwaysActive( true );
-#endif
-	}
-
-#if SPAWN_PROTOGEN
-	CreateProtogen();
-#endif
-
-#endif
+	return mapmanager->apMap != nullptr;
 }
 
 
@@ -412,11 +291,11 @@ void GameSystem::Update( float frameTime )
 
 	GameUpdate( frameTime );
 
+	gui->Update( frameTime );
 	graphics->Update( frameTime );  // updates gui internally
 	audio->Update( frameTime );
 }
 
-static void *gpCurrLine = 0;
 
 void GameSystem::GameUpdate( float frameTime )
 {
@@ -438,10 +317,8 @@ void GameSystem::GameUpdate( float frameTime )
 
 	aCurTime += aFrameTime;
 
-	for ( auto& mesh: g_world->mdl->GetModelData().aMeshes )
-	{
-		materialsystem->AddRenderable( mesh );
-	}
+#if 0
+	materialsystem->AddRenderable( g_world->mdl );
 
 #if BULLET_PHYSICS
 
@@ -450,7 +327,7 @@ void GameSystem::GameUpdate( float frameTime )
 		physObj->SetContinuousCollisionEnabled( true );
 
 		// uhhhhh
-		Transform worldTransform = g_world->mdl->GetModelData().GetTransform();
+		Transform worldTransform = g_world->mdl->GetTransform();
 		worldTransform.aAng = {phys_rot_x, phys_rot_y, phys_rot_z};
 		worldTransform.aAng = glm::radians( worldTransform.aAng );
 
@@ -461,6 +338,9 @@ void GameSystem::GameUpdate( float frameTime )
 		//physObj->SetAngularFactor( {0, 0, 0} );
 	}
 #endif
+#endif
+
+	mapmanager->Update();
 
 	// WORLD GLOBAL AXIS
 	if ( dbg_global_axis )
@@ -479,7 +359,7 @@ void GameSystem::GameUpdate( float frameTime )
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
-		Model *model = &entities->GetComponent< Model >( ent );
+		Model* model = entities->GetComponent< Model* >( ent );
 
 		if ( !model )
 			continue;
@@ -487,7 +367,7 @@ void GameSystem::GameUpdate( float frameTime )
 		// Model *physObjList = &entities->GetComponent< Model >( ent );
 
 		// Transform& transform = entities->GetComponent< Transform >( ent );
-		Transform &transform = model->GetModelData().GetTransform();
+		Transform &transform = model->GetTransform();
 		PhysicsObject* phys = entities->GetComponent< PhysicsObject* >( ent );
 
 		if ( phys )
@@ -497,15 +377,12 @@ void GameSystem::GameUpdate( float frameTime )
 			transform.aPos = phys->GetWorldTransform().aPos;
 			transform.aAng = phys->GetWorldTransform().aAng;
 
-			model->GetModelData().SetTransform( transform );
+			model->SetTransform( transform );
 
 			gui->DebugMessage( 13, "Phys Obj Ang: %s", Vec2Str( transform.aAng ).c_str() );
 		}
 
-		for ( auto &mesh : model->GetModelData().aMeshes )
-		{
-			materialsystem->AddRenderable( mesh );
-		}
+		materialsystem->AddRenderable( model );
 	}
 
 	// stupid
@@ -693,8 +570,8 @@ void GameSystem::SetupModels( float frameTime )
 
 	for ( auto& proto: g_protos )
 	{
-		auto& model = entities->GetComponent< Model >( proto );
-		Transform& protoTransform = model.GetModelData().GetTransform();
+		auto model = entities->GetComponent< Model* >( proto );
+		Transform& protoTransform = model->GetTransform();
 
 		if ( proto_look.GetBool() )
 		{
@@ -716,19 +593,18 @@ void GameSystem::SetupModels( float frameTime )
 			//protoTransform.aAng[ROLL] = 90.f;
 		}
 
-		for ( auto& mesh: model.GetModelData().aMeshes )
-		{
-			mesh->aTransform = protoTransform;
-			materialsystem->AddRenderable( mesh );
-		}
+		protoTransform.aScale = {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale};
+		// model.SetTransform( protoTransform );
+
+		materialsystem->AddRenderable( model );
 	}
 	
 	// scale the world
-	g_world->mdl->GetModelData().SetScale( glm::vec3(1.f) * velocity_scale.GetFloat() );
+	g_world->mdl->SetScale( glm::vec3(1.f) * velocity_scale.GetFloat() );
 
 	if ( g_streamModel )
 	{
-		g_streamModel->GetModelData().SetScale( {snd_cube_scale, snd_cube_scale, snd_cube_scale} );
+		g_streamModel->SetScale( {snd_cube_scale, snd_cube_scale, snd_cube_scale} );
 	}
 }
 
@@ -752,10 +628,7 @@ void GameSystem::UpdateAudio(  )
 	{
 		if ( stream && stream->Valid() )
 		{
-			audio->FreeSound( &stream );
-
-			if ( g_streamModel )
-				g_streamModel->GetModelData().aNoDraw = true;
+			audio->FreeSound( stream );
 		}
 		// test sound
 		//else if ( stream = audio->LoadSound("sound/rain2.ogg") )  
@@ -767,20 +640,18 @@ void GameSystem::UpdateAudio(  )
 		{
 			stream->vol = snd_test_vol;
 			stream->pos = transform.aPos;  // play it where the player currently is
-			//stream->effects = AudioEffectPreset_World;
+			// stream->effects = AudioEffectPreset_World;
 			stream->loop = true;
 
 			audio->PlaySound( stream );
 
-			if ( g_streamModel == nullptr )
+			/*if ( g_streamModel == nullptr )
 			{
-				g_streamModel = new Model;
-				graphics->LoadModel( "materials/models/cube.obj", "", g_streamModel );
+				g_streamModel = graphics->LoadModel( "materials/models/cube.obj" );
 				//aModels.push_back( g_streamModel );
 			}
 
-			g_streamModel->GetModelData().aNoDraw = false;  // !stream->inWorld
-			g_streamModel->GetModelData().SetPos( transform.aPos );
+			g_streamModel->SetPos( transform.aPos );*/
 		}
 	}
 

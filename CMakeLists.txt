@@ -15,6 +15,10 @@ get_property( CH_THIRDPARTY GLOBAL PROPERTY CH_THIRDPARTY )
 
 include( ${CH_ROOT}/scripts/core.cmake )
 
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CH_ROOT}/obj/sidury )
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CH_ROOT}/obj/sidury/Debug )
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CH_ROOT}/obj/sidury/Release )
+
 # Now Add Sidury Projects
 add_subdirectory( src/launcher )
 add_subdirectory( src/game )

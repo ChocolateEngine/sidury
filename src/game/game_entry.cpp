@@ -10,7 +10,7 @@
 GameSystem *gamesystem = new GameSystem;
 Engine     *engine     = 0;
 
-CONVAR( en_max_frametime, 0.1 );  // 0.2
+CONVAR( en_max_frametime, 0.1 );
 CONVAR( en_timescale, 1 );
 CONVAR( en_fps_max, 0 );
 
@@ -41,9 +41,12 @@ extern "C"
 		engine->Init();
 		gamesystem->Init();
 
-	        while ( engine->aActive ) {
-			static auto startTime = std::chrono::high_resolution_clock::now(  );
+		console->Add( "exec ongameload" );
 
+		auto startTime = std::chrono::high_resolution_clock::now();
+
+		while ( engine->aActive )
+		{
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count(  );
 	
@@ -53,8 +56,7 @@ extern "C"
 			// rendering is actually half the framerate for some reason, odd
 			if ( en_fps_max.GetFloat() > 0.f )
 			{
-				// HACK: fps is doubled for some reason, so multiple by 2
-				float maxFps = glm::clamp( en_fps_max.GetFloat() * 2.f, 20.f, 5000.f );
+				float maxFps = glm::clamp( en_fps_max.GetFloat(), 10.f, 5000.f );
 
 				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
 				float minFrameTime = 1.0f / maxFps;
@@ -69,10 +71,9 @@ extern "C"
 			gamesystem->Update( time );
 			console->Update();
 
-			//engine->Update( time );
-
 			startTime = currentTime;
 		}
+
 		delete engine;
 
 		SDL_UnloadObject( pHandle );

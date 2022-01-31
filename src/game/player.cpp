@@ -1,5 +1,6 @@
 #include "player.h"
 #include "util.h"
+#include "mapmanager.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -40,6 +41,7 @@ CONVAR( sv_friction, 8 );  // 4.f
 CONVAR( sv_friction_enable, 1 );
 
 CONVAR( phys_friction_player, 2 );
+CONVAR( phys_player_offset, 40 );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
@@ -62,11 +64,10 @@ CONVAR( cl_stepduration, 0.22 );
 CONVAR( cl_view_height, 67 );  // 67
 CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
-CONVAR( cl_view_height_offset, -40 );  // 0.015
 
 CONVAR( cl_smooth_land, 1 );
 CONVAR( cl_smooth_land_lerp, 30 );  // 0.015 // 150?
-CONVAR( cl_smooth_land_scale, 600 );
+CONVAR( cl_smooth_land_scale, 0.25 );  // 600
 CONVAR( cl_smooth_land_up_scale, 50 );
 CONVAR( cl_smooth_land_view_scale, 0.05 );
 CONVAR( cl_smooth_land_view_offset, 0.5 );
@@ -90,19 +91,6 @@ CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
 
 constexpr float PLAYER_MASS = 200.f;
-
-// TEMP
-// #define SPAWN_POS 1085.69824, 260, 644.222046
-//#define SPAWN_POS 1085.69824 * velocity_scale, 260 * velocity_scale, 644.222046 * velocity_scale
-// #define SPAWN_POS 1085.69824 * velocity_scale, -46, 644.222046 * velocity_scale
-// #define SPAWN_POS 10.8569824, -2.60, 6.44222046
-// #define SPAWN_POS -26.5, -45, -8.2
-
-//constexpr glm::vec3 SPAWN_POS = {0, 0, 0};
-//constexpr glm::vec3 SPAWN_ANG = {0, 45, 0};
-
-const glm::vec3 SPAWN_POS = {0, 0, 0};
-const glm::vec3 SPAWN_ANG = {0, 45, 0};
 
 
 CON_COMMAND( respawn )
@@ -184,8 +172,8 @@ Entity PlayerManager::Create(  )
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
 	//entities->AddComponent( player, model );
 
-	Model* model = &entities->AddComponent< Model >( player );
-	graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj", "", model );
+	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
+	entities->AddComponent< Model >( player, *model );
 
 #if BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
@@ -198,7 +186,7 @@ Entity PlayerManager::Create(  )
 
 	// physInfo.bounds = glm::vec3(14, 14, 32);
 	// was 14, decreased for now with the colision margin
-	physInfo.bounds = glm::vec3(6, 6, 32);
+	physInfo.bounds = glm::vec3(6, 6, 32) * velocity_scale.GetFloat();
 
 	//physInfo.bounds = {14, 32, 14};  // bruh wtf why y up for this even though it's a btCylinderShapeZ
 
@@ -235,10 +223,9 @@ void PlayerManager::Respawn( Entity player )
 	auto& transform = GetTransform( player );
 	auto& camTransform = GetCamera( player ).aTransform;
 
-	// HACK FOR RIVERHOUSE SPAWN POS
-	transform.aPos = SPAWN_POS;
-	transform.aAng = {0, SPAWN_ANG.y, 0};
-	camTransform.aAng = SPAWN_ANG;
+	transform.aPos = mapmanager->GetSpawnPos();
+	transform.aAng = {0, mapmanager->GetSpawnAng().y, 0};
+	camTransform.aAng = mapmanager->GetSpawnAng();
 	rigidBody.aVel = {0, 0, 0};
 	rigidBody.aAccel = {0, 0, 0};
 
@@ -262,10 +249,10 @@ void PlayerManager::Update( float frameTime )
 		{
 			auto& model = entities->GetComponent< Model >( player );
 			auto& transform = entities->GetComponent< Transform >( player );
-			model.GetModelData().SetTransform( transform );
-			model.GetModelData().SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
+			model.SetTransform( transform );
+			model.SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
 
-			for ( auto& mesh: model.GetModelData().aMeshes )
+			for ( auto& mesh: model.aMeshes )
 				materialsystem->AddRenderable( mesh );
 		}
 
@@ -318,7 +305,8 @@ void PlayerManager::UpdateView( Entity player )
 
 	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transformView = transform;
-	transformView.aPos += (camera.aTransform.aPos + glm::vec3(1, 1, cl_view_height_offset)) * velocity_scale.GetFloat();
+	// transformView.aPos += (camera.aTransform.aPos + glm::vec3(1, 1, cl_view_height_offset)) * velocity_scale.GetFloat();
+	transformView.aPos += camera.aTransform.aPos * velocity_scale.GetFloat();
 	transformView.aAng = camera.aTransform.aAng;
 	//Transform transformView = transform;
 	//transformView.aPos += move.aViewOffset * velocity_scale.GetFloat();
@@ -366,6 +354,7 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	Transform transform = entities->GetComponent< Transform >( player );
 	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
 	transform.aAng = {};
+	transform.aPos.z += phys_player_offset;
 	apPhysObj->SetWorldTransform( transform );
 #endif
 
@@ -412,22 +401,13 @@ void PlayerMovement::MovePlayer( Entity player )
 	}
 
 	// CHANGE THIS IN THE FUTURE FOR NETWORKING
-	if ( cl_thirdperson.GetBool() )
+	if ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() )
 	{
-		auto& model = entities->GetComponent< Model >( player );
+		auto model = entities->GetComponent< Model* >( player );
 
-		for ( auto& mesh: model.GetModelData().aMeshes )
-		{
-#if BULLET_PHYSICS
-			//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
-			//mesh->aTransform = physObj->GetWorldTransform();
-#else
-			mesh->aTransform = *apTransform;
-#endif
-			mesh->aTransform.aAng[ROLL] += 90;
-			mesh->aTransform.aAng[YAW] *= -1;
-			mesh->aTransform.aAng[YAW] += 180;
-		}
+		model->aTransform.aAng[ROLL] += 90;
+		model->aTransform.aAng[YAW] *= -1;
+		model->aTransform.aAng[YAW] += 180;
 	}
 }
 
@@ -608,7 +588,7 @@ void PlayerMovement::UpdatePosition( Entity player )
 		//aTransform = apPhysObj->GetWorldTransform();
 	//transform.aPos = physObj->GetWorldTransform().aPos;
 	transform.aPos = apPhysObj->GetWorldTransform().aPos;
-	//transform.aAng = physObj->GetWorldTransform().aAng;  // hmm
+	transform.aPos.z -= phys_player_offset;
 #else
 	SetPos( GetPos() + (apRigidBody->aVel * velocity_scale.GetFloat()) * game->aFrameTime );
 
@@ -690,8 +670,7 @@ void PlayerMovement::DoRayCollision(  )
 }
 
 
-// CONVAR( phys_ground_dist, 1200 );  // 200 // 1050
-CONVAR( phys_ground_dist, 2500 );  // 200 // 1050
+CONVAR( phys_ground_dist, 100 );
 
 #if BULLET_PHYSICS
 PhysicsObject* GetGroundObject( Entity player )
@@ -901,26 +880,42 @@ CONVAR( cl_step_sound, 1 );
 CONVAR( cl_impact_sound, 1 );
 
 
-std::string PlayerMovement::GetStepSound()
+// old system
+/*std::string PlayerMovement::PreloadStepSounds()
 {
 	char soundName[128];
 	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
 	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
 
 	return soundName;
+}*/
+
+
+AudioStream* PlayerMovement::GetStepSound()
+{
+	char soundName[128];
+	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
+	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
+
+	// audio system should auto free it i think?
+	if ( AudioStream *stepSound = audio->LoadSound( soundName ) )
+		// return audio->PreloadSound( stepSound ) ? stepSound : nullptr;
+		return stepSound;
+
+	return nullptr;
 }
 
 
 void PlayerMovement::StopStepSound( bool force )
 {
-	if ( apMove->apStepSound && apMove->apStepSound->Valid() )
+	/*if ( apMove->apStepSound && apMove->apStepSound->Valid() )
 	{
 		if ( game->aCurTime - apMove->aLastStepTime > cl_stepduration || force )
 		{
-			audio->FreeSound( &apMove->apStepSound );
+			audio->FreeSound( apMove->apStepSound );
 			//gui->DebugMessage( 7, "Freed Step Sound" );
 		}
-	}
+	}*/
 }
 
 
@@ -936,13 +931,17 @@ void PlayerMovement::PlayStepSound(  )
 	if ( speedFactor < cl_step_sound_min_speed )
 		return;
 
+	if ( game->aCurTime - apMove->aLastStepTime < cl_stepduration )
+		return;
+
 	StopStepSound( true );
 
-	if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
+	// if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
+	if ( AudioStream* stepSound = GetStepSound() )
 	{
-		apMove->apStepSound->vol = speedFactor;
+		stepSound->vol = speedFactor;
 
-		audio->PlaySound( apMove->apStepSound );
+		audio->PlaySound( stepSound );
 
 		apMove->aLastStepTime = game->aCurTime;
 	}
@@ -952,10 +951,10 @@ void PlayerMovement::PlayStepSound(  )
 // really need to be able to play multiple impact sounds at a time
 void PlayerMovement::StopImpactSound()
 {
-	if ( apMove->apImpactSound && apMove->apImpactSound->Valid() )
+	/*if ( apMove->apImpactSound && apMove->apImpactSound->Valid() )
 	{
-		audio->FreeSound( &apMove->apImpactSound );
-	}
+		audio->FreeSound( apMove->apImpactSound );
+	}*/
 }
 
 
@@ -973,11 +972,18 @@ void PlayerMovement::PlayImpactSound()
 
 	StopImpactSound();
 
-	if ( apMove->apImpactSound = audio->LoadSound( GetStepSound().c_str() ) )
+	/*if ( apMove->apImpactSound = audio->LoadSound(GetStepSound().c_str()) )
 	{
 		apMove->apImpactSound->vol = speedFactor;
 
 		audio->PlaySound( apMove->apImpactSound );
+	}*/
+
+	if ( AudioStream *impactSound = GetStepSound() )
+	{
+		impactSound->vol = speedFactor;
+
+		audio->PlaySound( impactSound );
 	}
 }
 
@@ -1090,7 +1096,7 @@ void PlayerMovement::WalkMove(  )
 	}
 
 	// something is wrong with this here on bullet
-#if !BULLET_PHYSICS
+#if 1 // !BULLET_PHYSICS
 	DoSmoothLand( onGround );
 #endif
 
@@ -1113,6 +1119,7 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 	static float prevDuckLerp = apRigidBody->aVel[W_UP] * velocity_scale;
 
 	float landLerp = cl_smooth_land_lerp * game->aFrameTime;
+	// float landScale = cl_smooth_land_scale * velocity_scale * game->aFrameTime;
 	float landScale = cl_smooth_land_scale * velocity_scale * game->aFrameTime;
 	float landUpScale = cl_smooth_land_up_scale * velocity_scale;
 
@@ -1159,6 +1166,7 @@ CONVAR( cl_bob_exit_lerp, 0.1 );
 CONVAR( cl_bob_exit_threshold, 0.1 );
 CONVAR( cl_bob_sound_threshold, 0.1 );
 CONVAR( cl_bob_offset, 0.25 );
+CONVAR( cl_bob_time_offset, -0.6 );
 
 
 // TODO: doesn't smoothly transition out of viewbob still
@@ -1201,7 +1209,7 @@ void PlayerMovement::DoViewBob(  )
 	// using this math function mess instead of abs(sin(x)) and lerping it, since it gives a similar result
 	// mmmmmmm cpu cycles go brrrrrr
 	// apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime)))) - sinMessFix);
-	apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime - 0.6f)))) - sinMessFix);
+	apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * (sin(cos(tan(cos(apMove->aWalkTime + cl_bob_time_offset)))) - sinMessFix);
 
 	// apMove->aBobOffsetAmount = cl_bob_magnitude * speedFactor * ( 0.6*(1-cos( 2*sin(apMove->aWalkTime) )) );
 

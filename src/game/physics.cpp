@@ -258,13 +258,13 @@ void contact_added_callback_obj(btManifoldPoint& cp, const btCollisionObject* co
 	// lmao lol
 	PhysicsObject* physObj = (PhysicsObject*)colObj->getUserPointer();
 
-	if ( physObj->aPhysInfo.mesh == nullptr )
+	if ( physObj->aPhysInfo.vertices.empty() )
 		return;
 
 	// uh
-	btVector3 v1 = toBt(physObj->aPhysInfo.mesh->aVertices[0].pos);
-	btVector3 v2 = toBt(physObj->aPhysInfo.mesh->aVertices[1].pos);
-	btVector3 v3 = toBt(physObj->aPhysInfo.mesh->aVertices[2].pos);
+	btVector3 v1 = toBt(physObj->aPhysInfo.vertices[0].pos);
+	btVector3 v2 = toBt(physObj->aPhysInfo.vertices[1].pos);
+	btVector3 v3 = toBt(physObj->aPhysInfo.vertices[2].pos);
 
 	//btVector3 v3 = tshape->m_vertices1[2];
 
@@ -662,6 +662,15 @@ bool PhysicsEnvironment::CreatePhysicsObject( PhysicsObject *phys, PhysicsObject
 }
 
 
+void PhysicsEnvironment::DeletePhysicsObject( PhysicsObject *physObj )
+{
+	DeleteRigidBody( physObj->apRigidBody );
+
+	// ????????????????????????????
+	// delete physObj;
+}
+
+
 btRigidBody* PhysicsEnvironment::CreateRigidBody( PhysicsObject* physObj, PhysicsObjectInfo& physInfo, btCollisionShape* shape )
 {
 	if ( !shape || shape->getShapeType() == INVALID_SHAPE_PROXYTYPE )
@@ -708,7 +717,7 @@ btRigidBody* PhysicsEnvironment::CreateRigidBody( PhysicsObject* physObj, Physic
 	}
 
 	//if ( physInfo.callbacks )
-	if ( physInfo.mesh )
+	if ( !physInfo.vertices.empty() )
 		body->setCollisionFlags( body->getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK );
 
 #else
@@ -737,10 +746,8 @@ void PhysicsEnvironment::DeleteRigidBody( btRigidBody* body )
 
 btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo& physInfo )
 {
-	if ( physInfo.mesh == nullptr )
+	if ( physInfo.vertices.empty() )
 		return nullptr;
-
-	IMesh* mesh = physInfo.mesh;
 
 	btTransform transform;
 	transform.setIdentity();
@@ -765,16 +772,16 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 	btTriangleMesh* meshInterface = new btTriangleMesh();
 	aMeshInterfaces.push_back( meshInterface );
 
-	for (int i = 0; i < mesh->aIndices.size() / 3; i++)
+	for (int i = 0; i < physInfo.indices.size() / 3; i++)
 	//for (int i = 0; i < model.aIndices.size() / 3; i++)
 	{
 		//glm::vec3 v0 = model.aVertices[ model.aIndices[i * 3]     ].pos;
 		//glm::vec3 v1 = model.aVertices[ model.aIndices[i * 3 + 1] ].pos;
 		//glm::vec3 v2 = model.aVertices[ model.aIndices[i * 3 + 2] ].pos;
 
-		glm::vec3 v0 = mesh->aVertices[ mesh->aIndices[i * 3]     ].pos;
-		glm::vec3 v1 = mesh->aVertices[ mesh->aIndices[i * 3 + 1] ].pos;
-		glm::vec3 v2 = mesh->aVertices[ mesh->aIndices[i * 3 + 2] ].pos;
+		glm::vec3 v0 = physInfo.vertices[ physInfo.indices[i * 3]     ].pos;
+		glm::vec3 v1 = physInfo.vertices[ physInfo.indices[i * 3 + 1] ].pos;
+		glm::vec3 v2 = physInfo.vertices[ physInfo.indices[i * 3 + 2] ].pos;
 
 		meshInterface->addTriangle(btVector3(v0[0], v0[1], v0[2]),
 									btVector3(v1[0], v1[1], v1[2]),
@@ -798,12 +805,10 @@ btBvhTriangleMeshShape* PhysicsEnvironment::LoadModelConCave( PhysicsObjectInfo&
 
 btConvexHullShape* PhysicsEnvironment::LoadModelConvex( PhysicsObjectInfo& physInfo )
 {
-	if ( physInfo.mesh == nullptr )
+	if ( physInfo.vertices.empty() )
 		return nullptr;
 
-	IMesh* mesh = physInfo.mesh;
-
-	btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(mesh->aVertices.data()->pos[0])), mesh->aVertices.size(), sizeof(vertex_3d_t));
+	btConvexHullShape* shape = new btConvexHullShape((const btScalar*)(&(physInfo.vertices.data()->pos[0])), physInfo.vertices.size(), sizeof(vertex_3d_t));
 	aCollisionShapes.push_back( shape );
 
 	if ( physInfo.optimizeConvex )
