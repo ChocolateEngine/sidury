@@ -20,7 +20,23 @@ MapManager *mapmanager = nullptr;
 extern ConVar velocity_scale;
 
 
-CONCMD( map )
+void map_dropdown(
+	const std::vector< std::string >& args,  // arguments currently typed in by the user
+	std::vector< std::string >& results )      // results to populate the dropdown list with
+{
+	for ( const auto file: filesys->ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	{
+		if ( file.ends_with( ".." ) )
+			continue;
+
+		std::string mapName = filesys->GetFileName( file );
+
+		results.push_back( mapName );
+	}
+}
+
+
+CONCMD_DROP( map, map_dropdown )
 {
 	if ( !mapmanager )
 	{

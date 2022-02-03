@@ -89,6 +89,7 @@ CONVAR( cl_thirdperson, 0 );
 CONVAR( cl_playermodel_enable, 0 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
+CONVAR( cl_show_player_stats, 0 );
 
 constexpr float PLAYER_MASS = 200.f;
 
@@ -481,6 +482,9 @@ void PlayerMovement::EnableGravity( bool enabled )
 
 void PlayerMovement::DisplayPlayerStats( Entity player ) const
 {
+	if ( !cl_show_player_stats )
+		return;
+
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 	auto& rigidBody = entities->GetComponent< CRigidBody >( player );
 	auto& transform = entities->GetComponent< Transform >( player );

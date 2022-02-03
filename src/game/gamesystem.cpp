@@ -81,32 +81,17 @@ void CreateProtogen()
 }
 
 
-void CreatePhysEntity()
+void CreatePhysEntity( const std::string& path )
 {
 	Entity physEnt = entities->CreateEntity();
 
-	Model* model = graphics->LoadModel( "materials/models/riverhouse/riverhouse.obj" );
+	Model* model = graphics->LoadModel( path );
 	entities->AddComponent< Model* >( physEnt, model );
 
 	Transform transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 	transform.aAng = {};
 	transform.aScale = {1, 1, 1};
 
-	// uhhh
-#if 0
-	std::vector< PhysicsObject * > physObjs;
-	for ( auto &mesh : model->GetModelData().aMeshes )
-	{
-		PhysicsObjectInfo physInfo( ShapeType::Convex );
-		physInfo.mesh = mesh;
-		physInfo.mass = 40.f;
-		physInfo.collisionType = CollisionType::Kinematic;
-
-		physObjs.push_back( physenv->CreatePhysicsObject( physInfo ) );
-	}
-
-	entities->AddComponent< std::vector< PhysicsObject * > >( physEnt, physObjs );
-#elif 1
 	PhysicsObjectInfo physInfo( ShapeType::Convex );
 	physInfo.vertices = model->aVertices;
 	physInfo.indices = model->aIndices;
@@ -122,22 +107,6 @@ void CreatePhysEntity()
 	phys->SetFriction( phys_friction );
 
 	entities->AddComponent< PhysicsObject * >( physEnt, phys );
-#else
-	PhysicsObjectInfo physInfo( ShapeType::Box );
-	physInfo.bounds = {20, 20, 20};
-	physInfo.mass = 40.f;
-	// physInfo.collisionType = CollisionType::Kinematic;
-	physInfo.transform = transform;  // doesn't even work? bruh
-
-	PhysicsObject* phys = physenv->CreatePhysicsObject( physInfo );
-	phys->SetWorldTransform( transform );
-	phys->SetAlwaysActive( true );
-	phys->SetContinuousCollisionEnabled( true );
-	phys->SetSleepingThresholds( 0, 0 );
-	phys->SetFriction( phys_friction );
-
-	entities->AddComponent< PhysicsObject * >( physEnt, phys );
-#endif
 
 	model->SetPos( transform.aPos );
 
@@ -152,7 +121,12 @@ CON_COMMAND( create_proto )
 
 CON_COMMAND( create_phys_test )
 {
-	CreatePhysEntity();
+	CreatePhysEntity( "materials/models/riverhouse/riverhouse.obj" );
+}
+
+CON_COMMAND( create_phys_proto )
+{
+	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
 }
 
 
