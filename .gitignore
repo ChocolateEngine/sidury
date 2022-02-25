@@ -6,6 +6,7 @@
 
 #build files
 obj/
+out/
 
 #windows build files
 *.exe
@@ -26,3 +27,6 @@ scripts/*.mak
 .emacs.*
 *.desktop
 *.bak
+
+#ide
+.vs/
