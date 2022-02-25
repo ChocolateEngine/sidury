@@ -174,7 +174,7 @@ Entity PlayerManager::Create(  )
 	//entities->AddComponent( player, model );
 
 	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
-	entities->AddComponent< Model >( player, *model );
+	entities->AddComponent< Model* >( player, model );
 
 #if BULLET_PHYSICS
 	PhysicsObjectInfo physInfo( ShapeType::Cylinder );
@@ -248,12 +248,12 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			auto& model = entities->GetComponent< Model >( player );
+			auto model = entities->GetComponent< Model* >( player );
 			auto& transform = entities->GetComponent< Transform >( player );
-			model.SetTransform( transform );
-			model.SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
+			model->SetTransform( transform );
+			model->SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
 
-			for ( auto& mesh: model.aMeshes )
+			for ( auto& mesh: model->aMeshes )
 				materialsystem->AddRenderable( mesh );
 		}
 

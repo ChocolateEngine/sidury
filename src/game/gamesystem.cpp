@@ -129,6 +129,16 @@ CON_COMMAND( create_phys_proto )
 	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
 }
 
+CON_COMMAND( delete_protos )
+{
+	for ( auto& proto : g_protos )
+	{
+		graphics->FreeModel( entities->GetComponent< Model* >( proto ) );
+		entities->DeleteEntity( proto );
+	}
+	g_protos.clear();
+}
+
 
 GameSystem::GameSystem(  ):
 	aPaused( true ),
