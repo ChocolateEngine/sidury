@@ -272,12 +272,12 @@ extern ConVar velocity_scale;
 void GameSystem::Update( float frameTime )
 {
 	input->Update( frameTime );
+	gui->StartFrame();
 
 	GameUpdate( frameTime );
 
 	gui->Update( frameTime );
 	graphics->Update( frameTime );  // updates gui internally
-	audio->Update( frameTime );
 }
 
 
