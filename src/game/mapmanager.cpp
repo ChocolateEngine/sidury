@@ -31,6 +31,9 @@ void map_dropdown(
 
 		std::string mapName = filesys->GetFileName( file );
 
+		if ( args.size() && !mapName.starts_with( args[0] ) )
+			continue;
+
 		results.push_back( mapName );
 	}
 }
@@ -46,7 +49,7 @@ CONCMD_DROP( map, map_dropdown )
 
 	if ( args.size() == 0 )
 	{
-		Print( "No Map Path/Name specified!\n" );
+		LogWarn( "No Map Path/Name specified!\n" );
 		return;
 	}
 
@@ -102,7 +105,7 @@ bool MapManager::LoadMap( const std::string &path )
 
 	if ( absPath == "" )
 	{
-		Print( "[MapManager] Map does not exist: \"%s\"", path.c_str() );
+		LogWarn( "[MapManager] Map does not exist: \"%s\"", path.c_str() );
 		return false;
 	}
 
@@ -185,7 +188,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 {
 	if ( !filesys->Exists( path ) )
 	{
-		Print( "[MapManager] Map Info does not exist: \"%s\"", path.c_str() );
+		LogWarn( "[MapManager] Map Info does not exist: \"%s\"", path.c_str() );
 		return nullptr;
 	}
 
@@ -193,7 +196,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 	if ( rawData.empty() )
 	{
-		Print( "[MapManager] Failed to read file: %s\n", path.c_str() );
+		LogWarn( "[MapManager] Failed to read file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -205,7 +208,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 	if ( err != KeyValueErrorCode::NO_ERROR )
 	{
-		Print( "[MapManager] Failed to parse file: %s\n", path.c_str() );
+		LogWarn( "[MapManager] Failed to parse file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -231,7 +234,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 			mapInfo->version = ToLong( kv->value.string, 0 );
 			if ( mapInfo->version != MAP_VERSION )
 			{
-				Print( "[MapManager] Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
+				LogError( "[MapManager] Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
 				delete mapInfo;
 				return nullptr;
 			}
@@ -248,7 +251,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 			if ( mapInfo->modelPath == "" )
 			{
-				Print( "[MapManager] Empty Model Path for map \"%s\"\n", path.c_str() );
+				LogWarn( "[MapManager] Empty Model Path for map \"%s\"\n", path.c_str() );
 				delete mapInfo;
 				return nullptr;
 			}
@@ -282,12 +285,12 @@ void MapManager::SpawnPlayer()
 }
 
 
-const glm::vec3& MapManager::GetSpawnPos()
+glm::vec3 MapManager::GetSpawnPos()
 {
 	return (apMap) ? apMap->aMapInfo->spawnPos : glm::vec3( 0, 0, 0 );
 }
 
-const glm::vec3& MapManager::GetSpawnAng()
+glm::vec3 MapManager::GetSpawnAng()
 {
 	return (apMap) ? apMap->aMapInfo->spawnAng : glm::vec3( 0, 0, 0 );
 }

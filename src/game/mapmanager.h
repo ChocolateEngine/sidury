@@ -48,8 +48,8 @@ public:
 	// void            ParseEntities( const std::string &path );
 	void            SpawnPlayer();
 
-	const glm::vec3& GetSpawnPos();
-	const glm::vec3& GetSpawnAng();
+	glm::vec3       GetSpawnPos();
+	glm::vec3       GetSpawnAng();
 
 	SiduryMap      *apMap = nullptr;
 };
