@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/core.h"
 #include "system.h"
 #include "iinput.h"
 #include "iaudio.h"

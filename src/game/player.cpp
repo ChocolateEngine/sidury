@@ -269,7 +269,7 @@ inline float DegreeConstrain( float num )
 }
 
 
-auto ClampAngles = []( Transform& transform, CCamera& camera )
+inline void ClampAngles( Transform& transform, CCamera& camera )
 {
 	transform.aAng[YAW] = DegreeConstrain( transform.aAng[YAW] );
 	camera.aTransform.aAng[YAW] = DegreeConstrain( camera.aTransform.aAng[YAW] );
@@ -895,18 +895,18 @@ CONVAR( cl_impact_sound, 1 );
 }*/
 
 
-AudioStream* PlayerMovement::GetStepSound()
+Handle PlayerMovement::GetStepSound()
 {
 	char soundName[128];
 	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
 	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
 
 	// audio system should auto free it i think?
-	if ( AudioStream *stepSound = audio->LoadSound( soundName ) )
+	if ( Handle stepSound = audio->LoadSound( soundName ) )
 		// return audio->PreloadSound( stepSound ) ? stepSound : nullptr;
 		return stepSound;
 
-	return nullptr;
+	return InvalidHandle;
 }
 
 
@@ -941,10 +941,9 @@ void PlayerMovement::PlayStepSound(  )
 	StopStepSound( true );
 
 	// if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
-	if ( AudioStream* stepSound = GetStepSound() )
+	if ( Handle stepSound = GetStepSound() )
 	{
-		stepSound->vol = speedFactor;
-
+		audio->SetVolume( stepSound, speedFactor );
 		audio->PlaySound( stepSound );
 
 		apMove->aLastStepTime = game->aCurTime;
@@ -983,10 +982,9 @@ void PlayerMovement::PlayImpactSound()
 		audio->PlaySound( apMove->apImpactSound );
 	}*/
 
-	if ( AudioStream *impactSound = GetStepSound() )
+	if ( Handle impactSound = GetStepSound() )
 	{
-		impactSound->vol = speedFactor;
-
+		audio->SetVolume( impactSound, speedFactor );
 		audio->PlaySound( impactSound );
 	}
 }

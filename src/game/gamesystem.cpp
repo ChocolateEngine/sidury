@@ -260,7 +260,7 @@ bool GameSystem::InMap()
 
 
 // testing
-AudioStream *stream = nullptr;
+Handle stream = InvalidHandle;
 Model* g_streamModel = nullptr;
 
 
@@ -610,7 +610,7 @@ void GameSystem::UpdateAudio(  )
 
 	if ( input->KeyJustPressed(SDL_SCANCODE_G) )
 	{
-		if ( stream && stream->Valid() )
+		if ( audio->IsValid( stream ) )
 		{
 			audio->FreeSound( stream );
 		}
@@ -622,10 +622,9 @@ void GameSystem::UpdateAudio(  )
 		//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )  
 		//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )  
 		{
-			stream->vol = snd_test_vol;
-			stream->pos = transform.aPos;  // play it where the player currently is
-			// stream->effects = AudioEffectPreset_World;
-			stream->loop = true;
+			audio->SetVolume( stream, snd_test_vol );
+			audio->SetWorldPos( stream, transform.aPos );  // play it where the player currently is
+			audio->SetLoop( stream, true );
 
 			audio->PlaySound( stream );
 
@@ -639,9 +638,9 @@ void GameSystem::UpdateAudio(  )
 		}
 	}
 
-	if ( stream && stream->Valid() )
+	if ( audio->IsValid( stream ) )
 	{
-		stream->vol = snd_test_vol;
+		audio->SetVolume( stream, snd_test_vol );
 	}
 
 	audio->SetListenerTransform( transform.aPos, transform.aAng );

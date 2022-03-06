@@ -1,8 +1,6 @@
 #include "../../src/game/gamesystem.h"
-#include "core/platform.h"
 /* Horrendous.  */
 #include "../src/engine/engine.h"
-#include "core/filesystem.h"
 
 #include <vector>
 #include <functional>
@@ -18,17 +16,20 @@ extern "C"
 {
 	void DLL_EXPORT game_init()
 	{
+		if ( cmdline->Find( "-debugger" ) )
+			sys_wait_for_debugger();
+
 		Module pHandle;
 		Engine *( *cengine_get )() = 0;
 
-		std::string path = filesys->FindFile( std::string( "engine" ) + EXT_DLL );
+		std::string path = filesys->FindFile( "engine" EXT_DLL );
 
 		if ( path == "" ) {
-			fprintf( stderr, "Couldn't find %s\n", path.c_str() );
+			LogError( "Couldn't find %s\n", path.c_str() );
 		}
 
 		if ( !( pHandle = SDL_LoadObject( path.c_str() ) ) ) {
-		        fprintf( stderr, "Failed to load engine: %s!\n", SDL_GetError() );
+			LogError( "Failed to load engine: %s!\n", SDL_GetError() );
 			return;
 		}
 		*( void** )( &cengine_get ) = SDL_LoadFunction( pHandle, "cengine_get" );
@@ -53,7 +54,6 @@ extern "C"
 			// don't let the time go too crazy, usually happens when in a breakpoint
 			time = glm::min( time, en_max_frametime.GetFloat() );
 
-			// rendering is actually half the framerate for some reason, odd
 			if ( en_fps_max.GetFloat() > 0.f )
 			{
 				float maxFps = glm::clamp( en_fps_max.GetFloat(), 10.f, 5000.f );

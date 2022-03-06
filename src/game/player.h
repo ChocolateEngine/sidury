@@ -104,7 +104,7 @@ public:
 	void                    DetermineMoveType(  );
 
 	// std::string             GetStepSound(  );
-	AudioStream*            GetStepSound(  );
+	Handle                  GetStepSound(  );
 
 	void                    PlayStepSound(  );
 	void                    StopStepSound( bool force = false );  // Temp Hack for sound system
