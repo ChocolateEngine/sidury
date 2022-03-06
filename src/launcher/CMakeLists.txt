@@ -3,7 +3,6 @@ message( "Current Project: Sidury Launcher" )
 set(
 	SRC_FILES
 	gameloader.c
-	${CH_PUBLIC}/core/platform.c  # temp
 )
 
 add_executable( SiduryLauncher ${SRC_FILES} )
