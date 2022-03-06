@@ -17,7 +17,7 @@ file(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-include( ${CH_ROOT}/scripts/joltphysics.cmake )
+#include( ${CH_ROOT}/scripts/joltphysics.cmake )
 include( ${CH_ROOT}/scripts/bullet.cmake )
 include( ${CH_ROOT}/scripts/vulkan.cmake )
 
@@ -40,4 +40,6 @@ set_target_properties(
 	LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin
 	LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}/sidury/bin
 )
+
+target_precompile_headers( SiduryClient PRIVATE "${CH_PUBLIC}/core/core.h" )
 
