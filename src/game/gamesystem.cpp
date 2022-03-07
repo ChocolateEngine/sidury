@@ -289,6 +289,8 @@ void GameSystem::GameUpdate( float frameTime )
 	// scale the nearz and farz
 	aView.Set( 0, 0, aView.width, aView.height, r_nearz * velocity_scale, r_farz * velocity_scale, r_fov );
 
+	HandleSystemEvents();
+
 	CheckPaused(  );
 
 	if ( aPaused )
@@ -647,27 +649,32 @@ void GameSystem::UpdateAudio(  )
 }
 
 
-void GameSystem::HandleSDLEvent( SDL_Event* e )
+void GameSystem::HandleSystemEvents()
 {
-	switch (e->type)
-	{
-		case SDL_WINDOWEVENT:
-		{
-			switch (e->window.event)
-			{
-				case SDL_WINDOWEVENT_SIZE_CHANGED:
-				{
-					graphics->GetWindowSize( &aView.width, &aView.height );
-					aView.ComputeProjection();
-					break;
-				}
-			}
-			break;
-		}
+	static std::vector< SDL_Event >* events = input->GetEvents();
 
-		default:
+	for ( auto& e: *events )
+	{
+		switch (e.type)
 		{
-			break;
+			case SDL_WINDOWEVENT:
+			{
+				switch (e.window.event)
+				{
+					case SDL_WINDOWEVENT_SIZE_CHANGED:
+					{
+						graphics->GetWindowSize( &aView.width, &aView.height );
+						aView.ComputeProjection();
+						break;
+					}
+				}
+				break;
+			}
+
+			default:
+			{
+				break;
+			}
 		}
 	}
 }

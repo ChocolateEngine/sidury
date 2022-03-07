@@ -63,7 +63,7 @@ public:
 
 	void SetViewMatrix( const glm::mat4& viewMatrix );
 
-	void HandleSDLEvent( SDL_Event* e );
+	void HandleSystemEvents();
 
 	std::vector< Model* > aModels;
 
