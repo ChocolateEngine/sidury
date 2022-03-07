@@ -34,7 +34,7 @@ extern "C"
 		}
 		*( void** )( &cengine_get ) = SDL_LoadFunction( pHandle, "cengine_get" );
 		if ( !cengine_get ) {
-			fprintf( stderr, "Failed to load engine's entry point: %s!\n", SDL_GetError() );
+			LogError( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
 			return;
 		}
 

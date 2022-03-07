@@ -205,7 +205,7 @@ void GameSystem::Init(  )
 
 	players->Spawn( aLocalPlayer );
 
-	Print( "Game Loaded!\n" );
+	LogMsg( "Game Loaded!\n" );
 }
 
 

@@ -6,6 +6,8 @@
 #include <BulletCollision/CollisionShapes/btTriangleShape.h>
 #include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 
+LOG_REGISTER_CHANNEL( Physics, LogColor::DarkMagenta );
+
 PhysicsEnvironment* physenv = nullptr;
 
 
@@ -320,7 +322,7 @@ void PhysDebugDraw::draw3dText( const btVector3 &location, const char *textStrin
 
 void PhysDebugDraw::reportErrorWarning( const char *warningString )
 {
-	Print( "[BulletPhysics] Warning: %s\n", warningString );
+	LogWarn( gPhysicsChannel, "[BULLET] %s", warningString );
 }
 
 
