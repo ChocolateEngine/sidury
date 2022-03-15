@@ -42,7 +42,7 @@ extern "C"
 		engine->Init();
 		gamesystem->Init();
 
-		console->Add( "exec ongameload" );
+		console->QueueCommand( "exec ongameload" );
 
 		auto startTime = std::chrono::high_resolution_clock::now();
 
