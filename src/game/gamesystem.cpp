@@ -644,7 +644,10 @@ void GameSystem::UpdateAudio(  )
 			audio->SetVolume( stream, snd_test_vol );
 			audio->SetWorldPos( stream, transform.aPos );  // play it where the player currently is
 			audio->SetLoop( stream, true );
+
+#if AUDIO2
 			audio->SetEffects( stream, AudioEffect_World );
+#endif
 
 			audio->PlaySound( stream );
 
