@@ -9,6 +9,7 @@ Loads Sidury Map Files (smf)
 #include "util.h"
 #include "gamesystem.h"
 #include "player.h"
+#include "skybox.h"
 
 #include "mapmanager.h"
 
@@ -61,6 +62,7 @@ CONCMD_DROP( map, map_dropdown )
 
 MapManager::MapManager()
 {
+	GetSkybox().Init();
 }
 
 MapManager::~MapManager()
@@ -75,6 +77,8 @@ void MapManager::Update()
 
 	// scale the world
 	apMap->apWorldModel->SetScale( glm::vec3( 1.f ) * velocity_scale.GetFloat() );
+
+	GetSkybox().Draw();
 
 	materialsystem->AddRenderable( apMap->apWorldModel );
 }
@@ -119,6 +123,8 @@ bool MapManager::LoadMap( const std::string &path )
 	apMap = new SiduryMap;
 	apMap->aMapInfo = mapInfo;
 
+	GetSkybox().SetSkybox( mapInfo->skybox );
+
 	if ( !LoadWorldModel() )
 	{
 		CloseMap();
@@ -145,13 +151,16 @@ bool MapManager::LoadWorldModel()
 
 #if BULLET_PHYSICS
 
-	// for ( auto &mesh : apMap->apWorldModel->aMeshes )
+	for ( auto &mesh : apMap->apWorldModel->aMeshes )
 	{
 		PhysicsObjectInfo physInfo( ShapeType::Concave );
 		// physInfo.mesh = mesh;
 
-		physInfo.vertices = apMap->apWorldModel->aVertices;
-		physInfo.indices = apMap->apWorldModel->aIndices;
+		// physInfo.vertices = apMap->apWorldModel->aVertices;
+		// physInfo.indices = apMap->apWorldModel->aIndices;
+		
+		physInfo.vertices = mesh->GetVertices();
+		physInfo.indices = mesh->GetIndices();
 
 		PhysicsObject *physObj = physenv->CreatePhysicsObject( physInfo );
 		physObj->SetContinuousCollisionEnabled( true );

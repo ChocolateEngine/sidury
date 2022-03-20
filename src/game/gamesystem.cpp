@@ -223,7 +223,9 @@ void GameSystem::RegisterKeys(  )
 	input->RegisterKey( SDL_SCANCODE_V ); // noclip
 	input->RegisterKey( SDL_SCANCODE_B ); // flight
 
-	input->RegisterKey( SDL_SCANCODE_G ); // play test sound at current position in world
+	input->RegisterKey( SDL_SCANCODE_G ); // play a test sound at current position in world
+	input->RegisterKey( SDL_SCANCODE_H ); // stop all test sounds
+
 	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
@@ -260,7 +262,7 @@ bool GameSystem::InMap()
 
 
 // testing
-Handle stream = InvalidHandle;
+std::vector<Handle> streams {};
 Model* g_streamModel = nullptr;
 
 
@@ -610,15 +612,30 @@ void GameSystem::UpdateAudio(  )
 
 	auto& transform = entities->GetComponent< Transform >( aLocalPlayer );
 
-	if ( input->KeyJustPressed(SDL_SCANCODE_G) )
+	if ( input->KeyJustPressed( SDL_SCANCODE_H ) )
 	{
-		if ( audio->IsValid( stream ) )
+		for ( Handle stream: streams )
+		{
+			if ( audio->IsValid( stream ) )
+			{
+				audio->FreeSound( stream );
+			}
+		}
+
+		streams.clear();
+	}
+
+	if ( input->KeyJustPressed( SDL_SCANCODE_G ) )
+	{
+		Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion2.ogg" ) );
+
+		/*if ( audio->IsValid( stream ) )
 		{
 			audio->FreeSound( stream );
-		}
+		}*/
 		// test sound
 		//else if ( stream = audio->LoadSound("sound/rain2.ogg") )  
-		else if ( stream = audio->LoadSound("sound/endymion2.ogg" ) )  
+		if ( stream )  
 		//else if ( stream = audio->LoadSound("sound/endymion_mono.ogg") )  
 		//else if ( stream = audio->LoadSound("sound/endymion2.wav") )  
 		//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )  
@@ -627,6 +644,7 @@ void GameSystem::UpdateAudio(  )
 			audio->SetVolume( stream, snd_test_vol );
 			audio->SetWorldPos( stream, transform.aPos );  // play it where the player currently is
 			audio->SetLoop( stream, true );
+			audio->SetEffects( stream, AudioEffect_World );
 
 			audio->PlaySound( stream );
 
@@ -640,9 +658,12 @@ void GameSystem::UpdateAudio(  )
 		}
 	}
 
-	if ( audio->IsValid( stream ) )
+	for ( Handle stream: streams )
 	{
-		audio->SetVolume( stream, snd_test_vol );
+		if ( audio->IsValid( stream ) )
+		{
+			audio->SetVolume( stream, snd_test_vol );
+		}
 	}
 
 	audio->SetListenerTransform( transform.aPos, transform.aAng );

@@ -63,8 +63,8 @@ struct CPlayerMoveData
 	// AudioStream* apStepSound = nullptr;
 	// AudioStream* apImpactSound = nullptr;
 
-	std::vector< AudioStream* > aStepSounds;
-	std::vector< AudioStream* > aImpactSounds;
+	std::vector< Handle > aStepSounds;
+	std::vector< Handle > aImpactSounds;
 };
 
 
@@ -172,7 +172,7 @@ public:
 	void                    Respawn( Entity player );
 	void                    Update( float frameTime );  // ??
 
-	void                    UpdateView( Entity player );
+	void                    UpdateView( CPlayerInfo& info, Entity player );
 	void                    DoMouseLook( Entity player );
 
 	std::vector< Entity > aPlayerList;

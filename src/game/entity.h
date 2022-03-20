@@ -357,7 +357,7 @@ struct CCamera: public CDirection
 class CSound
 {
 public:
-	AudioStream* apStream = nullptr;
+	Handle aStream = InvalidHandle;
 };
 
 

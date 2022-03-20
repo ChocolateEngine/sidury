@@ -13,7 +13,7 @@ PhysicsEnvironment* physenv = nullptr;
 
 CONVAR( phys_dbg, 1 );
 
-CONVAR( phys_dbg_wireframe, 1 );
+CONVAR( phys_dbg_wireframe, 0 );
 CONVAR( phys_dbg_aabb, 0 );
 CONVAR( phys_dbg_features_text, 0 );
 CONVAR( phys_dbg_contact_points, 0 );

@@ -1,6 +1,7 @@
 #include "player.h"
 #include "util.h"
 #include "mapmanager.h"
+#include "skybox.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -257,7 +258,7 @@ void PlayerManager::Update( float frameTime )
 				materialsystem->AddRenderable( mesh );
 		}
 
-		UpdateView( player );
+		UpdateView( playerInfo, player );
 	}
 }
 
@@ -293,7 +294,7 @@ void PlayerManager::DoMouseLook( Entity player )
 }
 
 
-void PlayerManager::UpdateView( Entity player )
+void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 {
 	auto& move = GetPlayerMoveData( player );
 	auto& transform = GetTransform( player );
@@ -329,6 +330,11 @@ void PlayerManager::UpdateView( Entity player )
 
 		game->SetViewMatrix( viewMat );
 		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
+	}
+
+	if ( info.aIsLocalPlayer )
+	{
+		GetSkybox().aAng = transformView.aAng;
 	}
 }
 
