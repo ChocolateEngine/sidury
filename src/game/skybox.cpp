@@ -19,107 +19,6 @@ Skybox& GetSkybox()
 }
 
 
-enum Faces
-{
-	FaceTop,
-	FaceBottom,
-	FaceLeft,
-	FaceRight,
-	FaceBack,
-	FaceFront,
-};
-
-
-const char SkyboxFaceVerts[][3] = {
-	{  0,  0,  1 },  // Above
-	{  0,  0, -1 },  // Below
-	{ -1,  0,  0 },  // Left
-	{  1,  0,  0 },  // Right
-	{  0, -1,  0 },  // Behind
-	{  0,  1,  0 },  // Front
-};
-
-
-const glm::vec3 FaceNorm[6] = {
-	{  0,  0,  1 },  // Above
-	{  0,  0, -1 },  // Below
-	// { -1,  0,  0 },  // Left
-	{ -0.25,  0,  0.3 },  // Left
-	{  1,  0,  0 },  // Right
-	// {  0.5,  0,  0 },  // Right - HACK FOR LIGHTING
-	{  0, -1,  0 },  // Behind
-	{  0,  1,  0.15 },  // Front
-};
-
-
-/*const glm::vec2 texCoord[2][3] = {
-	// { { 1, 1 }, { 0, 1 }, { 0, 0 } },
-	// { { 1, 0 }, { 1, 1 }, { 0, 0 } }
-	
-	//{ { 2, 2 }, { 0, 2 }, { 0, 0 } },
-	//{ { 2, 0 }, { 2, 2 }, { 0, 0 } }
-	
-	{ { 2, 2 }, { -2, 2 }, { -2, -2 } },
-	{ { 2, -2 }, { 2, 2 }, { -2, -2 } }
-	
-	//{ { -2, -2 }, { 0, -2 }, { 0, 0 } },
-	//{ { -2, 0 }, { -2, -2 }, { 0, 0 } }
-
-	//{ { 1, 1 }, { -1, 1 }, { -1, -1 } },
-	//{ { 1, -1 }, { 1, 1 }, { -1, -1 } }
-
-	//{ { 1, 10 }, { -10, 10 },   { -10, -10 } },
-	//{ { 1, -10 },  { 10, 10 },  { -10, -10 } }
-};*/
-
-
-const glm::vec3 texCoord[12][3] = {
-	// Bottom Face (-Z)
-	// { { -1, -1 },  { 1, -1 }, { 1, 1 } },
-	// { { -1, 1 }, { -1, -1 },  { 1, 1 } },
-
-	// { { 1, 1, 1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	// // { { -1, -3 }, {  -3, -1 }, { 1,  1 } },
-	// { { -1, 1, 1 }, { -1, -1, 1 },  { 1, 1, 1 } },
-
-	// 2nd list moves it along the bottom (y+) in a corner only?
-	// 3rd list moves it along x????
-	{ { 2, -2, 1 /*nothing?*/ },	{ 1, -1, 4 },	{ 4, 1, 1 } },
-	//{ { -1, 1, 4 },		{ -1, -1, 1 },	{ 1, 1, 1 } },
-	{ { -2, 2, 4 },		{ -2, -2, 1 },	{ 2, 2, 1 } },
-
-	// Top Face (+Z)
-	{ { 1, 1,  1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	{ { 1, -1, 1 },  { 1, 1, 1 },  { -1,  -1, 1 } },
-
-	// Left Face (-X)
-	//{ { 1, 1,  1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	//{ { 1, -1, 1 },  { 1, 1, 1 },  { -1,  -1, 1 } },
-	
-	//{ { 4, 4,  1 },  { -4, 4, 1 }, { -4,  -4, 1 } },
-	//{ { 4, -4, 1 },  { 4, 4, 1 },  { -4,  -4, 1 } },
-
-	// { { 1, 1,  1 },  { -4, 4, 0 }, { -1, -1, 1 } },
-	{ { 1, 2,  0 },  { -2, 1, -2 }, { -2, -2, 1 } },
-	{ { 4, -4, 0 },  { 4, 4, 4 },  { -8,  -2, 0 } },
-
-	// Right Face (+X)
-	//{ { 1, 1,  1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	//{ { 1, -1, 1 },  { 1, 1, 1 },  { -1,  -1, 1 } },
-
-	{ { 4, 4,  0 },  { -4, 4, 1 }, { -4,  -4, 4 } },
-	{ { 4, -4, 1 },  { 4, 4, 0 },  { -4,  -4, 4 } },
-
-	// Back Face (+Y)
-	{ { 1, 1,  1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	{ { 1, -1, 1 },  { 1, 1, 1 },  { -1,  -1, 1 } },
-
-	// Front Face (-Y)
-	{ { 1, 1,  1 },  { -1, 1, 1 }, { -1,  -1, 1 } },
-	{ { 1, -1, 1 },  { 1, 1, 1 },  { -1,  -1, 1 } },
-};
-
-
 constexpr float SKYBOX_SCALE = 100.0f;
 
 
@@ -135,11 +34,9 @@ void Skybox::Init()
 
 	vertex_cube_3d_t vert{};
 
-#if 1
-	auto CreateVert = [&]( const glm::vec3& pos, const glm::vec3& uv )
+	auto CreateVert = [&]( const glm::vec3& pos )
 	{
 		vert.pos = (pos * SKYBOX_SCALE);
-		vert.texCoord = uv;
 
 		auto iterSavedIndex = vertIndexes.find(vert);
 
@@ -155,51 +52,49 @@ void Skybox::Init()
 		vertIndexes[ vert ] = vertIndexes.size();
 	};
 
-	auto CreateTri = [&]( const glm::vec3 uv[3], const glm::vec3& pos0, const glm::vec3& pos1, const glm::vec3& pos2 )
+	auto CreateTri = [&]( const glm::vec3& pos0, const glm::vec3& pos1, const glm::vec3& pos2 )
 	{
-		CreateVert( pos0, uv[0] );
-		CreateVert( pos1, uv[1] );
-		CreateVert( pos2, uv[2] );
-
-		//CreateVert( pos0, pos0 );
-		//CreateVert( pos1, pos1 );
-		//CreateVert( pos2, pos2 );
+		CreateVert( pos0 );
+		CreateVert( pos1 );
+		CreateVert( pos2 );
 	};
 
 	// create the skybox mesh now
 	// Create Bottom Face (-Z)
-	CreateTri( texCoord[0],     {  1,  1, -1 },  { -1,  1, -1 },  { -1, -1, -1 } );
-	CreateTri( texCoord[1],     {  1, -1, -1 },  {  1,  1, -1 },  { -1, -1, -1 } );
+	CreateTri( {  1,  1, -1 },  { -1,  1, -1 },  { -1, -1, -1 } );
+	CreateTri( {  1, -1, -1 },  {  1,  1, -1 },  { -1, -1, -1 } );
 
 	// Create Top Face (+Z)
-	CreateTri( texCoord[2],     {  1,  1,  1 },  {  1, -1,  1 },  { -1, -1,  1 } );
-	CreateTri( texCoord[3],     { -1,  1,  1 },  {  1,  1,  1 },  { -1, -1,  1 } );
+	CreateTri( {  1,  1,  1 },  {  1, -1,  1 },  { -1, -1,  1 } );
+	CreateTri( { -1,  1,  1 },  {  1,  1,  1 },  { -1, -1,  1 } );
 
 	// Create Left Face (-X)
-	CreateTri( texCoord[4],     { -1, -1, -1 },  { -1,  1, -1 },  { -1,  1,  1 } );
-	CreateTri( texCoord[5],     { -1, -1,  1 },  { -1, -1, -1 },  { -1,  1,  1 } );
+	CreateTri( { -1, -1, -1 },  { -1,  1, -1 },  { -1,  1,  1 } );
+	CreateTri( { -1, -1,  1 },  { -1, -1, -1 },  { -1,  1,  1 } );
 
 	// Create Right Face (+X)
-	CreateTri( texCoord[6],     {  1,  1, -1 },  {  1, -1, -1 },  {  1, -1,  1 } );
-	CreateTri( texCoord[7],     {  1,  1,  1 },  {  1,  1, -1 },  {  1, -1,  1 } );
+	CreateTri( {  1,  1, -1 },  {  1, -1, -1 },  {  1, -1,  1 } );
+	CreateTri( {  1,  1,  1 },  {  1,  1, -1 },  {  1, -1,  1 } );
 
 	// Create Back Face (+Y)
-	CreateTri( texCoord[8],     {  1,  1,  1 },  { -1,  1,  1 },  { -1,  1, -1 } );
-	CreateTri( texCoord[9],     {  1,  1, -1 },  {  1,  1,  1 },  { -1,  1, -1 } );
+	CreateTri( {  1,  1,  1 },  { -1,  1,  1 },  { -1,  1, -1 } );
+	CreateTri( {  1,  1, -1 },  {  1,  1,  1 },  { -1,  1, -1 } );
 
 	// Create Front Face (-Y)
-	CreateTri( texCoord[10],    {  1, -1,  1 },  {  1, -1, -1 },  { -1, -1, -1 } );
-	CreateTri( texCoord[11],    { -1, -1,  1 },  {  1, -1,  1 },  { -1, -1, -1 } );
+	CreateTri( {  1, -1,  1 },  {  1, -1, -1 },  { -1, -1, -1 } );
+	CreateTri( { -1, -1,  1 },  {  1, -1,  1 },  { -1, -1, -1 } );
 
 	materialsystem->CreateVertexBuffer( this );
 	materialsystem->CreateIndexBuffer( this );
-#endif
 }
 
 
 void Skybox::SetSkybox( const std::string &path )
 {
 	aValid = false;
+
+	if ( GetMaterial() )
+		materialsystem->DeleteMaterial( GetMaterial() );
 
 	SetMaterial( materialsystem->ParseMaterial( path ) );
 
@@ -212,7 +107,7 @@ void Skybox::SetSkybox( const std::string &path )
 		return;
 	}
 
-	aValid = true;
+	aValid = path != "";
 }
 
 
@@ -225,39 +120,7 @@ void Skybox::Draw()
 		materialsystem->AddRenderable( this );
 
 	// TESTING
-	if ( !g_skybox_ang_freeze )
+	if ( !g_skybox_ang_freeze && GetMaterial() )
 		GetMaterial()->SetVar( "ang", aAng );
-
-	auto CreateTri = [&]( const glm::vec3 color, const glm::vec3& pos0, const glm::vec3& pos1, const glm::vec3& pos2 )
-	{
-		graphics->DrawLine( pos0 * SKYBOX_SCALE, pos1 * SKYBOX_SCALE, color );
-		graphics->DrawLine( pos0 * SKYBOX_SCALE, pos2 * SKYBOX_SCALE, color );
-		graphics->DrawLine( pos1 * SKYBOX_SCALE, pos2 * SKYBOX_SCALE, color );
-	};
-
-	// create the skybox mesh now
-	// Create Bottom Face (-Z)
-	CreateTri( {0, 0, 1},     {  1,  1, -1 },  { -1,  1, -1 },  { -1, -1, -1 } );
-	CreateTri( {0, 0, 1},     {  1, -1, -1 },  {  1,  1, -1 },  { -1, -1, -1 } );
-
-	// Create Top Face (+Z)
-	CreateTri( {0, 0, 1},     {  1,  1,  1 },  {  1, -1,  1 },  { -1, -1,  1 } );
-	CreateTri( {0, 0, 1},     { -1,  1,  1 },  {  1,  1,  1 },  { -1, -1,  1 } );
-
-	// Create Left Face (-X)
-	CreateTri( {1, 0, 0},     {  1,  1, -1 },  {  1, -1, -1 },  {  1, -1,  1 } );
-	CreateTri( {1, 0, 0},     {  1,  1,  1 },  {  1,  1, -1 },  {  1, -1,  1 } );
-
-	// Create Right Face (+X)
-	CreateTri( {1, 0, 0},     { -1, -1, -1 },  { -1,  1, -1 },  { -1,  1,  1 } );
-	CreateTri( {1, 0, 0},     { -1, -1,  1 },  { -1, -1, -1 },  { -1,  1,  1 } );
-
-	// Create Back Face (+Y)
-	CreateTri( {0, 1, 0},     {  1,  1,  1 },  { -1,  1,  1 },  { -1,  1, -1 } );
-	CreateTri( {0, 1, 0},     {  1,  1, -1 },  {  1,  1,  1 },  { -1,  1, -1 } );
-
-	// Create Front Face (-Y)
-	CreateTri( {0, 1, 0},     {  1, -1,  1 },  {  1, -1, -1 },  { -1, -1, -1 } );
-	CreateTri( {0, 1, 0},     { -1, -1,  1 },  {  1, -1,  1 },  { -1, -1, -1 } );
 }
 
