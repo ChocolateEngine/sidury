@@ -9,6 +9,7 @@
 #include "mapmanager.h"
 #include <algorithm>
 
+#include "core/profiler.h"
 
 GameSystem* game = nullptr;
 
@@ -93,8 +94,20 @@ void CreatePhysEntity( const std::string& path )
 	transform.aScale = {1, 1, 1};
 
 	PhysicsObjectInfo physInfo( ShapeType::Convex );
-	physInfo.vertices = model->aVertices;
-	physInfo.indices = model->aIndices;
+
+	for ( auto &mesh : model->aMeshes )
+	{
+		auto& verts = mesh->GetVertices();
+		auto& ind = mesh->GetIndices();
+
+		physInfo.vertices.reserve( physInfo.vertices.size() + verts.size() );
+		physInfo.indices.reserve( physInfo.vertices.size() + verts.size() );
+
+		physInfo.vertices.insert( verts.end(), verts.begin(), verts.end() );
+		if ( ind.size() )
+			physInfo.indices.insert( ind.end(), ind.begin(), ind.end() );
+	}
+
 	physInfo.mass = 40.f;
 	// physInfo.collisionType = CollisionType::Kinematic;
 	physInfo.transform = transform;  // doesn't even work? bruh
@@ -269,10 +282,12 @@ Model* g_streamModel = nullptr;
 ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
 
-
 // TODO: figure out a better way to do this, god
 void GameSystem::Update( float frameTime )
 {
+	// ZoneScoped
+	PROF_SCOPE();
+
 	input->Update( frameTime );
 	gui->StartFrame();
 

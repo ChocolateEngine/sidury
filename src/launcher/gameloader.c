@@ -18,13 +18,10 @@ void unload_objects()
 
 int load_object( Module* mod, const char* path )
 {
-	char pathExt[512];
-	snprintf(pathExt, 512, "%s%s", path, EXT_DLL );
-
-	if ( *mod = SDL_LoadObject( pathExt ) )
+	if ( *mod = SDL_LoadObject( path ) )
 		return 0;
 
-	fprintf( stderr, "Failed to load %s: %s\n", pathExt, SDL_GetError(  ) );
+	fprintf( stderr, "Failed to load %s: %s\n", path, SDL_GetError(  ) );
 	//sys_print_last_error( "Failed to load %s", path );
 
 	unload_objects(  );
@@ -33,16 +30,19 @@ int load_object( Module* mod, const char* path )
 }
 
 
+#define GAME_PATH "sidury"
+
+
 int main( int argc, char *argv[] )
 {
 	void ( *game_init )() = 0;
 	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
 
-	if ( load_object( &core, "bin/core" ) == -1 )
+	if ( load_object( &core, "bin/core" EXT_DLL ) == -1 )
 		return -1;
-	if ( load_object( &imgui, "bin/imgui" ) == -1 )
+	if ( load_object( &imgui, "bin/imgui" EXT_DLL ) == -1 )
 		return -1;
-	if ( load_object( &client, "sidury/bin/client" ) == -1 )
+	if ( load_object( &client, GAME_PATH "/bin/client" EXT_DLL ) == -1 )
 		return -1;
 
 	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 		return -1;
 	}
 
-	core_init( argc, argv, "sidury" );
+	core_init( argc, argv, GAME_PATH );
 
 	*( void** )( &game_init ) = SDL_LoadFunction( client, "game_init" );
 	if ( !game_init )

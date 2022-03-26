@@ -2,6 +2,8 @@
 /* Horrendous.  */
 #include "../src/engine/engine.h"
 
+#include "core/profiler.h"
+
 #include <vector>
 #include <functional>
 
@@ -24,17 +26,21 @@ extern "C"
 
 		std::string path = filesys->FindFile( "engine" EXT_DLL );
 
-		if ( path == "" ) {
-			LogError( "Couldn't find %s\n", path.c_str() );
+		if ( path == "" )
+		{
+			LogFatal( "Couldn't find engine" EXT_DLL "!\n" );
+			return;
 		}
 
-		if ( !( pHandle = SDL_LoadObject( path.c_str() ) ) ) {
-			LogError( "Failed to load engine: %s!\n", SDL_GetError() );
+		if ( !( pHandle = SDL_LoadObject( path.c_str() ) ) )
+		{
+			LogFatal( "Failed to load engine: %s!\n", SDL_GetError() );
 			return;
 		}
 		*( void** )( &cengine_get ) = SDL_LoadFunction( pHandle, "cengine_get" );
-		if ( !cengine_get ) {
-			LogError( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
+		if ( !cengine_get )
+		{
+			LogFatal( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
 			return;
 		}
 
@@ -42,12 +48,15 @@ extern "C"
 		engine->Init();
 		gamesystem->Init();
 
-		console->QueueCommand( "exec ongameload" );
+		console->QueueCommandSilent( "exec ongameload", false );
 
 		auto startTime = std::chrono::high_resolution_clock::now();
 
 		while ( engine->aActive )
 		{
+			// ZoneScoped
+			PROF_SCOPE();
+
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count(  );
 	
@@ -72,6 +81,8 @@ extern "C"
 			console->Update();
 
 			startTime = currentTime;
+
+			profile_end_frame();
 		}
 
 		delete engine;
