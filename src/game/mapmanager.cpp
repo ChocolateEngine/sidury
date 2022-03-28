@@ -91,12 +91,11 @@ void MapManager::CloseMap()
 
 	if ( apMap->apWorldModel )
 		graphics->FreeModel( apMap->apWorldModel );
-
+#if BULLET_PHYSICS
 	for ( auto physObj: apMap->aWorldPhysObjs )
 		physenv->DeletePhysicsObject( physObj );
-
 	apMap->aWorldPhysObjs.clear();
-
+#endif
 	delete apMap;
 	apMap = nullptr;
 }

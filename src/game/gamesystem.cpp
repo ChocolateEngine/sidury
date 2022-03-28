@@ -84,6 +84,7 @@ void CreateProtogen()
 
 void CreatePhysEntity( const std::string& path )
 {
+#if BULLET_PHYSICS
 	Entity physEnt = entities->CreateEntity();
 
 	Model* model = graphics->LoadModel( path );
@@ -92,7 +93,6 @@ void CreatePhysEntity( const std::string& path )
 	Transform transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 	transform.aAng = {};
 	transform.aScale = {1, 1, 1};
-
 	PhysicsObjectInfo physInfo( ShapeType::Convex );
 
 	for ( auto &mesh : model->aMeshes )
@@ -124,6 +124,7 @@ void CreatePhysEntity( const std::string& path )
 	model->SetPos( transform.aPos );
 
 	g_otherEnts.push_back( physEnt );
+#endif
 }
 
 

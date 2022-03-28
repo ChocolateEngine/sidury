@@ -67,8 +67,8 @@ CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
 
 CONVAR( cl_smooth_land, 1 );
-CONVAR( cl_smooth_land_lerp, 30 );  // 0.015 // 150?
-CONVAR( cl_smooth_land_scale, 0.25 );  // 600
+CONVAR( cl_smooth_land_lerp, 0.025 );  // 0.015 // 150?
+CONVAR( cl_smooth_land_scale, 500 );  // 600
 CONVAR( cl_smooth_land_up_scale, 50 );
 CONVAR( cl_smooth_land_view_scale, 0.05 );
 CONVAR( cl_smooth_land_view_offset, 0.5 );
@@ -76,7 +76,7 @@ CONVAR( cl_smooth_land_view_offset, 0.5 );
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
 #if !BULLET_PHYSICS
-CONVAR( velocity_scale, 0.025 );
+CONVAR( velocity_scale, 1 );
 CONVAR( player_model_scale, 1 );
 CONVAR( cl_cam_z, -2.5 );
 #else
@@ -1117,52 +1117,33 @@ void PlayerMovement::WalkMove(  )
 	onGround = IsOnGround();
 }
 
+CONVAR( land_max_speed, 100 );
+CONVAR( land_power, 1.75 );
+CONVAR( land_timevar, 1 );
 
 void PlayerMovement::DoSmoothLand( bool wasOnGround )
 {
-	static glm::vec3 prevViewHeight = {};
-	static glm::vec3 fallViewOffset = {};
+	static float landLerp = 0.f, landTime = 0.f;
 
-	static float duckLerp = apRigidBody->aVel[W_UP] * velocity_scale;
-	static float prevDuckLerp = apRigidBody->aVel[W_UP] * velocity_scale;
+    if ( cl_smooth_land )
+    {
+        // NOTE: this doesn't work properly when jumping mid duck and landing
+        // meh, works well enough with the current values for now
+        if ( IsOnGround() && !wasOnGround )
+        {
+            landLerp = std::clamp( pow( abs( apRigidBody->aVel[W_UP] * cl_smooth_land_lerp ), land_power ), 0.f, land_max_speed.GetFloat() );
+            landTime = 0.f;
+        }
 
-	float landLerp = cl_smooth_land_lerp * game->aFrameTime;
-	// float landScale = cl_smooth_land_scale * velocity_scale * game->aFrameTime;
-	float landScale = cl_smooth_land_scale * velocity_scale * game->aFrameTime;
-	float landUpScale = cl_smooth_land_up_scale * velocity_scale;
-
-	float viewHeightScale = glm::log( apMove->aPrevViewHeight * cl_smooth_land_view_scale + cl_smooth_land_view_offset );
-
-	//game->apGui->DebugMessage(16, "smooth land view thing: %.4f", bruh );
-
-	landScale *= viewHeightScale;
-
-	if ( cl_smooth_land )
-	{
-		// NOTE: this doesn't work properly when jumping mid duck and landing
-		// meh, works well enough with the current values for now
-		if ( IsOnGround() && !wasOnGround )
-		{
-			duckLerp = apRigidBody->aVel[W_UP] * velocity_scale;
-			prevDuckLerp = duckLerp;
-		}
-
-		// duckLerp = glm::lerp( prevDuckLerp, {0, 0, 0}, GetLandingLerp() );
-		// duckLerp = glm::lerp( prevDuckLerp, -prevViewHeight, GetLandingLerp() );
-		// acts like a trampoline, hmm
-		duckLerp = std::lerp( prevDuckLerp, (-prevViewHeight[W_UP]) * landUpScale, landLerp );
-
-		fallViewOffset[W_UP] += duckLerp * landScale;
-		prevDuckLerp = duckLerp;
-	}
-	else
-	{
-		// lerp it back to 0 just in case
-		fallViewOffset = glm::lerp( fallViewOffset, {0, 0, 0}, landLerp );
-	}
-
-	prevViewHeight = fallViewOffset;
-	apCamera->aTransform.aPos += fallViewOffset;
+        apCamera->aTransform.aPos[W_UP] += -landLerp * sin( landTime / landLerp / 2 ) / exp( landTime / landLerp );
+        gui->DebugMessage( "How Low Can You Go? %f (%.4f)", landLerp, game->aFrameTime );
+        landTime += cl_smooth_land_scale * game->aFrameTime * land_timevar.GetFloat();
+    }
+    else
+    {
+        landLerp = 0.f;
+        landTime = 0.f;
+    }
 }
 
 
