@@ -2,6 +2,7 @@
 #include "util.h"
 #include "mapmanager.h"
 #include "skybox.h"
+#include "inputsystem.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -51,13 +52,6 @@ CONVAR( phys_player_offset, 40 );
 CONVAR( sv_gravity, 800 );
 CONVAR( ground_pos, 225 );
 
-// hack until i add config file support
-#ifdef _MSC_VER
-CONVAR( in_sensitivity, 0.025 );
-#else
-CONVAR( in_sensitivity, 0.1 );
-#endif
-
 CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
@@ -65,13 +59,6 @@ CONVAR( cl_stepduration, 0.22 );
 CONVAR( cl_view_height, 67 );  // 67
 CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
-
-CONVAR( cl_smooth_land, 1 );
-CONVAR( cl_smooth_land_lerp, 0.025 );  // 0.015 // 150?
-CONVAR( cl_smooth_land_scale, 500 );  // 600
-CONVAR( cl_smooth_land_up_scale, 50 );
-CONVAR( cl_smooth_land_view_scale, 0.05 );
-CONVAR( cl_smooth_land_view_offset, 0.5 );
 
 // multiplies the final velocity by this amount when setting the player position,
 // a workaround for quake movement values not working correctly when lowered
@@ -91,6 +78,15 @@ CONVAR( cl_playermodel_enable, 0 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
 CONVAR( cl_show_player_stats, 0 );
+
+CONVAR( r_fov, 106.f );
+CONVAR( r_nearz, 1.f );
+CONVAR( r_farz, 10000.f );
+
+CONVAR( cl_zoom_fov, 40 );
+CONVAR( cl_zoom_duration, 0.4 );
+
+extern ConVar m_yaw, m_pitch;
 
 constexpr float PLAYER_MASS = 200.f;
 
@@ -150,6 +146,7 @@ void PlayerManager::Init(  )
 {
 	entities->RegisterComponent<CPlayerMoveData>();
 	entities->RegisterComponent<CPlayerInfo>();
+	entities->RegisterComponent<CPlayerZoom>();
 	entities->RegisterComponent<Model*>();
 	entities->RegisterComponent<Model>();
 	//entities->RegisterComponent<PhysicsObject*>();
@@ -169,6 +166,7 @@ Entity PlayerManager::Create(  )
 	Transform& transform = entities->AddComponent< Transform >( player );
 	entities->AddComponent< CCamera >( player );
 	entities->AddComponent< CDirection >( player );
+	entities->AddComponent< CPlayerZoom >( player );
 
 	//Model* model = new Model;
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
@@ -224,12 +222,16 @@ void PlayerManager::Respawn( Entity player )
 	auto& rigidBody = GetRigidBody( player );
 	auto& transform = GetTransform( player );
 	auto& camTransform = GetCamera( player ).aTransform;
+	auto& zoom = GetPlayerZoom( player );
 
 	transform.aPos = mapmanager->GetSpawnPos();
 	transform.aAng = {0, mapmanager->GetSpawnAng().y, 0};
 	camTransform.aAng = mapmanager->GetSpawnAng();
 	rigidBody.aVel = {0, 0, 0};
 	rigidBody.aAccel = {0, 0, 0};
+
+	zoom.aOrigFov = r_fov;
+	zoom.aNewFov = r_fov;
 
 	apMove->OnPlayerRespawn( player );
 }
@@ -283,14 +285,114 @@ void PlayerManager::DoMouseLook( Entity player )
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 
-	const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(input->GetMouseDelta());
+	// const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(input->GetMouseDelta());
+	const glm::vec2 mouse = gameinput.GetMouseDelta();
 
 	// transform.aAng[PITCH] = -mouse.y;
-	camera.aTransform.aAng[PITCH] += mouse.y;
-	camera.aTransform.aAng[YAW] += mouse.x;
-	transform.aAng[YAW] += mouse.x;
+	camera.aTransform.aAng[PITCH] += mouse.y * m_pitch;
+	camera.aTransform.aAng[YAW] += mouse.x * m_yaw;
+	transform.aAng[YAW] += mouse.x * m_yaw;
 
 	ClampAngles( transform, camera );
+}
+
+
+float Lerp_GetDuration( float max, float min, float current )
+{
+	return (current - min) / (max - min);
+}
+
+float Lerp_GetDuration( float max, float min, float current, float mult )
+{
+	return ((current - min) / (max - min)) * mult;
+}
+
+// inverted version of it
+float Lerp_GetDurationIn( float max, float min, float current )
+{
+	return 1 - ((current - min) / (max - min));
+}
+
+float Lerp_GetDurationIn( float max, float min, float current, float mult )
+{
+	return (1 - ((current - min) / (max - min))) * mult;
+}
+
+
+float Math_EaseOutExpo( float x )
+{
+	return x == 1 ? 1 : 1 - pow( 2, -10 * x );
+}
+
+float Math_EaseOutQuart( float x )
+{
+	return 1 - pow( 1 - x, 4 );
+}
+
+
+void CalcZoom( CCamera& camera, Entity player )
+{
+	auto& zoom = GetPlayerZoom( player );
+
+	if ( zoom.aOrigFov != r_fov )
+	{
+		zoom.aZoomTime = 0.f;  // idk lol
+		zoom.aOrigFov = r_fov;
+	}
+
+	if ( game->aPaused )
+	{
+		camera.aFov = zoom.aNewFov;
+		return;
+	}
+
+	float lerpTarget = 0.f;
+
+	if ( KEY_PRESSED( SDL_SCANCODE_Z ) )
+	{
+		if ( KEY_JUST_PRESSED( SDL_SCANCODE_Z ) )
+		{
+			zoom.aZoomChangeFov = camera.aFov;
+			
+			// scale duration by how far zoomed in we are compared to the target zoom level
+			zoom.aZoomDuration = Lerp_GetDurationIn( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
+			zoom.aZoomTime = 0.f;
+		}
+
+		lerpTarget = cl_zoom_fov;
+	}
+	else
+	{
+		if ( KEY_JUST_RELEASED( SDL_SCANCODE_Z ) )
+		{
+			zoom.aZoomChangeFov = camera.aFov;
+
+			// scale duration by how far zoomed in we are compared to the target zoom level
+			zoom.aZoomDuration = Lerp_GetDuration( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
+			zoom.aZoomTime = 0.f;
+		}
+
+		lerpTarget = zoom.aOrigFov;
+	}
+
+	zoom.aZoomTime += game->aFrameTime;
+
+	if ( zoom.aZoomDuration >= zoom.aZoomTime )
+	{
+		float time = (zoom.aZoomTime / zoom.aZoomDuration);
+
+		// smooth cosine lerp
+		// float timeCurve = (( cos((zoomLerp * M_PI) - M_PI) ) + 1) * 0.5;
+		float timeCurve = Math_EaseOutQuart( time );
+
+		zoom.aNewFov = std::lerp( zoom.aZoomChangeFov, lerpTarget, timeCurve );
+	}
+
+	// scale mouse delta
+	float fovScale = (zoom.aNewFov / zoom.aOrigFov);
+	gameinput.SetMouseDeltaScale( {fovScale, fovScale} );
+
+	camera.aFov = zoom.aNewFov;
 }
 
 
@@ -300,15 +402,19 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 	auto& dir = GetDirection( player );
+	auto& rigidBody = GetRigidBody( player );
 
 	ClampAngles( transform, camera );
 
 	GetDirectionVectors( transform.ToViewMatrixZ(  ), dir.aForward, dir.aRight, dir.aUp );
 
+	// MOVE ME ELSEWHERE IDK, MAYBE WHEN AN HEV SUIT COMPONENT IS MADE
+	CalcZoom( camera, player );
+
 	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transformView = transform;
 	// transformView.aPos += (camera.aTransform.aPos + glm::vec3(1, 1, cl_view_height_offset)) * velocity_scale.GetFloat();
-	transformView.aPos += camera.aTransform.aPos * velocity_scale.GetFloat();
+	transformView.aPos += camera.aTransform.aPos;
 	transformView.aAng = camera.aTransform.aAng;
 	//Transform transformView = transform;
 	//transformView.aPos += move.aViewOffset * velocity_scale.GetFloat();
@@ -319,6 +425,11 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 		Transform thirdPerson = {};
 		thirdPerson.aPos = {cl_cam_x, cl_cam_y, cl_cam_z};
 
+		if ( info.aIsLocalPlayer )
+		{
+			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
+		}
+
 		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ(  );
 
 		game->SetViewMatrix( viewMat );
@@ -326,6 +437,12 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 	}
 	else
 	{
+		if ( info.aIsLocalPlayer )
+		{
+			// wtf broken??
+			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
+		}
+
 		glm::mat4 viewMat = transformView.ToViewMatrixZ(  );
 
 		game->SetViewMatrix( viewMat );
@@ -334,7 +451,17 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 	if ( info.aIsLocalPlayer )
 	{
-		GetSkybox().aAng = transformView.aAng;
+		// scale the nearz and farz
+		game->aView.Set( 0, 0, game->aView.width, game->aView.height, r_nearz, r_farz, camera.aFov );
+
+		// i feel like there's gonna be a lot more here in the future...
+		GetSkybox().SetAng( transformView.aAng );
+		audio->SetListenerTransform( transformView.aPos, transform.aAng );
+
+#if AUDIO_OPENAL
+		audio->SetListenerVelocity( rigidBody.aVel );
+		audio->SetListenerOrient( camera.aForward, camera.aUp );
+#endif
 	}
 }
 
@@ -366,11 +493,8 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 #endif
 
 	// Init Smooth Duck
-	move.aPrevViewHeight = GetViewHeight();
 	move.aTargetViewHeight = GetViewHeight();
-	move.aDuckLerpGoal = GetViewHeight();
-	move.aDuckLerp = GetViewHeight();
-	move.aPrevDuckLerp = GetViewHeight();
+	move.aOutViewHeight = GetViewHeight();
 }
 
 
@@ -494,22 +618,19 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 	auto& rigidBody = entities->GetComponent< CRigidBody >( player );
 	auto& transform = entities->GetComponent< Transform >( player );
-	auto& camTransform = entities->GetComponent< CCamera >( player ).aTransform;
+	auto& camera = entities->GetComponent< CCamera >( player );
+	auto& camTransform = camera.aTransform;
 
-	glm::vec3 scaledVelocity = rigidBody.aVel * velocity_scale.GetFloat();
-	float scaledSpeed = glm::length( glm::vec2(scaledVelocity.x, scaledVelocity.y) );
 	float speed = glm::length( glm::vec2(rigidBody.aVel.x, rigidBody.aVel.y) );
 
-	gui->DebugMessage( 0, "Player Pos:    %s", Vec2Str(transform.aPos).c_str() );
-	gui->DebugMessage( 1, "Player Ang:    %s", Vec2Str(transform.aAng).c_str() );
-	gui->DebugMessage( 2, "Player Vel:    %s", Vec2Str(scaledVelocity).c_str() );
-	gui->DebugMessage( 3, "Player Speed:  %.4f (%.4f Unscaled)", scaledSpeed, speed );
+	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform.aPos).c_str() );
+	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform.aAng).c_str() );
+	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody.aVel).c_str() );
+	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
-	//gui->DebugMessage( 5, "View Offset:   %.6f (%.6f Unscaled)", move.aViewOffset.z * velocity_scale, move.aViewOffset.z );
-	//gui->DebugMessage( 6, "Ang Offset:    %s", Vec2Str(move.aViewAngOffset).c_str() );
-
-	gui->DebugMessage( 5, "View Pos:      %s", Vec2Str(camTransform.aPos).c_str() );
-	gui->DebugMessage( 6, "View Ang:      %s", Vec2Str(camTransform.aAng).c_str() );
+	gui->DebugMessage( "Camera FOV:    %.4f", camera.aFov );
+	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.aPos).c_str() );
+	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.aAng).c_str() );
 }
 
 
@@ -559,46 +680,51 @@ void PlayerMovement::UpdateInputs(  )
 	const float sideSpeed = side_speed * moveScale;
 	apMove->aMaxSpeed = max_speed * moveScale;
 
-	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() ) apRigidBody->aAccel[W_FORWARD] = forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_S) || in_forward == -1.f ) apRigidBody->aAccel[W_FORWARD] += -forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_A) || in_side == -1.f ) apRigidBody->aAccel[W_RIGHT] = -sideSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_D) || in_side.GetBool() ) apRigidBody->aAccel[W_RIGHT] += sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() )  apRigidBody->aAccel[W_FORWARD] = forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_S) || in_forward == -1.f )    apRigidBody->aAccel[W_FORWARD] += -forwardSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_A) || in_side == -1.f )       apRigidBody->aAccel[W_RIGHT] = -sideSpeed;
+	if ( KEY_PRESSED(SDL_SCANCODE_D) || in_side.GetBool() )     apRigidBody->aAccel[W_RIGHT] += sideSpeed;
 
-	// HACK:
-	// why is this so complicated???
+	// kind of a hack
+	// this feels really stupid
 	static bool wasJumpButtonPressed = false;
 	bool jump = KEY_PRESSED(SDL_SCANCODE_SPACE) || in_jump;
 
-	static bool jumped = false;
-
-	if ( jump && IsOnGround() && !wasJumpButtonPressed )
+	if ( CalcOnGround() )
 	{
-#if BULLET_PHYSICS
-		// apPhysObj->ApplyImpulse( {0, 0, jump_force} );
-#endif
-		apRigidBody->aVel[W_UP] = jump_force;
-		jumped = true;
+		if ( jump && !wasJumpButtonPressed )
+		{
+			apRigidBody->aVel[W_UP] = jump_force;
+			wasJumpButtonPressed = true;
+			// LogMsg( "New Velocity After Jumping: %s", Vec2Str( apRigidBody->aVel ).c_str() );
+		}
 	}
 	else
 	{
-		jumped = false;
+		wasJumpButtonPressed = false;
 	}
-
-	wasJumpButtonPressed = jumped;
 }
 
 
 void PlayerMovement::UpdatePosition( Entity player )
 {
 #if BULLET_PHYSICS
-	auto& transform = entities->GetComponent< Transform >( player );
+	apMove = &entities->GetComponent< CPlayerMoveData >( player );
+	apTransform = &entities->GetComponent< Transform >( player );
 	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
 
 	//if ( aMoveType == MoveType::Fly )
 		//aTransform = apPhysObj->GetWorldTransform();
 	//transform.aPos = physObj->GetWorldTransform().aPos;
-	transform.aPos = apPhysObj->GetWorldTransform().aPos;
-	transform.aPos.z -= phys_player_offset;
+	apTransform->aPos = apPhysObj->GetWorldTransform().aPos;
+	apTransform->aPos.z -= phys_player_offset;
+
+	// um
+	if ( apMove->aMoveType == PlayerMoveType::Walk )
+	{
+		WalkMovePostPhys();
+	}
+
 #else
 	SetPos( GetPos() + (apRigidBody->aVel * velocity_scale.GetFloat()) * game->aFrameTime );
 
@@ -609,40 +735,54 @@ void PlayerMovement::UpdatePosition( Entity player )
 }
 
 
-void PlayerMovement::DoSmoothDuck(  )
-{
-	float viewHeightLerp = cl_view_height_lerp * game->aFrameTime;
+CONVAR( cl_duck_time, 0.4 );
 
-	// NOTE: this doesn't work properly when jumping mid duck and landing
-	// try and get this to round up a little faster while lerping to the target pos at the same speed?
+
+float Math_EaseInOutCubic( float x )
+{
+	return x < 0.5 ? 4 * x * x * x : 1 - pow( -2 * x + 2, 3 ) / 2;
+}
+
+
+
+// VERY BUGGY STILL
+void PlayerMovement::DoSmoothDuck()
+{
 	if ( IsOnGround() && apMove->aMoveType == PlayerMoveType::Walk )
 	{
 		if ( apMove->aTargetViewHeight != GetViewHeight() )
 		{
-			apMove->aPrevDuckLerp = apMove->aDuckLerp;
-			apMove->aDuckLerp = GetViewHeight();
-			apMove->aDuckLerpGoal = GetViewHeight();
+			apMove->aPrevViewHeight = apMove->aOutViewHeight;
+			apMove->aTargetViewHeight = GetViewHeight();
+			apMove->aDuckTime = 0.f;
+
+			apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight );
+
+			// this is stupid
+			if ( apMove->aTargetViewHeight == cl_view_height.GetFloat() )
+				apMove->aDuckDuration = 1 - apMove->aDuckDuration;
+
+			apMove->aDuckDuration *= cl_duck_time;
 		}
-
-		// duckLerp = glm::lerp( prevDuckLerp, duckLerpGoal, viewHeightLerp );
-		apMove->aDuckLerp = std::lerp( apMove->aPrevDuckLerp, apMove->aDuckLerpGoal, viewHeightLerp );
-		apMove->aPrevDuckLerp = apMove->aDuckLerp;
-
-		//duckLerp.y = Round( duckLerp.y );
-		apMove->aDuckLerp = Round( apMove->aDuckLerp );
-		// floating point inprecision smh my head
-		//aViewOffset = glm::lerp( prevViewHeight, duckLerp, viewHeightLerp );
-		apCamera->aTransform.aPos[W_UP] = std::lerp( apMove->aPrevViewHeight, apMove->aDuckLerp, viewHeightLerp );
-
-		apMove->aTargetViewHeight = GetViewHeight();
 	}
-	else
+	else if ( WasOnGround() )
 	{
-		//aViewOffset = glm::lerp( prevViewHeight, {0, targetViewHeight, 0}, viewHeightLerp );
-		apCamera->aTransform.aPos[W_UP] = std::lerp( apMove->aPrevViewHeight, apMove->aTargetViewHeight, viewHeightLerp );
+		apMove->aPrevViewHeight = apMove->aOutViewHeight;
+		apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
+		apMove->aDuckTime = 0.f;
 	}
 
-	apMove->aPrevViewHeight = apCamera->aTransform.aPos[W_UP];
+	apMove->aDuckTime += game->aFrameTime;
+
+	if ( apMove->aDuckDuration >= apMove->aDuckTime )
+	{
+		float time = (apMove->aDuckTime / apMove->aDuckDuration);
+		float timeCurve = Math_EaseOutQuart( time );
+
+		apMove->aOutViewHeight = std::lerp( apMove->aPrevViewHeight, apMove->aTargetViewHeight, timeCurve );
+	}
+
+	apCamera->aTransform.aPos[W_UP] = apMove->aOutViewHeight;
 }
 
 
@@ -745,8 +885,9 @@ CONVAR( phys_ground_thres, 0.4 );
 CONVAR( phys_ground_dist2, 0 );
 
 
+
 // TODO: improve this
-bool PlayerMovement::IsOnGround(  )
+bool PlayerMovement::CalcOnGround(  )
 {
 #if 1
 #if BULLET_PHYSICS
@@ -842,10 +983,16 @@ bool PlayerMovement::IsOnGround(  )
 }
 
 
+bool PlayerMovement::IsOnGround(  )
+{
+	return apMove->aPlayerFlags & PlyOnGround;
+}
+
 bool PlayerMovement::WasOnGround()
 {
 	return apMove->aPrevPlayerFlags & PlyOnGround;
 }
+
 
 float PlayerMovement::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 {
@@ -1058,7 +1205,9 @@ void PlayerMovement::WalkMove(  )
 	glm::vec3 wishdir(0,0,0);
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	static bool onGround = IsOnGround();
+	// man
+	static bool wasOnGround = IsOnGround();
+	bool onGround = CalcOnGround();
 
 	if ( onGround )
 	{
@@ -1096,7 +1245,7 @@ void PlayerMovement::WalkMove(  )
 
 	if ( IsOnGround() && !onGround )
 	{
-		PlayImpactSound();
+	//	PlayImpactSound();
 
 		//glm::vec2 vel( apRigidBody->aVel.x, apRigidBody->aVel.y );
 		//if ( glm::length( vel ) < cl_land_sound_threshold )
@@ -1105,43 +1254,70 @@ void PlayerMovement::WalkMove(  )
 
 	// something is wrong with this here on bullet
 #if 1 // !BULLET_PHYSICS
-	DoSmoothLand( onGround );
+	DoSmoothLand( wasOnGround );
 #endif
 
 	DoViewBob(  );
 	DoViewTilt(  );
 
-	if ( IsOnGround() )
-		apRigidBody->aVel[W_UP] = 0;
+	// if ( IsOnGround() )
+	//	apRigidBody->aVel[W_UP] = 0;
 
-	onGround = IsOnGround();
+	wasOnGround = IsOnGround();
 }
 
-CONVAR( land_max_speed, 100 );
-CONVAR( land_power, 1.75 );
-CONVAR( land_timevar, 1 );
+
+void PlayerMovement::WalkMovePostPhys(  )
+{
+	bool onGroundPrev = IsOnGround();
+	bool onGround = CalcOnGround();
+
+	// uhhh
+	// apRigidBody->aVel = apPhysObj->GetLinearVelocity();
+
+	if ( onGround && !onGroundPrev )
+		PlayImpactSound();
+
+	if ( onGround )
+		apRigidBody->aVel[W_UP] = 0.f;
+}
+
+
+CONVAR( cl_land_smoothing, 1 );
+CONVAR( cl_land_max_speed, 1000 );
+CONVAR( cl_land_power, 1 ); // 2
+CONVAR( cl_land_vel_scale, 1 ); // 0.01
+CONVAR( cl_land_power_scale, 100 ); // 0.01
+CONVAR( cl_land_timevar, 2 );
 
 void PlayerMovement::DoSmoothLand( bool wasOnGround )
 {
-	static float landLerp = 0.f, landTime = 0.f;
+	static float landPower = 0.f, landTime = 0.f;
 
-    if ( cl_smooth_land )
+    if ( cl_land_smoothing )
     {
         // NOTE: this doesn't work properly when jumping mid duck and landing
         // meh, works well enough with the current values for now
-        if ( IsOnGround() && !wasOnGround )
+        if ( CalcOnGround() && !wasOnGround )
+        // if ( CalcOnGround() && !WasOnGround() )
         {
-            landLerp = std::clamp( pow( abs( apRigidBody->aVel[W_UP] * cl_smooth_land_lerp ), land_power ), 0.f, land_max_speed.GetFloat() );
-            landTime = 0.f;
+			float baseLandVel = abs(apRigidBody->aVel[W_UP] * cl_land_vel_scale.GetFloat()) / cl_land_max_speed.GetFloat();
+			float landVel = std::clamp( baseLandVel * M_PI, 0.0, M_PI );
+
+			landPower = (-cos( landVel ) + 1) / 2;
+
+			landTime = 0.f;
         }
 
-        apCamera->aTransform.aPos[W_UP] += -landLerp * sin( landTime / landLerp / 2 ) / exp( landTime / landLerp );
-        gui->DebugMessage( "How Low Can You Go? %f (%.4f)", landLerp, game->aFrameTime );
-        landTime += cl_smooth_land_scale * game->aFrameTime * land_timevar.GetFloat();
+		landTime += game->aFrameTime * cl_land_timevar;
+
+		if ( landPower > 0.f )
+			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;
+			apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower) / exp(landTime / landPower)) * cl_land_power_scale;
     }
     else
     {
-        landLerp = 0.f;
+		landPower = 0.f;
         landTime = 0.f;
     }
 }
@@ -1156,6 +1332,8 @@ CONVAR( cl_bob_exit_threshold, 0.1 );
 CONVAR( cl_bob_sound_threshold, 0.1 );
 CONVAR( cl_bob_offset, 0.25 );
 CONVAR( cl_bob_time_offset, -0.6 );
+
+CONVAR( cl_bob_debug, 0 );
 
 
 // TODO: doesn't smoothly transition out of viewbob still
@@ -1220,10 +1398,13 @@ void PlayerMovement::DoViewBob(  )
 	}
 
 	apCamera->aTransform.aPos[W_UP] += apMove->aBobOffsetAmount;
-
-	gui->DebugMessage( 8,  "Walk Time * Speed:  %.8f", apMove->aWalkTime );
-	gui->DebugMessage( 9,  "View Bob Offset:    %.4f", apMove->aBobOffsetAmount );
-	gui->DebugMessage( 10, "View Bob Speed:     %.6f", speedFactor );
+	
+	if ( cl_bob_debug )
+	{
+		gui->DebugMessage( "Walk Time * Speed:  %.8f", apMove->aWalkTime );
+		gui->DebugMessage( "View Bob Offset:    %.4f", apMove->aBobOffsetAmount );
+		gui->DebugMessage( "View Bob Speed:     %.6f", speedFactor );
+	}
 }
 
 

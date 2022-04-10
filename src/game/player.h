@@ -53,9 +53,9 @@ struct CPlayerMoveData
 	// Smooth Duck
 	float aPrevViewHeight = 0.f;
 	float aTargetViewHeight = 0.f;
-	float aDuckLerpGoal = 0.f;
-	float aDuckLerp = 0.f;
-	float aPrevDuckLerp = 0.f;
+	float aOutViewHeight = 0.f;
+	float aDuckDuration = 0.f;
+	float aDuckTime = 0.f;
 
 	// Step Sound
 	double aLastStepTime = 0.f;
@@ -65,6 +65,21 @@ struct CPlayerMoveData
 
 	std::vector< Handle > aStepSounds;
 	std::vector< Handle > aImpactSounds;
+};
+
+
+struct CPlayerZoom
+{
+	float aOrigFov{};
+	float aNewFov{};
+	float aZoomChangeFov{};
+	float aZoomTime{};
+	float aZoomDuration{};
+};
+
+
+struct CSensitivityScale
+{
 };
 
 
@@ -113,6 +128,7 @@ public:
 	void                    PlayImpactSound(  );
 	void                    StopImpactSound(  );  // Temp Hack for sound system
 
+	bool                    CalcOnGround(  );
 	bool                    IsOnGround(  );
 	bool                    WasOnGround(  );
 	void                    DoRayCollision(  );
@@ -127,6 +143,8 @@ public:
 	void                    NoClipMove(  );
 	void                    FlyMove(  );
 	void                    WalkMove(  );
+
+	void                    WalkMovePostPhys(  );  // um
 
 	void                    DoSmoothDuck(  );
 	void                    DoSmoothLand( bool wasOnGround );
@@ -183,6 +201,7 @@ public:
 
 // convinence
 inline auto& GetPlayerMoveData( Entity ent )	    { return entities->GetComponent< CPlayerMoveData >( ent ); }
+inline auto& GetPlayerZoom( Entity ent )            { return entities->GetComponent< CPlayerZoom >( ent ); }
 inline auto& GetPlayerInfo( Entity ent )            { return entities->GetComponent< CPlayerInfo >( ent ); }
 inline auto& GetTransform( Entity ent )             { return entities->GetComponent< Transform >( ent ); }
 inline auto& GetCamera( Entity ent )                { return entities->GetComponent< CCamera >( ent ); }

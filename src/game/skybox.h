@@ -18,8 +18,7 @@ public:
 	void                    Init();
 	void                    SetSkybox( const std::string& path );
 	void                    Draw();
-
-	glm::vec3               aAng{};
+	void                    SetAng( const glm::vec3& ang );
 
 private:
 

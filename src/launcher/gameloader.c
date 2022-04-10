@@ -37,6 +37,7 @@ int main( int argc, char *argv[] )
 {
 	void ( *game_init )() = 0;
 	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
+	void ( *core_exit )() = 0;
 
 	if ( load_object( &core, "bin/core" EXT_DLL ) == -1 )
 		return -1;
@@ -47,6 +48,14 @@ int main( int argc, char *argv[] )
 
 	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
 	if ( !core_init )
+	{
+		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
+		unload_objects();
+		return -1;
+	}
+
+	*( void** )( &core_exit ) = SDL_LoadFunction( core, "core_exit" );
+	if ( !core_exit )
 	{
 		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
 		unload_objects();
@@ -64,6 +73,7 @@ int main( int argc, char *argv[] )
 	}
 
 	game_init();
+	core_exit();
 	unload_objects();
 
 	return 0;

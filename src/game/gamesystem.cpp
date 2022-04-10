@@ -1,5 +1,6 @@
 #include "gamesystem.h"
 #include "core/systemmanager.h"
+#include "core/asserts.h"
 #include "util.h"
 #include "physics.h"
 #include "player.h"
@@ -7,6 +8,9 @@
 #include "terrain/terrain.h"
 #include "graphics/sprite.h"
 #include "mapmanager.h"
+#include "inputsystem.h"
+#include "skybox.h"
+
 #include <algorithm>
 
 #include "core/profiler.h"
@@ -29,10 +33,7 @@ void CenterMouseOnScreen(  )
 	SDL_WarpMouseInWindow( graphics->GetWindow(), w/2, h/2 );
 }
 
-
-CONVAR( r_fov, 100.f );
-CONVAR( r_nearz, 1.f );
-CONVAR( r_farz, 10000.f );
+extern ConVar r_nearz, r_farz, r_fov;
 
 CONVAR( phys_rot_x, 90 );
 CONVAR( phys_rot_y, 0 );
@@ -196,12 +197,19 @@ GameSystem::~GameSystem(  )
 }
 
 
+Handle hAudioMusic = InvalidHandle;
+
+
 void GameSystem::Init(  )
 {
 	LoadModules(  );
 	RegisterKeys(  );
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
+
+#if AUDIO_OPENAL
+	hAudioMusic = audio->RegisterChannel( "Music" );
+#endif
 
 	entities = new EntityManager;
 	entities->Init();
@@ -243,7 +251,11 @@ void GameSystem::RegisterKeys(  )
 	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
+	input->RegisterKey( SDL_SCANCODE_Z ); // zoom button
+
 	//input->RegisterKey( SDL_SCANCODE_G ); // create a sprite
+
+	gameinput.Init();
 }
 
 
@@ -299,67 +311,9 @@ void GameSystem::Update( float frameTime )
 }
 
 
-void GameSystem::GameUpdate( float frameTime )
+#if BULLET_PHYSICS
+void EntUpdate()
 {
-	// move to engine?
-	aFrameTime = frameTime * en_timescale;
-
-	// scale the nearz and farz
-	aView.Set( 0, 0, aView.width, aView.height, r_nearz * velocity_scale, r_farz * velocity_scale, r_fov );
-
-	HandleSystemEvents();
-
-	CheckPaused(  );
-
-	if ( aPaused )
-	{
-		//ResetInputs(  );
-		//players->Update( 0.f );
-		//return;
-		aFrameTime = 0.f;
-	}
-
-	aCurTime += aFrameTime;
-
-#if 0
-	materialsystem->AddRenderable( g_world->mdl );
-
-#if BULLET_PHYSICS
-
-	for ( auto &physObj : g_world->physObj )
-	{
-		physObj->SetContinuousCollisionEnabled( true );
-
-		// uhhhhh
-		Transform worldTransform = g_world->mdl->GetTransform();
-		worldTransform.aAng = {phys_rot_x, phys_rot_y, phys_rot_z};
-		worldTransform.aAng = glm::radians( worldTransform.aAng );
-
-		// glm::vec3 ang = glm::radians( g_world->mdl->GetModelData().GetTransform().aAng );
-		// worldTransform.aAng = {ang.z, ang.y, ang.x};
-
-		physObj->SetWorldTransform( worldTransform );
-		//physObj->SetAngularFactor( {0, 0, 0} );
-	}
-#endif
-#endif
-
-	mapmanager->Update();
-
-	// WORLD GLOBAL AXIS
-	if ( dbg_global_axis )
-	{
-		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size, 0, 0}, {1, 0, 0} );
-		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size, 0}, {0, 1, 0} );
-		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size}, {0, 0, 1} );
-	}
-
-	//voxelworld->Update( frameTime );
-	players->Update( aFrameTime );
-
-#if BULLET_PHYSICS
-	physenv->Simulate(  );
-
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
@@ -382,12 +336,51 @@ void GameSystem::GameUpdate( float frameTime )
 			transform.aAng = phys->GetWorldTransform().aAng;
 
 			model->SetTransform( transform );
-
-			gui->DebugMessage( 13, "Phys Obj Ang: %s", Vec2Str( transform.aAng ).c_str() );
 		}
 
 		materialsystem->AddRenderable( model );
 	}
+}
+#endif
+
+
+void GameSystem::GameUpdate( float frameTime )
+{
+	// move to engine?
+	aFrameTime = frameTime * en_timescale;
+
+	HandleSystemEvents();
+
+	gameinput.Update();
+
+	CheckPaused();
+
+	if ( aPaused )
+	{
+		//ResetInputs(  );
+		//players->Update( 0.f );
+		//return;
+		aFrameTime = 0.f;
+	}
+
+	aCurTime += aFrameTime;
+
+	mapmanager->Update();
+
+	// WORLD GLOBAL AXIS
+	if ( dbg_global_axis )
+	{
+		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size, 0, 0}, {1, 0, 0} );
+		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size, 0}, {0, 1, 0} );
+		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size}, {0, 0, 1} );
+	}
+
+	players->Update( aFrameTime );
+
+#if BULLET_PHYSICS
+	physenv->Simulate();
+
+	EntUpdate();
 
 	// stupid
 	for (auto& player: players->aPlayerList)
@@ -400,18 +393,18 @@ void GameSystem::GameUpdate( float frameTime )
 
 	SetupModels( frameTime );
 
-	ResetInputs(  );
+	ResetInputs();
 
-	UpdateAudio(  );
+	UpdateAudio();
 
 	if ( input->WindowHasFocus() && !aPaused )
 	{
-		CenterMouseOnScreen(  );
+		CenterMouseOnScreen();
 	}
 }
 
 
-void GameSystem::CheckPaused(  )
+void GameSystem::CheckPaused()
 {
 	bool wasPaused = aPaused;
 	aPaused = gui->IsConsoleShown();
@@ -429,23 +422,13 @@ void GameSystem::CheckPaused(  )
 	audio->SetPaused( aPaused );
 }
 
-CONVAR( proto_x,  550 );
-CONVAR( proto_y,  240 );
-CONVAR( proto_z, -360 );
-
-CONVAR( proto_spin_p, 0 );
-CONVAR( proto_spin_y, 90 );
-CONVAR( proto_spin_r, 0 );
-
-CONVAR( proto_look, 1 );
-
 
 // from vkquake
 glm::vec3 VectorToAngles( const glm::vec3& forward )
 {
 	glm::vec3 angles;
 
-	if (forward.x == 0 && forward.y == 0)
+	if (forward.x == 0.f && forward.y == 0.f )
 	{
 		// either vertically up or down
 		angles[PITCH] = (forward.z > 0) ? -90 : 90;
@@ -538,25 +521,12 @@ void AngleToVectors( const glm::vec3& angles, glm::vec3& forward, glm::vec3& rig
 
 extern ConVar cl_view_height;
 
+CONVAR( proto_look, 1 );
+
 
 // will be used in the future for when updating bones and stuff
 void GameSystem::SetupModels( float frameTime )
 {
-#if 0
-	if ( g_proto && g_proto->mdl )
-	{
-		/*g_proto->mdl->GetModelData().aTransform.aPos = {
-			proto_x * velocity_scale,
-			proto_y * velocity_scale,
-			proto_z * velocity_scale
-		};*/
-		
-		g_proto->mdl->GetModelData().aTransform.aAng[PITCH] += proto_spin_p * aFrameTime;
-		g_proto->mdl->GetModelData().aTransform.aAng[YAW]   += proto_spin_y * aFrameTime;
-		g_proto->mdl->GetModelData().aTransform.aAng[ROLL]  += proto_spin_r * aFrameTime;
-	}
-#endif
-
 	if ( !aPaused )
 	{
 		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
@@ -620,6 +590,20 @@ void GameSystem::ResetInputs(  )
 
 CONVAR( snd_test_vol, 0.25 );
 
+#if AUDIO_OPENAL
+// idk what these values should really be tbh
+// will require a lot of fine tuning tbh
+CONVAR_CMD( snd_doppler_scale, 0.2 )
+{
+	audio->SetDopplerScale( snd_doppler_scale );
+}
+
+CONVAR_CMD( snd_sound_speed, 6000 )
+{
+	audio->SetSoundSpeed( snd_sound_speed );
+}
+#endif
+
 
 void GameSystem::UpdateAudio(  )
 {
@@ -643,7 +627,7 @@ void GameSystem::UpdateAudio(  )
 
 	if ( input->KeyJustPressed( SDL_SCANCODE_G ) )
 	{
-		Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion2.ogg" ) );
+		Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion_mono.ogg" ) );
 
 		/*if ( audio->IsValid( stream ) )
 		{
@@ -658,12 +642,14 @@ void GameSystem::UpdateAudio(  )
 		//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )  
 		{
 			audio->SetVolume( stream, snd_test_vol );
-			audio->SetWorldPos( stream, transform.aPos );  // play it where the player currently is
-			audio->SetLoop( stream, true );
 
-#if AUDIO2
-			audio->SetEffects( stream, AudioEffect_World );
+#if AUDIO_OPENAL
+			audio->AddEffect( stream, AudioEffect_Loop );  // on by default
 #endif
+
+			// play it where the player currently is
+			// audio->AddEffect( stream, AudioEffect_World );
+			// audio->SetEffectData( stream, Audio_World_Pos, transform.aPos );
 
 			audio->PlaySound( stream );
 
@@ -684,8 +670,6 @@ void GameSystem::UpdateAudio(  )
 			audio->SetVolume( stream, snd_test_vol );
 		}
 	}
-
-	audio->SetListenerTransform( transform.aPos, transform.aAng );
 }
 
 

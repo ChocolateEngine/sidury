@@ -153,15 +153,15 @@ public:
 	template<typename T>
 	void RegisterComponent()
 	{
-		const char* typeName = typeid(T).name();
+		size_t typeHash = typeid(T).hash_code();
 
-		assert(aComponentTypes.find(typeName) == aComponentTypes.end() && "Registering component type more than once.");
+		assert(aComponentTypes.find(typeHash) == aComponentTypes.end() && "Registering component type more than once.");
 
 		// Add this component type to the component type map
-		aComponentTypes.insert({typeName, aNextComponentType});
+		aComponentTypes.insert({typeHash, aNextComponentType});
 
 		// Create a ComponentArray pointer and add it to the component arrays map
-		aComponentArrays.insert({typeName, new ComponentArray<T>});
+		aComponentArrays.insert({typeHash, new ComponentArray<T>});
 
 		// Increment the value so that the next component registered will be different
 		++aNextComponentType;
@@ -170,12 +170,12 @@ public:
 	template<typename T>
 	ComponentType GetComponentType()
 	{
-		const char* typeName = typeid(T).name();
+		size_t typeHash = typeid(T).hash_code();
 
-		assert(aComponentTypes.find(typeName) != aComponentTypes.end() && "Component not registered before use.");
+		assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
 
 		// Return this component's type - used for creating signatures
-		return aComponentTypes[typeName];
+		return aComponentTypes[typeHash];
 	}
 
 	template<typename T>
@@ -245,25 +245,25 @@ public:
 	template<typename T>
 	T* RegisterSystem()
 	{
-		const char* typeName = typeid(T).name();
+		size_t typeHash = typeid(T).hash_code();
 
-		assert(aSystems.find(typeName) == aSystems.end() && "Registering system more than once.");
+		assert(aSystems.find(typeHash) == aSystems.end() && "Registering system more than once.");
 
 		// Create a pointer to the system and return it so it can be used externally
 		auto system = new T;
-		aSystems.insert({typeName, system});
+		aSystems.insert({typeHash, system});
 		return system;
 	}
 
 	template<typename T>
 	void SetSystemSignature( Signature signature )
 	{
-		const char* typeName = typeid(T).name();
+		size_t typeHash = typeid(T).hash_code();
 
-		assert(aSystems.find(typeName) != aSystems.end() && "System used before registered.");
+		assert(aSystems.find(typeHash) != aSystems.end() && "System used before registered.");
 
 		// Set the signature for this system
-		aSystemSignatures.insert({typeName, signature});
+		aSystemSignatures.insert({typeHash, signature});
 	}
 
 private:
@@ -277,11 +277,11 @@ private:
 	Entity aEntityCount = 0;
 
 private:
-	// Map from type string pointer to a component type
-	std::unordered_map<const char*, ComponentType> aComponentTypes{};
+	// Map from type hash value to a component type
+	std::unordered_map<size_t, ComponentType> aComponentTypes{};
 
-	// Map from type string pointer to a component array
-	std::unordered_map<const char*, IComponentArray*> aComponentArrays{};
+	// Map from type hash value to a component array
+	std::unordered_map<size_t, IComponentArray*> aComponentArrays{};
 
 	// The component type to be assigned to the next registered component - starting at 0
 	ComponentType aNextComponentType = 0;
@@ -290,19 +290,19 @@ private:
 	template<typename T>
 	ComponentArray<T>* GetComponentArray()
 	{
-		const char* typeName = typeid(T).name();
+		size_t typeHash = typeid(T).hash_code();
 
-		assert(aComponentTypes.find(typeName) != aComponentTypes.end() && "Component not registered before use.");
+		assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
 
-		return (ComponentArray<T>*)aComponentArrays[typeName];
+		return (ComponentArray<T>*)aComponentArrays[typeHash];
 	}
 
 private:
 	// Map from system type string pointer to a signature
-	std::unordered_map<const char*, Signature> aSystemSignatures{};
+	std::unordered_map<size_t, Signature> aSystemSignatures{};
 
 	// Map from system type string pointer to a system pointer
-	std::unordered_map<const char*, System*> aSystems{};
+	std::unordered_map<size_t, System*> aSystems{};
 };
 
 
@@ -351,6 +351,7 @@ struct CDirection
 struct CCamera: public CDirection
 {
 	TransformSmall aTransform = {};
+	float          aFov = 90.f;
 };
 
 

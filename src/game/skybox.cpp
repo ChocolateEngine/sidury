@@ -10,6 +10,7 @@ extern IMaterialSystem* materialsystem;
 
 
 CONVAR( g_skybox, 1 );
+CONVAR( g_skybox_ang_freeze, 0 );
 
 
 Skybox& GetSkybox()
@@ -20,6 +21,7 @@ Skybox& GetSkybox()
 
 
 constexpr float SKYBOX_SCALE = 100.0f;
+constexpr glm::vec3 vec3_zero( 0, 0, 0 );
 
 
 void Skybox::Init()
@@ -36,7 +38,7 @@ void Skybox::Init()
 
 	auto CreateVert = [&]( const glm::vec3& pos )
 	{
-		vert.pos = (pos * SKYBOX_SCALE);
+		vert.pos = pos * SKYBOX_SCALE;
 
 		auto iterSavedIndex = vertIndexes.find(vert);
 
@@ -108,19 +110,21 @@ void Skybox::SetSkybox( const std::string &path )
 	}
 
 	aValid = path != "";
+
+	GetMaterial()->SetVar( "ang", vec3_zero );
 }
 
 
-CONVAR( g_skybox_ang_freeze, 0 );
+void Skybox::SetAng( const glm::vec3& ang )
+{
+	if ( !g_skybox_ang_freeze && GetMaterial() )
+		GetMaterial()->SetVar( "ang", ang );
+}
 
 
 void Skybox::Draw()
 {
 	if ( aValid && g_skybox )
 		materialsystem->AddRenderable( this );
-
-	// TESTING
-	if ( !g_skybox_ang_freeze && GetMaterial() )
-		GetMaterial()->SetVar( "ang", aAng );
 }
 
