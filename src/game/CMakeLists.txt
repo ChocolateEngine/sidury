@@ -33,13 +33,18 @@ set_target_properties(
 	LIBRARY_OUTPUT_NAME client
 
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
-	RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin
-	RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}/sidury/bin
-
 	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
-	LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CH_BUILD}/sidury/bin
-	LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CH_BUILD}/sidury/bin
 )
+
+# set output directories for all builds (Debug, Release, etc.)
+foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set_target_properties(
+    	SiduryClient PROPERTIES
+    	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin
+    	LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin
+    )
+endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 target_precompile_headers( SiduryClient PRIVATE "${CH_PUBLIC}/core/core.h" )
 

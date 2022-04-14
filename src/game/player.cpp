@@ -422,8 +422,11 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 	if ( cl_thirdperson.GetBool() )
 	{
-		Transform thirdPerson = {};
-		thirdPerson.aPos = {cl_cam_x, cl_cam_y, cl_cam_z};
+		Transform thirdPerson = {
+			.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()}
+		};
+
+		// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
 
 		if ( info.aIsLocalPlayer )
 		{
@@ -476,7 +479,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	SetMoveType( move, PlayerMoveType::Walk );
 
 	auto& camera = entities->GetComponent< CCamera >( player );
-	camera.aTransform.aPos = {0, 0, cl_view_height};
+	camera.aTransform.aPos = {0, 0, cl_view_height.GetFloat()};
 }
 
 

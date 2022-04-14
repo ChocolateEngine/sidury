@@ -1,14 +1,13 @@
 #include "../../src/game/gamesystem.h"
-/* Horrendous.  */
-#include "../src/engine/engine.h"
 
 #include "core/profiler.h"
+#include "ch_iengine.h"
 
 #include <vector>
 #include <functional>
 
 GameSystem *gamesystem = new GameSystem;
-Engine     *engine     = 0;
+Ch_IEngine *engine     = 0;
 
 CONVAR( en_max_frametime, 0.1 );
 CONVAR( en_timescale, 1 );
@@ -22,7 +21,7 @@ extern "C"
 			sys_wait_for_debugger();
 
 		Module pHandle;
-		Engine *( *cengine_get )() = 0;
+		Ch_IEngine *( *cengine_get )() = 0;
 
 		std::string path = filesys->FindFile( "engine" EXT_DLL );
 
@@ -45,14 +44,22 @@ extern "C"
 		}
 
 		engine = cengine_get();
-		engine->Init();
+
+		// Load Modules and Initialize them in this order
+		engine->Init({
+			"input",
+			"graphics",
+			"aduio",
+			"ch_physics",
+		});
+
 		gamesystem->Init();
 
 		console->QueueCommandSilent( "exec ongameload", false );
 
 		auto startTime = std::chrono::high_resolution_clock::now();
 
-		while ( engine->aActive )
+		while ( engine->IsActive() )
 		{
 			// ZoneScoped
 			PROF_SCOPE();

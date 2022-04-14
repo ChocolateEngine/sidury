@@ -77,7 +77,7 @@ void CreateProtogen()
 	auto transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
 	model->SetPos( transform.aPos );
-	model->SetScale( {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale} );
+	model->SetScale( {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()} );
 
 	g_protos.push_back( proto );
 }
@@ -370,15 +370,15 @@ void GameSystem::GameUpdate( float frameTime )
 	// WORLD GLOBAL AXIS
 	if ( dbg_global_axis )
 	{
-		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size, 0, 0}, {1, 0, 0} );
-		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size, 0}, {0, 1, 0} );
-		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size}, {0, 0, 1} );
+		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size.GetFloat(), 0, 0}, {1, 0, 0});
+		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size.GetFloat(), 0}, {0, 1, 0} );
+		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
 	}
 
 	players->Update( aFrameTime );
 
 #if BULLET_PHYSICS
-	physenv->Simulate();
+	physenv->Simulate( aFrameTime );
 
 	EntUpdate();
 
@@ -542,6 +542,9 @@ void GameSystem::SetupModels( float frameTime )
 	//transform.aPos += camTransform.aPos;
 	//transform.aAng += camTransform.aAng;
 
+	// ?????
+	float protoScale = vrcmdl_scale;
+
 	for ( auto& proto: g_protos )
 	{
 		auto model = entities->GetComponent< Model* >( proto );
@@ -567,7 +570,8 @@ void GameSystem::SetupModels( float frameTime )
 			//protoTransform.aAng[ROLL] = 90.f;
 		}
 
-		protoTransform.aScale = {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale};
+		// protoTransform.aScale = {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale};
+		protoTransform.aScale = {protoScale, protoScale, protoScale};
 		// model.SetTransform( protoTransform );
 
 		materialsystem->AddRenderable( model );
@@ -578,7 +582,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	if ( g_streamModel )
 	{
-		g_streamModel->SetScale( {snd_cube_scale, snd_cube_scale, snd_cube_scale} );
+		g_streamModel->SetScale( {snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat()} );
 	}
 }
 
