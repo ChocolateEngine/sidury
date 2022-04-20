@@ -17,8 +17,8 @@ file(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-#include( ${CH_ROOT}/scripts/joltphysics.cmake )
-include( ${CH_ROOT}/scripts/bullet.cmake )
+# include( ${CH_ROOT}/scripts/joltphysics.cmake )
+# include( ${CH_ROOT}/scripts/bullet.cmake )
 include( ${CH_ROOT}/scripts/vulkan.cmake )
 
 link_libraries( Core )

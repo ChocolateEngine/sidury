@@ -2,7 +2,7 @@
 #include "core/systemmanager.h"
 #include "core/asserts.h"
 #include "util.h"
-#include "physics.h"
+#include "game_physics.h"
 #include "player.h"
 #include "entity.h"
 #include "terrain/terrain.h"
@@ -53,7 +53,7 @@ struct ModelPhysTest
 {
 	Model* mdl;
 #if BULLET_PHYSICS
-	std::vector<PhysicsObject*> physObj;
+	std::vector<IPhysicsObject*> physObj;
 #else
 	int* physObj;
 #endif
@@ -85,47 +85,38 @@ void CreateProtogen()
 
 void CreatePhysEntity( const std::string& path )
 {
-#if BULLET_PHYSICS
 	Entity physEnt = entities->CreateEntity();
 
 	Model* model = graphics->LoadModel( path );
 	entities->AddComponent< Model* >( physEnt, model );
 
-	Transform transform = entities->GetComponent< Transform >( game->aLocalPlayer );
-	transform.aAng = {};
-	transform.aScale = {1, 1, 1};
-	PhysicsObjectInfo physInfo( ShapeType::Convex );
+	Transform& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
-	for ( auto &mesh : model->aMeshes )
-	{
-		auto& verts = mesh->GetVertices();
-		auto& ind = mesh->GetIndices();
+	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
+	shapeInfo.aMeshData.apModel = model;
 
-		physInfo.vertices.reserve( physInfo.vertices.size() + verts.size() );
-		physInfo.indices.reserve( physInfo.vertices.size() + verts.size() );
+	IPhysicsShape* shape = physenv->CreateShape( shapeInfo );
 
-		physInfo.vertices.insert( verts.end(), verts.begin(), verts.end() );
-		if ( ind.size() )
-			physInfo.indices.insert( ind.end(), ind.begin(), ind.end() );
-	}
+	PhysicsObjectInfo physInfo;
+	physInfo.aPos = transform.aPos;
+	physInfo.aAng = transform.aAng;
+	physInfo.aMass = 40.f;
+	physInfo.aMotionType = PhysMotionType::Dynamic;
+	physInfo.aStartActive = true;
 
-	physInfo.mass = 40.f;
-	// physInfo.collisionType = CollisionType::Kinematic;
-	physInfo.transform = transform;  // doesn't even work? bruh
-
-	PhysicsObject* phys = physenv->CreatePhysicsObject( physInfo );
-	phys->SetWorldTransform( transform );
+	IPhysicsObject* phys = physenv->CreateObject( shape, physInfo );
 	phys->SetAlwaysActive( true );
 	phys->SetContinuousCollisionEnabled( true );
-	phys->SetSleepingThresholds( 0, 0 );
 	phys->SetFriction( phys_friction );
 
-	entities->AddComponent< PhysicsObject * >( physEnt, phys );
+	gamephys.SetMaxVelocities( phys );
+
+	entities->AddComponent< IPhysicsShape * >( physEnt, shape );
+	entities->AddComponent< IPhysicsObject * >( physEnt, phys );
 
 	model->SetPos( transform.aPos );
 
 	g_otherEnts.push_back( physEnt );
-#endif
 }
 
 
@@ -269,10 +260,7 @@ void GameSystem::LoadModules(  )
 	graphics->GetWindowSize( &aView.width, &aView.height );
 	aView.ComputeProjection();
 
-#if BULLET_PHYSICS
-	physenv = new PhysicsEnvironment;
-	physenv->Init(  );
-#endif
+	gamephys.Init();
 
 	// stupid
 	materialsystem = graphics->GetMaterialSystem();
@@ -326,14 +314,14 @@ void EntUpdate()
 
 		// Transform& transform = entities->GetComponent< Transform >( ent );
 		Transform &transform = model->GetTransform();
-		PhysicsObject* phys = entities->GetComponent< PhysicsObject* >( ent );
+		IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
 
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
 
-			transform.aPos = phys->GetWorldTransform().aPos;
-			transform.aAng = phys->GetWorldTransform().aAng;
+			transform.aPos = phys->GetPos();
+			transform.aAng = phys->GetAng();
 
 			model->SetTransform( transform );
 		}

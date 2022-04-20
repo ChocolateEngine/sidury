@@ -29,7 +29,8 @@ struct SiduryMap
 	MapInfo *aMapInfo = nullptr;
 	Model *apWorldModel = nullptr;
 #if BULLET_PHYSICS
-	std::vector< PhysicsObject * > aWorldPhysObjs;
+	std::vector< IPhysicsShape* >  aWorldPhysShapes;
+	std::vector< IPhysicsObject* > aWorldPhysObjs;
 #endif
 };
 

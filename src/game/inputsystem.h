@@ -3,8 +3,9 @@
 #include <SDL2/SDL_scancode.h>
 #include <string>
 
+using ButtonInput_t = size_t;
 
-enum ButtonInputs_
+enum ButtonInputs_ : ButtonInput_t
 {
 	In_None = 0,
 
@@ -24,7 +25,6 @@ enum ButtonInputs_
 
 };
 
-typedef unsigned int ButtonInput_t;
 
 
 // only handles mouse input right now
@@ -39,13 +39,16 @@ public:
 	void                Update();
 
 	void                CalcMouseDelta();
-	const glm::vec2&    GetMouseDelta();
+	glm::vec2           GetMouseDelta();
 
 	// could use some stack system to determine who gets to control the mouse scale maybe
 	void                SetMouseDeltaScale( const glm::vec2& scale );
 	const glm::vec2&    GetMouseDeltaScale();
 
-	//void BindKey( SDL_Scancode key, ButtonInput_t key );
+	// Button Handling
+	ButtonInput_t       RegisterButton();
+
+	void BindKey( SDL_Scancode key, const std::string& cmd );
 
 	//bool KeyPressed( ButtonInput_t key );
 	//bool KeyReleased( ButtonInput_t key );
@@ -54,7 +57,19 @@ public:
 
 	glm::vec2 aMouseDelta{};
 	glm::vec2 aMouseDeltaScale{1.f, 1.f};
+
+	std::vector< ButtonInput_t > aButtonInputs;
+
+	ButtonInput_t aButtons;
+
+	std::unordered_map< SDL_Scancode, std::string > aKeyBinds;
 };
 
 extern GameInput gameinput;
+
+GameInput& GetGameInput();
+
+
+extern ButtonInput_t IN_FORWARD;
+
 

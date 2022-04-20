@@ -21,7 +21,7 @@ const glm::vec3 vec3_forward(1, 0, 0);
 const glm::vec3 vec3_right(0, 1, 0);
 const glm::vec3 vec3_up(0, 0, 1);
 
-#include "physics.h"
+#include "game_physics.h"
 #include "entity.h"
 
 

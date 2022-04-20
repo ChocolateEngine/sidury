@@ -2,6 +2,8 @@
 #include "world.h"
 #include "util.h"
 
+#include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
+
 
 EntityManager* entities = nullptr;
 
@@ -24,13 +26,14 @@ int EntityManager::Init()
 	RegisterComponent< CSound >();
 	RegisterComponent< CDirection >();
 
-#if BULLET_PHYSICS
-	RegisterComponent< PhysicsObject* >();
+#if 1
+	RegisterComponent< IPhysicsShape* >();
+	RegisterComponent< IPhysicsObject* >();
 
 	// HACK HACK HACK
 	// so this ECS doesn't support multiple of the same component on this,
 	// so i'll just allow a vector of these physics objects for now
-	RegisterComponent< std::vector<PhysicsObject*> >();
+	// RegisterComponent< std::vector<PhysicsObject*> >();
 #endif
 
 	return 0;

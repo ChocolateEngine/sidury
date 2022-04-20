@@ -4,7 +4,7 @@
 #include "util.h"
 #include "types/transform.h"
 #include "entity.h"
-#include "physics.h"
+#include "game_physics.h"
 
 
 enum class SurfaceType
@@ -39,32 +39,43 @@ enum class PlayerMoveType
 // TODO: Split up into more components, did this pretty lazily
 struct CPlayerMoveData
 {
-	PlayerMoveType aMoveType = PlayerMoveType::Walk;
+	// General
+	PlayerMoveType          aMoveType = PlayerMoveType::Walk;
 
-	PlayerFlags aPlayerFlags = PlyNone;
-	PlayerFlags aPrevPlayerFlags = PlyNone;
+	PlayerFlags             aPlayerFlags = PlyNone;
+	PlayerFlags             aPrevPlayerFlags = PlyNone;
 
-	float aMaxSpeed = 0.f;
+	float                   aMaxSpeed = 0.f;
 
 	// View Bobbing
-	float aWalkTime = 0.f;
-	float aBobOffsetAmount = 0.f;
+	float                   aWalkTime = 0.f;
+	float                   aBobOffsetAmount = 0.f;
 
 	// Smooth Duck
-	float aPrevViewHeight = 0.f;
-	float aTargetViewHeight = 0.f;
-	float aOutViewHeight = 0.f;
-	float aDuckDuration = 0.f;
-	float aDuckTime = 0.f;
+	float                   aPrevViewHeight = 0.f;
+	float                   aTargetViewHeight = 0.f;
+	float                   aOutViewHeight = 0.f;
+	float                   aDuckDuration = 0.f;
+	float                   aDuckTime = 0.f;
 
-	// Step Sound
-	double aLastStepTime = 0.f;
+	// Sound Effects
+	double                  aLastStepTime = 0.f;
 
-	// AudioStream* apStepSound = nullptr;
-	// AudioStream* apImpactSound = nullptr;
+	std::vector< Handle >   aStepSounds;
+	std::vector< Handle >   aImpactSounds;
 
-	std::vector< Handle > aStepSounds;
-	std::vector< Handle > aImpactSounds;
+	// Physics
+
+	// The maximum angle of slope that character can still walk on (radians and put in cos())
+	float                   aMaxSlopeAngle = 45.f * (M_PI / 180.f);
+
+	IPhysicsShape*          apPhysShape = nullptr;
+	IPhysicsObject*         apPhysObj   = nullptr;
+	
+	IPhysicsObject*         apGroundObj = nullptr;
+	glm::vec3               aGroundPosition{};
+	glm::vec3               aGroundNormal{};
+	// Handle                  aGroundMaterial;
 };
 
 
@@ -78,16 +89,11 @@ struct CPlayerZoom
 };
 
 
-struct CSensitivityScale
-{
-};
-
-
 struct CPlayerInfo
 {
-	Entity aEnt;
-	std::string aName = "";
-	bool aIsLocalPlayer = false;
+	Entity          aEnt;
+	std::string     aName = "";
+	bool            aIsLocalPlayer = false;
 };
 
 
@@ -168,12 +174,14 @@ public:
 	inline bool             WasInDuck(  )       { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
 	// store it for use in functions, save on GetComponent calls
-	Entity aPlayer = ENT_INVALID;
-	CPlayerMoveData* apMove = nullptr;
-	CRigidBody* apRigidBody = nullptr;
-	Transform* apTransform = nullptr;
-	CCamera* apCamera = nullptr;
-	CDirection* apDir = nullptr;
+	Entity                  aPlayer = ENT_INVALID;
+	CPlayerMoveData*        apMove = nullptr;
+	CRigidBody*             apRigidBody = nullptr;
+	Transform*              apTransform = nullptr;
+	CCamera*                apCamera = nullptr;
+	CDirection*             apDir = nullptr;
+
+	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;
 };
 

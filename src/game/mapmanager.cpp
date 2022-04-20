@@ -91,11 +91,16 @@ void MapManager::CloseMap()
 
 	if ( apMap->apWorldModel )
 		graphics->FreeModel( apMap->apWorldModel );
-#if BULLET_PHYSICS
+
 	for ( auto physObj: apMap->aWorldPhysObjs )
-		physenv->DeletePhysicsObject( physObj );
+		physenv->DestroyObject( physObj );
+
+	for ( auto physShape: apMap->aWorldPhysShapes )
+		physenv->DestroyShape( physShape );
+
 	apMap->aWorldPhysObjs.clear();
-#endif
+	apMap->aWorldPhysShapes.clear();
+
 	delete apMap;
 	apMap = nullptr;
 }
@@ -148,32 +153,21 @@ bool MapManager::LoadWorldModel()
 	// rotate the world model
 	apMap->apWorldModel->SetAng( apMap->aMapInfo->ang );
 
-#if BULLET_PHYSICS
+	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
+	shapeInfo.aMeshData.apModel = apMap->apWorldModel;
 
-	for ( auto &mesh : apMap->apWorldModel->aMeshes )
-	{
-		PhysicsObjectInfo physInfo( ShapeType::Concave );
-		// physInfo.mesh = mesh;
+	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+	Assert( physShape );
 
-		// physInfo.vertices = apMap->apWorldModel->aVertices;
-		// physInfo.indices = apMap->apWorldModel->aIndices;
-		
-		physInfo.vertices = mesh->GetVertices();
-		physInfo.indices = mesh->GetIndices();
+	PhysicsObjectInfo physInfo;
+	physInfo.aPos = apMap->apWorldModel->GetTransform().aPos;
+	physInfo.aAng = glm::radians( apMap->aMapInfo->physAng );
 
-		PhysicsObject *physObj = physenv->CreatePhysicsObject( physInfo );
-		physObj->SetContinuousCollisionEnabled( true );
+	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
+	// physObj->SetContinuousCollisionEnabled( true );
 
-		Transform worldTransform = apMap->apWorldModel->GetTransform();
-		// worldTransform.aAng = glm::radians( apMap->apWorldModel->GetTransform().aAng );
-		worldTransform.aAng = glm::radians( apMap->aMapInfo->physAng );
-
-		physObj->SetWorldTransform( worldTransform );
-		//physObj->SetAngularFactor( {0, 0, 0} );
-
-		apMap->aWorldPhysObjs.push_back( physObj );
-	}
-#endif
+	apMap->aWorldPhysShapes.push_back( physShape );
+	apMap->aWorldPhysObjs.push_back( physObj );
 
 	return true;
 }

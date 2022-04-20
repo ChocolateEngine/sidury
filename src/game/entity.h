@@ -12,7 +12,6 @@
 #include "types/transform.h"
 #include "graphics/imesh.h"
 #include "iaudio.h"
-#include "physics.h"
 
 
 // lot of help from this page
