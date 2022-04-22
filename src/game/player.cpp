@@ -173,8 +173,8 @@ Entity PlayerManager::Create(  )
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
 	//entities->AddComponent( player, model );
 
-	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
-	entities->AddComponent< Model* >( player, model );
+	// Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
+	// entities->AddComponent< Model* >( player, model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Cylinder );
 	shapeInfo.aBounds = glm::vec3(72, 16, 1);
@@ -188,12 +188,12 @@ Entity PlayerManager::Create(  )
 	physInfo.aPos = transform.aPos;
 	physInfo.aAng = transform.aAng;
 
-	physInfo.aHasMass = true;
+	physInfo.aCustomMass = true;
 	physInfo.aMass = PLAYER_MASS;
 
 	apPhysObj = physenv->CreateObject( apPhysShape, physInfo );
-	apPhysObj->SetAlwaysActive( true );
-	apPhysObj->SetContinuousCollisionEnabled( true );
+	apPhysObj->SetAllowSleeping( false );
+	apPhysObj->SetMotionQuality( PhysMotionQuality::LinearCast );
 	apPhysObj->SetLinearVelocity( {0, 0, 0} );
 	apPhysObj->SetAngularVelocity( {0, 0, 0} );
 
@@ -769,8 +769,11 @@ void PlayerMovement::UpdatePosition( Entity player )
 	apTransform->aPos = apPhysObj->GetPos();
 	apTransform->aPos.z -= phys_player_offset;
 
-	PlayerCollisionCheck playerCollide( physenv->GetGravity(), apMove );
-	apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
+	if ( apMove->aMoveType != PlayerMoveType::NoClip )
+	{
+		PlayerCollisionCheck playerCollide( physenv->GetGravity(), apMove );
+		apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
+	}
 
 	// um
 	if ( apMove->aMoveType == PlayerMoveType::Walk )

@@ -98,15 +98,13 @@ void CreatePhysEntity( const std::string& path )
 	IPhysicsShape* shape = physenv->CreateShape( shapeInfo );
 
 	PhysicsObjectInfo physInfo;
-	physInfo.aPos = transform.aPos;
+	physInfo.aPos = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
 	physInfo.aAng = transform.aAng;
 	physInfo.aMass = 40.f;
 	physInfo.aMotionType = PhysMotionType::Dynamic;
 	physInfo.aStartActive = true;
 
 	IPhysicsObject* phys = physenv->CreateObject( shape, physInfo );
-	phys->SetAlwaysActive( true );
-	phys->SetContinuousCollisionEnabled( true );
 	phys->SetFriction( phys_friction );
 
 	gamephys.SetMaxVelocities( phys );
