@@ -98,6 +98,9 @@ void Skybox::SetSkybox( const std::string &path )
 	if ( GetMaterial() )
 		materialsystem->DeleteMaterial( GetMaterial() );
 
+	if ( path.empty() )
+		return;
+
 	SetMaterial( materialsystem->ParseMaterial( path ) );
 
 	if ( GetMaterial() == nullptr )
@@ -109,7 +112,7 @@ void Skybox::SetSkybox( const std::string &path )
 		return;
 	}
 
-	aValid = path != "";
+	aValid = true;
 
 	GetMaterial()->SetVar( "ang", vec3_zero );
 }
