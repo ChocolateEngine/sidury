@@ -3,6 +3,7 @@
 
 #include "graphics/imaterialsystem.h"
 #include "graphics/imaterial.h"
+#include "graphics/meshbuilder.hpp"
 #include "util.h"
 
 extern GameSystem* game;
@@ -29,29 +30,23 @@ void Skybox::Init()
 	// Create Mesh (only to get the shader to draw right now, blech
 	materialsystem->RegisterRenderable( this );
 
-	std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
+	// create an empty material just to have for now
+	// kind of an issue with this, funny
+	IMaterial* mat = materialsystem->CreateMaterial( "skybox" );
 
-	std::vector< vertex_cube_3d_t >& vertices = GetVertices();
-	std::vector< uint32_t >&    indices  = GetIndices();
+	MeshBuilder meshBuilder;
+	meshBuilder.Start( materialsystem, this );
+	meshBuilder.SetMaterial( mat );
 
-	vertex_cube_3d_t vert{};
+	// std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
+	// 
+	// std::vector< vertex_cube_3d_t >& vertices = GetVertices();
+	// std::vector< uint32_t >&    indices  = GetIndices();
 
 	auto CreateVert = [&]( const glm::vec3& pos )
 	{
-		vert.pos = pos * SKYBOX_SCALE;
-
-		auto iterSavedIndex = vertIndexes.find(vert);
-
-		// Do we have this vertex saved?
-		if ( iterSavedIndex != vertIndexes.end() )
-		{
-			GetIndices().push_back( iterSavedIndex->second );
-			return;
-		}
-
-		vertices.push_back( vert );
-		indices.push_back( vertIndexes.size() );
-		vertIndexes[ vert ] = vertIndexes.size();
+		meshBuilder.SetPos( pos * SKYBOX_SCALE );
+		meshBuilder.NextVertex();
 	};
 
 	auto CreateTri = [&]( const glm::vec3& pos0, const glm::vec3& pos1, const glm::vec3& pos2 )
@@ -85,43 +80,53 @@ void Skybox::Init()
 	// Create Front Face (-Y)
 	CreateTri( {  1, -1,  1 },  {  1, -1, -1 },  { -1, -1, -1 } );
 	CreateTri( { -1, -1,  1 },  {  1, -1,  1 },  { -1, -1, -1 } );
-
-	materialsystem->CreateVertexBuffer( this );
-	materialsystem->CreateIndexBuffer( this );
+	
+	meshBuilder.End();
 }
+
+
+// TODO: i really need to look into speeding up const char*
+// cause this is a bit annoying
+static std::string MatVar_Ang = "ang";
 
 
 void Skybox::SetSkybox( const std::string &path )
 {
 	aValid = false;
 
-	if ( GetMaterial() )
-		materialsystem->DeleteMaterial( GetMaterial() );
+	IMaterial* prevMat = GetMaterial( 0 );
+
+	if ( prevMat )
+	{
+		SetMaterial( 0, nullptr );
+		materialsystem->DeleteMaterial( prevMat );
+	}
 
 	if ( path.empty() )
 		return;
 
-	SetMaterial( materialsystem->ParseMaterial( path ) );
-
-	if ( GetMaterial() == nullptr )
+	IMaterial* mat = materialsystem->ParseMaterial( path );
+	if ( !mat )
 		return;
 
-	if ( GetMaterial()->GetShaderName() != "skybox" )
+	SetMaterial( 0, mat );
+
+	if ( mat->GetShaderName() != "skybox" )
 	{
-		Print( "[Game] Skybox Material is not using skybox shader: %s\n", path.c_str() );
+		LogWarn( "[Game] Skybox Material is not using skybox shader: %s\n", path.c_str() );
 		return;
 	}
 
 	aValid = true;
 
-	GetMaterial()->SetVar( "ang", vec3_zero );
+	mat->SetVar( MatVar_Ang, vec3_zero );
 }
 
 
 void Skybox::SetAng( const glm::vec3& ang )
 {
-	if ( !g_skybox_ang_freeze && GetMaterial() )
-		GetMaterial()->SetVar( "ang", ang );
+	if ( aValid && !g_skybox_ang_freeze && GetMaterial( 0 ) )
+		GetMaterial( 0 )->SetVar( MatVar_Ang, ang );
 }
 
 

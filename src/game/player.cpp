@@ -79,6 +79,8 @@ CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
 CONVAR( cl_show_player_stats, 0 );
 
+CONVAR( phys_dbg_player, 0 );
+
 CONVAR( r_fov, 106.f );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
@@ -256,13 +258,13 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			auto model = entities->GetComponent< Model* >( player );
-			auto& transform = entities->GetComponent< Transform >( player );
-			model->SetTransform( transform );
-			model->SetScale( glm::vec3(1.f) * player_model_scale.GetFloat() );
+			RenderableDrawData drawData;
 
-			for ( auto& mesh: model->aMeshes )
-				materialsystem->AddRenderable( mesh );
+			auto model = entities->GetComponent< Model* >( player );
+			drawData.aTransform = entities->GetComponent< Transform >( player );
+			drawData.aTransform.aScale = glm::vec3(1.f) * player_model_scale.GetFloat();
+
+			materialsystem->AddRenderable( model, drawData );
 		}
 
 		UpdateView( playerInfo, player );
@@ -517,6 +519,8 @@ void PlayerMovement::MovePlayer( Entity player )
 	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
 
 #if BULLET_PHYSICS
+	apPhysObj->SetAllowDebugDraw( phys_dbg_player );
+
 	// update velocity
 	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
 
@@ -541,6 +545,7 @@ void PlayerMovement::MovePlayer( Entity player )
 	}
 
 	// CHANGE THIS IN THE FUTURE FOR NETWORKING
+#if 0
 	if ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() )
 	{
 		auto model = entities->GetComponent< Model* >( player );
@@ -549,6 +554,7 @@ void PlayerMovement::MovePlayer( Entity player )
 		model->aTransform.aAng[YAW] *= -1;
 		model->aTransform.aAng[YAW] += 180;
 	}
+#endif
 }
 
 

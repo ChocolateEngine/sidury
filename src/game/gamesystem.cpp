@@ -43,6 +43,7 @@ CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 
 CONVAR( vrcmdl_scale, 40 );
+CONVAR( fox_scale, 1 );
 
 extern ConVar en_timescale;
 
@@ -62,8 +63,11 @@ struct ModelPhysTest
 
 const int physEntCount = 0;
 ModelPhysTest* g_world = new ModelPhysTest{new Model, {}};
+
+// GET RID OF THIS
 std::vector< Entity > g_protos;
 std::vector< Entity > g_otherEnts;
+std::vector< Entity > g_staticEnts;
 std::vector< ModelPhysTest* > g_physEnts;
 
 
@@ -72,14 +76,31 @@ void CreateProtogen()
 	Entity proto = entities->CreateEntity();
 
 	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
+	Transform& transform = entities->AddComponent< Transform >( proto );
 	entities->AddComponent< Model* >( proto, model );
 
-	auto transform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	auto playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
 
-	model->SetPos( transform.aPos );
-	model->SetScale( {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()} );
+	transform.aPos   = playerTransform.aPos;
+	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
 
 	g_protos.push_back( proto );
+}
+
+
+void CreateModelEntity( const std::string& path )
+{
+	Entity physEnt = entities->CreateEntity();
+
+	Model* model = graphics->LoadModel( path );
+	entities->AddComponent< Model* >( physEnt, model );
+	Transform& transform = entities->AddComponent< Transform >( physEnt );
+
+	Transform& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	transform = playerTransform;
+
+	// NO
+	g_staticEnts.push_back( physEnt );
 }
 
 
@@ -112,8 +133,6 @@ void CreatePhysEntity( const std::string& path )
 	entities->AddComponent< IPhysicsShape * >( physEnt, shape );
 	entities->AddComponent< IPhysicsObject * >( physEnt, phys );
 
-	model->SetPos( transform.aPos );
-
 	g_otherEnts.push_back( physEnt );
 }
 
@@ -131,6 +150,12 @@ CON_COMMAND( create_phys_test )
 CON_COMMAND( create_phys_proto )
 {
 	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
+}
+
+// TEMP TEMP TEMP
+CON_COMMAND( create_gltf_fox )
+{
+	CreateModelEntity( "models/animated/Fox.glb" );
 }
 
 CON_COMMAND( delete_protos )
@@ -263,6 +288,9 @@ void GameSystem::LoadModules(  )
 	// stupid
 	materialsystem = graphics->GetMaterialSystem();
 
+	// TEMP TEMP TEMP
+	filesys->AddSearchPath( "D:\\git\\bevy\\assets" );
+
 	mapmanager = new MapManager;
 }
 
@@ -311,20 +339,18 @@ void EntUpdate()
 		// Model *physObjList = &entities->GetComponent< Model >( ent );
 
 		// Transform& transform = entities->GetComponent< Transform >( ent );
-		Transform &transform = model->GetTransform();
+		RenderableDrawData drawData;
 		IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
 
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
 
-			transform.aPos = phys->GetPos();
-			transform.aAng = phys->GetAng();
-
-			model->SetTransform( transform );
+			drawData.aTransform.aPos = phys->GetPos();
+			drawData.aTransform.aAng = phys->GetAng();
 		}
 
-		materialsystem->AddRenderable( model );
+		materialsystem->AddRenderable( model, drawData );
 	}
 }
 #endif
@@ -524,17 +550,17 @@ void GameSystem::SetupModels( float frameTime )
 	auto& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
 	auto& camTransform = entities->GetComponent< CCamera >( game->aLocalPlayer ).aTransform;
 
-	Transform transform = playerTransform;
 	//transform.aPos += camTransform.aPos;
 	//transform.aAng += camTransform.aAng;
 
 	// ?????
 	float protoScale = vrcmdl_scale;
 
+	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	for ( auto& proto: g_protos )
 	{
 		auto model = entities->GetComponent< Model* >( proto );
-		Transform& protoTransform = model->GetTransform();
+		auto& protoTransform = entities->GetComponent< Transform >( proto );
 
 		if ( proto_look.GetBool() )
 		{
@@ -545,7 +571,7 @@ void GameSystem::SetupModels( float frameTime )
 			glm::vec3 protoView = protoTransform.aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction = (protoView - transform.aPos);
+			glm::vec3 direction = (protoView - playerTransform.aPos);
 			// glm::vec3 rotationAxis = VectorToAngles( direction );
 			glm::vec3 rotationAxis = VectorToAngles( direction, up );
 
@@ -560,15 +586,30 @@ void GameSystem::SetupModels( float frameTime )
 		protoTransform.aScale = {protoScale, protoScale, protoScale};
 		// model.SetTransform( protoTransform );
 
-		materialsystem->AddRenderable( model );
+		RenderableDrawData drawData;
+		drawData.aTransform = protoTransform;
+
+		materialsystem->AddRenderable( model, drawData );
 	}
-	
-	// scale the world
-	g_world->mdl->SetScale( glm::vec3(1.f) * velocity_scale.GetFloat() );
+
+	float foxScale = fox_scale;
+
+	for ( auto& ent: g_staticEnts )
+	{
+		auto model = entities->GetComponent< Model* >( ent );
+		auto& transform = entities->GetComponent< Transform >( ent );
+
+		transform.aScale = {foxScale, foxScale, foxScale};
+
+		RenderableDrawData drawData;
+		drawData.aTransform = transform;
+
+		materialsystem->AddRenderable( model, drawData );
+	}
 
 	if ( g_streamModel )
 	{
-		g_streamModel->SetScale( {snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat()} );
+		// g_streamModel->SetScale( {snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat()} );
 	}
 }
 

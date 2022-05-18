@@ -8,9 +8,9 @@
 #include <queue>
 #include <set>
 #include <memory>
+#include <array>
 
 #include "types/transform.h"
-#include "graphics/imesh.h"
 #include "iaudio.h"
 
 
@@ -104,10 +104,19 @@ public:
 
 	T& GetData( Entity entity )
 	{
-		assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Retrieving non-existent component." );
+		auto it = aEntityToIndexMap.find( entity );
+
+		if ( it == aEntityToIndexMap.end() )
+			LogFatal( "Retrieving non-existent component: \"%s\"\n", typeid(T).name() );
 
 		// Return a reference to the entity's component
-		return aComponentArray[aEntityToIndexMap[entity]];
+		return aComponentArray[it->second];
+
+
+		// assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Retrieving non-existent component." );
+		// 
+		// // Return a reference to the entity's component
+		// return aComponentArray[aEntityToIndexMap[entity]];
 	}
 
 	void EntityDestroyed( Entity entity ) override
@@ -134,6 +143,9 @@ private:
 
 	// Total size of valid entries in the array.
 	size_t aSize = 0;
+
+	// Hash of data type
+	// size_t aTypeHash = 0;
 };
 
 
@@ -171,10 +183,20 @@ public:
 	{
 		size_t typeHash = typeid(T).hash_code();
 
-		assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
+		auto it = aComponentTypes.find( typeHash );
+
+		if ( it == aComponentTypes.end() )
+			LogFatal( "Component not registered before use: \"%s\"\n", typeid(T).name() );
 
 		// Return this component's type - used for creating signatures
-		return aComponentTypes[typeHash];
+		return it->second;
+
+
+		// size_t typeHash = typeid(T).hash_code();
+		// 
+		// assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
+		// 
+		// return aComponentTypes[typeHash];
 	}
 
 	template<typename T>
@@ -291,9 +313,12 @@ private:
 	{
 		size_t typeHash = typeid(T).hash_code();
 
-		assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
+		auto it = aComponentArrays.find( typeHash );
 
-		return (ComponentArray<T>*)aComponentArrays[typeHash];
+		if ( it == aComponentArrays.end() )
+			LogFatal( "Component not registered before use: \"%s\"\n", typeid(T).name() );
+
+		return (ComponentArray<T>*)it->second;
 	}
 
 private:

@@ -75,12 +75,9 @@ void MapManager::Update()
 	if ( !apMap )
 		return;
 
-	// scale the world
-	apMap->apWorldModel->SetScale( glm::vec3( 1.f ) * velocity_scale.GetFloat() );
-
 	GetSkybox().Draw();
 
-	materialsystem->AddRenderable( apMap->apWorldModel );
+	materialsystem->AddRenderable( apMap->apWorldModel, apMap->aDrawData );
 }
 
 
@@ -151,21 +148,19 @@ bool MapManager::LoadWorldModel()
 	}
 
 	// rotate the world model
-	apMap->apWorldModel->SetAng( apMap->aMapInfo->ang );
-
+	apMap->aDrawData.aTransform.aAng = apMap->aMapInfo->ang;
+	
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 	shapeInfo.aMeshData.apModel = apMap->apWorldModel;
-
+	
 	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
 	Assert( physShape );
-
+	
 	PhysicsObjectInfo physInfo;
-	physInfo.aPos = apMap->apWorldModel->GetTransform().aPos;
 	physInfo.aAng = glm::radians( apMap->aMapInfo->physAng );
-
+	
 	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
-	// physObj->SetContinuousCollisionEnabled( true );
-
+	
 	apMap->aWorldPhysShapes.push_back( physShape );
 	apMap->aWorldPhysObjs.push_back( physObj );
 
