@@ -71,11 +71,11 @@ std::vector< Entity > g_staticEnts;
 std::vector< ModelPhysTest* > g_physEnts;
 
 
-void CreateProtogen()
+void CreateProtogen( const std::string& path )
 {
 	Entity proto = entities->CreateEntity();
 
-	Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
+	Model *model = graphics->LoadModel( path );
 	Transform& transform = entities->AddComponent< Transform >( proto );
 	entities->AddComponent< Model* >( proto, model );
 
@@ -136,26 +136,16 @@ void CreatePhysEntity( const std::string& path )
 	g_otherEnts.push_back( physEnt );
 }
 
+#define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
 
 CON_COMMAND( create_proto )
 {
-	CreateProtogen();
+	CreateProtogen( DEFAULT_PROTOGEN_PATH );
 }
 
-CON_COMMAND( create_phys_test )
+CON_COMMAND( create_gltf_proto )
 {
-	CreatePhysEntity( "materials/models/riverhouse/riverhouse.obj" );
-}
-
-CON_COMMAND( create_phys_proto )
-{
-	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
-}
-
-// TEMP TEMP TEMP
-CON_COMMAND( create_gltf_fox )
-{
-	CreateModelEntity( "models/animated/Fox.glb" );
+	CreateProtogen( "materials/models/protogen_wip_25d/protogen_25d.glb" );
 }
 
 CON_COMMAND( delete_protos )
@@ -166,6 +156,16 @@ CON_COMMAND( delete_protos )
 		entities->DeleteEntity( proto );
 	}
 	g_protos.clear();
+}
+
+CON_COMMAND( create_phys_test )
+{
+	CreatePhysEntity( "materials/models/riverhouse/riverhouse.obj" );
+}
+
+CON_COMMAND( create_phys_proto )
+{
+	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
 }
 
 
@@ -287,9 +287,6 @@ void GameSystem::LoadModules(  )
 
 	// stupid
 	materialsystem = graphics->GetMaterialSystem();
-
-	// TEMP TEMP TEMP
-	filesys->AddSearchPath( "D:\\git\\bevy\\assets" );
 
 	mapmanager = new MapManager;
 }
@@ -543,7 +540,7 @@ void GameSystem::SetupModels( float frameTime )
 	{
 		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
 		{
-			CreateProtogen(  );
+			CreateProtogen( DEFAULT_PROTOGEN_PATH );
 		}
 	}
 
