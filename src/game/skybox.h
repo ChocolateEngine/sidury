@@ -12,13 +12,17 @@
 
 // NOTE: this should be just a single mesh class with one material
 // and the vertex format shouldn't matter because we have this other stuff
-class Skybox : public Model
+class Skybox : public IRenderable
 {
 public:
 	void                             Init();
 	void                             SetSkybox( const std::string& path );
 	void                             Draw();
 	void                             SetAng( const glm::vec3& ang );
+
+	IModel*                          GetModel() override;
+	const glm::mat4&                 GetModelMatrix() override;
+	const std::vector< float >&      GetMorphWeights() override;
 
 #if 0
 	IMaterial*                       apMaterial = nullptr;
@@ -63,9 +67,16 @@ public:
 #endif
 
 	bool                    aValid = false;
+	Model*                  apModel = nullptr;
+	glm::mat4               aMatrix{};
+	std::vector< float >    aMorphVerts;
 
 	Skybox()  {};
-	~Skybox() {}
+	~Skybox()
+	{
+		if ( apModel )
+			delete apModel;
+	}
 };
 
 

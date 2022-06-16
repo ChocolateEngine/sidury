@@ -27,15 +27,14 @@ constexpr glm::vec3 vec3_zero( 0, 0, 0 );
 
 void Skybox::Init()
 {
-	// Create Mesh (only to get the shader to draw right now, blech
-	materialsystem->RegisterRenderable( this );
+	apModel = new Model;
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
 	IMaterial* mat = materialsystem->CreateMaterial( "skybox" );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( materialsystem, this );
+	meshBuilder.Start( materialsystem, apModel );
 	meshBuilder.SetMaterial( mat );
 
 	// std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
@@ -94,11 +93,11 @@ void Skybox::SetSkybox( const std::string &path )
 {
 	aValid = false;
 
-	IMaterial* prevMat = GetMaterial( 0 );
+	IMaterial* prevMat = apModel->GetMaterial( 0 );
 
 	if ( prevMat )
 	{
-		SetMaterial( 0, nullptr );
+		apModel->SetMaterial( 0, nullptr );
 		materialsystem->DeleteMaterial( prevMat );
 	}
 
@@ -109,7 +108,7 @@ void Skybox::SetSkybox( const std::string &path )
 	if ( !mat )
 		return;
 
-	SetMaterial( 0, mat );
+	apModel->SetMaterial( 0, mat );
 
 	if ( mat->GetShaderName() != "skybox" )
 	{
@@ -123,10 +122,38 @@ void Skybox::SetSkybox( const std::string &path )
 }
 
 
+#define VIEWMAT_ANG( axis ) glm::vec3(viewMatrix[0][axis], viewMatrix[1][axis], viewMatrix[2][axis])
+
+/* Y Up version of the ViewMatrix */
+inline void ToViewMatrixY( glm::mat4& viewMatrix, const glm::vec3& ang )
+{
+#if 0
+	viewMatrix = glm::eulerAngleYZX(
+		glm::radians(ang[YAW]),
+		glm::radians(ang[ROLL]),
+		glm::radians(ang[PITCH])
+	);
+#else
+	/* Y Rotation - YAW (Mouse X for Y up) */
+	viewMatrix = glm::rotate( glm::radians(ang[YAW]), vec_right );
+
+	/* X Rotation - PITCH (Mouse Y) */
+	viewMatrix = glm::rotate( viewMatrix, glm::radians(ang[PITCH]), VIEWMAT_ANG(0) );
+
+	/* Z Rotation - ROLL */
+	viewMatrix = glm::rotate( viewMatrix, glm::radians(ang[ROLL]), VIEWMAT_ANG(2) );
+#endif
+}
+
+#undef VIEWMAT_ANG
+
+
 void Skybox::SetAng( const glm::vec3& ang )
 {
-	if ( aValid && !g_skybox_ang_freeze && GetMaterial( 0 ) )
-		GetMaterial( 0 )->SetVar( MatVar_Ang, ang );
+	if ( !aValid || g_skybox_ang_freeze || !apModel->GetMaterial( 0 ) )
+		return;
+
+	ToViewMatrixY( aMatrix, ang );
 }
 
 
@@ -134,5 +161,22 @@ void Skybox::Draw()
 {
 	if ( aValid && g_skybox )
 		materialsystem->AddRenderable( this );
+}
+
+
+IModel* Skybox::GetModel()
+{
+	return apModel;
+}
+
+const glm::mat4& Skybox::GetModelMatrix()
+{
+	return aMatrix;
+}
+
+// hmm, i don't like having to return something valid here
+const std::vector< float >& Skybox::GetMorphWeights()
+{
+	return aMorphVerts;
 }
 

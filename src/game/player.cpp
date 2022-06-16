@@ -258,13 +258,16 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			RenderableDrawData drawData;
+			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( player );
 
 			auto model = entities->GetComponent< Model* >( player );
-			drawData.aTransform = entities->GetComponent< Transform >( player );
-			drawData.aTransform.aScale = glm::vec3(1.f) * player_model_scale.GetFloat();
+			Transform transform = entities->GetComponent< Transform >( player );
+			transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
 
-			materialsystem->AddRenderable( model, drawData );
+			renderable->aMatrix = transform.ToMatrix();
+			renderable->apModel = model;
+
+			materialsystem->AddRenderable( renderable );
 		}
 
 		UpdateView( playerInfo, player );

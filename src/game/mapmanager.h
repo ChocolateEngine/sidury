@@ -29,8 +29,7 @@ struct SiduryMap
 	MapInfo *aMapInfo = nullptr;
 	Model *apWorldModel = nullptr;
 
-	// man
-	RenderableDrawData aDrawData;
+	DefaultRenderable aRenderable;
 
 #if BULLET_PHYSICS
 	std::vector< IPhysicsShape* >  aWorldPhysShapes;

@@ -77,6 +77,11 @@ void CreateProtogen( const std::string& path )
 
 	Model *model = graphics->LoadModel( path );
 	Transform& transform = entities->AddComponent< Transform >( proto );
+
+	DefaultRenderable* renderable = new DefaultRenderable;
+	renderable->apModel = model;
+
+	entities->AddComponent< RenderableHandle_t >( proto, (RenderableHandle_t)renderable );
 	entities->AddComponent< Model* >( proto, model );
 
 	auto playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
@@ -336,18 +341,16 @@ void EntUpdate()
 		// Model *physObjList = &entities->GetComponent< Model >( ent );
 
 		// Transform& transform = entities->GetComponent< Transform >( ent );
-		RenderableDrawData drawData;
+		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( ent );
 		IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
 
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
-
-			drawData.aTransform.aPos = phys->GetPos();
-			drawData.aTransform.aAng = phys->GetAng();
+			ToMatrix( renderable->aMatrix, phys->GetPos(), phys->GetAng() );
 		}
 
-		materialsystem->AddRenderable( model, drawData );
+		materialsystem->AddRenderable( renderable );
 	}
 }
 #endif
@@ -545,7 +548,7 @@ void GameSystem::SetupModels( float frameTime )
 	}
 
 	auto& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
-	auto& camTransform = entities->GetComponent< CCamera >( game->aLocalPlayer ).aTransform;
+	// auto& camTransform = entities->GetComponent< CCamera >( game->aLocalPlayer ).aTransform;
 
 	//transform.aPos += camTransform.aPos;
 	//transform.aAng += camTransform.aAng;
@@ -554,13 +557,18 @@ void GameSystem::SetupModels( float frameTime )
 	float protoScale = vrcmdl_scale;
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
+	// also could thread this as a test
 	for ( auto& proto: g_protos )
 	{
-		auto model = entities->GetComponent< Model* >( proto );
+		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
 		auto& protoTransform = entities->GetComponent< Transform >( proto );
+
+		bool matrixChanged = false;
 
 		if ( proto_look.GetBool() )
 		{
+			matrixChanged = true;
+			
 			glm::vec3 forward{}, right{}, up{};
 			//AngleToVectors( protoTransform.aAng, forward, right, up );
 			AngleToVectors( playerTransform.aAng, forward, right, up );
@@ -579,29 +587,17 @@ void GameSystem::SetupModels( float frameTime )
 			//protoTransform.aAng[ROLL] = 90.f;
 		}
 
-		// protoTransform.aScale = {vrcmdl_scale, vrcmdl_scale, vrcmdl_scale};
-		protoTransform.aScale = {protoScale, protoScale, protoScale};
-		// model.SetTransform( protoTransform );
+		if ( protoTransform.aScale.x != protoScale )
+		{
+			// protoTransform.aScale = {protoScale, protoScale, protoScale};
+			protoTransform.aScale = glm::vec3( protoScale );
+			matrixChanged = true;
+		}
+		
+		if ( matrixChanged )
+			renderable->aMatrix = protoTransform.ToMatrix();
 
-		RenderableDrawData drawData;
-		drawData.aTransform = protoTransform;
-
-		materialsystem->AddRenderable( model, drawData );
-	}
-
-	float foxScale = fox_scale;
-
-	for ( auto& ent: g_staticEnts )
-	{
-		auto model = entities->GetComponent< Model* >( ent );
-		auto& transform = entities->GetComponent< Transform >( ent );
-
-		transform.aScale = {foxScale, foxScale, foxScale};
-
-		RenderableDrawData drawData;
-		drawData.aTransform = transform;
-
-		materialsystem->AddRenderable( model, drawData );
+		materialsystem->AddRenderable( renderable );
 	}
 
 	if ( g_streamModel )

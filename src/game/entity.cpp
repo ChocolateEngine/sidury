@@ -2,6 +2,8 @@
 #include "world.h"
 #include "util.h"
 
+#include "graphics/imaterialsystem.h"
+
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
@@ -19,6 +21,12 @@ int EntityManager::Init()
 	// Register Base Components
 	RegisterComponent< Transform >();
 	RegisterComponent< TransformSmall >();
+	
+	// uhhhhh
+	RegisterComponent< IRenderable* >();
+	RegisterComponent< DefaultRenderable* >();
+	RegisterComponent< RenderableHandle_t >();
+
 	//RegisterComponent< ModelData >();  // doesn't like this
 	RegisterComponent< CRigidBody >();
 	RegisterComponent< CGravity >();

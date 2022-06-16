@@ -77,7 +77,7 @@ void MapManager::Update()
 
 	GetSkybox().Draw();
 
-	materialsystem->AddRenderable( apMap->apWorldModel, apMap->aDrawData );
+	materialsystem->AddRenderable( &apMap->aRenderable );
 }
 
 
@@ -148,7 +148,11 @@ bool MapManager::LoadWorldModel()
 	}
 
 	// rotate the world model
-	apMap->aDrawData.aTransform.aAng = apMap->aMapInfo->ang;
+	Transform mapTransform{};
+	mapTransform.aAng = apMap->aMapInfo->ang;
+	
+	apMap->aRenderable.apModel = apMap->apWorldModel;
+	apMap->aRenderable.aMatrix = mapTransform.ToMatrix();
 	
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 	shapeInfo.aMeshData.apModel = apMap->apWorldModel;
