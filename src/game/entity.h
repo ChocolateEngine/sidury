@@ -107,7 +107,7 @@ public:
 		auto it = aEntityToIndexMap.find( entity );
 
 		if ( it == aEntityToIndexMap.end() )
-			LogFatal( "Retrieving non-existent component: \"%s\"\n", typeid(T).name() );
+			Log_FatalF( "Retrieving non-existent component: \"%s\"\n", typeid( T ).name() );
 
 		// Return a reference to the entity's component
 		return aComponentArray[it->second];
@@ -186,7 +186,7 @@ public:
 		auto it = aComponentTypes.find( typeHash );
 
 		if ( it == aComponentTypes.end() )
-			LogFatal( "Component not registered before use: \"%s\"\n", typeid(T).name() );
+			Log_FatalF( "Component not registered before use: \"%s\"\n", typeid(T).name() );
 
 		// Return this component's type - used for creating signatures
 		return it->second;
@@ -316,7 +316,7 @@ private:
 		auto it = aComponentArrays.find( typeHash );
 
 		if ( it == aComponentArrays.end() )
-			LogFatal( "Component not registered before use: \"%s\"\n", typeid(T).name() );
+			Log_FatalF( "Component not registered before use: \"%s\"\n", typeid(T).name() );
 
 		return (ComponentArray<T>*)it->second;
 	}

@@ -17,29 +17,29 @@ extern "C"
 {
 	void DLL_EXPORT game_init()
 	{
-		if ( cmdline->Find( "-debugger" ) )
+		if ( Args_Find( "-debugger" ) )
 			sys_wait_for_debugger();
-
+		
 		Module pHandle;
 		Ch_IEngine *( *cengine_get )() = 0;
 
-		std::string path = filesys->FindFile( "engine" EXT_DLL );
+		std::string path = FileSys_FindFile( "engine" EXT_DLL );
 
 		if ( path == "" )
 		{
-			LogFatal( "Couldn't find engine" EXT_DLL "!\n" );
+			Log_Fatal( "Couldn't find engine" EXT_DLL "!\n" );
 			return;
 		}
 
 		if ( !( pHandle = SDL_LoadObject( path.c_str() ) ) )
 		{
-			LogFatal( "Failed to load engine: %s!\n", SDL_GetError() );
+			Log_FatalF( "Failed to load engine: %s!\n", SDL_GetError() );
 			return;
 		}
 		*( void** )( &cengine_get ) = SDL_LoadFunction( pHandle, "cengine_get" );
 		if ( !cengine_get )
 		{
-			LogFatal( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
+			Log_FatalF( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
 			return;
 		}
 
@@ -55,8 +55,13 @@ extern "C"
 
 		gamesystem->Init();
 
-		console->QueueCommandSilent( "exec ongameload", false );
+		Con_QueueCommandSilent( "exec ongameload", false );
 
+		// ftl::TaskSchedulerInitOptions schedOptions;
+		// schedOptions.Behavior = ftl::EmptyQueueBehavior::Sleep;
+		// 
+		// gTaskScheduler.Init( schedOptions );
+		
 		auto startTime = std::chrono::high_resolution_clock::now();
 
 		while ( engine->IsActive() )
@@ -84,8 +89,13 @@ extern "C"
 					continue;
 			}
 
+			// ftl::TaskCounter taskCounter( &gTaskScheduler );
+
 			gamesystem->Update( time );
-			console->Update();
+			// Con_Update();
+			
+			// Wait and help to execute unfinished tasks
+			// gTaskScheduler.WaitForCounter( &taskCounter );
 
 			startTime = currentTime;
 

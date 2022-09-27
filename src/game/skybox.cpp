@@ -112,7 +112,7 @@ void Skybox::SetSkybox( const std::string &path )
 
 	if ( mat->GetShaderName() != "skybox" )
 	{
-		LogWarn( "[Game] Skybox Material is not using skybox shader: %s\n", path.c_str() );
+		Log_WarnF( "[Game] Skybox Material is not using skybox shader: %s\n", path.c_str() );
 		return;
 	}
 

@@ -246,7 +246,7 @@ void GameSystem::Init(  )
 
 	players->Spawn( aLocalPlayer );
 
-	LogMsg( "Game Loaded!\n" );
+	Log_Msg( "Game Loaded!\n" );
 }
 
 
@@ -311,23 +311,47 @@ Model* g_streamModel = nullptr;
 ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
 
+
 // TODO: figure out a better way to do this, god
 void GameSystem::Update( float frameTime )
 {
 	// ZoneScoped
 	PROF_SCOPE();
 
+	static bool ranOnce = false;
+	
 	input->Update( frameTime );
+
+	// if ( ranOnce )
+	// gTaskScheduler.WaitForCounter( &gGraphicsCounter );
+	// gTaskScheduler.WaitAll( 1000 );
+
 	gui->StartFrame();
 
 	GameUpdate( frameTime );
+	
+	// GraphicsTask graphicsTasks[1];
+	// graphicsTasks[0].aFrameTime = frameTime;
+
+	// gTaskScheduler.RunAsync( MT::TaskGroup::Default(), &graphicsTasks[0], 1 );
+
+	// ftl::Task graphicsTask;
+	// graphicsTask.Function = TaskGraphicsUpdate;
+	// graphicsTask.ArgData = &frameTime;
+	// 
+	// gTaskScheduler.AddTask( graphicsTask, ftl::TaskPriority::Normal, &gGraphicsCounter );
+	
+	// gTaskScheduler.WaitForCounter( &gGraphicsCounter );
+
+	ranOnce = true;
 
 	gui->Update( frameTime );
-	graphics->Update( frameTime );  // updates gui internally
+	graphics->Update( frameTime );
+	
+	Con_Update();
 }
 
 
-#if BULLET_PHYSICS
 void EntUpdate()
 {
 	// blech
@@ -353,7 +377,6 @@ void EntUpdate()
 		materialsystem->AddRenderable( renderable );
 	}
 }
-#endif
 
 
 void GameSystem::GameUpdate( float frameTime )
@@ -536,6 +559,65 @@ extern ConVar cl_view_height;
 CONVAR( proto_look, 1 );
 
 
+struct ProtoLookData_t
+{
+	std::vector< Entity > aProtos;
+	Transform* aPlayerTransform;
+};
+
+
+#if 0
+void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
+{
+	float protoScale = vrcmdl_scale;
+
+	ProtoLookData_t* lookData = (ProtoLookData_t*)arg;
+	
+	// TODO: maybe make this into some kind of "look at player" component? idk lol
+	// also could thread this as a test
+	for ( auto& proto : lookData->aProtos )
+	{
+		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
+		auto& protoTransform = entities->GetComponent< Transform >( proto );
+
+		bool matrixChanged = false;
+
+		if ( proto_look.GetBool() )
+		{
+			matrixChanged = true;
+
+			glm::vec3 forward{}, right{}, up{};
+			//AngleToVectors( protoTransform.aAng, forward, right, up );
+			AngleToVectors( lookData->aPlayerTransform->aAng, forward, right, up );
+
+			glm::vec3 protoView = protoTransform.aPos;
+			//protoView.z += cl_view_height;
+
+			glm::vec3 direction = (protoView - lookData->aPlayerTransform->aPos);
+			// glm::vec3 rotationAxis = VectorToAngles( direction );
+			glm::vec3 rotationAxis = VectorToAngles( direction, up );
+
+			protoTransform.aAng = rotationAxis;
+			protoTransform.aAng[PITCH] = 0.f;
+			protoTransform.aAng[YAW] -= 90.f;
+			protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
+			//protoTransform.aAng[ROLL] = 90.f;
+		}
+
+		if ( protoTransform.aScale.x != protoScale )
+		{
+			// protoTransform.aScale = {protoScale, protoScale, protoScale};
+			protoTransform.aScale = glm::vec3( protoScale );
+			matrixChanged = true;
+		}
+
+		if ( matrixChanged )
+			renderable->aMatrix = protoTransform.ToMatrix();
+	}
+}
+#endif
+
+
 // will be used in the future for when updating bones and stuff
 void GameSystem::SetupModels( float frameTime )
 {
@@ -558,6 +640,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
+#if 1
 	for ( auto& proto: g_protos )
 	{
 		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
@@ -568,7 +651,7 @@ void GameSystem::SetupModels( float frameTime )
 		if ( proto_look.GetBool() )
 		{
 			matrixChanged = true;
-			
+
 			glm::vec3 forward{}, right{}, up{};
 			//AngleToVectors( protoTransform.aAng, forward, right, up );
 			AngleToVectors( playerTransform.aAng, forward, right, up );
@@ -593,12 +676,98 @@ void GameSystem::SetupModels( float frameTime )
 			protoTransform.aScale = glm::vec3( protoScale );
 			matrixChanged = true;
 		}
-		
+
 		if ( matrixChanged )
 			renderable->aMatrix = protoTransform.ToMatrix();
 
 		materialsystem->AddRenderable( renderable );
 	}
+#else
+	if ( g_protos.size() )
+	{
+		constexpr int numTasks = 2;
+		ftl::Task *protoLookTasks = new ftl::Task[numTasks];
+		ProtoLookData_t *protoLookData = new ProtoLookData_t[numTasks];
+
+		// setup tasks
+		for ( int i = 0; i < numTasks; i++ )
+		{
+			protoLookTasks[i].Function = TaskUpdateProtoLook;
+			protoLookTasks[i].ArgData = &protoLookData[i];
+		}
+
+		// for ( auto& proto: g_protos )
+		// add protos to the task
+		for ( int i = 0; i < g_protos.size(); i++ )
+		{
+			Entity& proto = g_protos[i];
+
+			int taskIndex = i % numTasks;
+			protoLookData[taskIndex].aProtos.push_back( proto );
+			protoLookData[taskIndex].aPlayerTransform = &playerTransform;
+#if 1
+
+#else
+			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
+			auto& protoTransform = entities->GetComponent< Transform >( proto );
+
+			bool matrixChanged = false;
+
+			if ( proto_look.GetBool() )
+			{
+				matrixChanged = true;
+
+				glm::vec3 forward{}, right{}, up{};
+				//AngleToVectors( protoTransform.aAng, forward, right, up );
+				AngleToVectors( playerTransform.aAng, forward, right, up );
+
+				glm::vec3 protoView = protoTransform.aPos;
+				//protoView.z += cl_view_height;
+
+				glm::vec3 direction = (protoView - playerTransform.aPos);
+				// glm::vec3 rotationAxis = VectorToAngles( direction );
+				glm::vec3 rotationAxis = VectorToAngles( direction, up );
+
+				protoTransform.aAng = rotationAxis;
+				protoTransform.aAng[PITCH] = 0.f;
+				protoTransform.aAng[YAW] -= 90.f;
+				protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
+				//protoTransform.aAng[ROLL] = 90.f;
+			}
+
+			if ( protoTransform.aScale.x != protoScale )
+			{
+				// protoTransform.aScale = {protoScale, protoScale, protoScale};
+				protoTransform.aScale = glm::vec3( protoScale );
+				matrixChanged = true;
+			}
+
+			if ( matrixChanged )
+				renderable->aMatrix = protoTransform.ToMatrix();
+
+			materialsystem->AddRenderable( renderable );
+#endif
+		}
+
+
+		ftl::TaskCounter counter( &gTaskScheduler );
+		gTaskScheduler.AddTasks( numTasks, protoLookTasks, ftl::TaskPriority::Normal, &counter );
+
+		// FTL creates its own copies of the tasks, so we can safely delete the memory
+		delete[] protoLookTasks;
+
+		// Wait for the tasks to complete
+		gTaskScheduler.WaitForCounter( &counter );
+
+		delete[] protoLookData;
+
+		for ( auto& proto : g_protos )
+		{
+			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
+			materialsystem->AddRenderable( renderable );
+		}
+	}	
+#endif
 
 	if ( g_streamModel )
 	{

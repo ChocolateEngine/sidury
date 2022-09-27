@@ -27,12 +27,12 @@ void map_dropdown(
 	const std::vector< std::string >& args,  // arguments currently typed in by the user
 	std::vector< std::string >& results )      // results to populate the dropdown list with
 {
-	for ( const auto& file: filesys->ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	for ( const auto& file: FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
 	{
 		if ( file.ends_with( ".." ) )
 			continue;
 
-		std::string mapName = filesys->GetFileName( file );
+		std::string mapName = FileSys_GetFileName( file );
 
 		if ( args.size() && !mapName.starts_with( args[0] ) )
 			continue;
@@ -46,13 +46,13 @@ CONCMD_DROP( map, map_dropdown )
 {
 	if ( !mapmanager )
 	{
-		LogWarn( gMapChannel, "Map Manager doesn't exist yet, oops\n" );
+		Log_Warn( gMapChannel, "Map Manager doesn't exist yet, oops\n" );
 		return;
 	}
 
 	if ( args.size() == 0 )
 	{
-		LogWarn( gMapChannel, "No Map Path/Name specified!\n" );
+		Log_Warn( gMapChannel, "No Map Path/Name specified!\n" );
 		return;
 	}
 
@@ -108,11 +108,11 @@ bool MapManager::LoadMap( const std::string &path )
 	if ( apMap )
 		CloseMap();
 
-	std::string absPath = filesys->FindDir( "maps/" + path );
+	std::string absPath = FileSys_FindDir( "maps/" + path );
 
 	if ( absPath == "" )
 	{
-		LogWarn( gMapChannel, "Map does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gMapChannel, "Map does not exist: \"%s\"", path.c_str() );
 		return false;
 	}
 
@@ -189,17 +189,17 @@ gMapInfoKeys;
 
 MapInfo *MapManager::ParseMapInfo( const std::string &path )
 {
-	if ( !filesys->Exists( path ) )
+	if ( !FileSys_Exists( path ) )
 	{
-		LogWarn( gMapChannel, "Map Info does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gMapChannel, "Map Info does not exist: \"%s\"", path.c_str() );
 		return nullptr;
 	}
 
-	std::vector< char > rawData = filesys->ReadFile( path );
+	std::vector< char > rawData = FileSys_ReadFile( path );
 
 	if ( rawData.empty() )
 	{
-		LogWarn( gMapChannel, "Failed to read file: %s\n", path.c_str() );
+		Log_WarnF( gMapChannel, "Failed to read file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -211,7 +211,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 	if ( err != KeyValueErrorCode::NO_ERROR )
 	{
-		LogWarn( gMapChannel, "Failed to parse file: %s\n", path.c_str() );
+		Log_WarnF( gMapChannel, "Failed to parse file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -227,7 +227,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 	{
 		if ( kv->hasChildren )
 		{
-			LogMsg( gMapChannel, "Skipping extra children in kv file: %s", path.c_str() );
+			Log_MsgF( gMapChannel, "Skipping extra children in kv file: %s", path.c_str() );
 			kv = kv->next;
 			continue;
 		}
@@ -237,7 +237,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 			mapInfo->version = ToLong( kv->value.string, 0 );
 			if ( mapInfo->version != MAP_VERSION )
 			{
-				LogError( gMapChannel, "Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
+				Log_ErrorF( gMapChannel, "Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
 				delete mapInfo;
 				return nullptr;
 			}
@@ -254,7 +254,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 			if ( mapInfo->modelPath == "" )
 			{
-				LogWarn( gMapChannel, "Empty Model Path for map \"%s\"\n", path.c_str() );
+				Log_WarnF( gMapChannel, "Empty Model Path for map \"%s\"\n", path.c_str() );
 				delete mapInfo;
 				return nullptr;
 			}

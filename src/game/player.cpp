@@ -715,7 +715,7 @@ void PlayerMovement::UpdateInputs(  )
 		{
 			apRigidBody->aVel[W_UP] = jump_force;
 			wasJumpButtonPressed = true;
-			// LogMsg( "New Velocity After Jumping: %s", Vec2Str( apRigidBody->aVel ).c_str() );
+			// Log_Msg( "New Velocity After Jumping: %s", Vec2Str( apRigidBody->aVel ).c_str() );
 		}
 	}
 	else
