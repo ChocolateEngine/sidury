@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gamesystem.h"
 #include "util.h"
 #include "types/transform.h"
 #include "entity.h"
@@ -214,7 +213,7 @@ inline auto& GetPlayerInfo( Entity ent )            { return entities->GetCompon
 inline auto& GetTransform( Entity ent )             { return entities->GetComponent< Transform >( ent ); }
 inline auto& GetCamera( Entity ent )                { return entities->GetComponent< CCamera >( ent ); }
 inline auto& GetRigidBody( Entity ent )             { return entities->GetComponent< CRigidBody >( ent ); }
-inline auto& GetModel( Entity ent )                 { return entities->GetComponent< Model >( ent ); }
+// inline HModel GetModel( Entity ent )                 { return entities->GetComponent< HModel >( ent ); }
 
 
 extern PlayerManager* players;

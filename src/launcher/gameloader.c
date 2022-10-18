@@ -21,7 +21,7 @@ int load_object( Module* mod, const char* path )
 	if ( *mod = SDL_LoadObject( path ) )
 		return 0;
 
-	fprintf( stderr, "Failed to load %s: %s\n", path, SDL_GetError(  ) );
+	fprintf( stderr, "Failed to load %s: %s\n", path, SDL_GetError() );
 	//sys_print_last_error( "Failed to load %s", path );
 
 	unload_objects(  );
@@ -49,7 +49,7 @@ int main( int argc, char *argv[] )
 	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
 	if ( !core_init )
 	{
-		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
+		fprintf( stderr, "Error: %s\n", SDL_GetError() );
 		unload_objects();
 		return -1;
 	}
@@ -57,7 +57,7 @@ int main( int argc, char *argv[] )
 	*( void** )( &core_exit ) = SDL_LoadFunction( core, "core_exit" );
 	if ( !core_exit )
 	{
-		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
+		fprintf( stderr, "Error: %s\n", SDL_GetError() );
 		unload_objects();
 		return -1;
 	}
@@ -67,7 +67,7 @@ int main( int argc, char *argv[] )
 	*( void** )( &game_init ) = SDL_LoadFunction( client, "game_init" );
 	if ( !game_init )
 	{
-		fprintf( stderr, "Error: %s\n", SDL_GetError(  ) );
+		fprintf( stderr, "Error: %s\n", SDL_GetError() );
 		unload_objects();
 		return -1;
 	}

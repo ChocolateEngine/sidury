@@ -1,7 +1,5 @@
 #pragma once
 
-#include "graphics/igraphics.h"
-
 constexpr unsigned int MAP_VERSION = 1;
 
 
@@ -27,9 +25,7 @@ struct MapInfo
 struct SiduryMap
 {
 	MapInfo *aMapInfo = nullptr;
-	Model *apWorldModel = nullptr;
-
-	DefaultRenderable aRenderable;
+	ModelDraw_t aRenderable{};
 
 #if BULLET_PHYSICS
 	std::vector< IPhysicsShape* >  aWorldPhysShapes;

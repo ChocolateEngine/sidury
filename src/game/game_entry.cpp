@@ -1,8 +1,11 @@
-#include "../../src/game/gamesystem.h"
+#include "../../src/game/main.h"
 
 #include "core/profiler.h"
 #include "ch_iengine.h"
 
+#include "imgui/imgui.h"
+
+#include <chrono>
 #include <vector>
 #include <functional>
 
@@ -43,12 +46,15 @@ extern "C"
 			return;
 		}
 
+		ImGui::CreateContext();
+
 		engine = cengine_get();
 
 		// Load Modules and Initialize them in this order
 		engine->Init({
 			"input",
-			"graphics",
+			"ch_graphics",
+			"ch_gui",
 			"aduio",
 			"ch_physics",
 		});

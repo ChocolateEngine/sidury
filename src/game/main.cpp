@@ -1,37 +1,47 @@
-#include "gamesystem.h"
+#include "main.h"
 #include "core/systemmanager.h"
 #include "core/asserts.h"
+
+#include "iinput.h"
+#include "igui.h"
+#include "render/irender.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl.h"
+
 #include "util.h"
 #include "game_physics.h"
 #include "player.h"
 #include "entity.h"
 #include "terrain/terrain.h"
-#include "graphics/sprite.h"
+#include "graphics/graphics.h"
 #include "mapmanager.h"
 #include "inputsystem.h"
 #include "skybox.h"
 
 #include <algorithm>
 
-#include "core/profiler.h"
 
-GameSystem* game = nullptr;
+GameSystem*      game         = nullptr;
 
-BaseGuiSystem* gui = nullptr;
-BaseGraphicsSystem* graphics = nullptr;
-BaseInputSystem* input = nullptr;
-BaseAudioSystem* audio = nullptr;
+BaseGuiSystem*   gui          = nullptr;
+IRender*         render       = nullptr;
+BaseInputSystem* input        = nullptr;
+BaseAudioSystem* audio        = nullptr;
 
-IMaterialSystem* materialsystem = nullptr;
+static bool      gPaused      = false;
+float            gFrameTime   = 0.f;
+double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
+
+Entity           gLocalPlayer = ENT_INVALID;
+ViewportCamera_t gView{};
+
+// Audio Channels
+Handle           hAudioMusic = InvalidHandle;
+
+// only large near and farz for riverhouse and quake movement
+// aView( 0, 0, 200, 200, r_nearz, r_farz, r_fov )
 
 #define SPAWN_PROTOGEN 0
-
-void CenterMouseOnScreen(  )
-{
-	int w, h;
-	SDL_GetWindowSize( graphics->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( graphics->GetWindow(), w/2, h/2 );
-}
 
 extern ConVar r_nearz, r_farz, r_fov;
 
@@ -73,9 +83,10 @@ std::vector< ModelPhysTest* > g_physEnts;
 
 void CreateProtogen( const std::string& path )
 {
+#if 0
 	Entity proto = entities->CreateEntity();
 
-	Model *model = graphics->LoadModel( path );
+	Model *model = Graphics_LoadModel( path );
 	Transform& transform = entities->AddComponent< Transform >( proto );
 
 	DefaultRenderable* renderable = new DefaultRenderable;
@@ -90,30 +101,33 @@ void CreateProtogen( const std::string& path )
 	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
 
 	g_protos.push_back( proto );
+#endif
 }
 
 
 void CreateModelEntity( const std::string& path )
 {
+#if 0
 	Entity physEnt = entities->CreateEntity();
 
-	Model* model = graphics->LoadModel( path );
+	Model* model   = Graphics_LoadModel( path );
 	entities->AddComponent< Model* >( physEnt, model );
 	Transform& transform = entities->AddComponent< Transform >( physEnt );
 
 	Transform& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
 	transform = playerTransform;
 
-	// NO
 	g_staticEnts.push_back( physEnt );
+#endif
 }
 
 
 void CreatePhysEntity( const std::string& path )
 {
+#if 0
 	Entity physEnt = entities->CreateEntity();
 
-	Model* model = graphics->LoadModel( path );
+	Model* model   = Graphics_LoadModel( path );
 	entities->AddComponent< Model* >( physEnt, model );
 
 	Transform& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
@@ -139,6 +153,7 @@ void CreatePhysEntity( const std::string& path )
 	entities->AddComponent< IPhysicsObject * >( physEnt, phys );
 
 	g_otherEnts.push_back( physEnt );
+#endif
 }
 
 #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
@@ -157,7 +172,7 @@ CON_COMMAND( delete_protos )
 {
 	for ( auto& proto : g_protos )
 	{
-		graphics->FreeModel( entities->GetComponent< Model* >( proto ) );
+		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
 		entities->DeleteEntity( proto );
 	}
 	g_protos.clear();
@@ -174,12 +189,7 @@ CON_COMMAND( create_phys_proto )
 }
 
 
-GameSystem::GameSystem(  ):
-	aPaused( true ),
-	aFrameTime(0.f),
-	// only large near and farz for riverhouse and quake movement
-	// aView( 0, 0, 200, 200, 1, 10000, 90 )
-	aView( 0, 0, 200, 200, r_nearz, r_farz, r_fov )
+GameSystem::GameSystem()
 {
 	game = this;
 }
@@ -216,19 +226,22 @@ GameSystem::~GameSystem(  )
 }
 
 
-Handle hAudioMusic = InvalidHandle;
-
-
-void GameSystem::Init(  )
+void GameSystem::Init()
 {
-	LoadModules(  );
-	RegisterKeys(  );
+	Game_LoadModules();
+	Game_RegisterKeys();
+	Game_UpdateProjection();
+
+	if ( !Graphics_Init() )
+		return;
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 
 #if AUDIO_OPENAL
 	hAudioMusic = audio->RegisterChannel( "Music" );
 #endif
+
+	mapmanager = new MapManager;
 
 	entities = new EntityManager;
 	entities->Init();
@@ -238,19 +251,19 @@ void GameSystem::Init(  )
 	players = entities->RegisterSystem<PlayerManager>();
 	players->Init();
 
-	aLocalPlayer = players->Create();
+	gLocalPlayer = players->Create();
 
 	// mark this as the local player
-	auto& playerInfo = entities->GetComponent< CPlayerInfo >( aLocalPlayer );
+	auto& playerInfo = entities->GetComponent< CPlayerInfo >( gLocalPlayer );
 	playerInfo.aIsLocalPlayer = true;
 
-	players->Spawn( aLocalPlayer );
+	players->Spawn( gLocalPlayer );
 
 	Log_Msg( "Game Loaded!\n" );
 }
 
 
-void GameSystem::RegisterKeys(  )
+void Game_RegisterKeys()
 {
 	input->RegisterKey( SDL_SCANCODE_W );
 	input->RegisterKey( SDL_SCANCODE_S );
@@ -278,26 +291,26 @@ void GameSystem::RegisterKeys(  )
 }
 
 
-void GameSystem::LoadModules(  )
+void Game_LoadModules(  )
 {
 	GET_SYSTEM_CHECK( gui, BaseGuiSystem );
-	GET_SYSTEM_CHECK( graphics, BaseGraphicsSystem );
+	GET_SYSTEM_CHECK( render, IRender );
 	GET_SYSTEM_CHECK( input, BaseInputSystem );
 	GET_SYSTEM_CHECK( audio, BaseAudioSystem );
 
-	graphics->GetWindowSize( &aView.width, &aView.height );
-	aView.ComputeProjection();
-
 	gamephys.Init();
-
-	// stupid
-	materialsystem = graphics->GetMaterialSystem();
-
-	mapmanager = new MapManager;
 }
 
 
-bool GameSystem::InMap()
+void CenterMouseOnScreen()
+{
+	int w, h;
+	SDL_GetWindowSize( render->GetWindow(), &w, &h );
+	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
+}
+
+
+bool Game_InMap()
 {
 	return mapmanager->apMap != nullptr;
 }
@@ -312,48 +325,23 @@ ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
 
 
-// TODO: figure out a better way to do this, god
 void GameSystem::Update( float frameTime )
 {
-	// ZoneScoped
-	PROF_SCOPE();
-
-	static bool ranOnce = false;
-	
 	input->Update( frameTime );
 
-	// if ( ranOnce )
-	// gTaskScheduler.WaitForCounter( &gGraphicsCounter );
-	// gTaskScheduler.WaitAll( 1000 );
+	ImGui::NewFrame();
+	ImGui_ImplSDL2_NewFrame();
 
-	gui->StartFrame();
-
-	GameUpdate( frameTime );
-	
-	// GraphicsTask graphicsTasks[1];
-	// graphicsTasks[0].aFrameTime = frameTime;
-
-	// gTaskScheduler.RunAsync( MT::TaskGroup::Default(), &graphicsTasks[0], 1 );
-
-	// ftl::Task graphicsTask;
-	// graphicsTask.Function = TaskGraphicsUpdate;
-	// graphicsTask.ArgData = &frameTime;
-	// 
-	// gTaskScheduler.AddTask( graphicsTask, ftl::TaskPriority::Normal, &gGraphicsCounter );
-	
-	// gTaskScheduler.WaitForCounter( &gGraphicsCounter );
-
-	ranOnce = true;
-
+	Game_Update( frameTime );
 	gui->Update( frameTime );
-	graphics->Update( frameTime );
-	
+	Graphics_Present();
 	Con_Update();
 }
 
 
 void EntUpdate()
 {
+#if 0
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
@@ -374,87 +362,97 @@ void EntUpdate()
 			ToMatrix( renderable->aMatrix, phys->GetPos(), phys->GetAng() );
 		}
 
-		materialsystem->AddRenderable( renderable );
+		// materialsystem->AddRenderable( renderable );
 	}
+#endif
 }
 
 
-void GameSystem::GameUpdate( float frameTime )
+void Game_Update( float frameTime )
 {
-	// move to engine?
-	aFrameTime = frameTime * en_timescale;
+	gFrameTime = frameTime * en_timescale;
 
-	HandleSystemEvents();
+	Graphics_NewFrame();
+	Game_HandleSystemEvents();
 
 	gameinput.Update();
 
-	CheckPaused();
+	Game_CheckPaused();
 
-	if ( aPaused )
+	if ( gPaused )
 	{
 		//ResetInputs(  );
 		//players->Update( 0.f );
 		//return;
-		aFrameTime = 0.f;
+		gFrameTime = 0.f;
 	}
 
-	aCurTime += aFrameTime;
+	gCurTime += gFrameTime;
 
 	mapmanager->Update();
 
 	// WORLD GLOBAL AXIS
-	if ( dbg_global_axis )
-	{
-		graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size.GetFloat(), 0, 0}, {1, 0, 0});
-		graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size.GetFloat(), 0}, {0, 1, 0} );
-		graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
-	}
+	// if ( dbg_global_axis )
+	// {
+	// 	graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size.GetFloat(), 0, 0}, {1, 0, 0});
+	// 	graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size.GetFloat(), 0}, {0, 1, 0} );
+	// 	graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
+	// }
 
-	players->Update( aFrameTime );
+	players->Update( gFrameTime );
 
-#if BULLET_PHYSICS
-	physenv->Simulate( aFrameTime );
+	physenv->Simulate( gFrameTime );
 
 	EntUpdate();
 
 	// stupid
-	for (auto& player: players->aPlayerList)
+	for ( auto& player: players->aPlayerList )
 	{
 		players->apMove->UpdatePosition( player );
 	}
-#endif
 
-	players->apMove->DisplayPlayerStats( aLocalPlayer );
+	players->apMove->DisplayPlayerStats( gLocalPlayer );
 
-	SetupModels( frameTime );
+	Game_SetupModels( gFrameTime );
+	Game_ResetInputs();
+	Game_UpdateAudio();
 
-	ResetInputs();
-
-	UpdateAudio();
-
-	if ( input->WindowHasFocus() && !aPaused )
+	if ( input->WindowHasFocus() && !gPaused )
 	{
 		CenterMouseOnScreen();
 	}
 }
 
 
-void GameSystem::CheckPaused()
+
+void Game_SetPaused( bool paused )
 {
-	bool wasPaused = aPaused;
-	aPaused = gui->IsConsoleShown();
+	gPaused = paused;
+}
 
-	if ( wasPaused != aPaused )
+
+bool Game_IsPaused()
+{
+	return gPaused;
+}
+
+
+void Game_CheckPaused()
+{
+	bool wasPaused = gPaused;
+	gPaused = gui->IsConsoleShown();
+
+	if ( wasPaused != gPaused )
 	{
-		SDL_SetRelativeMouseMode( (SDL_bool)!aPaused );
+		SDL_SetRelativeMouseMode( (SDL_bool)!gPaused );
 
-		if ( aPaused )
+		if ( gPaused )
 		{
-			CenterMouseOnScreen(  );
+			CenterMouseOnScreen();
 		}
 	}
 
-	audio->SetPaused( aPaused );
+	audio->SetPaused( gPaused );
 }
 
 
@@ -619,9 +617,9 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 
 
 // will be used in the future for when updating bones and stuff
-void GameSystem::SetupModels( float frameTime )
+void Game_SetupModels( float frameTime )
 {
-	if ( !aPaused )
+	if ( !gPaused )
 	{
 		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
 		{
@@ -629,7 +627,7 @@ void GameSystem::SetupModels( float frameTime )
 		}
 	}
 
-	auto& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
 	// auto& camTransform = entities->GetComponent< CCamera >( game->aLocalPlayer ).aTransform;
 
 	//transform.aPos += camTransform.aPos;
@@ -640,7 +638,7 @@ void GameSystem::SetupModels( float frameTime )
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
-#if 1
+#if 0
 	for ( auto& proto: g_protos )
 	{
 		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
@@ -682,101 +680,11 @@ void GameSystem::SetupModels( float frameTime )
 
 		materialsystem->AddRenderable( renderable );
 	}
-#else
-	if ( g_protos.size() )
-	{
-		constexpr int numTasks = 2;
-		ftl::Task *protoLookTasks = new ftl::Task[numTasks];
-		ProtoLookData_t *protoLookData = new ProtoLookData_t[numTasks];
-
-		// setup tasks
-		for ( int i = 0; i < numTasks; i++ )
-		{
-			protoLookTasks[i].Function = TaskUpdateProtoLook;
-			protoLookTasks[i].ArgData = &protoLookData[i];
-		}
-
-		// for ( auto& proto: g_protos )
-		// add protos to the task
-		for ( int i = 0; i < g_protos.size(); i++ )
-		{
-			Entity& proto = g_protos[i];
-
-			int taskIndex = i % numTasks;
-			protoLookData[taskIndex].aProtos.push_back( proto );
-			protoLookData[taskIndex].aPlayerTransform = &playerTransform;
-#if 1
-
-#else
-			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
-			auto& protoTransform = entities->GetComponent< Transform >( proto );
-
-			bool matrixChanged = false;
-
-			if ( proto_look.GetBool() )
-			{
-				matrixChanged = true;
-
-				glm::vec3 forward{}, right{}, up{};
-				//AngleToVectors( protoTransform.aAng, forward, right, up );
-				AngleToVectors( playerTransform.aAng, forward, right, up );
-
-				glm::vec3 protoView = protoTransform.aPos;
-				//protoView.z += cl_view_height;
-
-				glm::vec3 direction = (protoView - playerTransform.aPos);
-				// glm::vec3 rotationAxis = VectorToAngles( direction );
-				glm::vec3 rotationAxis = VectorToAngles( direction, up );
-
-				protoTransform.aAng = rotationAxis;
-				protoTransform.aAng[PITCH] = 0.f;
-				protoTransform.aAng[YAW] -= 90.f;
-				protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
-				//protoTransform.aAng[ROLL] = 90.f;
-			}
-
-			if ( protoTransform.aScale.x != protoScale )
-			{
-				// protoTransform.aScale = {protoScale, protoScale, protoScale};
-				protoTransform.aScale = glm::vec3( protoScale );
-				matrixChanged = true;
-			}
-
-			if ( matrixChanged )
-				renderable->aMatrix = protoTransform.ToMatrix();
-
-			materialsystem->AddRenderable( renderable );
 #endif
-		}
-
-
-		ftl::TaskCounter counter( &gTaskScheduler );
-		gTaskScheduler.AddTasks( numTasks, protoLookTasks, ftl::TaskPriority::Normal, &counter );
-
-		// FTL creates its own copies of the tasks, so we can safely delete the memory
-		delete[] protoLookTasks;
-
-		// Wait for the tasks to complete
-		gTaskScheduler.WaitForCounter( &counter );
-
-		delete[] protoLookData;
-
-		for ( auto& proto : g_protos )
-		{
-			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
-			materialsystem->AddRenderable( renderable );
-		}
-	}	
-#endif
-
-	if ( g_streamModel )
-	{
-		// g_streamModel->SetScale( {snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat(), snd_cube_scale.GetFloat()} );
-	}
 }
 
 
-void GameSystem::ResetInputs(  )
+void Game_ResetInputs(  )
 {
 }
 
@@ -798,12 +706,12 @@ CONVAR_CMD( snd_sound_speed, 6000 )
 #endif
 
 
-void GameSystem::UpdateAudio(  )
+void Game_UpdateAudio(  )
 {
-	if ( aPaused )
+	if ( gPaused )
 		return;
 
-	auto& transform = entities->GetComponent< Transform >( aLocalPlayer );
+	auto& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
 	if ( input->KeyJustPressed( SDL_SCANCODE_H ) )
 	{
@@ -866,7 +774,7 @@ void GameSystem::UpdateAudio(  )
 }
 
 
-void GameSystem::HandleSystemEvents()
+void Game_HandleSystemEvents()
 {
 	static std::vector< SDL_Event >* events = input->GetEvents();
 
@@ -880,8 +788,7 @@ void GameSystem::HandleSystemEvents()
 				{
 					case SDL_WINDOWEVENT_SIZE_CHANGED:
 					{
-						graphics->GetWindowSize( &aView.width, &aView.height );
-						aView.ComputeProjection();
+						Game_UpdateProjection();
 						break;
 					}
 				}
@@ -897,9 +804,32 @@ void GameSystem::HandleSystemEvents()
 }
 
 
-void GameSystem::SetViewMatrix( const glm::mat4& viewMatrix )
+void Game_SetView( const glm::mat4& srViewMat )
 {
-	aView.viewMatrix = viewMatrix;
-	graphics->SetView( aView );
+	int width = 0, height = 0;
+	render->GetSurfaceSize( width, height );
+
+	gView.aViewMat = srViewMat;
+	gView.ComputeProjection( width, height );
+
+	Graphics_SetViewProjMatrix( gView.aProjViewMat );
+
+	auto& io         = ImGui::GetIO();
+	io.DisplaySize.x = width;
+	io.DisplaySize.y = height;
+}
+
+
+void Game_UpdateProjection()
+{
+	int width = 0, height = 0;
+	render->GetSurfaceSize( width, height );
+	gView.ComputeProjection( width, height );
+
+	Graphics_SetViewProjMatrix( gView.aProjViewMat );
+
+	auto& io = ImGui::GetIO();
+	io.DisplaySize.x = width;
+	io.DisplaySize.y = height;
 }
 

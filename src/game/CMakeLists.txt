@@ -4,8 +4,8 @@ file(
 	GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
 	*.cpp
 	*.h
-	terrain/*.cpp
-	terrain/*.h
+	graphics/*.cpp
+	graphics/*.h
 )
 
 file(
@@ -21,11 +21,11 @@ file(
 # include( ${CH_ROOT}/scripts/bullet.cmake )
 include( ${CH_ROOT}/scripts/vulkan.cmake )
 
-link_libraries( Core )
+link_libraries( Core ImGui )
 
 add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} )
 
-add_dependencies( SiduryClient "Core" )
+add_dependencies( SiduryClient "Core" "ImGui" )
 
 set_target_properties(
 	SiduryClient PROPERTIES

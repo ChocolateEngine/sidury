@@ -7,9 +7,10 @@ Loads Sidury Map Files (smf)
 #include "core/filesystem.h"
 #include "core/console.h"
 #include "util.h"
-#include "gamesystem.h"
+#include "main.h"
 #include "player.h"
 #include "skybox.h"
+#include "graphics/graphics.h"
 
 #include "mapmanager.h"
 
@@ -21,6 +22,7 @@ LOG_REGISTER_CHANNEL( Map, LogColor::DarkGreen );
 MapManager *mapmanager = nullptr;
 
 extern ConVar velocity_scale;
+extern Entity gLocalPlayer;
 
 
 void map_dropdown(
@@ -77,7 +79,7 @@ void MapManager::Update()
 
 	GetSkybox().Draw();
 
-	materialsystem->AddRenderable( &apMap->aRenderable );
+	Graphics_DrawModel( &apMap->aRenderable );
 }
 
 
@@ -86,8 +88,8 @@ void MapManager::CloseMap()
 	if ( apMap == nullptr )
 		return;
 
-	if ( apMap->apWorldModel )
-		graphics->FreeModel( apMap->apWorldModel );
+	if ( apMap->aRenderable.aModel != InvalidHandle )
+		Graphics_FreeModel( apMap->aRenderable.aModel );
 
 	for ( auto physObj: apMap->aWorldPhysObjs )
 		physenv->DestroyObject( physObj );
@@ -142,7 +144,7 @@ bool MapManager::LoadMap( const std::string &path )
 
 bool MapManager::LoadWorldModel()
 {
-	if ( !(apMap->apWorldModel = graphics->LoadModel( apMap->aMapInfo->modelPath )) )
+	if ( !( apMap->aRenderable.aModel = Graphics_LoadModel( apMap->aMapInfo->modelPath ) ) )
 	{
 		return false;
 	}
@@ -151,9 +153,10 @@ bool MapManager::LoadWorldModel()
 	Transform mapTransform{};
 	mapTransform.aAng = apMap->aMapInfo->ang;
 	
-	apMap->aRenderable.apModel = apMap->apWorldModel;
-	apMap->aRenderable.aMatrix = mapTransform.ToMatrix();
+	apMap->aRenderable.aModelMatrix = mapTransform.ToMatrix();
 	
+	// temp disabled
+#if 0
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 	shapeInfo.aMeshData.apModel = apMap->apWorldModel;
 	
@@ -167,6 +170,7 @@ bool MapManager::LoadWorldModel()
 	
 	apMap->aWorldPhysShapes.push_back( physShape );
 	apMap->aWorldPhysObjs.push_back( physObj );
+#endif
 
 	return true;
 }
@@ -284,7 +288,7 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 
 void MapManager::SpawnPlayer()
 {
-	players->Respawn( game->aLocalPlayer );
+	players->Respawn( gLocalPlayer );
 }
 
 

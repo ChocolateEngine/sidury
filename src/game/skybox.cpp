@@ -1,18 +1,17 @@
 #include "skybox.h"
-#include "gamesystem.h"
+#include "main.h"
 
-#include "graphics/imaterialsystem.h"
-#include "graphics/imaterial.h"
-#include "graphics/meshbuilder.hpp"
+#include "graphics/graphics.h"
+#include "graphics/mesh_builder.h"
 #include "util.h"
 
 extern GameSystem* game;
-extern IMaterialSystem* materialsystem;
 
 
 CONVAR( g_skybox, 1 );
 CONVAR( g_skybox_ang_freeze, 0 );
 
+static Handle gSkyboxShader = InvalidHandle;
 
 Skybox& GetSkybox()
 {
@@ -27,14 +26,17 @@ constexpr glm::vec3 vec3_zero( 0, 0, 0 );
 
 void Skybox::Init()
 {
-	apModel = new Model;
+	Model* model    = new Model;
+	aModel          = Graphics_AddModel( model );
+
+	gSkyboxShader = Graphics_GetShader( "skybox" );
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
-	IMaterial* mat = materialsystem->CreateMaterial( "skybox" );
+	Handle      mat = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( materialsystem, apModel );
+	meshBuilder.Start( model );
 	meshBuilder.SetMaterial( mat );
 
 	// std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
@@ -93,24 +95,24 @@ void Skybox::SetSkybox( const std::string &path )
 {
 	aValid = false;
 
-	IMaterial* prevMat = apModel->GetMaterial( 0 );
+	Handle prevMat = Model_GetMaterial( aModel, 0 );
 
 	if ( prevMat )
 	{
-		apModel->SetMaterial( 0, nullptr );
-		materialsystem->DeleteMaterial( prevMat );
+		Model_SetMaterial( aModel, 0, InvalidHandle );
+		Graphics_FreeMaterial( prevMat );
 	}
 
 	if ( path.empty() )
 		return;
 
-	IMaterial* mat = materialsystem->ParseMaterial( path );
-	if ( !mat )
+	Handle mat = Graphics_LoadMaterial( path );
+	if ( mat == InvalidHandle )
 		return;
 
-	apModel->SetMaterial( 0, mat );
+	Model_SetMaterial( aModel, 0, mat );
 
-	if ( mat->GetShaderName() != "skybox" )
+	if ( Mat_GetShader( mat ) != gSkyboxShader )
 	{
 		Log_WarnF( "[Game] Skybox Material is not using skybox shader: %s\n", path.c_str() );
 		return;
@@ -118,7 +120,7 @@ void Skybox::SetSkybox( const std::string &path )
 
 	aValid = true;
 
-	mat->SetVar( MatVar_Ang, vec3_zero );
+	Mat_SetVar( mat, MatVar_Ang, vec3_zero );
 }
 
 
@@ -150,7 +152,7 @@ inline void ToViewMatrixY( glm::mat4& viewMatrix, const glm::vec3& ang )
 
 void Skybox::SetAng( const glm::vec3& ang )
 {
-	if ( !aValid || g_skybox_ang_freeze || !apModel->GetMaterial( 0 ) )
+	if ( !aValid || g_skybox_ang_freeze || Model_GetMaterial( aModel, 0 ) == InvalidHandle )
 		return;
 
 	ToViewMatrixY( aMatrix, ang );
@@ -159,24 +161,8 @@ void Skybox::SetAng( const glm::vec3& ang )
 
 void Skybox::Draw()
 {
-	if ( aValid && g_skybox )
-		materialsystem->AddRenderable( this );
+	// if ( aValid && g_skybox )
+	// 	Graphics_DrawModel( {aModel, aMatrix} );
 }
 
-
-IModel* Skybox::GetModel()
-{
-	return apModel;
-}
-
-const glm::mat4& Skybox::GetModelMatrix()
-{
-	return aMatrix;
-}
-
-// hmm, i don't like having to return something valid here
-const std::vector< float >& Skybox::GetMorphWeights()
-{
-	return aMorphVerts;
-}
 

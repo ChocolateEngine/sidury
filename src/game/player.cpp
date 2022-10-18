@@ -1,8 +1,15 @@
+#include "main.h"
 #include "player.h"
 #include "util.h"
-#include "mapmanager.h"
 #include "skybox.h"
 #include "inputsystem.h"
+
+#include "igui.h"
+#include "iinput.h"
+#include "render/irender.h"
+#include "graphics/graphics.h"
+
+#include "mapmanager.h"
 
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -88,19 +95,21 @@ CONVAR( r_farz, 10000.f );
 CONVAR( cl_zoom_fov, 40 );
 CONVAR( cl_zoom_duration, 0.4 );
 
-extern ConVar m_yaw, m_pitch;
+extern ConVar   m_yaw, m_pitch;
+
+extern Entity   gLocalPlayer;
 
 constexpr float PLAYER_MASS = 200.f;
 
 
 CON_COMMAND( respawn )
 {
-	players->Respawn( game->aLocalPlayer );
+	players->Respawn( gLocalPlayer );
 }
 
 CON_COMMAND( reset_velocity )
 {
-	auto& rigidBody = entities->GetComponent< CRigidBody >( game->aLocalPlayer );
+	auto& rigidBody = entities->GetComponent< CRigidBody >( gLocalPlayer );
 	rigidBody.aVel = {0, 0, 0};
 }
 
@@ -248,7 +257,7 @@ void PlayerManager::Update( float frameTime )
 {
 	for ( Entity player: aPlayerList )
 	{
-		if ( !game->aPaused )
+		if ( !Game_IsPaused() )
 		{
 			DoMouseLook( player );
 			apMove->MovePlayer( player );
@@ -258,16 +267,16 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( player );
+			ModelDraw_t* renderable = entities->GetComponent< ModelDraw_t* >( player );
 
-			auto model = entities->GetComponent< Model* >( player );
+			auto model = entities->GetComponent< HModel >( player );
 			Transform transform = entities->GetComponent< Transform >( player );
 			transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
 
-			renderable->aMatrix = transform.ToMatrix();
-			renderable->apModel = model;
+			renderable->aModelMatrix = transform.ToMatrix();
+			renderable->aModel = model.handle;
 
-			materialsystem->AddRenderable( renderable );
+			Graphics_DrawModel( renderable );
 		}
 
 		UpdateView( playerInfo, player );
@@ -350,7 +359,7 @@ void CalcZoom( CCamera& camera, Entity player )
 		zoom.aOrigFov = r_fov;
 	}
 
-	if ( game->aPaused )
+	if ( Game_IsPaused() )
 	{
 		camera.aFov = zoom.aNewFov;
 		return;
@@ -385,7 +394,7 @@ void CalcZoom( CCamera& camera, Entity player )
 		lerpTarget = zoom.aOrigFov;
 	}
 
-	zoom.aZoomTime += game->aFrameTime;
+	zoom.aZoomTime += gFrameTime;
 
 	if ( zoom.aZoomDuration >= zoom.aZoomTime )
 	{
@@ -445,7 +454,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ(  );
 
-		game->SetViewMatrix( viewMat );
+		Game_SetView( viewMat );
 		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
 	else
@@ -458,14 +467,17 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		glm::mat4 viewMat = transformView.ToViewMatrixZ(  );
 
-		game->SetViewMatrix( viewMat );
+		Game_SetView( viewMat );
 		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
 
 	if ( info.aIsLocalPlayer )
 	{
 		// scale the nearz and farz
-		game->aView.Set( 0, 0, game->aView.width, game->aView.height, r_nearz, r_farz, camera.aFov );
+		gView.aFarZ  = r_farz;
+		gView.aNearZ = r_nearz;
+		gView.aFOV   = camera.aFov;
+		Game_UpdateProjection();
 
 		// i feel like there's gonna be a lot more here in the future...
 		GetSkybox().SetAng( transformView.aAng );
@@ -837,7 +849,7 @@ void PlayerMovement::DoSmoothDuck()
 		apMove->aDuckTime = 0.f;
 	}
 
-	apMove->aDuckTime += game->aFrameTime;
+	apMove->aDuckTime += gFrameTime;
 
 	if ( apMove->aDuckDuration >= apMove->aDuckTime )
 	{
@@ -994,7 +1006,7 @@ void PlayerMovement::PlayStepSound(  )
 	if ( speedFactor < cl_step_sound_min_speed )
 		return;
 
-	if ( game->aCurTime - apMove->aLastStepTime < cl_stepduration )
+	if ( gCurTime - apMove->aLastStepTime < cl_stepduration )
 		return;
 
 	StopStepSound( true );
@@ -1005,7 +1017,7 @@ void PlayerMovement::PlayStepSound(  )
 		audio->SetVolume( stepSound, speedFactor );
 		audio->PlaySound( stepSound );
 
-		apMove->aLastStepTime = game->aCurTime;
+		apMove->aLastStepTime = gCurTime;
 	}
 }
 
@@ -1215,7 +1227,7 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 			landTime = 0.f;
         }
 
-		landTime += game->aFrameTime * cl_land_timevar;
+		landTime += gFrameTime * cl_land_timevar;
 
 		if ( landPower > 0.f )
 			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;
@@ -1273,7 +1285,7 @@ void PlayerMovement::DoViewBob(  )
 	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 );
 
 	// scale by speed
-	apMove->aWalkTime += game->aFrameTime * speedFactor * cl_bob_freq;
+	apMove->aWalkTime += gFrameTime * speedFactor * cl_bob_freq;
 
 	// never reaches 0 so do this to get it to 0
 	// static float sinMessFix = sin(cos(tan(cos(0))));
@@ -1342,14 +1354,14 @@ void PlayerMovement::DoViewTilt(  )
 		float speedFactor = glm::max(0.f, glm::log( glm::max(0.f, (fabs(output) * cl_tilt_speed_scale + 1) - cl_tilt_threshold_new) ));
 
 		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
-		output = glm::mix( prevTilt, speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * game->aFrameTime );
+		output = glm::mix( prevTilt, speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * gFrameTime );
 	}
 	else // type 0
 	{
 		output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
 
 		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
-		output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * game->aFrameTime );
+		output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * gFrameTime );
 	}
 
 	apCamera->aTransform.aAng[ROLL] = output;
@@ -1417,7 +1429,7 @@ void PlayerMovement::AddFriction(  )
 
 	// apply friction
 	float control = speed < stop_speed ? stop_speed : speed;
-	float newspeed = glm::max( 0.f, speed - game->aFrameTime * control * friction );
+	float newspeed = glm::max( 0.f, speed - gFrameTime * control * friction );
 
 	newspeed /= speed;
 	apRigidBody->aVel = vel * newspeed;
@@ -1436,7 +1448,7 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 	if ( addspeed <= 0.f )
 		return;
 
-	addspeed = glm::min( addspeed, accel_speed * game->aFrameTime * wishSpeed );
+	addspeed = glm::min( addspeed, accel_speed * gFrameTime * wishSpeed );
 
 	for ( int i = 0; i < 3; i++ )
 		apRigidBody->aVel[i] += addspeed * wishDir[i];

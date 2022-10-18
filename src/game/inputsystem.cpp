@@ -1,5 +1,7 @@
-#include "gamesystem.h"
 #include "inputsystem.h"
+#include "iinput.h"
+
+extern BaseInputSystem* input;
 
 GameInput gameinput;
 
