@@ -22,15 +22,16 @@ void                         Graphics_LoadObj( const std::string& srPath, Model*
 // void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Model* spModel );
 
 // shaders, fun
-Handle                       Shader_Basic3D_Create();
+Handle                       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
+void                         Shader_Basic3D_Destroy();
 void                         Shader_Basic3D_Bind( Handle cmd, size_t sCmdIndex );
 void                         Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
 void                         Shader_Basic3D_ResetPushData();
 void                         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
 VertexFormat                 Shader_Basic3D_GetVertexFormat();
 
-Handle                       Shader_UI_Create();
-void                         Shader_UI_SetupPushData( Handle shColor );
+Handle                       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
+void                         Shader_UI_Destroy();
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
 
 // --------------------------------------------------------------------------------------
@@ -180,6 +181,26 @@ Handle Graphics_GetMissingTexture()
 }
 
 
+void Graphics_DestroyRenderTargets()
+{
+	if ( gImGuiTextures[ 0 ] )
+		render->FreeTexture( gImGuiTextures[ 0 ] );
+
+	if ( gImGuiTextures[ 1 ] )
+		render->FreeTexture( gImGuiTextures[ 1 ] );
+
+	memset( gImGuiTextures, InvalidHandle, sizeof( gImGuiTextures ) );
+
+	if ( gImGuiBuffer[ 0 ] )
+		render->DestroyFramebuffer( gImGuiBuffer[ 0 ] );
+
+	if ( gImGuiBuffer[ 1 ] )
+		render->DestroyFramebuffer( gImGuiBuffer[ 1 ] );
+
+	memset( gImGuiBuffer, InvalidHandle, sizeof( gImGuiBuffer ) );
+}
+
+
 bool Graphics_CreateRenderTargets()
 {
 	int width = 0, height = 0;
@@ -203,7 +224,7 @@ bool Graphics_CreateRenderTargets()
 
 	// Create a new framebuffer for ImGui to draw on
 	CreateFramebuffer_t frameBufCreate{};
-	frameBufCreate.aRenderPass = gRenderPassUI;
+	frameBufCreate.aRenderPass = gRenderPassUI;  // ImGui will be drawn onto the graphics RenderPass
 	frameBufCreate.aSize       = { width, height };
 
 	// Create Color
@@ -214,7 +235,7 @@ bool Graphics_CreateRenderTargets()
 	// Create Depth
 	// frameBufCreate.aPass.aAttachColors.clear();
 	// gImGuiBuffer[ 1 ]                 = render->CreateFramebuffer( frameBufCreate );
-	gImGuiBuffer[ 1 ]                 = render->CreateFramebuffer( frameBufCreate );
+	gImGuiBuffer[ 1 ] = render->CreateFramebuffer( frameBufCreate );
 
 #if 0
 	CreateRenderTarget_t createTarget{};
@@ -236,6 +257,12 @@ bool Graphics_CreateRenderTargets()
 	}
 
 	return true;
+}
+
+
+void Graphics_DestroyRenderPasses()
+{
+	render->DestroyRenderPass( gRenderPassUI );
 }
 
 
@@ -264,6 +291,53 @@ bool Graphics_CreateRenderPasses()
 }
 
 
+void Graphics_OnResetCallback( ERenderResetFlags sFlags )
+{
+	gBackBuffer[ 0 ] = render->GetBackBufferColor();
+	gBackBuffer[ 1 ] = render->GetBackBufferDepth();
+
+	if ( gBackBuffer[ 0 ] == InvalidHandle || gBackBuffer[ 1 ] == InvalidHandle )
+	{
+		Log_Fatal( gLC_ClientGraphics, "Failed to get Back Buffer Handles!\n" );
+	}
+
+	Graphics_DestroyRenderTargets();
+
+	if ( !Graphics_CreateRenderTargets() )
+	{
+		Log_Fatal( gLC_ClientGraphics, "Failed to create Render Targets!\n" );
+	}
+
+	if ( sFlags & ERenderResetFlags_MSAA )
+	{
+		if ( !Graphics_CreateRenderPasses() )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create render passes\n" );
+			return;
+		}
+
+		render->ShutdownImGui();
+		if ( !render->InitImGui( gRenderPassGraphics ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to re-init ImGui for Vulkan\n" );
+			return;
+		}
+
+		if ( !( gUIShader = Shader_UI_Create( gRenderPassUI, true ) ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
+			return;
+		}
+
+		if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, true ) ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
+			return;
+		}
+	}
+}
+
+
 bool Graphics_Init()
 {
 	render->GetCommandBufferHandles( gCommandBuffers );
@@ -273,6 +347,8 @@ bool Graphics_Init()
 		Log_Fatal( gLC_ClientGraphics, "Failed to get render command buffers!\n" );
 		return false;
 	}
+
+	render->SetResetCallback( Graphics_OnResetCallback );
 
 	// TODO: the backbuffer should probably be created in game code
 	gBackBuffer[ 0 ] = render->GetBackBufferColor();
@@ -284,13 +360,13 @@ bool Graphics_Init()
 		return false;
 	}
 
-	if ( !( gUIShader = Shader_UI_Create() ) )
+	if ( !( gUIShader = Shader_UI_Create( gRenderPassUI, false ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
 		return false;
 	}
 
-	if ( !( gTempShader = Shader_Basic3D_Create() ) )
+	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, false ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
 		return false;
@@ -306,7 +382,8 @@ bool Graphics_Init()
 		return false;
 	}
 
-	return render->InitImGui( gRenderPassUI );
+	// return render->InitImGui( gRenderPassUI );
+	return render->InitImGui( gRenderPassGraphics );
 }
 
 
@@ -318,11 +395,7 @@ void Graphics_Shutdown()
 void Graphics_Reset()
 {
 	render->Reset();
-
-	if ( !Graphics_CreateRenderTargets() )
-	{
-		// return false;
-	}
+	// Graphics_OnResetCallback();
 }
 
 
@@ -411,6 +484,8 @@ void Graphics_BindBuffers( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 
 	// TODO: store index type here somewhere
 	render->CmdBindIndexBuffer( cmd, mesh.aIndexBuffer, 0, EIndexType_U32 );
+
+	CH_STACK_FREE( offsets );
 }
 
 
@@ -444,7 +519,9 @@ void Graphics_Render( Handle cmd )
 	// TODO: still could be better, but it's better than what we used to have
 	for ( auto& [ shader, renderList ] : gMeshDrawList )
 	{
-		render->CmdBindPipeline( cmd, shader );
+		if ( !render->CmdBindPipeline( cmd, shader ) )
+			continue;
+
 		Shader_Basic3D_Bind( cmd, gCmdIndex );
 
 		for ( auto& renderable : renderList )
@@ -462,6 +539,8 @@ void Graphics_Render( Handle cmd )
 			Graphics_CmdDrawModel( cmd, renderable );
 		}
 	}
+
+	return;
 
 	// un-flip viewport
 	viewPort.x        = 0.f;
@@ -491,8 +570,6 @@ void Graphics_PrepareDrawData()
 			Shader_Basic3D_SetupPushData( renderable );
 		}
 	}
-
-	Shader_UI_SetupPushData( gImGuiTextures[ 0 ] );
 }
 
 
@@ -515,26 +592,27 @@ void Graphics_Present()
 		RenderPassBegin_t renderPassBegin{};
 
 		// ImGui RenderPass
-		renderPassBegin.aRenderPass  = gRenderPassUI;
-		renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
-		renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear       = true;
-
-		render->BeginRenderPass( c, renderPassBegin );
-		render->DrawImGui( ImGui::GetDrawData(), c );
-		render->EndRenderPass( c );
+		// renderPassBegin.aRenderPass  = gRenderPassUI;
+		// renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
+		// renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 0.f };
+		// renderPassBegin.aClear       = true;
+		// 
+		// render->BeginRenderPass( c, renderPassBegin );
+		// render->DrawImGui( ImGui::GetDrawData(), c );
+		// render->EndRenderPass( c );
 
 		// Main RenderPass
 		renderPassBegin.aRenderPass  = gRenderPassGraphics;
 		renderPassBegin.aFrameBuffer = gBackBuffer[ gCmdIndex ];
 		renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 1.f };
+		renderPassBegin.aClear       = true;
 
 		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
 
 		Graphics_Render( c );
 
 		// TODO: this should be a on a separate render pass that doesn't use SRGB or MSAA
-		// render->DrawImGui( ImGui::GetDrawData(), c );
+		render->DrawImGui( ImGui::GetDrawData(), c );
 
 		render->EndRenderPass( c );
 

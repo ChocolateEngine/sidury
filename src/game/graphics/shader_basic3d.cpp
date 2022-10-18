@@ -40,34 +40,65 @@ struct Basic3D_Push
 static std::unordered_map< ModelSurfaceDraw_t*, Basic3D_Push > gPushData;
 
 
-Handle Shader_Basic3D_Create()
+// TODO: use this in a shader system later on, unless i go with json5 for the shader info
+void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
 {
-	PipelineLayoutCreate_t pipelineCreateInfo{};
-	// pipelineCreateInfo.aLayouts = DescriptorLayout_Image | DescriptorLayout_UniformBuffer;
-	pipelineCreateInfo.aLayouts = EDescriptorLayout_Image;
-	pipelineCreateInfo.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
-
-	gPipelineLayout = render->CreatePipelineLayout( pipelineCreateInfo );
+	// srPipeline.aLayouts = DescriptorLayout_Image | DescriptorLayout_UniformBuffer;
+	srPipeline.aLayouts = EDescriptorLayout_Image;
+	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
 
 	// --------------------------------------------------------------
 
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+
+	Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
+	Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
+
+	srGraphics.aPrimTopology     = EPrimTopology_Tri;
+	srGraphics.aDynamicState     = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode         = ECullMode_Back;
+	srGraphics.aPipelineLayout   = gPipelineLayout;
+	srGraphics.aRenderPass       = sRenderPass;
+	// TODO: expose the rest later
+}
+
+
+Handle Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate )
+{
+	PipelineLayoutCreate_t   pipelineCreateInfo{};
 	GraphicsPipelineCreate_t pipelineInfo{};
 
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+	Shader_Basic3D_GetCreateInfo( sRenderPass, pipelineCreateInfo, pipelineInfo );
 
-	Graphics_GetVertexBindingDesc( gVertexFormat, pipelineInfo.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( gVertexFormat, pipelineInfo.aVertexAttributes );
+	// --------------------------------------------------------------
 
-	pipelineInfo.aPrimTopology   = EPrimTopology_Tri;
-	pipelineInfo.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-	pipelineInfo.aCullMode       = ECullMode_Back;
-	pipelineInfo.aPipelineLayout = gPipelineLayout;
+	if ( sRecreate )
+	{
+		render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
+		render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
+	}
+	else
+	{
+		gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
+		pipelineInfo.aPipelineLayout = gPipelineLayout;
+		gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
+	}
 
-	// TODO: expose the rest later
-
-	gPipeline = render->CreateGraphicsPipeline( pipelineInfo );
 	return gPipeline;
+}
+
+
+void Shader_Basic3D_Destroy()
+{
+	if ( gPipelineLayout )
+		render->DestroyPipelineLayout( gPipelineLayout );
+
+	if ( gPipeline )
+		render->DestroyPipeline( gPipeline );
+
+	gPipelineLayout = InvalidHandle;
+	gPipeline       = InvalidHandle;
 }
 
 
