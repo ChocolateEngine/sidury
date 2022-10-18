@@ -18,6 +18,8 @@
 #include "inputsystem.h"
 #include "skybox.h"
 
+#include <SDL_system.h>
+
 #include <algorithm>
 
 
@@ -226,6 +228,29 @@ GameSystem::~GameSystem(  )
 }
 
 
+
+#ifdef _WIN32
+  #define WM_PAINT 0x000F
+
+void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, Uint64 wParam, Sint64 lParam )
+{
+	switch ( message )
+	{
+		case WM_PAINT:
+		{
+			Log_Msg( "WM_PAINT\n" );
+			break;
+		}
+
+		default:
+		{
+			break;
+		}
+	}
+}
+#endif
+
+
 void GameSystem::Init()
 {
 	Game_LoadModules();
@@ -234,6 +259,10 @@ void GameSystem::Init()
 
 	if ( !Graphics_Init() )
 		return;
+
+#ifdef _WIN32
+	SDL_SetWindowsMessageHook( Game_WindowMessageHook, nullptr );
+#endif
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 
@@ -333,8 +362,17 @@ void GameSystem::Update( float frameTime )
 	ImGui_ImplSDL2_NewFrame();
 
 	Game_Update( frameTime );
-	gui->Update( frameTime );
-	Graphics_Present();
+
+	if ( !(SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED) )
+	{
+		gui->Update( frameTime );
+		Graphics_Present();
+	}
+	else
+	{
+		ImGui::EndFrame();
+	}
+
 	Con_Update();
 }
 
@@ -788,7 +826,14 @@ void Game_HandleSystemEvents()
 				{
 					case SDL_WINDOWEVENT_SIZE_CHANGED:
 					{
+						Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
+						break;
+					}
+					case SDL_WINDOWEVENT_EXPOSED:
+					{
+						Log_Msg( "SDL_WINDOWEVENT_EXPOSED\n" );
+						// TODO: RESET RENDERER AND DRAW ONTO WINDOW WINDOW !!!
 						break;
 					}
 				}
@@ -832,4 +877,5 @@ void Game_UpdateProjection()
 	io.DisplaySize.x = width;
 	io.DisplaySize.y = height;
 }
+
 
