@@ -13,6 +13,11 @@
 
 #define BULLET_PHYSICS 1
 
+// TODO: when physics materials are implemented, split up models by their physics material
+void Phys_GetModelVerts( Handle sModel, std::vector< glm::vec3 >& srVertices );
+void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris );
+void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData );
+
 
 class GamePhysics
 {

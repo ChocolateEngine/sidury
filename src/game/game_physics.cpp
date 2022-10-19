@@ -4,12 +4,14 @@
 #include "graphics/mesh_builder.h"
 
 
-extern IRender*      render;
+extern IRender*          render;
 
-IPhysicsEnvironment* physenv    = nullptr;
-Ch_IPhysics*         ch_physics = nullptr;
+IPhysicsEnvironment*     physenv    = nullptr;
+Ch_IPhysics*             ch_physics = nullptr;
 
-GamePhysics          gamephys;
+GamePhysics              gamephys;
+
+static Phys_DebugFuncs_t gPhysDebugFuncs;
 
 
 CONVAR_CMD( phys_gravity, -800 )
@@ -119,8 +121,8 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 
 Handle Phys_CreateTriangleBatchInd(
-  const std::vector< PhysVertex >& srVerts,
-  const std::vector< u32 >&        srInd )
+  const std::vector< PhysVertex_t >& srVerts,
+  const std::vector< u32 >&          srInd )
 {
 #if 0
 	if ( inVertices == nullptr || inVertexCount == 0 || inIndices == nullptr || inIndexCount == 0 )
@@ -225,6 +227,173 @@ void Phys_DrawText(
 }
 
 
+void Phys_GetModelVerts( Handle sModel, std::vector< glm::vec3 >& srVertices )
+{
+	Model* model = Graphics_GetModelData( sModel );
+
+	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	{
+		Mesh&  mesh     = model->aMeshes[ s ];
+
+		auto&  ind      = mesh.aIndices;
+		auto&  vertData = mesh.aVertexData;
+
+		float* data     = nullptr;
+		for ( auto& attrib : vertData.aData )
+		{
+			if ( attrib.aAttrib == VertexAttribute_Position )
+			{
+				data = (float*)attrib.apData;
+				break;
+			}
+		}
+
+		if ( ind.size() )
+		{
+			for ( size_t i = 0; i < ind.size(); i++ )
+			{
+				size_t i0 = ind[ i ] * 3;
+				srVertices.emplace_back( data[ i0 ], data[ i0 + 1 ], data[ i0 + 2 ] );
+			}
+		}
+		else
+		{
+			for ( size_t i = 0; i < vertData.aCount * 3; )
+			{
+				srVertices.emplace_back( data[ i++ ], data[ i++ ], data[ i++ ] );
+			}
+		}
+	}
+}
+
+void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
+{
+	Model* model = Graphics_GetModelData( sModel );
+
+	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	{
+		Mesh&  mesh     = model->aMeshes[ s ];
+
+		auto&  ind      = mesh.aIndices;
+		auto&  vertData = mesh.aVertexData;
+
+		float* data     = nullptr;
+		for ( auto& attrib : vertData.aData )
+		{
+			if ( attrib.aAttrib == VertexAttribute_Position )
+			{
+				data = (float*)attrib.apData;
+				break;
+			}
+		}
+
+		// shouldn't be using this function if we have indices lol
+		// could even calculate them in GetModelInd as well
+		if ( ind.size() )
+		{
+			for ( size_t i = 0; i < ind.size(); i += 3 )
+			{
+				size_t    i0   = ind[ i + 0 ] * 3;
+				size_t    i1   = ind[ i + 1 ] * 3;
+				size_t    i2   = ind[ i + 2 ] * 3;
+
+				auto& tri = srTris.emplace_back();
+
+				tri.aPos[ 0 ] = { data[ i0 ], data[ i0 + 1 ], data[ i0 + 2 ] };
+				tri.aPos[ 1 ] = { data[ i1 ], data[ i1 + 1 ], data[ i1 + 2 ] };
+				tri.aPos[ 2 ] = { data[ i2 ], data[ i2 + 1 ], data[ i2 + 2 ] };
+
+				// srTris.emplace_back( vec0, vec1, vec2 );
+			}
+		}
+		else
+		{
+			for ( size_t i = 0; i < vertData.aCount * 3; )
+			{
+				auto&     tri  = srTris.emplace_back();
+
+				tri.aPos[ 0 ] = { data[ i++ ], data[ i++ ], data[ i++ ] };
+				tri.aPos[ 1 ] = { data[ i++ ], data[ i++ ], data[ i++ ] };
+				tri.aPos[ 2 ] = { data[ i++ ], data[ i++ ], data[ i++ ] };
+
+				// srTris.emplace_back( vec0, vec1, vec2 );
+			}
+		}
+	}
+}
+
+void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
+{
+	u32    origSize = srData.aVertCount;
+	Model* model    = Graphics_GetModelData( sModel );
+
+	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	{
+		Mesh&  mesh     = model->aMeshes[ s ];
+
+		auto&  ind      = mesh.aIndices;
+		auto&  vertData = mesh.aVertexData;
+
+		float* data     = nullptr;
+		for ( auto& attrib : vertData.aData )
+		{
+			if ( attrib.aAttrib == VertexAttribute_Position )
+			{
+				data = (float*)attrib.apData;
+				break;
+			}
+		}
+
+		if ( data == nullptr )
+		{
+			Log_Error( "Phys_GetModelInd(): Position Vertex Data not found?\n" );
+			return;
+		}
+
+		origSize = srData.aVertCount;
+
+		if ( srData.apVertices )
+			srData.apVertices = (glm::vec3*)realloc( srData.apVertices, ( origSize + vertData.aCount ) * sizeof( glm::vec3 ) );
+		else
+			srData.apVertices = (glm::vec3*)malloc( ( origSize + vertData.aCount ) * sizeof( glm::vec3 ) );
+
+		for ( u32 i = 0, j = 0; i < vertData.aCount * 3; i += 3, j++ )
+		{
+			// srVerts.emplace_back( data[ i + 0 ], data[ i + 1 ], data[ i + 2 ] );
+
+			srData.apVertices[ origSize + j ].x       = data[ i + 0 ];
+			srData.apVertices[ origSize + j ].y       = data[ i + 1 ];
+			srData.apVertices[ origSize + j ].z       = data[ i + 2 ];
+
+			// srVerts.push_back( what );
+		}
+
+		srData.aVertCount += vertData.aCount;
+		u32 indSize = srData.aTriCount;
+
+		if ( srData.aTris )
+			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ind.size() ) * sizeof( PhysIndexedTriangle_t ) );
+		else
+			srData.aTris = (PhysIndexedTriangle_t*)malloc( ( indSize + ind.size() ) * sizeof( PhysIndexedTriangle_t ) );
+
+		for ( u32 i = 0, j = 0; i < ind.size(); i += 3, j++ )
+		{
+			// auto& tri     = srConvexData.emplace_back();
+
+			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + ind[ i + 0 ];
+			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + ind[ i + 1 ];
+			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + ind[ i + 2 ];
+
+			// srInd.emplace_back(
+			//   origSize + ind[ i + 0 ],
+			//   origSize + ind[ i + 1 ],
+			//   origSize + ind[ i + 2 ] );
+		}
+
+		srData.aTriCount += ind.size();
+	}
+}
+
 
 GamePhysics::GamePhysics()
 {
@@ -241,18 +410,16 @@ void GamePhysics::Init()
 {
 	GET_SYSTEM_ASSERT( ch_physics, Ch_IPhysics );
 
-#if 0
 	Phys_DebugInit();
 
-	ch_physics->SetDebugDrawFuncs(
-		Phys_DrawLine,
-		Phys_DrawTriangle,
-		Phys_CreateTriangleBatch,
-		Phys_CreateTriangleBatchInd,
-		Phys_DrawGeometry,
-		Phys_DrawText
-	);
-#endif
+	gPhysDebugFuncs.apDrawLine          = Phys_DrawLine;
+	gPhysDebugFuncs.apDrawTriangle      = Phys_DrawTriangle;
+	gPhysDebugFuncs.apCreateTriBatch    = Phys_CreateTriangleBatch;
+	gPhysDebugFuncs.apCreateTriBatchInd = Phys_CreateTriangleBatchInd;
+	gPhysDebugFuncs.apDrawGeometry      = Phys_DrawGeometry;
+	gPhysDebugFuncs.apDrawText          = Phys_DrawText;
+
+	ch_physics->SetDebugDrawFuncs( gPhysDebugFuncs );
 
 	physenv = ch_physics->CreatePhysEnv();
 	physenv->Init(  );

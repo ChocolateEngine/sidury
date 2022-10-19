@@ -828,6 +828,7 @@ void Game_HandleSystemEvents()
 					{
 						Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
+						Graphics_Reset();
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:

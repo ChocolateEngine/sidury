@@ -155,10 +155,9 @@ bool MapManager::LoadWorldModel()
 	
 	apMap->aRenderable.aModelMatrix = mapTransform.ToMatrix();
 	
-	// temp disabled
-#if 0
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
-	shapeInfo.aMeshData.apModel = apMap->apWorldModel;
+
+	Phys_GetModelInd( apMap->aRenderable.aModel, shapeInfo.aConcaveData );
 	
 	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
 	Assert( physShape );
@@ -170,7 +169,6 @@ bool MapManager::LoadWorldModel()
 	
 	apMap->aWorldPhysShapes.push_back( physShape );
 	apMap->aWorldPhysObjs.push_back( physObj );
-#endif
 
 	return true;
 }

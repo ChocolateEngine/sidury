@@ -54,6 +54,7 @@ static glm::mat4                                 gViewProjMat;
 
 // stores backbuffer color and depth
 static Handle                                    gBackBuffer[ 2 ];
+static Handle                                    gBackBufferTex[ 3 ];
 static Handle                                    gImGuiBuffer[ 2 ];
 static Handle                                    gImGuiTextures[ 2 ];
 
@@ -131,8 +132,21 @@ Handle Graphics_AddModel( Model* spModel )
 }
 
 
-void Graphics_FreeModel( Handle hModel )
+void Graphics_FreeModel( Handle shModel )
 {
+}
+
+
+Model* Graphics_GetModelData( Handle shModel )
+{
+	Model* model = nullptr;
+	if ( !gModels.Get( shModel, &model ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Model_SetMaterial: Model is nullptr\n" );
+		return nullptr;
+	}
+
+	return model;
 }
 
 
@@ -308,6 +322,10 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 		Log_Fatal( gLC_ClientGraphics, "Failed to create Render Targets!\n" );
 	}
 
+	// actually stupid, they are HANDLES, YOU SHOULDN'T NEED NEW ONES
+	// only exception if we are in msaa now or not, blech
+	render->GetBackBufferTextures( &gBackBufferTex[ 0 ], &gBackBufferTex[ 1 ], &gBackBufferTex[ 2 ] );
+
 	if ( sFlags & ERenderResetFlags_MSAA )
 	{
 		if ( !Graphics_CreateRenderPasses() )
@@ -317,13 +335,13 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 		}
 
 		render->ShutdownImGui();
-		if ( !render->InitImGui( gRenderPassGraphics ) )
+		if ( !render->InitImGui( gRenderPassUI ) )
 		{
 			Log_Error( gLC_ClientGraphics, "Failed to re-init ImGui for Vulkan\n" );
 			return;
 		}
 
-		if ( !( gUIShader = Shader_UI_Create( gRenderPassUI, true ) ) )
+		if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, true ) ) )
 		{
 			Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
 			return;
@@ -350,6 +368,8 @@ bool Graphics_Init()
 
 	render->SetResetCallback( Graphics_OnResetCallback );
 
+	render->GetBackBufferTextures( &gBackBufferTex[ 0 ], &gBackBufferTex[ 1 ], &gBackBufferTex[ 2 ] );
+
 	// TODO: the backbuffer should probably be created in game code
 	gBackBuffer[ 0 ] = render->GetBackBufferColor();
 	gBackBuffer[ 1 ] = render->GetBackBufferDepth();
@@ -360,7 +380,7 @@ bool Graphics_Init()
 		return false;
 	}
 
-	if ( !( gUIShader = Shader_UI_Create( gRenderPassUI, false ) ) )
+	if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, false ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
 		return false;
@@ -382,8 +402,8 @@ bool Graphics_Init()
 		return false;
 	}
 
-	// return render->InitImGui( gRenderPassUI );
-	return render->InitImGui( gRenderPassGraphics );
+	return render->InitImGui( gRenderPassUI );
+	// return render->InitImGui( gRenderPassGraphics );
 }
 
 
@@ -540,7 +560,7 @@ void Graphics_Render( Handle cmd )
 		}
 	}
 
-	return;
+	// return;
 
 	// un-flip viewport
 	viewPort.x        = 0.f;
@@ -553,7 +573,7 @@ void Graphics_Render( Handle cmd )
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
 	Shader_UI_Draw( cmd, gCmdIndex, gImGuiTextures[ 0 ] );
-	// Shader_UI_Draw( cmd, gCmdIndex, gImGuiTextures[ 0 ] );
+	// Shader_UI_Draw( cmd, gCmdIndex, gBackBufferTex[ 0 ] );
 }
 
 
@@ -592,14 +612,14 @@ void Graphics_Present()
 		RenderPassBegin_t renderPassBegin{};
 
 		// ImGui RenderPass
-		// renderPassBegin.aRenderPass  = gRenderPassUI;
-		// renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
-		// renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 0.f };
-		// renderPassBegin.aClear       = true;
-		// 
-		// render->BeginRenderPass( c, renderPassBegin );
-		// render->DrawImGui( ImGui::GetDrawData(), c );
-		// render->EndRenderPass( c );
+		renderPassBegin.aRenderPass  = gRenderPassUI;
+		renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
+		renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear       = true;
+
+		render->BeginRenderPass( c, renderPassBegin );
+		render->DrawImGui( ImGui::GetDrawData(), c );
+		render->EndRenderPass( c );
 
 		// Main RenderPass
 		renderPassBegin.aRenderPass  = gRenderPassGraphics;
@@ -612,10 +632,9 @@ void Graphics_Present()
 		Graphics_Render( c );
 
 		// TODO: this should be a on a separate render pass that doesn't use SRGB or MSAA
-		render->DrawImGui( ImGui::GetDrawData(), c );
+		// render->DrawImGui( ImGui::GetDrawData(), c );
 
 		render->EndRenderPass( c );
-
 
 		render->EndCommandBuffer( c );
 	}

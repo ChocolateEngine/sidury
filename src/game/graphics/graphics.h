@@ -179,6 +179,7 @@ struct ModelSurfaceDraw_t
 Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_AddModel( Model* spModel );
 void               Graphics_FreeModel( Handle hModel );
+Model*             Graphics_GetModelData( Handle hModel );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
