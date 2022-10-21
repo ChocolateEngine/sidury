@@ -74,9 +74,12 @@ enum : EMatVar
 using EShaderFlags = int;
 enum : EShaderFlags
 {
-	EShaderFlags_None          = 0,
-	EShaderFlags_PushConstant  = ( 1 << 0 ),
-	EShaderFlags_UniformBuffer = ( 1 << 1 ),
+	EShaderFlags_None             = 0,
+	EShaderFlags_Sampler          = ( 1 << 0 ),  // Shader Uses Texture Sampler Array
+	EShaderFlags_ViewProj         = ( 1 << 1 ),  // Shader Uses View * Projection Matrix
+	EShaderFlags_VertexAttributes = ( 1 << 2 ),  // Shader Uses Vertex Attributes
+	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader makes of a Push Constant
+	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Makes use of Material Uniform Buffers
 };
 
 
@@ -200,7 +203,7 @@ void               Graphics_FreeMaterial( Handle sMaterial );
 // Name is a full path to the cmt file
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 // NAME: dev/grid01
-Handle             Graphics_FindMaterial( std::string_view srName );
+Handle             Graphics_FindMaterial( const char* spName );
 
 // Is This Material an Error Material?
 bool               Graphics_IsErrorMaterial( Handle sMaterial );
@@ -208,14 +211,14 @@ bool               Graphics_IsErrorMaterial( Handle sMaterial );
 // Get a fallback error material
 Handle             Graphics_GetErrorMaterial( Handle shShader );
 
-// Get Fallback Texture if the texture doesn't exist
-Handle             Graphics_GetMissingTexture();
-
 // Get the total amount of materials created
 size_t             Graphics_GetMaterialCount();
 
+// Tell all materials to rebuild
+void               Graphics_SetAllMaterialsDirty();
+
 // Modifying Material Data
-const std::string& Mat_GetName( Handle mat );
+const char*        Mat_GetName( Handle mat );
 size_t             Mat_GetVarCount( Handle mat );
 EMatVar            Mat_GetVarType( Handle mat, size_t sIndex );
 
@@ -229,6 +232,7 @@ void               Mat_SetVar( Handle mat, const std::string& name, const glm::v
 void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& data );
 void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& data );
 
+int                Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback = InvalidHandle );
 Handle             Mat_GetTexture( Handle mat, std::string_view name, Handle fallback = InvalidHandle );
 float              Mat_GetFloat( Handle mat, std::string_view name, float fallback = 0.f );
 int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 );
@@ -239,13 +243,18 @@ const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::ve
 // ---------------------------------------------------------------------------------------
 // Shaders
 
+bool               Graphics_ShaderInit( bool sRecreate );
 Handle             Graphics_GetShader( std::string_view name );
+
+bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
+bool               Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable );
+bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
 
 // ---------------------------------------------------------------------------------------
 // Buffers
 
-void               Graphics_CreateVertexBuffers( Mesh& spMesh );
-void               Graphics_CreateIndexBuffer( Mesh& spMesh );
+void               Graphics_CreateVertexBuffers( Mesh& spMesh, const char* spDebugName = nullptr );
+void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebugName = nullptr );
 
 // ---------------------------------------------------------------------------------------
 // Render Targets

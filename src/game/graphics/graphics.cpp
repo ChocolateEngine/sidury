@@ -6,6 +6,7 @@
 #include "imgui/imgui.h"
 
 #include <forward_list>
+#include <set>
 
 
 LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::DarkMagenta )
@@ -22,15 +23,16 @@ void                         Graphics_LoadObj( const std::string& srPath, Model*
 // void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Model* spModel );
 
 // shaders, fun
-Handle                       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
+// Handle                       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
 void                         Shader_Basic3D_Destroy();
 void                         Shader_Basic3D_Bind( Handle cmd, size_t sCmdIndex );
 void                         Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
 void                         Shader_Basic3D_ResetPushData();
 void                         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
 VertexFormat                 Shader_Basic3D_GetVertexFormat();
+void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
 
-Handle                       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
+// Handle                       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
 void                         Shader_UI_Destroy();
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
 
@@ -40,8 +42,8 @@ void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handl
 static std::vector< Handle > gCommandBuffers;
 static size_t                gCmdIndex = 0;
 
-static Handle                gRenderPassGraphics;
-static Handle                gRenderPassUI;  // TODO
+Handle                       gRenderPassGraphics;
+Handle                       gRenderPassUI;
 // static Handle                                                       gRenderPassShadow;  // maybe for future?
 
 // ew
@@ -51,6 +53,8 @@ static std::unordered_map<
 												 gMeshDrawList;
 
 static glm::mat4                                 gViewProjMat;
+static bool                                      gViewProjMatUpdate = false;
+static std::vector< Handle >                     gViewProjBuffers( 1 );
 
 // stores backbuffer color and depth
 static Handle                                    gBackBuffer[ 2 ];
@@ -58,9 +62,18 @@ static Handle                                    gBackBufferTex[ 3 ];
 static Handle                                    gImGuiBuffer[ 2 ];
 static Handle                                    gImGuiTextures[ 2 ];
 
-// temp shader
-static Handle                                    gTempShader = InvalidHandle;
-static Handle                                    gUIShader   = InvalidHandle;
+// descriptor set layouts
+Handle                                           gLayoutSampler         = InvalidHandle;
+Handle                                           gLayoutViewProj        = InvalidHandle;
+Handle                                           gLayoutMaterialBasic3D = InvalidHandle;  // blech
+
+// descriptor sets
+Handle                                           gLayoutSamplerSets[ 2 ];
+Handle                                           gLayoutViewProjSets[ 2 ];
+Handle*                                          gLayoutMaterialBasic3DSets;
+constexpr u32                                    MAX_MATERIALS_BASIC3D = 500;
+
+extern std::set< Handle >                        gDirtyMaterials;
 
 // --------------------------------------------------------------------------------------
 // Assets
@@ -188,15 +201,9 @@ Handle Model_GetMaterial( Handle shModel, size_t sSurface )
 }
 
 
-// Get Fallback Texture if the texture doesn't exist
-Handle Graphics_GetMissingTexture()
-{
-	return InvalidHandle;
-}
-
-
 void Graphics_DestroyRenderTargets()
 {
+	// TODO: reuse the handles, not replace them
 	if ( gImGuiTextures[ 0 ] )
 		render->FreeTexture( gImGuiTextures[ 0 ] );
 
@@ -204,6 +211,8 @@ void Graphics_DestroyRenderTargets()
 		render->FreeTexture( gImGuiTextures[ 1 ] );
 
 	memset( gImGuiTextures, InvalidHandle, sizeof( gImGuiTextures ) );
+
+	Graphics_SetAllMaterialsDirty();
 
 	if ( gImGuiBuffer[ 0 ] )
 		render->DestroyFramebuffer( gImGuiBuffer[ 0 ] );
@@ -222,6 +231,7 @@ bool Graphics_CreateRenderTargets()
 	
 	// Create ImGui Color Attachment
 	TextureCreateInfo_t texCreate{};
+	texCreate.apName    = "ImGui Color";
 	texCreate.aSize     = { width, height };
 	texCreate.aFormat   = GraphicsFmt::BGRA8888_UNORM;
 	texCreate.aUseMSAA  = false;
@@ -231,6 +241,7 @@ bool Graphics_CreateRenderTargets()
 	gImGuiTextures[ 0 ] = render->CreateTexture( texCreate );
 
 	// Create ImGui Depth Stencil Attachment
+	texCreate.apName    = "ImGui Depth";
 	texCreate.aFormat   = render->GetSwapFormatDepth();
 	texCreate.aUsage    = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
 
@@ -305,6 +316,101 @@ bool Graphics_CreateRenderPasses()
 }
 
 
+bool Graphics_CreateDescriptorSets()
+{
+	// TODO: just create the sampler here and have a
+	// Graphics_LoadTexture() function to auto add to the image sampler sets
+	gLayoutSampler = render->GetSamplerLayout();
+	render->GetSamplerSets( gLayoutSamplerSets );
+
+	// ------------------------------------------------------
+	// Create ViewProjetion matrix UBO
+
+	CreateVariableDescLayout_t createViewProj{};
+	createViewProj.aType    = EDescriptorType_UniformBuffer;
+	createViewProj.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
+	createViewProj.aBinding = 0;
+	createViewProj.aCount   = 2;
+
+	gLayoutViewProj         = render->CreateVariableDescLayout( createViewProj );
+
+	if ( gLayoutViewProj == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create ViewProj UBO Layout" );
+		return false;
+	}
+
+	AllocVariableDescLayout_t allocViewProj{};
+	allocViewProj.aLayout   = gLayoutViewProj;
+	allocViewProj.aCount    = gViewProjBuffers.size();
+	allocViewProj.aSetCount = 2;
+
+	if ( !render->AllocateVariableDescLayout( allocViewProj, gLayoutViewProjSets ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout" );
+		return false;
+	}
+
+	// create buffer for it
+	// (NOTE: not changing this from a std::vector cause you could use this for multiple views in the future probably)
+	for ( u32 i = 0; i < gViewProjBuffers.size(); i++ )
+	{
+		Handle buffer = render->CreateBuffer( "View * Projection Buffer", sizeof( glm::mat4 ), EBufferFlags_Uniform, EBufferMemory_Host );
+
+		if ( buffer == InvalidHandle )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
+			return false;
+		}
+
+		gViewProjBuffers[ i ] = buffer;
+	}
+
+	// update the material descriptor sets
+	UpdateVariableDescSet_t update{};
+
+	// what
+	update.aDescSets.push_back( gLayoutViewProjSets[ 0 ] );
+	update.aDescSets.push_back( gLayoutViewProjSets[ 1 ] );
+
+	update.aType    = EDescriptorType_UniformBuffer;
+	update.aBuffers = gViewProjBuffers;
+	render->UpdateVariableDescSet( update );
+
+	// ------------------------------------------------------
+	// Create Material Buffers for Basic3D shader
+	CreateVariableDescLayout_t createBasic3DMat{};
+	createBasic3DMat.aType           = EDescriptorType_UniformBuffer;
+	createBasic3DMat.aStages         = ShaderStage_Vertex | ShaderStage_Fragment;
+	createBasic3DMat.aBinding        = 0;
+	createBasic3DMat.aCount          = MAX_MATERIALS_BASIC3D;
+
+	gLayoutMaterialBasic3D           = render->CreateVariableDescLayout( createBasic3DMat );
+
+	if ( gLayoutMaterialBasic3D == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create Basic 3D Material Layout" );
+		return false;
+	}
+
+	AllocVariableDescLayout_t allocBasic3DMat{};
+	allocBasic3DMat.aLayout    = gLayoutMaterialBasic3D;
+	allocBasic3DMat.aCount     = MAX_MATERIALS_BASIC3D; // max materials for basic 3d
+	allocBasic3DMat.aSetCount  = 2;
+
+	// wtf
+	gLayoutMaterialBasic3DSets = new Handle[ MAX_MATERIALS_BASIC3D ];
+
+	if ( !render->AllocateVariableDescLayout( allocBasic3DMat, gLayoutMaterialBasic3DSets ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout" );
+		return false;
+	}
+
+	return true;
+}
+
+
 void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 {
 	gBackBuffer[ 0 ] = render->GetBackBufferColor();
@@ -341,15 +447,9 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 			return;
 		}
 
-		if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, true ) ) )
+		if ( !Graphics_ShaderInit( true ) )
 		{
-			Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
-			return;
-		}
-
-		if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, true ) ) )
-		{
-			Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
+			Log_Error( gLC_ClientGraphics, "Failed to Recreate Shaders!\n" );
 			return;
 		}
 	}
@@ -380,18 +480,6 @@ bool Graphics_Init()
 		return false;
 	}
 
-	if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, false ) ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
-		return false;
-	}
-
-	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, false ) ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
-		return false;
-	}
-
 	if ( !Graphics_CreateRenderPasses() )
 	{
 		return false;
@@ -399,6 +487,17 @@ bool Graphics_Init()
 	
 	if ( !Graphics_CreateRenderTargets() )
 	{
+		return false;
+	}
+
+	if ( !Graphics_CreateDescriptorSets() )
+	{
+		return false;
+	}
+
+	if ( !Graphics_ShaderInit( false ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to Create Shaders!\n" );
 		return false;
 	}
 
@@ -415,13 +514,14 @@ void Graphics_Shutdown()
 void Graphics_Reset()
 {
 	render->Reset();
-	// Graphics_OnResetCallback();
 }
 
 
 void Graphics_NewFrame()
 {
 	render->NewFrame();
+
+	gMeshDrawList.clear();
 }
 
 
@@ -462,25 +562,25 @@ void Graphics_CmdDrawModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Graphics_BindBuffers( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
+void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 {
 	// get model and check if it's nullptr
 	if ( srDrawInfo.apDraw->aModel == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindBuffers: model handle is InvalidHandle\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: model handle is InvalidHandle\n" );
 		return;
 	}
 
 	Model* model = nullptr;
 	if ( !gModels.Get( srDrawInfo.apDraw->aModel, &model ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindBuffers: model is nullptr\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: model is nullptr\n" );
 		return;
 	}
 
 	if ( srDrawInfo.aSurface > model->aMeshes.size() )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindBuffers: model surface index is out of range!\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: model surface index is out of range!\n" );
 		return;
 	}
 
@@ -494,7 +594,7 @@ void Graphics_BindBuffers( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 	size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * mesh.aVertexBuffers.size() );
 	if ( offsets == nullptr )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindBuffers: Failed to allocate vertex buffer offsets!\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: Failed to allocate vertex buffer offsets!\n" );
 		return;
 	}
 
@@ -512,9 +612,7 @@ void Graphics_BindBuffers( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 // Do Rendering with shader system and user land meshes
 void Graphics_Render( Handle cmd )
 {
-	ModelSurfaceDraw_t* prevRenderable = nullptr;
-
-	int                 width = 0, height = 0;
+	int width = 0, height = 0;
 	render->GetSurfaceSize( width, height );
 
 	// TODO: check if shader needs dynamic viewport and/or scissor
@@ -536,13 +634,13 @@ void Graphics_Render( Handle cmd )
 
 	render->CmdSetScissor( cmd, 0, &rect, 1 );
 
+	ModelSurfaceDraw_t* prevRenderable = nullptr;
+
 	// TODO: still could be better, but it's better than what we used to have
 	for ( auto& [ shader, renderList ] : gMeshDrawList )
 	{
-		if ( !render->CmdBindPipeline( cmd, shader ) )
+		if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 			continue;
-
-		Shader_Basic3D_Bind( cmd, gCmdIndex );
 
 		for ( auto& renderable : renderList )
 		{
@@ -551,11 +649,12 @@ void Graphics_Render( Handle cmd )
 			if ( !prevRenderable || prevRenderable->apDraw->aModel != renderable.apDraw->aModel || prevRenderable->aSurface != renderable.aSurface )
 			{
 				prevRenderable = &renderable;
-				Graphics_BindBuffers( cmd, renderable );
+				Graphics_BindModel( cmd, renderable );
 			}
 
-			// bind shader info (blech)
-			Shader_Basic3D_PushConstants( cmd, gCmdIndex, renderable );
+			if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, renderable ) )
+				continue;
+
 			Graphics_CmdDrawModel( cmd, renderable );
 		}
 	}
@@ -576,10 +675,27 @@ void Graphics_Render( Handle cmd )
 	// Shader_UI_Draw( cmd, gCmdIndex, gBackBufferTex[ 0 ] );
 }
 
-
 void Graphics_PrepareDrawData()
 {
 	ImGui::Render();
+
+	for ( const auto& mat : gDirtyMaterials )
+	{
+		Handle shader = Mat_GetShader( mat );
+
+		// HACK HACK
+		if ( Graphics_GetShader( "basic_3d" ) == shader )
+			Shader_Basic3D_UpdateMaterialData( mat );
+	}
+
+	gDirtyMaterials.clear();
+
+	if ( gViewProjMatUpdate )
+	{
+		gViewProjMatUpdate = false;
+		for ( size_t i = 0; i < gViewProjBuffers.size(); i++ )
+			render->MemWriteBuffer( gViewProjBuffers[ i ], sizeof( glm::mat4 ), &gViewProjMat );
+	}
 
 	Shader_Basic3D_ResetPushData();
 
@@ -639,8 +755,6 @@ void Graphics_Present()
 		render->EndCommandBuffer( c );
 	}
 
-	gMeshDrawList.clear();
-
 	render->Present();
 	// render->UnlockGraphicsMutex();
 }
@@ -649,6 +763,7 @@ void Graphics_Present()
 void Graphics_SetViewProjMatrix( const glm::mat4& srMat )
 {
 	gViewProjMat = srMat;
+	gViewProjMatUpdate = true;
 }
 
 
@@ -828,14 +943,26 @@ void Graphics_GetVertexAttributeDesc( VertexFormat format, std::vector< VertexIn
 }
 
 
-// ---------------------------------------------------------------------------------------
-// Shaders
-
-
-Handle Graphics_GetShader( std::string_view name )
+const char* Graphics_GetVertexAttributeName( VertexAttribute attrib )
 {
-	Log_Msg( gLC_ClientGraphics, "Graphics_GetShader: IMPLEMENT A SHADER SYSTEM AAAA\n" );
-	return gTempShader;
+	switch ( attrib )
+	{
+		default:
+		case VertexAttribute_Count:
+			return "ERROR";
+
+		case VertexAttribute_Position:
+			return "Position";
+
+		case VertexAttribute_Normal:
+			return "Normal";
+
+		case VertexAttribute_TexCoord:
+			return "TexCoord";
+
+		case VertexAttribute_Color:
+			return "Color";
+	}
 }
 
 
@@ -843,14 +970,14 @@ Handle Graphics_GetShader( std::string_view name )
 // Buffers
 
 // sBufferSize is sizeof(element) * count
-static Handle CreateModelBuffer( void* spData, size_t sBufferSize, EBufferFlags sUsage )
+static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage )
 {
 	Handle stagingBuffer = render->CreateBuffer( sBufferSize, sUsage | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	// Copy Data to Buffer
 	render->MemWriteBuffer( stagingBuffer, sBufferSize, spData );
 
-	Handle deviceBuffer = render->CreateBuffer( sBufferSize, sUsage | EBufferFlags_TransferDst, EBufferMemory_Device );
+	Handle deviceBuffer = render->CreateBuffer( spName, sBufferSize, sUsage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	// Copy Local Buffer data to Device
 	render->MemCopyBuffer( stagingBuffer, deviceBuffer, sBufferSize );
@@ -861,7 +988,7 @@ static Handle CreateModelBuffer( void* spData, size_t sBufferSize, EBufferFlags 
 }
 
 
-void Graphics_CreateVertexBuffers( Mesh& srMesh )
+void Graphics_CreateVertexBuffers( Mesh& srMesh, const char* spDebugName )
 {
 	VertexData_t& vertData     = srMesh.aVertexData;
 
@@ -889,9 +1016,23 @@ void Graphics_CreateVertexBuffers( Mesh& srMesh )
 
 	for ( size_t j = 0; j < attribs.size(); j++ )
 	{
-		auto&  data   = attribs[ j ];
+		auto& data       = attribs[ j ];
+		char* bufferName = nullptr;
+
+#ifdef _DEBUG
+		if ( spDebugName )
+		{
+			const char* attribName = Graphics_GetVertexAttributeName( data->aAttrib );
+
+			size_t      len        = strlen( spDebugName ) + strlen( attribName );
+			bufferName             = new char[ len + 9 ];  // MEMORY LEAK - need string memory pool
+
+			snprintf( bufferName, len + 9, "VB | %s | %s", attribName, spDebugName );
+		}
+#endif
 
 		Handle buffer = CreateModelBuffer(
+		  bufferName ? bufferName : "VB",
 		  data->apData,
 		  Graphics_GetVertexAttributeSize( data->aAttrib ) * vertData.aCount,
 		  EBufferFlags_Vertex );
@@ -901,9 +1042,22 @@ void Graphics_CreateVertexBuffers( Mesh& srMesh )
 }
 
 
-void Graphics_CreateIndexBuffer( Mesh& srMesh )
+void Graphics_CreateIndexBuffer( Mesh& srMesh, const char* spDebugName )
 {
+	char* bufferName = nullptr;
+
+#ifdef _DEBUG
+	if ( spDebugName )
+	{
+		size_t len = strlen( spDebugName );
+		bufferName = new char[ len + 6 ];  // MEMORY LEAK - need string memory pool
+
+		snprintf( bufferName, len + 6, "IB | %s", spDebugName );
+	}
+#endif
+
 	srMesh.aIndexBuffer = CreateModelBuffer(
+	  bufferName ? bufferName : "IB",
 	  srMesh.aIndices.data(),
 	  sizeof( u32 ) * srMesh.aIndices.size(),
 	  EBufferFlags_Index );

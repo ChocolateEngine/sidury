@@ -80,14 +80,18 @@ void LoadObj_Tiny( const std::string &srPath, Model* spModel )
 	// Parse Materials
 
 	MeshBuilder meshBuilder;
+#ifdef _DEBUG
+	meshBuilder.Start( spModel, srPath.c_str() );
+#else
 	meshBuilder.Start( spModel );
+#endif
 	meshBuilder.SetSurfaceCount( objMaterials.size() );
 
 	for ( size_t i = 0; i < objMaterials.size(); ++i )
 	{
 		const tinyobj::material_t &objMaterial = objMaterials[i];
 
-		Handle material = Graphics_FindMaterial( objMaterial.name );
+		Handle material = Graphics_FindMaterial( objMaterial.name.c_str() );
 
 		if ( material == InvalidHandle )
 		{

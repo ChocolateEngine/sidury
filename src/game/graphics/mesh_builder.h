@@ -132,6 +132,10 @@ struct MeshBuilder
 		std::vector< BlendShapeData >                aBlendShapes;
 	};
 
+#ifdef _DEBUG
+	const char* apDebugName = nullptr;
+#endif
+
 	Model*                    apMesh = nullptr;
 
 	std::vector< BlendShape > aBlendShapes;
@@ -141,7 +145,7 @@ struct MeshBuilder
 
 	// ------------------------------------------------------------------------
 
-	void                     Start( Model* spMesh );
+	void                     Start( Model* spMesh, const char* spDebugName = nullptr );
 	void                     End();
 	void                     Reset();
 

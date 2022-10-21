@@ -1,6 +1,10 @@
 #include "core/resources.hh"
 #include "graphics.h"
+#include "render/irender.h"
 
+#include <set>
+
+extern IRender* render;
 
 struct MaterialVar
 {
@@ -85,8 +89,10 @@ static std::unordered_map< Handle, Handle >       gMaterialShaders;
 static Handle                                     gInvalidMaterial;
 static std::string                                gStrEmpty;
 
+std::set< Handle >                                gDirtyMaterials;
 
-const std::string& Mat_GetName( Handle shMat )
+
+const char* Mat_GetName( Handle shMat )
 {
 	for ( auto& [name, mat] : gMaterialNames )
 	{
@@ -94,7 +100,7 @@ const std::string& Mat_GetName( Handle shMat )
 			return name;
 	}
 
-	return gStrEmpty;
+	return nullptr;
 }
 
 
@@ -147,6 +153,7 @@ void Mat_SetShader( Handle mat, Handle shShader )
 	if ( it != gMaterialShaders.end() )
 	{
 		it->second = shShader;
+		gDirtyMaterials.emplace( mat );
 	}
 	else
 	{
@@ -164,6 +171,8 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 		Log_Error( gLC_ClientGraphics, "Mat_SetVar: No Vars found, material must of been freed\n" );
 		return;
 	}
+
+	gDirtyMaterials.emplace( mat );
 
 	for ( MaterialVar& var : data->aVars )
 	{
@@ -208,6 +217,13 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 	}
 
 	return nullptr;
+}
+
+
+int Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, name );
+	return render->GetTextureIndex( var ? var->GetTexture( fallback ) : fallback );
 }
 
 
@@ -273,8 +289,13 @@ Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
 		return nameIt->second;
 	}
 
-	Handle handle              = gMaterials.Add( new MaterialData_t{} );
-	gMaterialNames[ srName.data() ] = handle;
+	Handle handle = gMaterials.Add( new MaterialData_t{} );
+
+	char*  name   = new char[ srName.size() + 1 ];
+	strncpy( name, srName.c_str(), srName.size() );
+	name[ srName.size() ]      = '\0';
+
+	gMaterialNames[ name ]     = handle;
 	gMaterialShaders[ handle ] = shShader;
 
 	return handle;
@@ -294,6 +315,19 @@ void Graphics_FreeMaterial( Handle shMaterial )
 	{
 		delete data;
 		gMaterials.Remove( shMaterial );
+
+		for ( auto& [ name, mat ] : gMaterialNames )
+		{
+			if ( mat == shMaterial )
+			{
+				gMaterialNames.erase( name ); // name is freed here
+				break;
+			}
+		}
+
+		// make sure it's not in the dirty materials list
+		if ( gDirtyMaterials.contains( shMaterial ) )
+			gDirtyMaterials.erase( shMaterial );
 	}
 }
 
@@ -302,9 +336,9 @@ void Graphics_FreeMaterial( Handle shMaterial )
 // Name is a full path to the cmt file
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 // NAME: dev/grid01
-Handle Graphics_FindMaterial( std::string_view srName )
+Handle Graphics_FindMaterial( const char* spName )
 {
-	auto nameIt = gMaterialNames.find( srName.data() );
+	auto nameIt = gMaterialNames.find( spName );
 	if ( nameIt != gMaterialNames.end() )
 		return nameIt->second;
 
@@ -330,5 +364,16 @@ Handle Graphics_GetErrorMaterial( Handle shShader )
 size_t Graphics_GetMaterialCount()
 {
 	return gMaterials.size();
+}
+
+
+// Tell all materials to rebuild
+void Graphics_SetAllMaterialsDirty()
+{
+	if ( gMaterialShaders.size() == gDirtyMaterials.size() )
+		return;
+
+	for ( const auto& [ mat, shader ] : gMaterialShaders )
+		gDirtyMaterials.emplace( mat );
 }
 

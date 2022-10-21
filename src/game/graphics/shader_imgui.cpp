@@ -14,6 +14,9 @@ static Handle         gPipelineLayout = InvalidHandle;
 constexpr const char* gpVertShader    = "shaders/imgui.vert.spv";
 constexpr const char* gpFragShader    = "shaders/imgui.frag.spv";
 
+// descriptor set layouts
+extern Handle         gLayoutSampler;
+extern Handle         gLayoutSamplerSets[ 2 ];
 
 struct UI_Push
 {
@@ -36,7 +39,7 @@ static std::unordered_map< Handle, UI_Push > gPushData;
 Handle Shader_UI_Create( Handle sRenderPass, bool sRecreate )
 {
 	PipelineLayoutCreate_t pipelineCreateInfo{};
-	pipelineCreateInfo.aLayouts = EDescriptorLayout_Image;
+	pipelineCreateInfo.aLayouts.push_back( gLayoutSampler );
 	pipelineCreateInfo.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( UI_Push ) );
 
 	// --------------------------------------------------------------
@@ -94,10 +97,10 @@ void Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor )
 	}
 
 	UI_Push push{};
-	push.index    = render->GetTextureIndex( shColor );
+	push.index = render->GetTextureIndex( shColor );
 
 	render->CmdPushConstants( cmd, gPipelineLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( UI_Push ), &push );
-	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, EDescriptorLayout_Image );
+	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, &gLayoutSamplerSets[ sCmdIndex ], 1 );
 	render->CmdDraw( cmd, 3, 1, 0, 0 );
 }
 

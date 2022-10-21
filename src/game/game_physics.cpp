@@ -84,7 +84,7 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 	// gMeshes.push_back( mesh );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( model );
+	meshBuilder.Start( model, "_phys_triangle_batch" );
 	meshBuilder.SetMaterial( gMatSolid );
 
 	// convert vertices

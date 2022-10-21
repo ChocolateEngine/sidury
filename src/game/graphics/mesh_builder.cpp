@@ -25,9 +25,13 @@
 
 
 // source uses some IVertexBuffer and IIndexBuffer class here? hmm
-void MeshBuilder::Start( Model* spMesh )
+void MeshBuilder::Start( Model* spMesh, const char* spDebugName )
 {
 	apMesh = spMesh;
+
+#ifdef _DEBUG
+	apDebugName = spDebugName;
+#endif
 
 	SetSurfaceCount( 1 );
 	SetCurrentSurface( 0 );
@@ -120,10 +124,20 @@ void MeshBuilder::End()
 		// apMesh->SetVertexDataLocked( i, true );
 		apMesh->aMeshes[ i ].aMaterial = surf.aMaterial;
 
-		Graphics_CreateVertexBuffers( apMesh->aMeshes[ i ] );
+		char* debugName = nullptr;
+#ifdef _DEBUG
+		if ( apDebugName )
+		{
+			size_t nameLen = strlen( apDebugName );
+			debugName = new char[ nameLen + 13 ];  // MEMORY LEAK - need string memory pool
+			snprintf( debugName, nameLen + 13, "%s | Surface %zd", apDebugName, i );
+		}
+#endif
+
+		Graphics_CreateVertexBuffers( apMesh->aMeshes[ i ], debugName );
 
 #if MESH_BUILDER_USE_IND
-		Graphics_CreateIndexBuffer( apMesh->aMeshes[ i ] );
+		Graphics_CreateIndexBuffer( apMesh->aMeshes[ i ], debugName );
 #endif
 	}
 }

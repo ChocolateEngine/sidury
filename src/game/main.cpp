@@ -826,14 +826,14 @@ void Game_HandleSystemEvents()
 				{
 					case SDL_WINDOWEVENT_SIZE_CHANGED:
 					{
-						Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
+						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
 						Graphics_Reset();
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:
 					{
-						Log_Msg( "SDL_WINDOWEVENT_EXPOSED\n" );
+						// Log_Msg( "SDL_WINDOWEVENT_EXPOSED\n" );
 						// TODO: RESET RENDERER AND DRAW ONTO WINDOW WINDOW !!!
 						break;
 					}

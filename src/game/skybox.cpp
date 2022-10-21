@@ -36,7 +36,7 @@ void Skybox::Init()
 	Handle      mat = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( model );
+	meshBuilder.Start( model, "__skybox_model" );
 	meshBuilder.SetMaterial( mat );
 
 	// std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
