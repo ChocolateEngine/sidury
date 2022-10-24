@@ -25,6 +25,7 @@ int EntityManager::Init()
 	// uhhhhh
 	RegisterComponent< Handle >();
 	RegisterComponent< HModel >();
+	RegisterComponent< ModelDraw_t >();
 
 	//RegisterComponent< ModelData >();  // doesn't like this
 	RegisterComponent< CRigidBody >();

@@ -4,17 +4,17 @@ modelloader_gtlf.cpp ( Authored by Demez )
 File dedicated for loading gltf models
 */
 
-#if 0
-#include "modelloader.h"
-#include "../materialsystem.h"
-#include "../graphics.h"
-#include "graphics/meshbuilder.hpp"
+#include "graphics.h"
+#include "mesh_builder.h"
+#include "render/irender.h"
 
 #include "util.h"
 #include "core/console.h"
 
 #define CGLTF_IMPLEMENTATION
 #include "cgltf/cgltf.h"
+
+extern IRender*    render;
 
 
 inline const char* Result2Str( cgltf_result result )
@@ -65,8 +65,7 @@ static std::string GetBaseDir( const std::string &srPath )
 }
 
 
-static std::string gDefaultShader       = "basic_3d";
-// static std::string gDefaultShader       = "debug";
+constexpr const char* gDefaultShader       = "basic_3d";
 
 static std::string MatVar_Diffuse       = "diffuse";
 static std::string MatVar_Emissive      = "emissive";
@@ -191,7 +190,7 @@ void LoadBlendShapes( MeshBuilder& meshBuilder, cgltf_primitive& prim )
 // TODO: only loads animations, materials, meshes, and textures
 // gltf can load a lot more, but this is not at all handled in the engine, or have any support for it
 // so we'll have to do this one day
-void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Model* spModel )
+void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath, const std::string& srExt, Model* spModel )
 {
 	cgltf_options options{};
 	cgltf_data* gltf = NULL;
@@ -213,33 +212,39 @@ void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Mod
 	}
 
 	std::string baseDir = GetBaseDir( srPath );
+	std::string baseDir2 = GetBaseDir( srBasePath );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( matsys, spModel );
+	meshBuilder.Start( spModel, srPath.c_str() );
 	meshBuilder.SetSurfaceCount( gltf->materials_count );
 
 	// --------------------------------------------------------
 	// Parse Materials
 
+	Handle defaultShader = Graphics_GetShader( gDefaultShader );
+
 	for ( size_t i = 0; i < gltf->materials_count; ++i )
 	{
 		cgltf_material& gltfMat = gltf->materials[i];
 
-		IMaterial* material = matsys->FindMaterial( gltfMat.name );
+		std::string     matName  = baseDir2 + "/" + gltfMat.name;
+		Handle          material = Graphics_FindMaterial( matName.c_str() );
 
-		if ( material == nullptr )
+		if ( material == InvalidHandle )
 		{
-			std::string matPath = baseDir + "/" + gltfMat.name + ".cmt";
+			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
-				material = matsys->ParseMaterial( matPath );
+				material = Graphics_LoadMaterial( matPath );
 		}
 
 		// fallback if there is no cmt file
-		if ( material == nullptr )
+		if ( material == InvalidHandle )
 		{
-			material = matsys->CreateMaterial();
-			material->aName = gltfMat.name;
-			material->SetShader( gDefaultShader );
+			material = Graphics_CreateMaterial( gltfMat.name, defaultShader );
+
+			TextureCreateData_t createData{};
+			createData.aUsage  = EImageUsage_Sampled;
+			createData.aFilter = EImageFilter_Linear;
 
 			// auto SetTexture = [&]( const std::string& param, const std::string &texname )
 			auto SetTexture = [&]( const std::string& param, cgltf_texture* texture )
@@ -251,9 +256,9 @@ void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Mod
 				const std::string texName = texture->name;
 
 				if ( FileSys_IsRelative( texName ) )
-					material->SetVar( param, matsys->CreateTexture( baseDir + "/" + texName ) );
+					Mat_SetVar( material, param, render->LoadTexture( baseDir2 + "/" + texName, createData ) );
 				else
-					material->SetVar( param, matsys->CreateTexture( texName ) );
+					Mat_SetVar( material, param, render->LoadTexture( texName, createData ) );
 			};
 
 			if ( gltfMat.has_pbr_metallic_roughness )
@@ -263,7 +268,7 @@ void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Mod
 			SetTexture( MatVar_Normal,   gltfMat.normal_texture.texture );
 
 			if ( gltfMat.has_emissive_strength )
-				material->SetVar( MatVar_EmissivePower, gltfMat.emissive_strength.emissive_strength );
+				Mat_SetVar( material, MatVar_EmissivePower, gltfMat.emissive_strength.emissive_strength );
 		}
 
 		meshBuilder.SetCurrentSurface( i );
@@ -523,7 +528,7 @@ void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Mod
 
 					if ( morphTargets.size() )
 					{
-						meshBuilder.SetMorphPos( *(glm::vec3*)(morphPos + (index * 3)) );
+						// meshBuilder.SetMorphPos( *(glm::vec3*)(morphPos + (index * 3)) );
 					}
 
 					// For Later
@@ -619,4 +624,3 @@ void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Mod
 	cgltf_free( gltf );
 }
 
-#endif

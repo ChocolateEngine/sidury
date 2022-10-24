@@ -122,9 +122,13 @@ Handle Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate )
 		gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
 	}
 
+	TextureCreateData_t createData{};
+	createData.aFilter = EImageFilter_Nearest;
+	createData.aUsage  = EImageUsage_Sampled;
+
 	// create fallback textures
-	gFallbackAO       = render->LoadTexture( gpFallbackAOPath );
-	gFallbackEmissive = render->LoadTexture( gpFallbackEmissivePath );
+	gFallbackAO        = render->LoadTexture( gpFallbackAOPath, createData );
+	gFallbackEmissive  = render->LoadTexture( gpFallbackEmissivePath, createData );
 
 	return gPipeline;
 }
@@ -247,7 +251,7 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	mat->ao            = Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
 	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
 
-	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 1.f );
+	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
 	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
 
 	// write new material data to the buffer

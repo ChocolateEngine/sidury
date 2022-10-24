@@ -19,8 +19,8 @@ extern IRender*              render;
 
 // --------------------------------------------------------------------------------------
 
-void                         Graphics_LoadObj( const std::string& srPath, Model* spModel );
-// void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Model* spModel );
+void                         Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath, Model* spModel );
+void                         Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath, const std::string& srExt, Model* spModel );
 
 // shaders, fun
 void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
@@ -106,13 +106,13 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	if ( fileExt == "obj" )
 	{
 		handle = gModels.Add( model );
-		Graphics_LoadObj( fullPath, model );
+		Graphics_LoadObj( srPath, fullPath, model );
 	}
-	// else if ( fileExt == "glb" || fileExt == "gltf" )
-	// {
-	// 	handle = gModels.Add( model );
-	// 	Graphics_LoadGltf( fullPath, fileExt, model );
-	// }
+	else if ( fileExt == "glb" || fileExt == "gltf" )
+	{
+		handle = gModels.Add( model );
+		Graphics_LoadGltf( srPath, fullPath, fileExt, model );
+	}
 	else
 	{
 		Log_DevF( gLC_ClientGraphics, 1, "Unknown Model File Extension: %s\n", fileExt.c_str() );
@@ -228,18 +228,20 @@ bool Graphics_CreateRenderTargets()
 	texCreate.apName    = "ImGui Color";
 	texCreate.aSize     = { width, height };
 	texCreate.aFormat   = GraphicsFmt::BGRA8888_UNORM;
-	texCreate.aUseMSAA  = false;
 	texCreate.aViewType = EImageView_2D;
-	texCreate.aUsage    = EImageUsage_AttachColor | EImageUsage_Sampled;
 
-	gImGuiTextures[ 0 ] = render->CreateTexture( texCreate );
+	TextureCreateData_t createData{};
+	createData.aUsage   = EImageUsage_AttachColor | EImageUsage_Sampled;
+	createData.aFilter  = EImageFilter_Nearest;
+
+	gImGuiTextures[ 0 ] = render->CreateTexture( texCreate, createData );
 
 	// Create ImGui Depth Stencil Attachment
 	texCreate.apName    = "ImGui Depth";
 	texCreate.aFormat   = render->GetSwapFormatDepth();
-	texCreate.aUsage    = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
+	createData.aUsage   = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
 
-	gImGuiTextures[ 1 ] = render->CreateTexture( texCreate );
+	gImGuiTextures[ 1 ] = render->CreateTexture( texCreate, createData );
 
 	// Create a new framebuffer for ImGui to draw on
 	CreateFramebuffer_t frameBufCreate{};

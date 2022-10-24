@@ -381,7 +381,11 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 			// Texture Path
 			case EJsonType_String:
 			{
-				Mat_SetVar( handle, cur.apName, render->LoadTexture( cur.apString ) );
+				TextureCreateData_t createData{};
+				createData.aUsage  = EImageUsage_Sampled;
+				createData.aFilter = EImageFilter_Linear;
+
+				Mat_SetVar( handle, cur.apName, render->LoadTexture( cur.apString, createData ) );
 				break;
 			}
 

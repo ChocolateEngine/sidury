@@ -41,9 +41,10 @@ static std::string MatVar_Diffuse = "diffuse";
 static std::string MatVar_Emissive = "emissive";
 
 
-void LoadObj_Tiny( const std::string &srPath, Model* spModel )
+void LoadObj_Tiny( const std::string& srBasePath, const std::string &srPath, Model* spModel )
 {
 	std::string baseDir = GetBaseDir( srPath );
+	std::string baseDir2 = GetBaseDir( srBasePath );
 	// auto startTime = std::chrono::high_resolution_clock::now();
 
 	tinyobj::ObjReader reader;
@@ -89,13 +90,13 @@ void LoadObj_Tiny( const std::string &srPath, Model* spModel )
 
 	for ( size_t i = 0; i < objMaterials.size(); ++i )
 	{
-		const tinyobj::material_t &objMaterial = objMaterials[i];
-
-		Handle material = Graphics_FindMaterial( objMaterial.name.c_str() );
+		const tinyobj::material_t& objMaterial = objMaterials[ i ];
+		std::string                matName     = baseDir2 + "/" + objMaterial.name;
+		Handle                     material    = Graphics_FindMaterial( matName.c_str() );
 
 		if ( material == InvalidHandle )
 		{
-			std::string matPath = baseDir + "/" + objMaterial.name + ".cmt";
+			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
 				material = Graphics_LoadMaterial( matPath );
 		}
@@ -105,14 +106,18 @@ void LoadObj_Tiny( const std::string &srPath, Model* spModel )
 		{
 			material        = Graphics_CreateMaterial( objMaterial.name, Graphics_GetShader( "basic_3d" ) );
 
+			TextureCreateData_t createData{};
+			createData.aUsage  = EImageUsage_Sampled;
+			createData.aFilter = EImageFilter_Linear;
+
 			auto SetTexture = [&]( const std::string& param, const std::string &texname )
 			{
 				if ( !texname.empty() )
 				{
 					if ( FileSys_IsRelative( texname ) )
-						Mat_SetVar( material, param, render->LoadTexture( baseDir + "/" + texname ) );
+						Mat_SetVar( material, param, render->LoadTexture( baseDir2 + "/" + texname, createData ) );
 					else
-						Mat_SetVar( material, param, render->LoadTexture( texname ) );
+						Mat_SetVar( material, param, render->LoadTexture( texname, createData ) );
 				}
 			};
 
@@ -750,7 +755,7 @@ void LoadObj_Fast( const std::string &srPath, Model* spModel )
 #endif
 
 
-void Graphics_LoadObj( const std::string& srPath, Model* spModel )
+void Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath, Model* spModel )
 {
 	//auto startTime = std::chrono::high_resolution_clock::now();
 	//float time = 0.f;
@@ -758,7 +763,7 @@ void Graphics_LoadObj( const std::string& srPath, Model* spModel )
 #if USE_FAST_OBJ
 	LoadObj_Fast( srPath, spModel );
 #else
-	LoadObj_Tiny( srPath, spModel );
+	LoadObj_Tiny( srBasePath, srPath, spModel );
 #endif
 
 	// auto currentTime = std::chrono::high_resolution_clock::now();

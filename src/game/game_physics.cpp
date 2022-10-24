@@ -227,7 +227,7 @@ void Phys_DrawText(
 }
 
 
-void Phys_GetModelVerts( Handle sModel, std::vector< glm::vec3 >& srVertices )
+void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 {
 	Model* model = Graphics_GetModelData( sModel );
 
@@ -248,20 +248,46 @@ void Phys_GetModelVerts( Handle sModel, std::vector< glm::vec3 >& srVertices )
 			}
 		}
 
+		if ( data == nullptr )
+		{
+			Log_Error( "Phys_GetModelInd(): Position Vertex Data not found?\n" );
+			return;
+		}
+
+		u32 newSize  = static_cast< u32 >( ind.size() );
+		if ( newSize == 0 )
+			newSize = srData.aVertCount;
+
+		u32 origSize = srData.aVertCount;
+
+		if ( srData.apVertices )
+			srData.apVertices = (glm::vec3*)realloc( srData.apVertices, ( origSize + newSize ) * sizeof( glm::vec3 ) );
+		else
+			srData.apVertices = (glm::vec3*)malloc( ( origSize + newSize ) * sizeof( glm::vec3 ) );
+
 		if ( ind.size() )
 		{
 			for ( size_t i = 0; i < ind.size(); i++ )
 			{
 				size_t i0 = ind[ i ] * 3;
-				srVertices.emplace_back( data[ i0 ], data[ i0 + 1 ], data[ i0 + 2 ] );
+
+				srData.apVertices[ origSize + i ].x = data[ i0 + 0 ];
+				srData.apVertices[ origSize + i ].y = data[ i0 + 1 ];
+				srData.apVertices[ origSize + i ].z = data[ i0 + 2 ];
 			}
+
+			srData.aVertCount += ind.size();
 		}
 		else
 		{
-			for ( size_t i = 0; i < vertData.aCount * 3; )
+			for ( size_t i = 0, j = 0; i < vertData.aCount * 3; j++ )
 			{
-				srVertices.emplace_back( data[ i++ ], data[ i++ ], data[ i++ ] );
+				srData.apVertices[ origSize + j ].x = data[ i++ ];
+				srData.apVertices[ origSize + j ].y = data[ i++ ];
+				srData.apVertices[ origSize + j ].z = data[ i++ ];
 			}
+
+			srData.aVertCount += vertData.aCount;
 		}
 	}
 }
@@ -361,9 +387,9 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		{
 			// srVerts.emplace_back( data[ i + 0 ], data[ i + 1 ], data[ i + 2 ] );
 
-			srData.apVertices[ origSize + j ].x       = data[ i + 0 ];
-			srData.apVertices[ origSize + j ].y       = data[ i + 1 ];
-			srData.apVertices[ origSize + j ].z       = data[ i + 2 ];
+			srData.apVertices[ origSize + j ].x = data[ i + 0 ];
+			srData.apVertices[ origSize + j ].y = data[ i + 1 ];
+			srData.apVertices[ origSize + j ].z = data[ i + 2 ];
 
 			// srVerts.push_back( what );
 		}

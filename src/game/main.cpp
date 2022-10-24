@@ -47,9 +47,6 @@ Handle           hAudioMusic = InvalidHandle;
 
 extern ConVar r_nearz, r_farz, r_fov;
 
-CONVAR( phys_rot_x, 90 );
-CONVAR( phys_rot_y, 0 );
-CONVAR( phys_rot_z, 0 );
 CONVAR( phys_friction, 10 );
 CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
@@ -85,19 +82,16 @@ std::vector< ModelPhysTest* > g_physEnts;
 
 void CreateProtogen( const std::string& path )
 {
-#if 0
+#if 1
 	Entity proto = entities->CreateEntity();
 
-	Model *model = Graphics_LoadModel( path );
+	ModelDraw_t modelDraw{};
+	modelDraw.aModel = Graphics_LoadModel( path );
+	entities->AddComponent< ModelDraw_t >( proto, modelDraw );
+
 	Transform& transform = entities->AddComponent< Transform >( proto );
 
-	DefaultRenderable* renderable = new DefaultRenderable;
-	renderable->apModel = model;
-
-	entities->AddComponent< RenderableHandle_t >( proto, (RenderableHandle_t)renderable );
-	entities->AddComponent< Model* >( proto, model );
-
-	auto playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	auto playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
 
 	transform.aPos   = playerTransform.aPos;
 	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
@@ -126,18 +120,26 @@ void CreateModelEntity( const std::string& path )
 
 void CreatePhysEntity( const std::string& path )
 {
-#if 0
+#if 1
 	Entity physEnt = entities->CreateEntity();
 
-	Model* model   = Graphics_LoadModel( path );
-	entities->AddComponent< Model* >( physEnt, model );
+	ModelDraw_t modelDraw{};
+	modelDraw.aModel = Graphics_LoadModel( path );
+	entities->AddComponent< ModelDraw_t >( physEnt, modelDraw );
 
-	Transform& transform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	Transform& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
-	shapeInfo.aMeshData.apModel = model;
+
+	Phys_GetModelVerts( modelDraw.aModel, shapeInfo.aConvexData );
 
 	IPhysicsShape* shape = physenv->CreateShape( shapeInfo );
+
+	if ( shape == nullptr )
+	{
+		Log_ErrorF( "Failed to create physics shape for model: \"%s\"\n", path.c_str() );
+		return;
+	}
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aPos = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
@@ -379,30 +381,27 @@ void GameSystem::Update( float frameTime )
 
 void EntUpdate()
 {
-#if 0
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
-		Model* model = entities->GetComponent< Model* >( ent );
+		ModelDraw_t& model = entities->GetComponent< ModelDraw_t >( ent );
 
-		if ( !model )
+		if ( model.aModel == InvalidHandle )
 			continue;
 
 		// Model *physObjList = &entities->GetComponent< Model >( ent );
 
 		// Transform& transform = entities->GetComponent< Transform >( ent );
-		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( ent );
 		IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
 
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
-			ToMatrix( renderable->aMatrix, phys->GetPos(), phys->GetAng() );
+			ToMatrix( model.aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
 
-		// materialsystem->AddRenderable( renderable );
+		Graphics_DrawModel( &model );
 	}
-#endif
 }
 
 
@@ -676,13 +675,13 @@ void Game_SetupModels( float frameTime )
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
-#if 0
+#if 1
 	for ( auto& proto: g_protos )
 	{
-		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
-		auto& protoTransform = entities->GetComponent< Transform >( proto );
+		ModelDraw_t& modelDraw      = entities->GetComponent< ModelDraw_t >( proto );
+		auto&        protoTransform = entities->GetComponent< Transform >( proto );
 
-		bool matrixChanged = false;
+		bool         matrixChanged  = false;
 
 		if ( proto_look.GetBool() )
 		{
@@ -714,9 +713,9 @@ void Game_SetupModels( float frameTime )
 		}
 
 		if ( matrixChanged )
-			renderable->aMatrix = protoTransform.ToMatrix();
+			modelDraw.aModelMatrix = protoTransform.ToMatrix();
 
-		materialsystem->AddRenderable( renderable );
+		Graphics_DrawModel( &modelDraw );
 	}
 #endif
 }
