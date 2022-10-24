@@ -46,6 +46,7 @@ Handle Shader_UI_Create( Handle sRenderPass, bool sRecreate )
 
 	GraphicsPipelineCreate_t pipelineInfo{};
 
+	pipelineInfo.apName = "imgui";
 	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
 	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
 

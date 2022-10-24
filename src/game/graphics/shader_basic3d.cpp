@@ -85,6 +85,7 @@ void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& s
 
 	// --------------------------------------------------------------
 
+	srGraphics.apName = "basic_3d";
 	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
 	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
 

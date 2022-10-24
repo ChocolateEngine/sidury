@@ -21,15 +21,14 @@ public:
 	void                             SetAng( const glm::vec3& ang );
 
 	bool                             aValid = false;
-	Handle                           aModel = InvalidHandle;
-	glm::mat4                        aMatrix{};
+	ModelDraw_t                      aDraw{};
 	std::vector< float >             aMorphVerts;
 
 	Skybox()  {};
 	~Skybox()
 	{
-		if ( aModel != InvalidHandle )
-			Graphics_FreeModel( aModel );
+		if ( aDraw.aModel != InvalidHandle )
+			Graphics_FreeModel( aDraw.aModel );
 	}
 };
 

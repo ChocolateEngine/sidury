@@ -225,6 +225,8 @@ EMatVar            Mat_GetVarType( Handle mat, size_t sIndex );
 Handle             Mat_GetShader( Handle mat );
 void               Mat_SetShader( Handle mat, Handle shShader );
 
+VertexFormat       Mat_GetVertexFormat( Handle mat );
+
 void               Mat_SetVar( Handle mat, const std::string& name, Handle texture );
 void               Mat_SetVar( Handle mat, const std::string& name, float data );
 void               Mat_SetVar( Handle mat, const std::string& name, int data );
@@ -244,11 +246,13 @@ const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::ve
 // Shaders
 
 bool               Graphics_ShaderInit( bool sRecreate );
-Handle             Graphics_GetShader( std::string_view name );
+Handle             Graphics_GetShader( std::string_view sName );
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
+void               Shader_ResetPushData();
 bool               Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable );
 bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
+VertexFormat       Shader_GetVertexFormat( Handle sShader );
 
 // ---------------------------------------------------------------------------------------
 // Buffers

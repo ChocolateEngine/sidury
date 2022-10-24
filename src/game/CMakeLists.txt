@@ -17,13 +17,14 @@ file(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-# include( ${CH_ROOT}/scripts/joltphysics.cmake )
-# include( ${CH_ROOT}/scripts/bullet.cmake )
-include( ${CH_ROOT}/scripts/vulkan.cmake )
-
-link_libraries( Core ImGui )
-
 add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} )
+
+target_link_libraries(
+	SiduryClient
+	PRIVATE
+	Core
+	ImGui
+)
 
 add_dependencies( SiduryClient "Core" "ImGui" )
 

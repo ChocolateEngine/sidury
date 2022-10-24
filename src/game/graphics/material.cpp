@@ -2,6 +2,8 @@
 #include "graphics.h"
 #include "render/irender.h"
 
+#include "core/json5.h"
+
 #include <set>
 
 extern IRender* render;
@@ -162,6 +164,17 @@ void Mat_SetShader( Handle mat, Handle shShader )
 }
 
 
+VertexFormat Mat_GetVertexFormat( Handle mat )
+{
+	Handle shader = Mat_GetShader( mat );
+
+	if ( shader == InvalidHandle )
+		return VertexFormat_None;
+
+	return Shader_GetVertexFormat( shader );
+}
+
+
 template <typename T>
 void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 {
@@ -272,10 +285,156 @@ const glm::vec4& Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4
 // ---------------------------------------------------------------------------------------------------------
 
 
+// Used in normal material loading, and eventually, live material reloading
+bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
+{
+	std::string fullPath;
+
+	if ( srPath.ends_with( ".cmt" ) )
+		fullPath = FileSys_FindFile( srPath );
+	else
+		fullPath = FileSys_FindFile( srPath + ".cmt" );
+
+	if ( fullPath.empty() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Find Material: \"%s\"", srPath.c_str() );
+		return false;
+	}
+
+	std::vector< char > data = FileSys_ReadFile( fullPath );
+
+	if ( data.empty() )
+		return false;
+
+	JsonObject_t root;
+	EJsonError   err = Json_Parse( &root, data.data() );
+
+	if ( err != EJsonError_None )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Error Parsing Material: %d\n", err );
+		return false;
+	}
+
+	Handle        shader = InvalidHandle;
+
+	for ( size_t i = 0; i < root.aObjects.size(); i++ )
+	{
+		JsonObject_t& cur = root.aObjects[ i ];
+
+		if ( strcmp( cur.apName, "shader" ) == 0 )
+		{
+			if ( shader != InvalidHandle )
+			{
+				Log_WarnF( gLC_ClientGraphics, "Shader is specified multiple times in material \"%s\"", srPath.c_str() );
+				continue;
+			}
+
+			if ( cur.aType != EJsonType_String )
+			{
+				Log_WarnF( gLC_ClientGraphics, "Shader value is not a string!: \"%s\"", srPath.c_str() );
+				Json_Free( &root );
+				return false;
+			}
+
+			shader = Graphics_GetShader( cur.apString );
+			if ( shader == InvalidHandle )
+			{
+				Log_ErrorF( gLC_ClientGraphics, "Failed to find Material Shader: %s - \"%s\"\n", cur.apString, srPath.c_str() );
+				Json_Free( &root );
+				return false;
+			}
+
+			MaterialData_t* matData = nullptr;
+			if ( handle == InvalidHandle )
+			{
+				matData    = new MaterialData_t;
+				handle     = gMaterials.Add( matData );
+
+				char* name = new char[ srPath.size() + 1 ];
+				strncpy( name, srPath.c_str(), srPath.size() );
+				name[ srPath.size() ]  = '\0';
+
+				gMaterialNames[ name ] = handle;
+			}
+			else
+			{
+				if ( !gMaterials.Get( handle, &matData ) )
+				{
+					Log_WarnF( gLC_ClientGraphics, "Failed to find Material Data while updating: \"%s\"\n", srPath.c_str() );
+					Json_Free( &root );
+					return false;
+				}
+			}
+			gMaterialShaders[ handle ] = shader;
+
+			continue;
+		}
+
+		switch ( cur.aType )
+		{
+			default:
+			{
+				Log_WarnF( gLC_ClientGraphics, "Unused Value Type: %d - \"%s\"\n", cur.aType, srPath.c_str() );
+				break;
+			}
+
+			// Texture Path
+			case EJsonType_String:
+			{
+				Mat_SetVar( handle, cur.apName, render->LoadTexture( cur.apString ) );
+				break;
+			}
+
+			case EJsonType_Int:
+			{
+				// integer is here is an int64_t
+				if ( cur.aInt > INT_MAX )
+				{
+					Log_WarnF( gLC_ClientGraphics, "Overflowed Int Value for key \"%s\", clamping to INT_MAX - \"%s\"\n", cur.apName , srPath.c_str() );
+					Mat_SetVar( handle, cur.apName, INT_MAX );
+					break;
+				}
+
+				Mat_SetVar( handle, cur.apName, static_cast< int >( cur.aInt ) );
+				break;
+			}
+
+			// double
+			case EJsonType_Double:
+			{
+				Mat_SetVar( handle, cur.apName, static_cast< float >( cur.aDouble ) );
+				break;
+			}
+
+			case EJsonType_Array:
+			{
+				Log_Msg( "TODO: IMPLEMENT ARRAY PARSING\n" );
+				break;
+			}
+		}
+	}
+
+	Json_Free( &root );
+
+	return true;
+}
+
+
 Handle Graphics_LoadMaterial( const std::string& srPath )
 {
-	// gMaterialPaths
-	return InvalidHandle;
+	auto nameIt = gMaterialNames.find( srPath.c_str() );
+	if ( nameIt != gMaterialNames.end() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Material Already Loaded: \"%s\"", srPath.c_str() );
+		return nameIt->second;
+	}
+
+	Handle handle = InvalidHandle;
+	if ( !Graphics_ParseMaterial( srPath, handle ) )
+		return InvalidHandle;
+
+	gMaterialPaths[ srPath ] = handle;
+	return handle;
 }
 
 

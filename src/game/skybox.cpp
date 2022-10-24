@@ -3,6 +3,7 @@
 
 #include "graphics/graphics.h"
 #include "graphics/mesh_builder.h"
+#include "render/irender.h"
 #include "util.h"
 
 extern GameSystem* game;
@@ -12,6 +13,9 @@ CONVAR( g_skybox, 1 );
 CONVAR( g_skybox_ang_freeze, 0 );
 
 static Handle gSkyboxShader = InvalidHandle;
+
+// wtf
+extern ViewportCamera_t gView;
 
 Skybox& GetSkybox()
 {
@@ -27,7 +31,7 @@ constexpr glm::vec3 vec3_zero( 0, 0, 0 );
 void Skybox::Init()
 {
 	Model* model    = new Model;
-	aModel          = Graphics_AddModel( model );
+	aDraw.aModel    = Graphics_AddModel( model );
 
 	gSkyboxShader = Graphics_GetShader( "skybox" );
 
@@ -95,11 +99,11 @@ void Skybox::SetSkybox( const std::string &path )
 {
 	aValid = false;
 
-	Handle prevMat = Model_GetMaterial( aModel, 0 );
+	Handle prevMat = Model_GetMaterial( aDraw.aModel, 0 );
 
 	if ( prevMat )
 	{
-		Model_SetMaterial( aModel, 0, InvalidHandle );
+		Model_SetMaterial( aDraw.aModel, 0, InvalidHandle );
 		Graphics_FreeMaterial( prevMat );
 	}
 
@@ -110,7 +114,7 @@ void Skybox::SetSkybox( const std::string &path )
 	if ( mat == InvalidHandle )
 		return;
 
-	Model_SetMaterial( aModel, 0, mat );
+	Model_SetMaterial( aDraw.aModel, 0, mat );
 
 	if ( Mat_GetShader( mat ) != gSkyboxShader )
 	{
@@ -152,17 +156,17 @@ inline void ToViewMatrixY( glm::mat4& viewMatrix, const glm::vec3& ang )
 
 void Skybox::SetAng( const glm::vec3& ang )
 {
-	if ( !aValid || g_skybox_ang_freeze || Model_GetMaterial( aModel, 0 ) == InvalidHandle )
+	if ( !aValid || g_skybox_ang_freeze || Model_GetMaterial( aDraw.aModel, 0 ) == InvalidHandle )
 		return;
 
-	ToViewMatrixY( aMatrix, ang );
+	ToViewMatrixY( aDraw.aModelMatrix, ang );
+	aDraw.aModelMatrix = gView.aProjMat * aDraw.aModelMatrix;
 }
 
 
 void Skybox::Draw()
 {
-	// if ( aValid && g_skybox )
-	// 	Graphics_DrawModel( {aModel, aMatrix} );
+	if ( aValid && g_skybox )
+		Graphics_DrawModel( &aDraw );
 }
-
 

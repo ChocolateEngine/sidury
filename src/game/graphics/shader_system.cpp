@@ -6,10 +6,11 @@
 extern IRender*                                         render;
 
 // temp shader
-static Handle                                           gTempShader = InvalidHandle;
-static Handle                                           gUIShader   = InvalidHandle;
+static Handle                                           gTempShader   = InvalidHandle;
+static Handle                                           gSkyboxShader = InvalidHandle;
+static Handle                                           gUIShader     = InvalidHandle;
 
-static std::unordered_map< const char*, Handle >        gShaderNames;
+static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
 static std::unordered_map< Handle, EShaderFlags >       gShaderFlags;      // [name]   = shader
 static std::unordered_map< Handle, Handle >             gShaderLayouts;    // [name]   = pipeline layout
@@ -53,6 +54,16 @@ void         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
 VertexFormat Shader_Basic3D_GetVertexFormat();
 Handle       Shader_Basic3D_GetPipelineLayout();
 
+Handle       Shader_Skybox_Create( Handle sRenderPass, bool sRecreate );
+void         Shader_Skybox_Destroy();
+void         Shader_Skybox_Bind( Handle cmd, size_t sCmdIndex );
+void         Shader_Skybox_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
+void         Shader_Skybox_ResetPushData();
+void         Shader_Skybox_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
+VertexFormat Shader_Skybox_GetVertexFormat();
+void         Shader_Skybox_UpdateMaterialData( Handle sMat );
+Handle       Shader_Skybox_GetPipelineLayout();
+
 Handle       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_UI_Destroy();
 void         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
@@ -78,23 +89,27 @@ void Graphics_AddShader( const char* spName, Handle sShader, EShaderFlags sFlags
 }
 
 
-Handle Graphics_GetShader( std::string_view name )
+Handle Graphics_GetShader( std::string_view sName )
 {
-	auto it = gShaderNames.find( name.data() );
+	auto it = gShaderNames.find( sName );
 	if ( it != gShaderNames.end() )
 		return it->second;
 
-	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %s\n", name.data() );
-	return gTempShader;
+	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %s\n", sName );
+	return InvalidHandle;
 }
 
 
 Handle Shader_GetPipelineLayout( Handle sShader )
 {
 	// HACK HACK HACK
-	return Shader_Basic3D_GetPipelineLayout();
+	if ( sShader == gTempShader )
+		return Shader_Basic3D_GetPipelineLayout();
 
-	// return InvalidHandle;
+	if ( sShader == gSkyboxShader )
+		return Shader_Skybox_GetPipelineLayout();
+
+	return InvalidHandle;
 }
 
 
@@ -112,10 +127,20 @@ bool Graphics_ShaderInit( bool sRecreate )
 		return false;
 	}
 
+	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGraphics, sRecreate ) ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
+		return false;
+	}
+
 	if ( !sRecreate )
 	{
 		Graphics_AddShader( "basic_3d", gTempShader,
 		                    EShaderFlags_Sampler | EShaderFlags_ViewProj | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform,
+		                    EPipelineBindPoint_Graphics );
+
+		Graphics_AddShader( "skybox", gSkyboxShader,
+		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
 		                    EPipelineBindPoint_Graphics );
 
 		Graphics_AddShader( "imgui", gUIShader,
@@ -152,7 +177,10 @@ EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 Handle* Shader_GetMaterialUniform( Handle sShader )
 {
 	// HACK HACK HACK
-	return gLayoutMaterialBasic3DSets;
+	if ( sShader == gTempShader )
+		return gLayoutMaterialBasic3DSets;
+	else
+		return nullptr;
 
 	// auto it = gShaderMaterials.find( sShader );
 	// if ( it != gShaderMaterials.end() )
@@ -199,14 +227,24 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 }
 
 
+void Shader_ResetPushData()
+{
+	Shader_Basic3D_ResetPushData();
+	Shader_Skybox_ResetPushData();
+}
+
+
 bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable )
 {
 	EShaderFlags shaderFlags = Shader_GetFlags( sShader );
 
 	if ( shaderFlags & EShaderFlags_PushConstant )
 	{
-		// HACK HACK
-		Shader_Basic3D_SetupPushData( srRenderable );
+		if ( sShader == gTempShader )
+			Shader_Basic3D_SetupPushData( srRenderable );
+
+		else if ( sShader == gSkyboxShader )
+			Shader_Skybox_SetupPushData( srRenderable );
 	}
 
 	return true;
@@ -219,10 +257,26 @@ bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSur
 
 	if ( shaderFlags & EShaderFlags_PushConstant )
 	{
-		// HACK HACK
-		Shader_Basic3D_PushConstants( sCmd, sIndex, srRenderable );
+		if ( sShader == gTempShader )
+			Shader_Basic3D_PushConstants( sCmd, sIndex, srRenderable );
+
+		else if ( sShader == gSkyboxShader )
+			Shader_Skybox_PushConstants( sCmd, sIndex, srRenderable );
 	}
 
 	return true;
+}
+
+
+VertexFormat Shader_GetVertexFormat( Handle sShader )
+{
+	// HACK HACK HACK
+	if ( sShader == gTempShader )
+		return Shader_Basic3D_GetVertexFormat();
+
+	if ( sShader == gSkyboxShader )
+		return Shader_Skybox_GetVertexFormat();
+
+	return VertexFormat_None;
 }
 

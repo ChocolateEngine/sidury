@@ -23,17 +23,8 @@ void                         Graphics_LoadObj( const std::string& srPath, Model*
 // void Graphics_LoadGltf( const std::string& srPath, const std::string& srExt, Model* spModel );
 
 // shaders, fun
-// Handle                       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
-void                         Shader_Basic3D_Destroy();
-void                         Shader_Basic3D_Bind( Handle cmd, size_t sCmdIndex );
-void                         Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-void                         Shader_Basic3D_ResetPushData();
-void                         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
-VertexFormat                 Shader_Basic3D_GetVertexFormat();
 void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
 
-// Handle                       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
-void                         Shader_UI_Destroy();
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
 
 // --------------------------------------------------------------------------------------
@@ -74,6 +65,9 @@ Handle*                                          gLayoutMaterialBasic3DSets;
 constexpr u32                                    MAX_MATERIALS_BASIC3D = 500;
 
 extern std::set< Handle >                        gDirtyMaterials;
+
+static bool                                      gDrawingSkybox = false;
+static Handle                                    gSkyboxShader = InvalidHandle;
 
 // --------------------------------------------------------------------------------------
 // Assets
@@ -522,6 +516,7 @@ void Graphics_NewFrame()
 	render->NewFrame();
 
 	gMeshDrawList.clear();
+	gDrawingSkybox = false;
 }
 
 
@@ -612,6 +607,11 @@ void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 // Do Rendering with shader system and user land meshes
 void Graphics_Render( Handle cmd )
 {
+	// here we go again
+	static Handle skybox    = Graphics_GetShader( "skybox" );
+
+	bool          hasSkybox = false;
+
 	int width = 0, height = 0;
 	render->GetSurfaceSize( width, height );
 
@@ -639,6 +639,12 @@ void Graphics_Render( Handle cmd )
 	// TODO: still could be better, but it's better than what we used to have
 	for ( auto& [ shader, renderList ] : gMeshDrawList )
 	{
+		if ( shader == skybox )
+		{
+			hasSkybox = true;
+			continue;
+		}
+
 		if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 			continue;
 
@@ -659,7 +665,39 @@ void Graphics_Render( Handle cmd )
 		}
 	}
 
-	// return;
+	// Draw Skybox - and set depth for skybox
+	if ( hasSkybox )
+	{
+		viewPort.minDepth = 0.999f;
+		viewPort.maxDepth = 1.f;
+
+		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+		if ( !Shader_Bind( cmd, gCmdIndex, skybox ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to bind skybox shader\n" );
+		}
+		else
+		{
+			auto& renderList = gMeshDrawList[ skybox ];
+
+			for ( auto& renderable : renderList )
+			{
+				// if ( prevRenderable != renderable || prevMatIndex != matIndex )
+				// if ( prevRenderable && prevRenderable->aModel != renderable->aModel || prevMatIndex != matIndex )
+				if ( !prevRenderable || prevRenderable->apDraw->aModel != renderable.apDraw->aModel || prevRenderable->aSurface != renderable.aSurface )
+				{
+					prevRenderable = &renderable;
+					Graphics_BindModel( cmd, renderable );
+				}
+
+				if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, skybox, renderable ) )
+					continue;
+
+				Graphics_CmdDrawModel( cmd, renderable );
+			}
+		}
+	}
 
 	// un-flip viewport
 	viewPort.x        = 0.f;
@@ -697,13 +735,13 @@ void Graphics_PrepareDrawData()
 			render->MemWriteBuffer( gViewProjBuffers[ i ], sizeof( glm::mat4 ), &gViewProjMat );
 	}
 
-	Shader_Basic3D_ResetPushData();
+	Shader_ResetPushData();
 
 	for ( auto& [ shader, renderList ] : gMeshDrawList )
 	{
 		for ( auto& renderable : renderList )
 		{
-			Shader_Basic3D_SetupPushData( renderable );
+			Shader_SetupRenderableDrawData( shader, renderable );
 		}
 	}
 }
@@ -796,22 +834,11 @@ void Graphics_DrawModel( ModelDraw_t* spDrawInfo )
 			continue;
 		}
 
-		// if ( Mat_GetShader( mat ) == InvalidHandle )
-		// {
-		// 	Log_Error( gLC_ClientGraphics, "Material has no shader!\n" );
-		// 	continue;
-		// }
+		Handle shader = Mat_GetShader( mat );
+		gMeshDrawList[ shader ].emplace_front( spDrawInfo, i );
 
-		// auto search = aDrawList.find( mat->apShader );
-		//
-		// if ( search != aDrawList.end() )
-		// 	search->second.push_back( renderable );
-		// else
-		// 	aDrawList[mat->apShader].push_back( renderable );
-
-		// aDrawList[mat->apShader].push_front( renderable );
-
-		gMeshDrawList[ Mat_GetShader( mat ) ].emplace_front( spDrawInfo, i );
+		if ( shader == gSkyboxShader )
+			gDrawingSkybox = true;
 	}
 }
 
@@ -992,12 +1019,14 @@ void Graphics_CreateVertexBuffers( Mesh& srMesh, const char* spDebugName )
 {
 	VertexData_t& vertData     = srMesh.aVertexData;
 
-	// HACK HACK HACK HACK HACK !!!!!!!!!!!!!!!!!!!!!!
-	VertexFormat  shaderFormat = Shader_Basic3D_GetVertexFormat();
+	VertexFormat  shaderFormat = Mat_GetVertexFormat( srMesh.aMaterial );
 
 	// wtf
 	if ( shaderFormat == VertexFormat_None )
+	{
+		Log_Error( gLC_ClientGraphics, "No Vertex Format for shader!\n" );
 		return;
+	}
 
 	// Get Attributes the shader wants
 	// TODO: what about if we don't have an attribute the shader wants???
