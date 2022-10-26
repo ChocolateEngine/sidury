@@ -92,11 +92,17 @@ void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& s
 	Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
 	Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
 
-	srGraphics.aPrimTopology     = EPrimTopology_Tri;
-	srGraphics.aDynamicState     = EDynamicState_Viewport | EDynamicState_Scissor;
-	srGraphics.aCullMode         = ECullMode_Back;
-	srGraphics.aPipelineLayout   = gPipelineLayout;
-	srGraphics.aRenderPass       = sRenderPass;
+	srGraphics.aColorBlendAttachments.emplace_back( false );  // pos
+	srGraphics.aColorBlendAttachments.emplace_back( false );  // normal
+	srGraphics.aColorBlendAttachments.emplace_back( false );  // color
+	srGraphics.aColorBlendAttachments.emplace_back( false );  // ao
+	srGraphics.aColorBlendAttachments.emplace_back( false );  // emission
+
+	srGraphics.aPrimTopology   = EPrimTopology_Tri;
+	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode       = ECullMode_Back;
+	srGraphics.aPipelineLayout = gPipelineLayout;
+	srGraphics.aRenderPass     = sRenderPass;
 	// TODO: expose the rest later
 }
 

@@ -80,6 +80,20 @@ enum : EShaderFlags
 	EShaderFlags_VertexAttributes = ( 1 << 2 ),  // Shader Uses Vertex Attributes
 	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader makes of a Push Constant
 	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Makes use of Material Uniform Buffers
+	// EShaderFlags_WorldLight       = ( 1 << 5 ),  // Shader Makes use of World Light (only used on deferred shader)
+};
+
+
+enum ELightType // : char
+{
+	ELightType_Point,
+	ELightType_Spot,
+	ELightType_Ortho,
+	ELightType_Capsule,
+
+	// uh
+	// ELightType_Line,
+	// ELightType_Capsule,
 };
 
 
@@ -175,6 +189,53 @@ struct ModelSurfaceDraw_t
 	size_t       aSurface;
 };
 
+// TODO: use descriptor indexing on forward rendering
+// would allow you to do all lighting on a model in one draw call
+struct LightInfo_t
+{
+	int aCountWorld   = 0;
+	int aCountPoint   = 0;
+	int aCountCone    = 0;
+	int aCountCapsule = 0;
+};
+
+// Light Types
+struct LightBase_t
+{
+	glm::vec3 aColor{};
+};
+
+struct LightWorld_t : public LightBase_t
+{
+	glm::vec3 aDir{};
+};
+
+struct LightPoint_t : public LightBase_t
+{
+	glm::vec3 aPos{};
+	float     aRadius = 0.f;
+};
+
+struct LightCone_t : public LightBase_t
+{
+	glm::vec3 aPos{};
+	glm::vec3 aDir{};
+};
+
+struct LightCapsule_t : public LightBase_t
+{
+	glm::vec3 aPos{};
+	glm::vec3 aDir{};
+	float     aLength    = 0.f;
+	float     aThickness = 0.f;
+};
+
+struct UniformBufferArray_t
+{
+	Handle                aLayout = InvalidHandle;
+	std::vector< Handle > aSets;
+	std::vector< Handle > aBuffers;
+};
 
 // ---------------------------------------------------------------------------------------
 // Models
@@ -200,9 +261,9 @@ Handle             Graphics_CreateMaterial( const std::string& srName, Handle sh
 void               Graphics_FreeMaterial( Handle sMaterial );
 
 // Find a material by name
-// Name is a full path to the cmt file
+// Name is a path to the cmt file if it was loaded on disk
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
-// NAME: dev/grid01
+// NAME: materials/dev/grid01
 Handle             Graphics_FindMaterial( const char* spName );
 
 // Is This Material an Error Material?
@@ -261,7 +322,15 @@ void               Graphics_CreateVertexBuffers( Mesh& spMesh, const char* spDeb
 void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebugName = nullptr );
 
 // ---------------------------------------------------------------------------------------
-// Render Targets
+// Lighting
+
+LightWorld_t*      Graphics_CreateLightWorld();
+LightPoint_t*      Graphics_CreateLightPoint();
+// LightCone_t*       Graphics_CreateLightCone();
+// LightCapsule_t*    Graphics_CreateLightCapsule();
+
+void               Graphics_UpdateLight( LightBase_t* spLight );
+void               Graphics_DestroyLight( LightBase_t* spLight );
 
 // ---------------------------------------------------------------------------------------
 // Rendering

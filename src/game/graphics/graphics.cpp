@@ -26,6 +26,7 @@ void                         Graphics_LoadGltf( const std::string& srBasePath, c
 void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
 
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
+void                         Shader_DeferredFS_Draw( Handle cmd, size_t sCmdIndex );
 
 // --------------------------------------------------------------------------------------
 // Rendering
@@ -35,7 +36,9 @@ static size_t                gCmdIndex = 0;
 
 Handle                       gRenderPassGraphics;
 Handle                       gRenderPassUI;
-// static Handle                                                       gRenderPassShadow;  // maybe for future?
+
+// deferred rendering
+Handle                       gRenderPassGBuffer;
 
 // ew
 static std::unordered_map<
@@ -53,6 +56,11 @@ static Handle                                    gBackBufferTex[ 3 ];
 static Handle                                    gImGuiBuffer[ 2 ];
 static Handle                                    gImGuiTextures[ 2 ];
 
+// deferred rendering framebuffer
+Handle                                           gGBufferTex[ 6 ];  // pos, normal, color, ao, emission, depth
+// static Handle                                    gGBufferTarget[ 2 ];
+static Handle                                    gGBuffer[ 2 ];
+
 // descriptor set layouts
 Handle                                           gLayoutSampler         = InvalidHandle;
 Handle                                           gLayoutViewProj        = InvalidHandle;
@@ -61,6 +69,7 @@ Handle                                           gLayoutMaterialBasic3D = Invali
 // descriptor sets
 Handle                                           gLayoutSamplerSets[ 2 ];
 Handle                                           gLayoutViewProjSets[ 2 ];
+Handle*                                          gLayoutLightSets;
 Handle*                                          gLayoutMaterialBasic3DSets;
 constexpr u32                                    MAX_MATERIALS_BASIC3D = 500;
 
@@ -68,6 +77,21 @@ extern std::set< Handle >                        gDirtyMaterials;
 
 static bool                                      gDrawingSkybox = false;
 static Handle                                    gSkyboxShader = InvalidHandle;
+
+// --------------------------------------------------------------------------------------
+// Lighting
+
+UniformBufferArray_t                             gUniformLightInfo;
+UniformBufferArray_t                             gUniformLightWorld;
+UniformBufferArray_t                             gUniformLightPoint;
+UniformBufferArray_t                             gUniformLightCone;
+UniformBufferArray_t                             gUniformLightCapsule;
+
+constexpr int                                    MAX_LIGHTS = 128;  // unused lol
+
+static std::vector< LightBase_t* >               gLights;
+static std::vector< LightBase_t* >               gDirtyLights;
+static bool                                      gNeedLightInfoUpdate = false;
 
 // --------------------------------------------------------------------------------------
 // Assets
@@ -197,6 +221,8 @@ Handle Model_GetMaterial( Handle shModel, size_t sSurface )
 
 void Graphics_DestroyRenderTargets()
 {
+	Graphics_SetAllMaterialsDirty();
+
 	// TODO: reuse the handles, not replace them
 	if ( gImGuiTextures[ 0 ] )
 		render->FreeTexture( gImGuiTextures[ 0 ] );
@@ -206,8 +232,6 @@ void Graphics_DestroyRenderTargets()
 
 	memset( gImGuiTextures, InvalidHandle, sizeof( gImGuiTextures ) );
 
-	Graphics_SetAllMaterialsDirty();
-
 	if ( gImGuiBuffer[ 0 ] )
 		render->DestroyFramebuffer( gImGuiBuffer[ 0 ] );
 
@@ -215,65 +239,89 @@ void Graphics_DestroyRenderTargets()
 		render->DestroyFramebuffer( gImGuiBuffer[ 1 ] );
 
 	memset( gImGuiBuffer, InvalidHandle, sizeof( gImGuiBuffer ) );
+
+	// ------------------------------------------------------------------
+	// G-Buffer
+
+	for ( int i = 0; i > 6; i++)
+	{
+		if ( gGBufferTex[ i ] )
+			render->FreeTexture( gGBufferTex[ i ] );
+	}
+
+	memset( gGBufferTex, InvalidHandle, sizeof( gGBufferTex ) );
+
+	if ( gGBuffer[ 0 ] )
+		render->DestroyFramebuffer( gGBuffer[ 0 ] );
+
+	if ( gGBuffer[ 1 ] )
+		render->DestroyFramebuffer( gGBuffer[ 1 ] );
+
+	memset( gGBuffer, InvalidHandle, sizeof( gGBuffer ) );
 }
 
 
-bool Graphics_CreateRenderTargets()
+bool Graphics_CreateGBufferTextures()
 {
 	int width = 0, height = 0;
 	render->GetSurfaceSize( width, height );
-	
-	// Create ImGui Color Attachment
+
 	TextureCreateInfo_t texCreate{};
-	texCreate.apName    = "ImGui Color";
+	texCreate.apName    = "G-Buffer Position";
 	texCreate.aSize     = { width, height };
-	texCreate.aFormat   = GraphicsFmt::BGRA8888_UNORM;
+	texCreate.aFormat   = GraphicsFmt::RGBA16161616_SFLOAT;
 	texCreate.aViewType = EImageView_2D;
 
 	TextureCreateData_t createData{};
-	createData.aUsage   = EImageUsage_AttachColor | EImageUsage_Sampled;
-	createData.aFilter  = EImageFilter_Nearest;
+	createData.aUsage  = EImageUsage_AttachColor | EImageUsage_Sampled;
+	createData.aFilter = EImageFilter_Nearest;
 
-	gImGuiTextures[ 0 ] = render->CreateTexture( texCreate, createData );
+	// Position
+	gGBufferTex[ 0 ]   = render->CreateTexture( texCreate, createData );
 
-	// Create ImGui Depth Stencil Attachment
-	texCreate.apName    = "ImGui Depth";
-	texCreate.aFormat   = render->GetSwapFormatDepth();
-	createData.aUsage   = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
+	// Normal
+	texCreate.apName   = "G-Buffer Normal";
+	gGBufferTex[ 1 ]   = render->CreateTexture( texCreate, createData );
 
-	gImGuiTextures[ 1 ] = render->CreateTexture( texCreate, createData );
+	// Color
+	texCreate.apName   = "G-Buffer Color";
+	texCreate.aFormat  = GraphicsFmt::RGBA8888_UNORM;
+	gGBufferTex[ 2 ]   = render->CreateTexture( texCreate, createData );
 
-	// Create a new framebuffer for ImGui to draw on
+	// AO
+	texCreate.apName   = "G-Buffer AO";
+	texCreate.aFormat  = GraphicsFmt::R16_SFLOAT;
+	gGBufferTex[ 3 ]   = render->CreateTexture( texCreate, createData );
+
+	// Emission
+	texCreate.apName   = "G-Buffer Emission";
+	texCreate.aFormat  = GraphicsFmt::RGBA8888_UNORM;
+	gGBufferTex[ 4 ]   = render->CreateTexture( texCreate, createData );
+
+	// Depth
+	texCreate.apName   = "G-Buffer Depth";
+	texCreate.aFormat  = render->GetSwapFormatDepth();
+	createData.aUsage  = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
+	gGBufferTex[ 5 ]   = render->CreateTexture( texCreate, createData );
+
+	// Create a new framebuffer
 	CreateFramebuffer_t frameBufCreate{};
-	frameBufCreate.aRenderPass = gRenderPassUI;  // ImGui will be drawn onto the graphics RenderPass
-	frameBufCreate.aSize       = { width, height };
+	frameBufCreate.aRenderPass        = gRenderPassGBuffer;
+	frameBufCreate.aSize              = { width, height };
 
-	// Create Color
-	frameBufCreate.aPass.aAttachColors.push_back( gImGuiTextures[ 0 ] );
-	frameBufCreate.aPass.aAttachDepth = gImGuiTextures[ 1 ];
-	gImGuiBuffer[ 0 ] = render->CreateFramebuffer( frameBufCreate );
+	frameBufCreate.aPass.aAttachDepth = gGBufferTex[ 5 ];
+	frameBufCreate.aPass.aAttachColors.push_back( gGBufferTex[ 0 ] );
+	frameBufCreate.aPass.aAttachColors.push_back( gGBufferTex[ 1 ] );
+	frameBufCreate.aPass.aAttachColors.push_back( gGBufferTex[ 2 ] );
+	frameBufCreate.aPass.aAttachColors.push_back( gGBufferTex[ 3 ] );
+	frameBufCreate.aPass.aAttachColors.push_back( gGBufferTex[ 4 ] );
 
-	// Create Depth
-	// frameBufCreate.aPass.aAttachColors.clear();
-	// gImGuiBuffer[ 1 ]                 = render->CreateFramebuffer( frameBufCreate );
-	gImGuiBuffer[ 1 ] = render->CreateFramebuffer( frameBufCreate );
+	gGBuffer[ 0 ] = render->CreateFramebuffer( frameBufCreate );  // Color
+	gGBuffer[ 1 ] = render->CreateFramebuffer( frameBufCreate );  // Depth
 
-#if 0
-	CreateRenderTarget_t createTarget{};
-	createTarget.aFormat  = GraphicsFmt::BGRA8888_UNORM;
-	createTarget.aSize    = { width, height };
-	createTarget.aUseMSAA = false;
-	createTarget.aDepth   = false;
-
-	gImGuiBuffer[ 0 ]     = render->CreateRenderTarget( createTarget );
-
-	createTarget.aDepth   = true;
-	gImGuiBuffer[ 1 ]     = render->CreateRenderTarget( createTarget );
-#endif
-
-	if ( gImGuiBuffer[ 0 ] == InvalidHandle || gImGuiBuffer[ 1 ] == InvalidHandle )
+	if ( gGBuffer[ 0 ] == InvalidHandle || gGBuffer[ 1 ] == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create render targets\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to create G-Buffer Framebuffers\n" );
 		return false;
 	}
 
@@ -281,9 +329,60 @@ bool Graphics_CreateRenderTargets()
 }
 
 
+bool Graphics_CreateRenderTargets()
+{
+	int width = 0, height = 0;
+	render->GetSurfaceSize( width, height );
+
+	// ---------------------------------------------------------
+	// ImGui
+	{
+		// Create ImGui Color Attachment
+		TextureCreateInfo_t texCreate{};
+		texCreate.apName    = "ImGui Color";
+		texCreate.aSize     = { width, height };
+		texCreate.aFormat   = GraphicsFmt::BGRA8888_UNORM;
+		texCreate.aViewType = EImageView_2D;
+
+		TextureCreateData_t createData{};
+		createData.aUsage   = EImageUsage_AttachColor | EImageUsage_Sampled;
+		createData.aFilter  = EImageFilter_Nearest;
+
+		gImGuiTextures[ 0 ] = render->CreateTexture( texCreate, createData );
+
+		// Create ImGui Depth Stencil Attachment
+		texCreate.apName    = "ImGui Depth";
+		texCreate.aFormat   = render->GetSwapFormatDepth();
+		createData.aUsage   = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
+
+		gImGuiTextures[ 1 ] = render->CreateTexture( texCreate, createData );
+
+		// Create a new framebuffer for ImGui to draw on
+		CreateFramebuffer_t frameBufCreate{};
+		frameBufCreate.aRenderPass = gRenderPassUI;  // ImGui will be drawn onto the graphics RenderPass
+		frameBufCreate.aSize       = { width, height };
+
+		// Create Color
+		frameBufCreate.aPass.aAttachColors.push_back( gImGuiTextures[ 0 ] );
+		frameBufCreate.aPass.aAttachDepth = gImGuiTextures[ 1 ];
+		gImGuiBuffer[ 0 ] = render->CreateFramebuffer( frameBufCreate );  // Color
+		gImGuiBuffer[ 1 ] = render->CreateFramebuffer( frameBufCreate );  // Depth
+
+		if ( gImGuiBuffer[ 0 ] == InvalidHandle || gImGuiBuffer[ 1 ] == InvalidHandle )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create render targets\n" );
+			return false;
+		}
+	}
+
+	return Graphics_CreateGBufferTextures();
+}
+
+
 void Graphics_DestroyRenderPasses()
 {
 	render->DestroyRenderPass( gRenderPassUI );
+	render->DestroyRenderPass( gRenderPassGBuffer );
 }
 
 
@@ -291,24 +390,135 @@ bool Graphics_CreateRenderPasses()
 {
 	RenderPassCreate_t create{};
 
-	create.aAttachments.resize( 2 );
+	// ImGui Render Pass
+	{
+		create.aAttachments.resize( 2 );
 
-	create.aAttachments[ 0 ].aFormat  = GraphicsFmt::BGRA8888_UNORM;
-	create.aAttachments[ 0 ].aUseMSAA = false;
-	create.aAttachments[ 0 ].aType    = EAttachmentType_Color;
-	create.aAttachments[ 0 ].aLoadOp  = EAttachmentLoadOp_Clear;
+		create.aAttachments[ 0 ].aFormat  = GraphicsFmt::BGRA8888_UNORM;
+		create.aAttachments[ 0 ].aUseMSAA = false;
+		create.aAttachments[ 0 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 0 ].aLoadOp  = EAttachmentLoadOp_Clear;
 
-	create.aAttachments[ 1 ].aFormat  = render->GetSwapFormatDepth();
-	create.aAttachments[ 1 ].aUseMSAA = false;
-	create.aAttachments[ 1 ].aType    = EAttachmentType_Depth;
-	create.aAttachments[ 1 ].aLoadOp  = EAttachmentLoadOp_Clear;
+		create.aAttachments[ 1 ].aFormat  = render->GetSwapFormatDepth();
+		create.aAttachments[ 1 ].aUseMSAA = false;
+		create.aAttachments[ 1 ].aType    = EAttachmentType_Depth;
+		create.aAttachments[ 1 ].aLoadOp  = EAttachmentLoadOp_Clear;
 
-	create.aSubpasses.resize( 1 );
-	create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
+		create.aSubpasses.resize( 1 );
+		create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
 
-	gRenderPassUI = render->CreateRenderPass( create );
+		gRenderPassUI                     = render->CreateRenderPass( create );
 
-	return gRenderPassUI != InvalidHandle;
+		if ( gRenderPassUI == InvalidHandle )
+			return false;
+	}
+
+	// --------------------------------------------------------------------------
+	// G-Buffer Render Pass
+	{
+		create.aAttachments.resize( 6 );
+
+		// Position
+		create.aAttachments[ 0 ].aFormat  = GraphicsFmt::RGBA16161616_SFLOAT;
+		create.aAttachments[ 0 ].aUseMSAA = false;
+		create.aAttachments[ 0 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 0 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		// Normal
+		create.aAttachments[ 1 ].aFormat  = GraphicsFmt::RGBA16161616_SFLOAT;
+		create.aAttachments[ 1 ].aUseMSAA = false;
+		create.aAttachments[ 1 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 1 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		// Color
+		create.aAttachments[ 2 ].aFormat  = GraphicsFmt::RGBA8888_UNORM;
+		create.aAttachments[ 2 ].aUseMSAA = false;
+		create.aAttachments[ 2 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 2 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		// AO
+		create.aAttachments[ 3 ].aFormat  = GraphicsFmt::R16_SFLOAT;
+		create.aAttachments[ 3 ].aUseMSAA = false;
+		create.aAttachments[ 3 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 3 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		// Emission
+		create.aAttachments[ 4 ].aFormat  = GraphicsFmt::RGBA8888_UNORM;
+		create.aAttachments[ 4 ].aUseMSAA = false;
+		create.aAttachments[ 4 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 4 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		// Depth
+		create.aAttachments[ 5 ].aFormat  = render->GetSwapFormatDepth();
+		create.aAttachments[ 5 ].aUseMSAA = false;
+		create.aAttachments[ 5 ].aType    = EAttachmentType_Depth;
+		create.aAttachments[ 5 ].aLoadOp  = EAttachmentLoadOp_Clear;
+
+		create.aSubpasses.resize( 1 );
+		create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
+
+		gRenderPassGBuffer               = render->CreateRenderPass( create );
+
+		if ( gRenderPassGBuffer == InvalidHandle )
+			return false;
+	}
+
+	return true;
+}
+
+
+bool Graphics_CreateLightLayout( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize )
+{
+	CreateVariableDescLayout_t createLayout{};
+	createLayout.aType    = EDescriptorType_UniformBuffer;
+	createLayout.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
+	createLayout.aBinding = 0;
+	createLayout.aCount   = 2;
+
+	srBuffer.aLayout      = render->CreateVariableDescLayout( createLayout );
+
+	if ( srBuffer.aLayout == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create Light Layout\n" );
+		return false;
+	}
+
+	AllocVariableDescLayout_t allocLayout{};
+	allocLayout.aLayout   = srBuffer.aLayout;
+	allocLayout.aCount    = srBuffer.aBuffers.size();
+	allocLayout.aSetCount = 2;
+
+	if ( !render->AllocateVariableDescLayout( allocLayout, gLayoutViewProjSets ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to allocate Light Layout\n" );
+		return false;
+	}
+
+	// create buffers for it
+	for ( size_t i = 0; i < srBuffer.aBuffers.size(); i++ )
+	{
+		Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
+
+		if ( buffer == InvalidHandle )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to Create Light Uniform Buffer\n" );
+			return false;
+		}
+
+		srBuffer.aBuffers[ i ] = buffer;
+	}
+
+	// update the descriptor sets
+	UpdateVariableDescSet_t update{};
+
+	for ( size_t i = 0; i < srBuffer.aSets.size(); i++ )
+		update.aDescSets.push_back( srBuffer.aSets[ i ] );
+
+	update.aType    = EDescriptorType_UniformBuffer;
+	update.aBuffers = srBuffer.aBuffers;
+	render->UpdateVariableDescSet( update );
+
+	return true;
 }
 
 
@@ -321,60 +531,81 @@ bool Graphics_CreateDescriptorSets()
 
 	// ------------------------------------------------------
 	// Create ViewProjetion matrix UBO
-
-	CreateVariableDescLayout_t createViewProj{};
-	createViewProj.aType    = EDescriptorType_UniformBuffer;
-	createViewProj.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
-	createViewProj.aBinding = 0;
-	createViewProj.aCount   = 2;
-
-	gLayoutViewProj         = render->CreateVariableDescLayout( createViewProj );
-
-	if ( gLayoutViewProj == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create ViewProj UBO Layout" );
-		return false;
-	}
+		CreateVariableDescLayout_t createViewProj{};
+		createViewProj.aType    = EDescriptorType_UniformBuffer;
+		createViewProj.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
+		createViewProj.aBinding = 0;
+		createViewProj.aCount   = 2;
 
-	AllocVariableDescLayout_t allocViewProj{};
-	allocViewProj.aLayout   = gLayoutViewProj;
-	allocViewProj.aCount    = gViewProjBuffers.size();
-	allocViewProj.aSetCount = 2;
+		gLayoutViewProj         = render->CreateVariableDescLayout( createViewProj );
 
-	if ( !render->AllocateVariableDescLayout( allocViewProj, gLayoutViewProjSets ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout" );
-		return false;
-	}
-
-	// create buffer for it
-	// (NOTE: not changing this from a std::vector cause you could use this for multiple views in the future probably)
-	for ( u32 i = 0; i < gViewProjBuffers.size(); i++ )
-	{
-		Handle buffer = render->CreateBuffer( "View * Projection Buffer", sizeof( glm::mat4 ), EBufferFlags_Uniform, EBufferMemory_Host );
-
-		if ( buffer == InvalidHandle )
+		if ( gLayoutViewProj == InvalidHandle )
 		{
-			Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
+			Log_Error( gLC_ClientGraphics, "Failed to create ViewProj UBO Layout\n" );
 			return false;
 		}
 
-		gViewProjBuffers[ i ] = buffer;
+		AllocVariableDescLayout_t allocViewProj{};
+		allocViewProj.aLayout   = gLayoutViewProj;
+		allocViewProj.aCount    = gViewProjBuffers.size();
+		allocViewProj.aSetCount = 2;
+
+		if ( !render->AllocateVariableDescLayout( allocViewProj, gLayoutViewProjSets ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout\n" );
+			return false;
+		}
+
+		// create buffer for it
+		// (NOTE: not changing this from a std::vector cause you could use this for multiple views in the future probably)
+		for ( u32 i = 0; i < gViewProjBuffers.size(); i++ )
+		{
+			Handle buffer = render->CreateBuffer( "View * Projection Buffer", sizeof( glm::mat4 ), EBufferFlags_Uniform, EBufferMemory_Host );
+
+			if ( buffer == InvalidHandle )
+			{
+				Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
+				return false;
+			}
+
+			gViewProjBuffers[ i ] = buffer;
+		}
+
+		// update the material descriptor sets
+		UpdateVariableDescSet_t update{};
+
+		// what
+		update.aDescSets.push_back( gLayoutViewProjSets[ 0 ] );
+		update.aDescSets.push_back( gLayoutViewProjSets[ 1 ] );
+
+		update.aType    = EDescriptorType_UniformBuffer;
+		update.aBuffers = gViewProjBuffers;
+		render->UpdateVariableDescSet( update );
 	}
 
-	// update the material descriptor sets
-	UpdateVariableDescSet_t update{};
+	// ------------------------------------------------------
+	// Create Light Layouts
+	{
+		if ( !Graphics_CreateLightLayout( gUniformLightInfo, "Light Info Buffer", sizeof( LightInfo_t ) ) )
+			return false;
 
-	// what
-	update.aDescSets.push_back( gLayoutViewProjSets[ 0 ] );
-	update.aDescSets.push_back( gLayoutViewProjSets[ 1 ] );
+		if ( !Graphics_CreateLightLayout( gUniformLightWorld, "Light World Buffer", sizeof( LightWorld_t ) ) )
+			return false;
 
-	update.aType    = EDescriptorType_UniformBuffer;
-	update.aBuffers = gViewProjBuffers;
-	render->UpdateVariableDescSet( update );
+		if ( !Graphics_CreateLightLayout( gUniformLightPoint, "Light Point Buffer", sizeof( LightPoint_t ) ) )
+			return false;
+
+		if ( !Graphics_CreateLightLayout( gUniformLightCone, "Light Cone Buffer", sizeof( LightCone_t ) ) )
+			return false;
+
+		if ( !Graphics_CreateLightLayout( gUniformLightCapsule, "Light Capsule Buffer", sizeof( LightCapsule_t ) ) )
+			return false;
+	}
 
 	// ------------------------------------------------------
 	// Create Material Buffers for Basic3D shader
+
 	CreateVariableDescLayout_t createBasic3DMat{};
 	createBasic3DMat.aType           = EDescriptorType_UniformBuffer;
 	createBasic3DMat.aStages         = ShaderStage_Vertex | ShaderStage_Fragment;
@@ -385,7 +616,7 @@ bool Graphics_CreateDescriptorSets()
 
 	if ( gLayoutMaterialBasic3D == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create Basic 3D Material Layout" );
+		Log_Error( gLC_ClientGraphics, "Failed to create Basic 3D Material Layout\n" );
 		return false;
 	}
 
@@ -399,7 +630,7 @@ bool Graphics_CreateDescriptorSets()
 
 	if ( !render->AllocateVariableDescLayout( allocBasic3DMat, gLayoutMaterialBasic3DSets ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout" );
+		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout\n" );
 		return false;
 	}
 
@@ -437,7 +668,7 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 		}
 
 		render->ShutdownImGui();
-		if ( !render->InitImGui( gRenderPassUI ) )
+		if ( !render->InitImGui( gRenderPassGraphics ) )
 		{
 			Log_Error( gLC_ClientGraphics, "Failed to re-init ImGui for Vulkan\n" );
 			return;
@@ -497,7 +728,7 @@ bool Graphics_Init()
 		return false;
 	}
 
-	return render->InitImGui( gRenderPassUI );
+	return render->InitImGui( gRenderPassGraphics );
 	// return render->InitImGui( gRenderPassGraphics );
 }
 
@@ -607,10 +838,11 @@ void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 
 
 // Do Rendering with shader system and user land meshes
-void Graphics_Render( Handle cmd )
+void Graphics_SetupGBuffer( Handle cmd )
 {
-	// here we go again
+	// only ones that work with G-Buffer right now
 	static Handle skybox    = Graphics_GetShader( "skybox" );
+	static Handle basic3d   = Graphics_GetShader( "basic_3d" );
 
 	bool          hasSkybox = false;
 
@@ -646,6 +878,9 @@ void Graphics_Render( Handle cmd )
 			hasSkybox = true;
 			continue;
 		}
+
+		if ( shader != basic3d )
+			continue;
 
 		if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 			continue;
@@ -700,6 +935,88 @@ void Graphics_Render( Handle cmd )
 			}
 		}
 	}
+}
+
+
+// Do Rendering with shader system and user land meshes
+void Graphics_Render( Handle cmd )
+{
+	// here we go again
+	static Handle skybox    = Graphics_GetShader( "skybox" );
+	static Handle basic3d   = Graphics_GetShader( "basic_3d" );
+
+	bool          hasSkybox = false;
+
+	int width = 0, height = 0;
+	render->GetSurfaceSize( width, height );
+
+	Rect2D_t rect{};
+	rect.aOffset.x = 0;
+	rect.aOffset.y = 0;
+	rect.aExtent.x = width;
+	rect.aExtent.y = height;
+
+	render->CmdSetScissor( cmd, 0, &rect, 1 );
+
+	// TODO: check if shader needs dynamic viewport and/or scissor
+	// normal viewport
+	Viewport_t viewPort{};
+	viewPort.x        = 0.f;
+	viewPort.y        = 0.f;
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 0.9f;
+	viewPort.width    = width;
+	viewPort.height   = height;
+
+	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+	Shader_DeferredFS_Draw( cmd, gCmdIndex );
+
+	// flip viewport
+	viewPort.x        = 0.f;
+	viewPort.y        = height;
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 1.f;
+	viewPort.width    = width;
+	viewPort.height   = height * -1.f;
+
+	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+	ModelSurfaceDraw_t* prevRenderable = nullptr;
+
+	// TODO: still could be better, but it's better than what we used to have
+	for ( auto& [ shader, renderList ] : gMeshDrawList )
+	{
+		if ( shader == skybox )
+		{
+			hasSkybox = true;
+			continue;
+		}
+
+		if ( shader == basic3d )
+			continue;
+
+		if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
+			continue;
+
+		for ( auto& renderable : renderList )
+		{
+			// if ( prevRenderable != renderable || prevMatIndex != matIndex )
+			// if ( prevRenderable && prevRenderable->aModel != renderable->aModel || prevMatIndex != matIndex )
+			if ( !prevRenderable || prevRenderable->apDraw->aModel != renderable.apDraw->aModel || prevRenderable->aSurface != renderable.aSurface )
+			{
+				prevRenderable = &renderable;
+				Graphics_BindModel( cmd, renderable );
+			}
+
+			if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, renderable ) )
+				continue;
+
+			Graphics_CmdDrawModel( cmd, renderable );
+		}
+	}
+
+	return;
 
 	// un-flip viewport
 	viewPort.x        = 0.f;
@@ -712,7 +1029,6 @@ void Graphics_Render( Handle cmd )
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
 	Shader_UI_Draw( cmd, gCmdIndex, gImGuiTextures[ 0 ] );
-	// Shader_UI_Draw( cmd, gCmdIndex, gBackBufferTex[ 0 ] );
 }
 
 void Graphics_PrepareDrawData()
@@ -729,6 +1045,31 @@ void Graphics_PrepareDrawData()
 	}
 
 	gDirtyMaterials.clear();
+
+	// Update UBO's for lights if needed
+	for ( LightBase_t* light : gDirtyLights )
+	{
+		if ( typeid( *light ) == typeid( LightWorld_t ) )
+		{
+		}
+		else if ( typeid( *light ) == typeid( LightPoint_t ) )
+		{
+		}
+		else if ( typeid( *light ) == typeid( LightCone_t ) )
+		{
+		}
+		else if ( typeid( *light ) == typeid( LightCapsule_t ) )
+		{
+		}
+	}
+
+	gDirtyLights.clear();
+
+	if ( gNeedLightInfoUpdate )
+	{
+		gNeedLightInfoUpdate = false;
+		// update Light Info UBO
+	}
 
 	if ( gViewProjMatUpdate )
 	{
@@ -767,28 +1108,48 @@ void Graphics_Present()
 
 		RenderPassBegin_t renderPassBegin{};
 
+		// ----------------------------------------------------------
 		// ImGui RenderPass
-		renderPassBegin.aRenderPass  = gRenderPassUI;
-		renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
-		renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear       = true;
+		// renderPassBegin.aRenderPass  = gRenderPassUI;
+		// renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
+		// renderPassBegin.aClear.resize( 2 );
+		// renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
+		// renderPassBegin.aClear[ 1 ].aIsDepth = true;
+		// 
+		// render->BeginRenderPass( c, renderPassBegin );
+		// render->DrawImGui( ImGui::GetDrawData(), c );
+		// render->EndRenderPass( c );
 
-		render->BeginRenderPass( c, renderPassBegin );
-		render->DrawImGui( ImGui::GetDrawData(), c );
+		// ----------------------------------------------------------
+		// G-Buffer RenderPass
+		renderPassBegin.aRenderPass  = gRenderPassGBuffer;
+		renderPassBegin.aFrameBuffer = gGBuffer[ gCmdIndex ];
+		renderPassBegin.aClear.resize( 6 );
+		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 1 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 2 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 3 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 4 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 5 ].aIsDepth = true;
+		renderPassBegin.aClear[ 1 ].aIsDepth = false;
+
+		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
+		Graphics_SetupGBuffer( c );
 		render->EndRenderPass( c );
 
+		// ----------------------------------------------------------
 		// Main RenderPass
 		renderPassBegin.aRenderPass  = gRenderPassGraphics;
 		renderPassBegin.aFrameBuffer = gBackBuffer[ gCmdIndex ];
-		renderPassBegin.aClearColor  = { 0.f, 0.f, 0.f, 1.f };
-		renderPassBegin.aClear       = true;
+		renderPassBegin.aClear.resize( 2 );
+		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 1 ].aDepth   = 1.f;
+		renderPassBegin.aClear[ 1 ].aIsDepth = true;
 
 		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
 
 		Graphics_Render( c );
-
-		// TODO: this should be a on a separate render pass that doesn't use SRGB or MSAA
-		// render->DrawImGui( ImGui::GetDrawData(), c );
+		render->DrawImGui( ImGui::GetDrawData(), c );
 
 		render->EndRenderPass( c );
 
@@ -1092,6 +1453,71 @@ void Graphics_CreateIndexBuffer( Mesh& srMesh, const char* spDebugName )
 	  srMesh.aIndices.data(),
 	  sizeof( u32 ) * srMesh.aIndices.size(),
 	  EBufferFlags_Index );
+}
+
+
+// ---------------------------------------------------------------------------------------
+// Lighting
+
+
+LightWorld_t* Graphics_CreateLightWorld()
+{
+	LightWorld_t* light = new LightWorld_t;
+	gLights.push_back( light );
+	gNeedLightInfoUpdate = true;
+	return light;
+}
+
+
+LightPoint_t* Graphics_CreateLightPoint()
+{
+	LightPoint_t* light = new LightPoint_t;
+	gLights.push_back( light );
+	gNeedLightInfoUpdate = true;
+	return light;
+}
+
+
+LightCone_t* Graphics_CreateLightCone()
+{
+	LightCone_t* light = new LightCone_t;
+	gLights.push_back( light );
+	gNeedLightInfoUpdate = true;
+	return light;
+}
+
+
+LightCapsule_t* Graphics_CreateLightCapsule()
+{
+	LightCapsule_t* light = new LightCapsule_t;
+	gLights.push_back( light );
+	gNeedLightInfoUpdate = true;
+	return light;
+}
+
+
+void Graphics_UpdateLight( LightBase_t* spLight )
+{
+	if ( !spLight )
+		return;
+
+	gDirtyLights.push_back( spLight );
+}
+
+
+void Graphics_DestroyLight( LightBase_t* spLight )
+{
+	if ( !spLight )
+		return;
+
+	gNeedLightInfoUpdate = true;
+
+	// Destroy Descriptor Set
+
+	vec_remove( gLights, spLight );
+	vec_remove_if( gDirtyLights, spLight );
+
+	delete spLight;
 }
 
 

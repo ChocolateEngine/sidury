@@ -308,15 +308,17 @@ void Game_RegisterKeys()
 	input->RegisterKey( SDL_SCANCODE_V ); // noclip
 	input->RegisterKey( SDL_SCANCODE_B ); // flight
 
+	input->RegisterKey( SDL_SCANCODE_Z );  // zoom button
+
+	// Debugging Keys
+
 	input->RegisterKey( SDL_SCANCODE_G ); // play a test sound at current position in world
 	input->RegisterKey( SDL_SCANCODE_H ); // stop all test sounds
 
 	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
-	input->RegisterKey( SDL_SCANCODE_Z ); // zoom button
-
-	//input->RegisterKey( SDL_SCANCODE_G ); // create a sprite
+	input->RegisterKey( SDL_SCANCODE_G ); // create a light
 
 	gameinput.Init();
 }

@@ -6,9 +6,10 @@
 extern IRender*                                         render;
 
 // temp shader
-static Handle                                           gTempShader   = InvalidHandle;
-static Handle                                           gSkyboxShader = InvalidHandle;
-static Handle                                           gUIShader     = InvalidHandle;
+static Handle                                           gTempShader       = InvalidHandle;
+static Handle                                           gSkyboxShader     = InvalidHandle;
+static Handle                                           gUIShader         = InvalidHandle;
+static Handle                                           gDeferredFSShader = InvalidHandle;
 
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
@@ -28,6 +29,7 @@ extern Handle                                           gLayoutViewProj;
 
 extern Handle                                           gRenderPassGraphics;
 extern Handle                                           gRenderPassUI;
+extern Handle                                           gRenderPassGBuffer;
 
 extern Handle                                           gLayoutSamplerSets[ 2 ];
 extern Handle                                           gLayoutViewProjSets[ 2 ];
@@ -67,6 +69,10 @@ Handle       Shader_Skybox_GetPipelineLayout();
 Handle       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_UI_Destroy();
 void         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
+
+Handle       Shader_DeferredFS_Create( Handle sRenderPass, bool sRecreate );
+void         Shader_DeferredFS_Destroy();
+void         Shader_DeferredFS_Draw( Handle cmd, size_t sCmdIndex );
 
 // --------------------------------------------------------------------------------------
 
@@ -121,13 +127,19 @@ bool Graphics_ShaderInit( bool sRecreate )
 		return false;
 	}
 
-	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGBuffer, sRecreate ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
 		return false;
 	}
 
-	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGBuffer, sRecreate ) ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
+		return false;
+	}
+
+	if ( !( gDeferredFSShader = Shader_DeferredFS_Create( gRenderPassGraphics, sRecreate ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
 		return false;
@@ -144,6 +156,10 @@ bool Graphics_ShaderInit( bool sRecreate )
 		                    EPipelineBindPoint_Graphics );
 
 		Graphics_AddShader( "imgui", gUIShader,
+		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
+		                    EPipelineBindPoint_Graphics );
+
+		Graphics_AddShader( "deferred_fullscreen", gDeferredFSShader,
 		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
 		                    EPipelineBindPoint_Graphics );
 	}

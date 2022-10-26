@@ -50,6 +50,8 @@ Handle Shader_UI_Create( Handle sRenderPass, bool sRecreate )
 	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
 	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
 
+	pipelineInfo.aColorBlendAttachments.emplace_back( true );
+
 	pipelineInfo.aPrimTopology   = EPrimTopology_Tri;
 	pipelineInfo.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
 	pipelineInfo.aCullMode       = ECullMode_None;

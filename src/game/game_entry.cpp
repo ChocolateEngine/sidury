@@ -76,7 +76,7 @@ extern "C"
 			PROF_SCOPE();
 
 			auto currentTime = std::chrono::high_resolution_clock::now();
-			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count(  );
+			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	
 			// don't let the time go too crazy, usually happens when in a breakpoint
 			time = glm::min( time, en_max_frametime.GetFloat() );
