@@ -34,18 +34,18 @@ extern Handle*                                          gLayoutMaterialBasic3DSe
 
 extern UniformBufferArray_t                             gUniformLightInfo;
 
-extern LightUniformBuffer_t                             gUniformLightWorld;
+extern LightUniformBuffer_t                             gUniformLightDirectional;
 extern LightUniformBuffer_t                             gUniformLightPoint;
 extern LightUniformBuffer_t                             gUniformLightCone;
 extern LightUniformBuffer_t                             gUniformLightCapsule;
 
-struct Shader_PushConst
+
+CONCMD( shader_reload )
 {
-	int       aMaterial = 0;   // material index
-	int       aProjView = 0;   // projection * view index
-	glm::mat4 aModelMatrix{};  // model matrix
-	// int       aModelMatrix = 0;  // model matrix index
-};
+	render->WaitForQueues();
+
+	Graphics_ShaderInit( true );
+}
 
 
 // --------------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ void Graphics_GetShaderCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& s
 	srPipeline.aLayouts.push_back( gLayoutViewProj );
 	srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
 	srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightWorld.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
@@ -334,7 +334,7 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 		for ( const auto& set : gUniformLightInfo.aSets )
 			descSets.push_back( set );
 
-		for ( const auto& set : gUniformLightWorld.aSets )
+		for ( const auto& set : gUniformLightDirectional.aSets )
 			descSets.push_back( set );
 
 		for ( const auto& set : gUniformLightPoint.aSets )

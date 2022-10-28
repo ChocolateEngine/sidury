@@ -68,8 +68,6 @@ void LoadObj_Tiny( const std::string& srBasePath, const std::string &srPath, Mod
 	auto &objAttrib = reader.GetAttrib();
 	auto &objShapes = reader.GetShapes();
 	auto &objMaterials = reader.GetMaterials();
-	
-	spModel->aMeshes.resize( objMaterials.size() );
 
 	// for ( size_t i = 0; i < spModel->aMeshes.size(); i++ )
 	// 	spModel->aMeshes[i] = new Model::MaterialGroup;

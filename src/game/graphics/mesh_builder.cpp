@@ -40,15 +40,28 @@ void MeshBuilder::Start( Model* spMesh, const char* spDebugName )
 
 void MeshBuilder::End()
 {
-	apMesh->SetSurfaceCount( aSurfaces.size() );
+	if ( apMesh->aMeshes.size() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Meshes already created for Model: \"%s\"\n", apDebugName ? apDebugName : "internal" );
+	}
+
+	// apMesh->SetSurfaceCount( aSurfaces.size() );
 
 	for ( size_t i = 0; i < aSurfaces.size(); i++ )
 	{
-		Surface&      surf       = aSurfaces[ i ];
-		VertexData_t& vertData   = apMesh->aMeshes[ i ].aVertexData;
+		Surface& surf = aSurfaces[ i ];
 
-		vertData.aFormat         = surf.aFormat;
-		vertData.aCount          = surf.aVertices.size();
+		if ( surf.aVertices.empty() )
+		{
+			Log_DevF( gLC_ClientGraphics, 1, "Model Surface %zd has no vertices, skipping: \"%s\"", i, apDebugName ? apDebugName : "internal" );
+			continue;
+		}
+
+		Mesh&         mesh     = apMesh->aMeshes.emplace_back();
+		VertexData_t& vertData = mesh.aVertexData;
+
+		vertData.aFormat       = surf.aFormat;
+		vertData.aCount        = surf.aVertices.size();
 
 		std::vector< VertexAttribute > attribs;
 		for ( int attrib = 0; attrib < VertexAttribute_Count; attrib++ )
@@ -344,7 +357,7 @@ void MeshBuilder::SetSurfaceCount( size_t sCount )
 	aSurfaces.resize( sCount );
 
 	// kind of a hack? not really supposed to do this but im lazy
-	apMesh->SetSurfaceCount( aSurfaces.size() );
+	// apMesh->SetSurfaceCount( aSurfaces.size() );
 }
 	
 

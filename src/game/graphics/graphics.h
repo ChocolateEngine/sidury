@@ -87,14 +87,10 @@ enum : EShaderFlags
 
 enum ELightType // : char
 {
-	ELightType_Directional,
+	ELightType_Directional,  // World
 	ELightType_Point,
-	ELightType_Spot,
+	ELightType_Cone,
 	ELightType_Capsule,
-
-	// uh
-	// ELightType_Line,
-	// ELightType_Capsule,
 };
 
 
@@ -227,32 +223,30 @@ struct LightInfo_t
 };
 
 // Light Types
-struct LightBase_t
-{
-};
-
-struct LightWorld_t : public LightBase_t
+struct UBO_LightDirectional_t
 {
 	alignas( 16 ) glm::vec3 aColor{};
 	alignas( 16 ) glm::vec3 aDir{};
 };
 
-struct LightPoint_t : public LightBase_t
+struct UBO_LightPoint_t
 {
 	alignas( 16 ) glm::vec3 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
 	float     aRadius = 0.f;
 };
 
-struct LightCone_t : public LightBase_t
+struct UBO_LightCone_t
 {
 	alignas( 16 ) glm::vec3 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
 	alignas( 16 ) glm::vec3 aDir{};
+	alignas( 16 ) glm::vec2 aFov{};
 };
 
-struct LightCapsule_t : public LightBase_t
+struct UBO_LightCapsule_t
 {
+	alignas( 16 ) glm::vec3 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
 	alignas( 16 ) glm::vec3 aDir{};
 	float     aLength    = 0.f;
@@ -260,14 +254,16 @@ struct LightCapsule_t : public LightBase_t
 };
 
 // maybe use this instead? would be easier to manage
-struct UBO_Light_t
+struct Light_t
 {
 	ELightType aType = ELightType_Directional;
-	alignas( 16 ) glm::vec3 aColor{};
-	alignas( 16 ) glm::vec3 aPos{};
-	alignas( 16 ) glm::vec3 aDir{};
-	float aRadius = 0.f;
-	float aLength = 0.f;
+	glm::vec3  aColor{};
+	glm::vec3  aPos{};
+	glm::vec3  aAng{};
+	float      aInnerFov = 45.f;
+	float      aOuterFov = 45.f;
+	float      aRadius   = 0.f;
+	float      aLength   = 0.f;
 };
 
 struct UniformBufferArray_t
@@ -278,9 +274,14 @@ struct UniformBufferArray_t
 
 struct LightUniformBuffer_t
 {
-	Handle                                     aLayout = InvalidHandle;
-	std::vector< Handle >                      aSets;
-	std::unordered_map< LightBase_t*, Handle > aBuffers;
+	LightUniformBuffer_t( ELightType sType ) :
+		aLightType( sType )
+	{
+	}
+
+	Handle                aLayout = InvalidHandle;
+	std::vector< Handle > aSets;
+	ELightType            aLightType;
 };
 
 struct UBO_ViewInfo_t
@@ -462,15 +463,11 @@ void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebug
 // ---------------------------------------------------------------------------------------
 // Lighting
 
-LightWorld_t*      Graphics_CreateLightWorld();
-LightPoint_t*      Graphics_CreateLightPoint();
-// LightCone_t*       Graphics_CreateLightCone();
-// LightCapsule_t*    Graphics_CreateLightCapsule();
-
-void               Graphics_UpdateLight( LightWorld_t* spLight );
-// void               Graphics_UpdateLight( LightPoint_t* spLight );
-
-void               Graphics_DestroyLight( LightBase_t* spLight );
+Light_t*           Graphics_CreateLight( ELightType sType );
+void               Graphics_EnableLight( Light_t* spLight );
+void               Graphics_DisableLight( Light_t* spLight );
+void               Graphics_UpdateLight( Light_t* spLight );
+void               Graphics_DestroyLight( Light_t* spLight );
 
 // ---------------------------------------------------------------------------------------
 // Rendering

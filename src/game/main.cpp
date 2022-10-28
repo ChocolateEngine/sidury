@@ -18,6 +18,8 @@
 #include "inputsystem.h"
 #include "skybox.h"
 
+#include "tools/light_editor.h"
+
 #include <SDL_system.h>
 
 #include <algorithm>
@@ -217,6 +219,8 @@ GameSystem::~GameSystem(  )
 		g_physEnts[i] = nullptr;
 	}
 
+	LightEditor_Shutdown();
+
 	/*for ( int i = 0; i < aModels.size(); i++ )
 	{
 		if ( aModels[i] )
@@ -272,6 +276,8 @@ void GameSystem::Init()
 	hAudioMusic = audio->RegisterChannel( "Music" );
 #endif
 
+	LightEditor_Init();
+
 	mapmanager = new MapManager;
 
 	entities = new EntityManager;
@@ -318,7 +324,8 @@ void Game_RegisterKeys()
 	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
-	input->RegisterKey( SDL_SCANCODE_T ); // create a light
+	input->RegisterKey( SDL_SCANCODE_T ); // create a point light
+	input->RegisterKey( SDL_SCANCODE_Y ); // create a cone light
 
 	gameinput.Init();
 }
@@ -366,6 +373,8 @@ void GameSystem::Update( float frameTime )
 	ImGui_ImplSDL2_NewFrame();
 
 	Game_Update( frameTime );
+
+	LightEditor_Update();
 
 	if ( !(SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED) )
 	{
@@ -496,7 +505,7 @@ void Game_CheckPaused()
 
 
 // from vkquake
-glm::vec3 VectorToAngles( const glm::vec3& forward )
+glm::vec3 Util_VectorToAngles( const glm::vec3& forward )
 {
 	glm::vec3 angles;
 
@@ -520,7 +529,7 @@ glm::vec3 VectorToAngles( const glm::vec3& forward )
 }
 
 
-glm::vec3 VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
+glm::vec3 Util_VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 {
 	glm::vec3 angles;
 
@@ -674,16 +683,6 @@ void Game_SetupModels( float frameTime )
 		{
 			CreateProtogen( DEFAULT_PROTOGEN_PATH );
 		}
-
-		if ( input->KeyJustPressed( SDL_SCANCODE_T ) )
-		{
-			LightPoint_t* light = Graphics_CreateLightPoint();
-
-			light->aPos         = playerTransform.aPos + camTransform.aPos;
-			// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
-			light->aColor       = { 1, 1, 1 };
-			light->aRadius      = 50;
-		}
 	}
 
 	//transform.aPos += camTransform.aPos;
@@ -714,8 +713,8 @@ void Game_SetupModels( float frameTime )
 			//protoView.z += cl_view_height;
 
 			glm::vec3 direction = (protoView - playerTransform.aPos);
-			// glm::vec3 rotationAxis = VectorToAngles( direction );
-			glm::vec3 rotationAxis = VectorToAngles( direction, up );
+			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
+			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
 
 			protoTransform.aAng = rotationAxis;
 			protoTransform.aAng[PITCH] = 0.f;

@@ -76,24 +76,20 @@ bool                                             gViewInfoUpdate = false;
 
 UniformBufferArray_t                             gUniformLightInfo;
 
-LightUniformBuffer_t                             gUniformLightWorld;
-LightUniformBuffer_t                             gUniformLightPoint;
-LightUniformBuffer_t                             gUniformLightCone;
-LightUniformBuffer_t                             gUniformLightCapsule;
+LightUniformBuffer_t                             gUniformLightDirectional( ELightType_Directional );
+LightUniformBuffer_t                             gUniformLightPoint( ELightType_Point );
+LightUniformBuffer_t                             gUniformLightCone( ELightType_Cone );
+LightUniformBuffer_t                             gUniformLightCapsule( ELightType_Capsule );
+
+std::unordered_map< Light_t*, Handle >           gLightBuffers;
 
 constexpr int                                    MAX_LIGHTS = 32;
-
-static std::vector< LightBase_t* >               gLights;
-
-// static std::vector< LightBase_t* >               gDirtyLights;
-static std::vector< LightWorld_t* >              gDirtyLightsWorld;
-static std::vector< LightPoint_t* >              gDirtyLightsPoint;
-static std::vector< LightCone_t* >               gDirtyLightsCone;
-static std::vector< LightCapsule_t* >            gDirtyLightsCapsule;
+std::vector< Light_t* >                          gLights;
+std::vector< Light_t* >                          gDirtyLights;
 
 LightInfo_t                                      gLightInfo;
 Handle                                           gLightInfoBuffer     = InvalidHandle;
-LightWorld_t*                                    gpWorldLight         = nullptr;
+Light_t*                                         gpWorldLight         = nullptr;
 
 static bool                                      gNeedLightInfoUpdate = false;
 
@@ -424,7 +420,7 @@ bool Graphics_UpdateLightLayout( LightUniformBuffer_t& srBuffer, const char* spB
 #endif
 
 
-Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBufferName, size_t sBufferSize, LightBase_t* spLight )
+Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
 	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
 
@@ -434,7 +430,7 @@ Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBu
 		return InvalidHandle;
 	}
 
-	srBuffer.aBuffers[ spLight ] = buffer;
+	gLightBuffers[ spLight ] = buffer;
 
 	// update the descriptor sets
 	UpdateVariableDescSet_t update{};
@@ -443,8 +439,11 @@ Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBu
 	for ( size_t i = 0; i < srBuffer.aSets.size(); i++ )
 		update.aDescSets.push_back( srBuffer.aSets[ i ] );
 
-	for ( const auto& [ light, bufferHandle ] : srBuffer.aBuffers )
-		update.aBuffers.push_back( bufferHandle );
+	for ( const auto& [ light, bufferHandle ] : gLightBuffers )
+	{
+		if ( light->aType == srBuffer.aLightType )
+			update.aBuffers.push_back( bufferHandle );
+	}
 
 	render->UpdateVariableDescSet( update );
 
@@ -521,8 +520,8 @@ bool Graphics_CreateDescriptorSets()
 		if ( !Graphics_CreateLightInfoLayout( gUniformLightInfo, "Light Info Buffer", sizeof( LightInfo_t ) ) )
 			return false;
 
-		gUniformLightWorld.aSets.resize( 1 );
-		if ( !Graphics_CreateLightLayout( gUniformLightWorld, "Light World Layout", "Light World Set" ) )
+		gUniformLightDirectional.aSets.resize( 1 );
+		if ( !Graphics_CreateLightLayout( gUniformLightDirectional, "Light Directional Layout", "Light Directional Set" ) )
 			return false;
 
 		gUniformLightPoint.aSets.resize( 1 );
@@ -683,9 +682,9 @@ bool Graphics_Init()
 	render->UpdateVariableDescSet( update );
 
 	// TEMP: make a world light
-	gpWorldLight = Graphics_CreateLightWorld();
+	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
 	gpWorldLight->aColor = { 0.5, 1.0, 0.5 };
-	gpWorldLight->aDir   = { 1.0, 0.5, 1.5 };
+	// gpWorldLight->aDir   = { 1.0, 0.5, 1.5, 0.f };
 
 	Graphics_UpdateLight( gpWorldLight );
 
@@ -884,39 +883,120 @@ void Graphics_Render( Handle cmd )
 }
 
 
-template< typename T >
-void Graphics_UpdateLightBuffer( LightUniformBuffer_t& srUniformBuffer, T* spLight, const char* spName )
+void Graphics_UpdateLightBuffer( Light_t* spLight )
 {
-	auto it = srUniformBuffer.aBuffers.find( spLight );
+	Handle buffer = InvalidHandle;
 
-	if ( it == srUniformBuffer.aBuffers.end() )
+	auto it = gLightBuffers.find( spLight );
+
+	if ( it == gLightBuffers.end() )
 	{
-		Handle buffer = Graphics_AddLightBuffer( srUniformBuffer, spName, sizeof( T ), spLight );
+		switch ( spLight->aType )
+		{
+			case ELightType_Directional:
+				buffer = Graphics_AddLightBuffer( gUniformLightDirectional, "Light Directional Buffer", sizeof( UBO_LightDirectional_t ), spLight );
+				gLightInfo.aCountWorld++;
+				break;
+			case ELightType_Point:
+				buffer = Graphics_AddLightBuffer( gUniformLightPoint, "Light Point Buffer", sizeof( UBO_LightPoint_t ), spLight );
+				gLightInfo.aCountPoint++;
+				break;
+			case ELightType_Cone:
+				buffer = Graphics_AddLightBuffer( gUniformLightCone, "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
+				gLightInfo.aCountCone++;
+				break;
+			case ELightType_Capsule:
+				buffer = Graphics_AddLightBuffer( gUniformLightCapsule, "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
+				gLightInfo.aCountCapsule++;
+				break;
+		}
+
 		if ( buffer == InvalidHandle )
 		{
 			Log_Warn( gLC_ClientGraphics, "Failed to Create Light Buffer!\n" );
 			return;
 		}
 
-		srUniformBuffer.aBuffers[ spLight ] = buffer;
-		render->MemWriteBuffer( buffer, sizeof( T ), spLight );
+		gLightBuffers[ spLight ] = buffer;
+		gNeedLightInfoUpdate     = true;
 	}
 	else
 	{
-		render->MemWriteBuffer( it->second, sizeof( T ), spLight );
+		buffer = it->second;
+	}
+
+	switch ( spLight->aType )
+	{
+		default:
+		{
+			Log_Error( gLC_ClientGraphics, "Unknown Light Type!\n" );
+			return;
+		}
+		case ELightType_Directional:
+		{
+			UBO_LightDirectional_t light;
+			light.aColor = spLight->aColor;
+
+			Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			return;
+		}
+		case ELightType_Point:
+		{
+			UBO_LightPoint_t light;
+			light.aColor  = spLight->aColor;
+			light.aPos    = spLight->aPos;
+			light.aRadius = spLight->aRadius;
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			return;
+		}
+		case ELightType_Cone:
+		{
+			UBO_LightCone_t light;
+			light.aColor = spLight->aColor;
+			light.aPos   = spLight->aPos;
+			light.aFov.x = glm::radians( spLight->aInnerFov );
+			light.aFov.y = glm::radians( spLight->aOuterFov );
+
+			glm::mat4 matrix;
+			ToMatrix( matrix, spLight->aPos, spLight->aAng );
+
+			GetDirectionVectors( matrix, light.aDir );
+
+			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			return;
+		}
+		case ELightType_Capsule:
+		{
+			UBO_LightCapsule_t light;
+			light.aColor     = spLight->aColor;
+			light.aPos       = spLight->aPos;
+			light.aLength    = spLight->aLength;
+			light.aThickness = spLight->aRadius;
+
+			Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			return;
+		}
 	}
 }
 
 
 void Graphics_PrepareDrawData()
 {
-	glm::vec3 ang( r_world_dir_x.GetFloat(), r_world_dir_y.GetFloat(), r_world_dir_z.GetFloat() );
-
-	Util_GetDirectionVectors( ang, nullptr, nullptr, &gpWorldLight->aDir );
-
-	Graphics_UpdateLight( gpWorldLight );
-
-	ImGui::Text( Vec2Str( gpWorldLight->aDir ).c_str() );
+	// glm::vec3 ang( r_world_dir_x.GetFloat(), r_world_dir_y.GetFloat(), r_world_dir_z.GetFloat() );
+	// 
+	// Util_GetDirectionVectors( ang, nullptr, nullptr, &gpWorldLight->aDir );
+	// 
+	// Graphics_UpdateLight( gpWorldLight );
+	// 
+	// ImGui::Text( Vec2Str( gpWorldLight->aDir ).c_str() );
 
 	ImGui::Render();
 
@@ -931,54 +1011,11 @@ void Graphics_PrepareDrawData()
 
 	gDirtyMaterials.clear();
 
-#if 0
 	// Update UBO's for lights if needed
-	for ( LightBase_t* lightBase : gDirtyLights )
-	{
-		auto& typeInfo = typeid( *lightBase );
-		auto& typeInfo2 = typeid( lightBase );
-		auto& typeInfo3 = typeid( LightWorld_t );
+	for ( Light_t* light : gDirtyLights )
+		Graphics_UpdateLightBuffer( light );
 
-		if ( typeInfo == typeid( LightWorld_t ) || typeInfo2 == typeid( LightWorld_t ) )
-		{
-			Graphics_UpdateLightBuffer( gUniformLightWorld, lightBase, sizeof( LightWorld_t ) );
-		}
-		else if ( typeid( *lightBase ) == typeid( LightPoint_t ) )
-		{
-			Graphics_UpdateLightBuffer( gUniformLightPoint, lightBase, sizeof( LightPoint_t ) );
-		}
-		else if ( typeid( *lightBase ) == typeid( LightCone_t ) )
-		{
-			Graphics_UpdateLightBuffer( gUniformLightCone, lightBase, sizeof( LightCone_t ) );
-		}
-		else if ( typeid( *lightBase ) == typeid( LightCapsule_t ) )
-		{
-			Graphics_UpdateLightBuffer( gUniformLightCapsule, lightBase, sizeof( LightCapsule_t ) );
-		}
-		else
-		{
-			Log_Error( gLC_ClientGraphics, "Error Updating Dirty Lights: Unknown Light Type\n" );
-		}
-	}
-#endif
-
-	// Update UBO's for lights if needed
-	for ( LightWorld_t* light : gDirtyLightsWorld )
-		Graphics_UpdateLightBuffer( gUniformLightWorld, light, "Light World Buffer" );
-
-	for ( LightPoint_t* light : gDirtyLightsPoint )
-		Graphics_UpdateLightBuffer( gUniformLightPoint, light, "Light Point Buffer" );
-
-	for ( LightCone_t* light : gDirtyLightsCone )
-		Graphics_UpdateLightBuffer( gUniformLightCone, light, "Light Cone Buffer" );
-
-	for ( LightCapsule_t* light : gDirtyLightsCapsule )
-		Graphics_UpdateLightBuffer( gUniformLightCapsule, light, "Light Capsule Buffer" );
-
-	gDirtyLightsWorld.clear();
-	gDirtyLightsPoint.clear();
-	gDirtyLightsCone.clear();
-	gDirtyLightsCapsule.clear();
+	gDirtyLights.clear();
 
 	// Update Light Info UBO
 	if ( gNeedLightInfoUpdate )
@@ -1282,7 +1319,7 @@ const char* Graphics_GetVertexAttributeName( VertexAttribute attrib )
 // sBufferSize is sizeof(element) * count
 static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage )
 {
-	Handle stagingBuffer = render->CreateBuffer( sBufferSize, sUsage | EBufferFlags_TransferSrc, EBufferMemory_Host );
+	Handle stagingBuffer = render->CreateBuffer( "Staging Model Buffer", sBufferSize, sUsage | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	// Copy Data to Buffer
 	render->MemWriteBuffer( stagingBuffer, sBufferSize, spData );
@@ -1300,11 +1337,16 @@ static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBuffe
 
 void Graphics_CreateVertexBuffers( Mesh& srMesh, const char* spDebugName )
 {
-	VertexData_t& vertData     = srMesh.aVertexData;
+	VertexData_t& vertData = srMesh.aVertexData;
 
-	VertexFormat  shaderFormat = Mat_GetVertexFormat( srMesh.aMaterial );
+	if ( vertData.aCount == 0 )
+	{
+		Log_Warn( gLC_ClientGraphics, "Trying to create Vertex Buffers for mesh with no vertices!\n" );
+		return;
+	}
 
-	// wtf
+	VertexFormat shaderFormat = Mat_GetVertexFormat( srMesh.aMaterial );
+
 	if ( shaderFormat == VertexFormat_None )
 	{
 		Log_Error( gLC_ClientGraphics, "No Vertex Format for shader!\n" );
@@ -1358,6 +1400,12 @@ void Graphics_CreateIndexBuffer( Mesh& srMesh, const char* spDebugName )
 {
 	char* bufferName = nullptr;
 
+	if ( srMesh.aIndices.empty() )
+	{
+		Log_Warn( gLC_ClientGraphics, "Trying to create Index Buffer for mesh with no indices!\n" );
+		return;
+	}
+
 #ifdef _DEBUG
 	if ( spDebugName )
 	{
@@ -1381,10 +1429,10 @@ void Graphics_CreateIndexBuffer( Mesh& srMesh, const char* spDebugName )
 
 
 template< typename T >
-T* Graphics_CreateLightInternal( LightUniformBuffer_t& srBuffer, const char* spName, std::vector< T* >& srDirty )
+T* Graphics_CreateLightInternal( LightUniformBuffer_t& srBuffer, const char* spName, std::vector< T* >& srLights, std::vector< T* >& srDirty )
 {
 	T* light = new T;
-	gLights.push_back( light );
+	srLights.push_back( light );
 	// Graphics_AddLightBuffer( srBuffer, spName, sizeof( T ), light );
 	gNeedLightInfoUpdate = true;
 	srDirty.push_back( light );
@@ -1399,65 +1447,33 @@ void Graphics_UpdateLightInternal( std::vector< T* >& srDirty, T* spLight )
 		srDirty.push_back( spLight );
 }
 
-
-LightWorld_t* Graphics_CreateLightWorld()
+Light_t* Graphics_CreateLight( ELightType sType )
 {
-	auto light = Graphics_CreateLightInternal< LightWorld_t >( gUniformLightWorld, "Light World Buffer", gDirtyLightsWorld );
-	if ( light )
-		gLightInfo.aCountWorld++;
+	Light_t* light       = new Light_t;
+	light->aType         = sType;
+	gNeedLightInfoUpdate = true;
+
+	gLights.push_back( light );
+	gDirtyLights.push_back( light );
+
 	return light;
 }
 
-
-LightPoint_t* Graphics_CreateLightPoint()
+void Graphics_EnableLight( Light_t* spLight )
 {
-	auto light = Graphics_CreateLightInternal< LightPoint_t >( gUniformLightPoint, "Light Point Buffer", gDirtyLightsPoint );
-	if ( light )
-		gLightInfo.aCountPoint++;
-	return light;
+}
+
+void Graphics_DisableLight( Light_t* spLight )
+{
+}
+
+void Graphics_UpdateLight( Light_t* spLight )
+{
+	gDirtyLights.push_back( spLight );
 }
 
 
-LightCone_t* Graphics_CreateLightCone()
-{
-	auto light = Graphics_CreateLightInternal< LightCone_t >( gUniformLightCone, "Light Cone Buffer", gDirtyLightsCone );
-	if ( light )
-		gLightInfo.aCountCone++;
-	return light;
-}
-
-
-LightCapsule_t* Graphics_CreateLightCapsule()
-{
-	auto light = Graphics_CreateLightInternal< LightCapsule_t >( gUniformLightCapsule, "Light Capsule Buffer", gDirtyLightsCapsule );
-	if ( light )
-		gLightInfo.aCountCapsule++;
-	return light;
-}
-
-
-void Graphics_UpdateLight( LightWorld_t* spLight )
-{
-	Graphics_UpdateLightInternal( gDirtyLightsWorld, spLight );
-}
-
-void Graphics_UpdateLight( LightPoint_t* spLight )
-{
-	Graphics_UpdateLightInternal( gDirtyLightsPoint, spLight );
-}
-
-void Graphics_UpdateLight( LightCone_t* spLight )
-{
-	Graphics_UpdateLightInternal( gDirtyLightsCone, spLight );
-}
-
-void Graphics_UpdateLight( LightCapsule_t* spLight )
-{
-	Graphics_UpdateLightInternal( gDirtyLightsCapsule, spLight );
-}
-
-
-void Graphics_DestroyLight( LightBase_t* spLight )
+void Graphics_DestroyLight( Light_t* spLight )
 {
 	if ( !spLight )
 		return;
@@ -1467,7 +1483,7 @@ void Graphics_DestroyLight( LightBase_t* spLight )
 	// Destroy Descriptor Set
 
 	vec_remove( gLights, spLight );
-	// vec_remove_if( gDirtyLights, spLight );
+	vec_remove_if( gDirtyLights, spLight );
 
 	delete spLight;
 }

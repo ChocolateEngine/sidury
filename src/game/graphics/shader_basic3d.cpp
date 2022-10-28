@@ -30,7 +30,7 @@ extern Handle*                              gLayoutMaterialBasic3DSets;
 
 extern UniformBufferArray_t                 gUniformLightInfo;
 
-extern LightUniformBuffer_t                 gUniformLightWorld;
+extern LightUniformBuffer_t                 gUniformLightDirectional;
 extern LightUniformBuffer_t                 gUniformLightPoint;
 extern LightUniformBuffer_t                 gUniformLightCone;
 extern LightUniformBuffer_t                 gUniformLightCapsule;
@@ -58,7 +58,7 @@ struct Basic3D_Push
 	int aProjView = 0;         // projection * view index
 
 	// debugging
-	bool aDbgShowDiffuse;
+	int aDebugDraw;
 };
 
 
@@ -85,7 +85,7 @@ static std::unordered_map< ModelSurfaceDraw_t*, Basic3D_Push > gPushData;
 static std::unordered_map< Handle, Basic3D_Material >          gMaterialData;
 
 
-CONVAR( r_basic3d_dbg_diffuse, 0 );
+CONVAR( r_basic3d_dbg_mode, 0 );
 
 
 struct ShaderBasic3D : public IShader
@@ -112,7 +112,7 @@ struct ShaderBasic3D : public IShader
 		srPipeline.aLayouts.push_back( gLayoutViewProj );
 		srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
 		srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightWorld.aLayout );
+		srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
 		srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
 		srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
 		srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
@@ -174,7 +174,7 @@ void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& s
 	srPipeline.aLayouts.push_back( gLayoutViewProj );
 	srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
 	srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightWorld.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
 	srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
@@ -259,16 +259,16 @@ void Shader_Basic3D_ResetPushData()
 
 void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 {
-	Basic3D_Push& push   = gPushData[ &srDrawInfo ];
-	push.aModelMatrix    = srDrawInfo.apDraw->aModelMatrix;
+	Basic3D_Push& push = gPushData[ &srDrawInfo ];
+	push.aModelMatrix  = srDrawInfo.apDraw->aModelMatrix;
 
-	Handle mat           = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
+	Handle mat         = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
 	// push.aMaterial     = GET_HANDLE_INDEX( mat );
 	// push.aMaterial     = gMaterialBufferIndex[ mat ];
-	push.aMaterial       = vec_index( gMaterialBufferIndex, mat );
+	push.aMaterial     = vec_index( gMaterialBufferIndex, mat );
 
-	push.aProjView       = 0;
-	push.aDbgShowDiffuse = r_basic3d_dbg_diffuse;
+	push.aProjView     = 0;
+	push.aDebugDraw    = r_basic3d_dbg_mode;
 }
 
 

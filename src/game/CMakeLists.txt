@@ -1,11 +1,20 @@
 message( "Current Project: Sidury Client" )
 
 file(
-	GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
+	GLOB_RECURSE SRC_FILES_GLOB CONFIGURE_DEPENDS
 	*.cpp
 	*.h
 	graphics/*.cpp
 	graphics/*.h
+)
+
+set(
+	SRC_FILES
+	${SRC_FILES_GLOB}
+	
+	# tools
+	tools/light_editor.cpp
+	tools/light_editor.h
 )
 
 file(
