@@ -318,7 +318,7 @@ void Game_RegisterKeys()
 	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
 	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
 
-	input->RegisterKey( SDL_SCANCODE_G ); // create a light
+	input->RegisterKey( SDL_SCANCODE_T ); // create a light
 
 	gameinput.Init();
 }
@@ -562,32 +562,39 @@ glm::vec3 VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 }
 
 
-// more vkquake stuff
-void AngleToVectors( const glm::vec3& angles, glm::vec3& forward, glm::vec3& right, glm::vec3& up )
+void Util_GetDirectionVectors( const glm::vec3& srAngles, glm::vec3* spForward, glm::vec3* spRight, glm::vec3* spUp )
 {
-	float angle;
+	glm::vec3 rad = glm::radians( srAngles );
 
-	angle = glm::radians( angles[YAW] );
-	float sy = sin(angle);
-	float cy = cos(angle);
+	float     sy  = sin( rad[ YAW ] );
+	float     cy  = cos( rad[ YAW ] );
 
-	angle = glm::radians( angles[PITCH] );
-	float sp = sin(angle);
-	float cp = cos(angle);
+	float     sp  = sin( rad[ PITCH ] );
+	float     cp  = cos( rad[ PITCH ] );
 
-	angle = glm::radians( angles[ROLL] );
-	float sr = sin(angle);
-	float cr = cos(angle);
+	float     sr  = sin( rad[ ROLL ] );
+	float     cr  = cos( rad[ ROLL ] );
 
-	forward[0] = cp*cy;
-	forward[1] = cp*sy;
-	forward[2] = -sp;
-	right[0] = (-1*sr*sp*cy+-1*cr*-sy);
-	right[1] = (-1*sr*sp*sy+-1*cr*cy);
-	right[2] = -1*sr*cp;
-	up[0] = (cr*sp*cy+-sr*-sy);
-	up[1] = (cr*sp*sy+-sr*cy);
-	up[2] = cr*cp;
+	if ( spForward )
+	{
+		spForward->x = cp * cy;
+		spForward->y = cp * sy;
+		spForward->z = -sp;
+	}
+
+	if ( spRight )
+	{
+		spRight->x = ( -1 * sr * sp * cy + -1 * cr * -sy );
+		spRight->y = ( -1 * sr * sp * sy + -1 * cr * cy );
+		spRight->z = -1 * sr * cp;
+	}
+
+	if ( spUp )
+	{
+		spUp->x = ( cr * sp * cy + -sr * -sy );
+		spUp->y = ( cr * sp * sy + -sr * cy );
+		spUp->z = cr * cp;
+	}
 }
 
 
@@ -658,16 +665,26 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 // will be used in the future for when updating bones and stuff
 void Game_SetupModels( float frameTime )
 {
+	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
+	auto& camTransform = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+
 	if ( !gPaused )
 	{
 		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
 		{
 			CreateProtogen( DEFAULT_PROTOGEN_PATH );
 		}
-	}
 
-	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
-	// auto& camTransform = entities->GetComponent< CCamera >( game->aLocalPlayer ).aTransform;
+		if ( input->KeyJustPressed( SDL_SCANCODE_T ) )
+		{
+			LightPoint_t* light = Graphics_CreateLightPoint();
+
+			light->aPos         = playerTransform.aPos + camTransform.aPos;
+			// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
+			light->aColor       = { 1, 1, 1 };
+			light->aRadius      = 50;
+		}
+	}
 
 	//transform.aPos += camTransform.aPos;
 	//transform.aAng += camTransform.aAng;
@@ -689,9 +706,9 @@ void Game_SetupModels( float frameTime )
 		{
 			matrixChanged = true;
 
-			glm::vec3 forward{}, right{}, up{};
+			glm::vec3 forward, right, up;
 			//AngleToVectors( protoTransform.aAng, forward, right, up );
-			AngleToVectors( playerTransform.aAng, forward, right, up );
+			Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
 
 			glm::vec3 protoView = protoTransform.aPos;
 			//protoView.z += cl_view_height;
@@ -859,7 +876,12 @@ void Game_SetView( const glm::mat4& srViewMat )
 	gView.aViewMat = srViewMat;
 	gView.ComputeProjection( width, height );
 
+	// um
+	gViewInfo.aProjection = gView.aProjMat;
+	gViewInfo.aView       = gView.aViewMat;
+
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
+	gViewInfoUpdate  = true;
 
 	auto& io         = ImGui::GetIO();
 	io.DisplaySize.x = width;
@@ -873,7 +895,12 @@ void Game_UpdateProjection()
 	render->GetSurfaceSize( width, height );
 	gView.ComputeProjection( width, height );
 
+	// um
+	gViewInfo.aProjection = gView.aProjMat;
+	gViewInfo.aView       = gView.aViewMat;
+
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
+	gViewInfoUpdate  = true;
 
 	auto& io = ImGui::GetIO();
 	io.DisplaySize.x = width;

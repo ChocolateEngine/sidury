@@ -454,6 +454,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ(  );
 
+		gViewInfo.aViewPos = thirdPerson.aPos;
 		Game_SetView( viewMat );
 		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
@@ -465,8 +466,9 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
 		}
 
-		glm::mat4 viewMat = transformView.ToViewMatrixZ(  );
+		glm::mat4 viewMat = transformView.ToViewMatrixZ();
 
+		gViewInfo.aViewPos = transformView.aPos;
 		Game_SetView( viewMat );
 		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}

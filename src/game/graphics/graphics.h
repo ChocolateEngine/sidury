@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/core.h"
+#include "render/irender.h"
 
 // ======================================================
 // User Land abstraction of renderer
@@ -76,19 +77,19 @@ enum : EShaderFlags
 {
 	EShaderFlags_None             = 0,
 	EShaderFlags_Sampler          = ( 1 << 0 ),  // Shader Uses Texture Sampler Array
-	EShaderFlags_ViewProj         = ( 1 << 1 ),  // Shader Uses View * Projection Matrix
+	EShaderFlags_ViewInfo         = ( 1 << 1 ),  // Shader Uses View Info UBO
 	EShaderFlags_VertexAttributes = ( 1 << 2 ),  // Shader Uses Vertex Attributes
 	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader makes of a Push Constant
 	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Makes use of Material Uniform Buffers
-	// EShaderFlags_WorldLight       = ( 1 << 5 ),  // Shader Makes use of World Light (only used on deferred shader)
+	EShaderFlags_Lights           = ( 1 << 5 ),  // Shader Makes use of Lights
 };
 
 
 enum ELightType // : char
 {
+	ELightType_Directional,
 	ELightType_Point,
 	ELightType_Spot,
-	ELightType_Ortho,
 	ELightType_Capsule,
 
 	// uh
@@ -98,6 +99,32 @@ enum ELightType // : char
 
 
 // ======================================================
+
+
+struct ViewportCamera_t
+{
+	void ComputeProjection( float sWidth, float sHeight )
+	{
+		float hAspect = (float)sWidth / (float)sHeight;
+		float vAspect = (float)sHeight / (float)sWidth;
+
+		float V       = 2.0f * atanf( tanf( glm::radians( aFOV ) / 2.0f ) * vAspect );
+
+		aProjMat      = glm::perspective( V, hAspect, aNearZ, aFarZ );
+
+		aProjViewMat  = aProjMat * aViewMat;
+	}
+
+	float     aNearZ;
+	float     aFarZ;
+	float     aFOV;
+
+	glm::mat4 aViewMat;
+	glm::mat4 aProjMat;
+
+	// projection matrix * view matrix
+	glm::mat4 aProjViewMat;
+};
 
 
 struct RenderTarget_t
@@ -202,40 +229,151 @@ struct LightInfo_t
 // Light Types
 struct LightBase_t
 {
-	glm::vec3 aColor{};
 };
 
 struct LightWorld_t : public LightBase_t
 {
-	glm::vec3 aDir{};
+	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec3 aDir{};
 };
 
 struct LightPoint_t : public LightBase_t
 {
-	glm::vec3 aPos{};
+	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec3 aPos{};
 	float     aRadius = 0.f;
 };
 
 struct LightCone_t : public LightBase_t
 {
-	glm::vec3 aPos{};
-	glm::vec3 aDir{};
+	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec3 aPos{};
+	alignas( 16 ) glm::vec3 aDir{};
 };
 
 struct LightCapsule_t : public LightBase_t
 {
-	glm::vec3 aPos{};
-	glm::vec3 aDir{};
+	alignas( 16 ) glm::vec3 aPos{};
+	alignas( 16 ) glm::vec3 aDir{};
 	float     aLength    = 0.f;
 	float     aThickness = 0.f;
+};
+
+// maybe use this instead? would be easier to manage
+struct UBO_Light_t
+{
+	ELightType aType = ELightType_Directional;
+	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec3 aPos{};
+	alignas( 16 ) glm::vec3 aDir{};
+	float aRadius = 0.f;
+	float aLength = 0.f;
 };
 
 struct UniformBufferArray_t
 {
 	Handle                aLayout = InvalidHandle;
 	std::vector< Handle > aSets;
-	std::vector< Handle > aBuffers;
 };
+
+struct LightUniformBuffer_t
+{
+	Handle                                     aLayout = InvalidHandle;
+	std::vector< Handle >                      aSets;
+	std::unordered_map< LightBase_t*, Handle > aBuffers;
+};
+
+struct UBO_ViewInfo_t
+{
+	Handle                aLayout = InvalidHandle;
+	std::vector< Handle > aSets;
+	Handle                aBuffer;
+};
+
+struct ViewInfo_t
+{
+	glm::mat4 aViewProj{};
+	glm::mat4 aProjection{};
+	glm::mat4 aView{};
+	glm::vec3 aViewPos{};
+};
+
+extern ViewInfo_t  gViewInfo;
+extern bool        gViewInfoUpdate;
+
+
+// Push Constant Function Pointers
+using FResetPushData = void();
+using FModelPushConstants = void( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
+using FSetupModelPushData = void( ModelSurfaceDraw_t& srDrawInfo );
+
+
+struct IPushConstant
+{
+	virtual void ResetPushData()
+	{
+	}
+
+	// kinda weird and tied to models, hmm
+	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
+
+	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
+};
+
+
+struct ShaderInfo_t
+{
+	EPipelineBindPoint aBindPoint    = EPipelineBindPoint_Graphics;
+	EShaderFlags       aFlags        = EShaderFlags_None;
+	VertexFormat       aVertexFormat = VertexFormat_None;
+};
+
+
+// DO NOT ADD ANY LOCAL VARIABLES TO THIS WHEN YOU OVERRIDE IT !!!
+struct IShader
+{
+	// Must Override
+	
+	// Returns the shader name, and fills in data in the struct with general shader info 
+	virtual const char* GetShaderInfo( ShaderInfo_t& srInfo ) = 0;
+
+	virtual void GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
+	{
+	}
+
+	// Optional to override
+	// Used if the shader has the push constants flag
+	virtual void ResetPushData()
+	{
+	}
+
+	// kinda weird and tied to models, hmm
+	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
+
+	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
+
+	// Used if the shader has the material data flag
+	virtual void AddMaterial( Handle sMat )
+	{
+	}
+
+	virtual void RemoveMaterial( Handle sMat )
+	{
+	}
+
+	virtual void UpdateMaterialData( Handle sMat )
+	{
+	}
+};
+
 
 // ---------------------------------------------------------------------------------------
 // Models
@@ -329,7 +467,9 @@ LightPoint_t*      Graphics_CreateLightPoint();
 // LightCone_t*       Graphics_CreateLightCone();
 // LightCapsule_t*    Graphics_CreateLightCapsule();
 
-void               Graphics_UpdateLight( LightBase_t* spLight );
+void               Graphics_UpdateLight( LightWorld_t* spLight );
+// void               Graphics_UpdateLight( LightPoint_t* spLight );
+
 void               Graphics_DestroyLight( LightBase_t* spLight );
 
 // ---------------------------------------------------------------------------------------

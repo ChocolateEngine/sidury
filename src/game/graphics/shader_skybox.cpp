@@ -59,10 +59,10 @@ Handle Shader_Skybox_Create( Handle sRenderPass, bool sRecreate )
 	Graphics_GetVertexAttributeDesc( gVertexFormat, pipelineInfo.aVertexAttributes );
 
 	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
+	// pipelineInfo.aColorBlendAttachments.emplace_back( true );
+	// pipelineInfo.aColorBlendAttachments.emplace_back( true );
+	// pipelineInfo.aColorBlendAttachments.emplace_back( true );
+	// pipelineInfo.aColorBlendAttachments.emplace_back( true );
 
 	pipelineInfo.aPrimTopology   = EPrimTopology_Tri;
 	pipelineInfo.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;

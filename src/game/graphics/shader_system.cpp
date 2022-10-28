@@ -9,12 +9,11 @@ extern IRender*                                         render;
 static Handle                                           gTempShader       = InvalidHandle;
 static Handle                                           gSkyboxShader     = InvalidHandle;
 static Handle                                           gUIShader         = InvalidHandle;
-static Handle                                           gDeferredFSShader = InvalidHandle;
 
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
-static std::unordered_map< Handle, EShaderFlags >       gShaderFlags;      // [name]   = shader
-static std::unordered_map< Handle, Handle >             gShaderLayouts;    // [name]   = pipeline layout
+static std::unordered_map< Handle, EShaderFlags >       gShaderFlags;      // [shader] = flags
+static std::unordered_map< Handle, Handle >             gShaderLayouts;    // [shader] = pipeline layout
 static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point
 static std::unordered_map< Handle, Handle >             gShaderMaterials;  // [shader] = uniform layout
 
@@ -28,12 +27,17 @@ extern Handle                                           gLayoutViewProj;
 // extern Handle                                           gLayoutModelMatrix;
 
 extern Handle                                           gRenderPassGraphics;
-extern Handle                                           gRenderPassUI;
-extern Handle                                           gRenderPassGBuffer;
 
 extern Handle                                           gLayoutSamplerSets[ 2 ];
 extern Handle                                           gLayoutViewProjSets[ 2 ];
 extern Handle*                                          gLayoutMaterialBasic3DSets;
+
+extern UniformBufferArray_t                             gUniformLightInfo;
+
+extern LightUniformBuffer_t                             gUniformLightWorld;
+extern LightUniformBuffer_t                             gUniformLightPoint;
+extern LightUniformBuffer_t                             gUniformLightCone;
+extern LightUniformBuffer_t                             gUniformLightCapsule;
 
 struct Shader_PushConst
 {
@@ -70,11 +74,79 @@ Handle       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_UI_Destroy();
 void         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
 
-Handle       Shader_DeferredFS_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_DeferredFS_Destroy();
-void         Shader_DeferredFS_Draw( Handle cmd, size_t sCmdIndex );
-
 // --------------------------------------------------------------------------------------
+
+
+void Graphics_GetShaderCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
+{
+#if 0
+	// TODO: have shader system handle adding layouts here
+	srPipeline.aLayouts.push_back( gLayoutSampler );
+	srPipeline.aLayouts.push_back( gLayoutViewProj );
+	srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
+	srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightWorld.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
+	srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
+	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
+
+	// --------------------------------------------------------------
+
+	srGraphics.apName = "basic_3d";
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+
+	Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
+	Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
+
+	srGraphics.aColorBlendAttachments.emplace_back( false );
+
+	srGraphics.aPrimTopology   = EPrimTopology_Tri;
+	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode       = ECullMode_Back;
+	srGraphics.aPipelineLayout = gPipelineLayout;
+	srGraphics.aRenderPass     = sRenderPass;
+	// TODO: expose the rest later
+#endif
+}
+
+
+bool Graphics_CreateShader( IShader* spShader, Handle sRenderPass, bool sRecreate )
+{
+	return false;
+
+	if ( spShader == nullptr )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Interface is nullptr!\n" );
+		return false;
+	}
+
+	ShaderInfo_t info{};
+	const char*  name = spShader->GetShaderInfo( info );
+
+	
+	PipelineLayoutCreate_t   pipelineCreateInfo{};
+	GraphicsPipelineCreate_t pipelineInfo{};
+
+	Graphics_GetShaderCreateInfo( sRenderPass, pipelineCreateInfo, pipelineInfo );
+
+	// --------------------------------------------------------------
+
+	if ( sRecreate )
+	{
+		// render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
+		// render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
+	}
+	else
+	{
+		// gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
+		// pipelineInfo.aPipelineLayout = gPipelineLayout;
+		// gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
+	}
+
+	// gShaderLayouts[ pipeline ] = InvalidHandle;
+}
 
 
 void Graphics_AddShader( const char* spName, Handle sShader, EShaderFlags sFlags, EPipelineBindPoint sBindPoint )
@@ -92,6 +164,39 @@ void Graphics_AddShader( const char* spName, Handle sShader, EShaderFlags sFlags
 	gShaderNames[ spName ]      = sShader;
 	gShaderFlags[ sShader ]     = sFlags;
 	gShaderBindPoint[ sShader ] = sBindPoint;
+}
+
+
+void Graphics_AddShader2( IShader* spShader )
+{
+	if ( spShader == nullptr )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Interface is nullptr!\n" );
+		return;
+	}
+
+	ShaderInfo_t info{};
+	const char*  name = spShader->GetShaderInfo( info );
+
+	if ( !gShaderNames.empty() )
+	{
+		auto it = gShaderNames.find( name );
+		if ( it != gShaderNames.end() )
+		{
+			Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Already Registered: %s\n", name );
+			return;
+		}
+	}
+
+	gShaderNames[ name ]        = InvalidHandle;
+	// gShaderFlags[ sShader ]     = info.aFlags;
+	// gShaderBindPoint[ sShader ] = info.aBindPoint;
+
+	// if ( !Graphics_CreateShader( spShader ) )
+	// {
+	// 	Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Failed to Create Shader \"%s\"\n", name );
+	// 	return;
+	// }
 }
 
 
@@ -115,6 +220,8 @@ Handle Shader_GetPipelineLayout( Handle sShader )
 	if ( sShader == gSkyboxShader )
 		return Shader_Skybox_GetPipelineLayout();
 
+	Log_Warn( gLC_ClientGraphics, "Shader_GetPipelineLayout(): BAD CODE !!!!!!!\n" );
+
 	return InvalidHandle;
 }
 
@@ -127,19 +234,13 @@ bool Graphics_ShaderInit( bool sRecreate )
 		return false;
 	}
 
-	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGBuffer, sRecreate ) ) )
+	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, sRecreate ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
 		return false;
 	}
 
-	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGBuffer, sRecreate ) ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
-		return false;
-	}
-
-	if ( !( gDeferredFSShader = Shader_DeferredFS_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGraphics, sRecreate ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
 		return false;
@@ -148,7 +249,7 @@ bool Graphics_ShaderInit( bool sRecreate )
 	if ( !sRecreate )
 	{
 		Graphics_AddShader( "basic_3d", gTempShader,
-		                    EShaderFlags_Sampler | EShaderFlags_ViewProj | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform,
+		                    EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights,
 		                    EPipelineBindPoint_Graphics );
 
 		Graphics_AddShader( "skybox", gSkyboxShader,
@@ -156,10 +257,6 @@ bool Graphics_ShaderInit( bool sRecreate )
 		                    EPipelineBindPoint_Graphics );
 
 		Graphics_AddShader( "imgui", gUIShader,
-		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
-		                    EPipelineBindPoint_Graphics );
-
-		Graphics_AddShader( "deferred_fullscreen", gDeferredFSShader,
 		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
 		                    EPipelineBindPoint_Graphics );
 	}
@@ -195,8 +292,9 @@ Handle* Shader_GetMaterialUniform( Handle sShader )
 	// HACK HACK HACK
 	if ( sShader == gTempShader )
 		return gLayoutMaterialBasic3DSets;
-	else
-		return nullptr;
+
+	Log_Error( gLC_ClientGraphics, "TODO: PROPERLY IMPLEMENT GETTING SHADER MATERIAL UNIFORM BUFFER!\n" );
+	return nullptr;
 
 	// auto it = gShaderMaterials.find( sShader );
 	// if ( it != gShaderMaterials.end() )
@@ -219,7 +317,7 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	if ( shaderFlags & EShaderFlags_Sampler )
 		descSets.push_back( gLayoutSamplerSets[ sIndex ] );
 
-	if ( shaderFlags & EShaderFlags_ViewProj )
+	if ( shaderFlags & EShaderFlags_ViewInfo )
 		descSets.push_back( gLayoutViewProjSets[ sIndex ] );
 
 	if ( shaderFlags & EShaderFlags_MaterialUniform )
@@ -229,6 +327,24 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 			return false;
 
 		descSets.push_back( mats[ sIndex ] );
+	}
+
+	if ( shaderFlags & EShaderFlags_Lights )
+	{
+		for ( const auto& set : gUniformLightInfo.aSets )
+			descSets.push_back( set );
+
+		for ( const auto& set : gUniformLightWorld.aSets )
+			descSets.push_back( set );
+
+		for ( const auto& set : gUniformLightPoint.aSets )
+			descSets.push_back( set );
+		
+		for ( const auto& set : gUniformLightCone.aSets )
+			descSets.push_back( set );
+		
+		for ( const auto& set : gUniformLightCapsule.aSets )
+			descSets.push_back( set );
 	}
 
 	if ( descSets.size() )
