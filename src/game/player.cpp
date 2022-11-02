@@ -57,7 +57,6 @@ CONVAR( phys_player_offset, 40 );
 //CONVAR( sv_friction_new, 8 );  // 4.f
 
 CONVAR( sv_gravity, 800 );
-CONVAR( ground_pos, 225 );
 
 CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
@@ -67,23 +66,13 @@ CONVAR( cl_view_height, 67 );  // 67
 CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
 
-// multiplies the final velocity by this amount when setting the player position,
-// a workaround for quake movement values not working correctly when lowered
-#if !BULLET_PHYSICS
-CONVAR( velocity_scale, 1 );
-CONVAR( player_model_scale, 1 );
-CONVAR( cl_cam_z, -2.5 );
-#else
-CONVAR( velocity_scale, 1.0 );
-CONVAR( velocity_scale2, 0.01 );
 CONVAR( player_model_scale, 25 );
-CONVAR( cl_cam_z, -150 );
-#endif
 
 CONVAR( cl_thirdperson, 0 );
 CONVAR( cl_playermodel_enable, 0 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
+CONVAR( cl_cam_z, -150 );
 CONVAR( cl_show_player_stats, 0 );
 
 CONVAR( phys_dbg_player, 0 );
@@ -94,6 +83,8 @@ CONVAR( r_farz, 10000.f );
 
 CONVAR( cl_zoom_fov, 40 );
 CONVAR( cl_zoom_duration, 0.4 );
+
+CONVAR( cl_duck_time, 0.4 );
 
 extern ConVar   m_yaw, m_pitch;
 
@@ -167,7 +158,7 @@ void PlayerManager::Init(  )
 }
 
 
-Entity PlayerManager::Create(  )
+Entity PlayerManager::Create()
 {
 	// Add Components
 	Entity player = entities->CreateEntity();
@@ -179,6 +170,13 @@ Entity PlayerManager::Create(  )
 	entities->AddComponent< CCamera >( player );
 	entities->AddComponent< CDirection >( player );
 	entities->AddComponent< CPlayerZoom >( player );
+
+	Light_t* flashlight = Graphics_CreateLight( ELightType_Cone );
+	flashlight->aInnerFov = 0.f ;
+	flashlight->aOuterFov = 45.f;
+	flashlight->aColor    = { 2.f, 2.f, 2.f };
+
+	entities->AddComponent< Light_t* >( player, flashlight );
 
 	//Model* model = new Model;
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
@@ -249,6 +247,8 @@ void PlayerManager::Respawn( Entity player )
 	zoom.aOrigFov = r_fov;
 	zoom.aNewFov = r_fov;
 
+	apPhysObj->SetLinearVelocity( { 0, 0, 0 } );
+
 	apMove->OnPlayerRespawn( player );
 }
 
@@ -257,20 +257,44 @@ void PlayerManager::Update( float frameTime )
 {
 	for ( Entity player: aPlayerList )
 	{
+		auto&     playerInfo = entities->GetComponent< CPlayerInfo >( player );
+		Transform transform  = entities->GetComponent< Transform >( player );
+		CCamera   camera     = entities->GetComponent< CCamera >( player );
+
+		Light_t*  flashlight = entities->GetComponent< Light_t* >( player );
+
 		if ( !Game_IsPaused() )
 		{
 			DoMouseLook( player );
 			apMove->MovePlayer( player );
-		}
 
-		auto& playerInfo = entities->GetComponent< CPlayerInfo >( player );
+			if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
+			{
+				if ( flashlight->aColor.x != 0.f )
+				{
+					flashlight->aColor = { 0, 0, 0 };
+					Graphics_UpdateLight( flashlight );
+				}
+				else
+				{
+					flashlight->aColor = { 10, 10, 10 };
+				}
+			}
+
+			if ( flashlight->aColor.x != 0.f )
+			{
+				flashlight->aPos = transform.aPos + camera.aTransform.aPos;
+				flashlight->aPos.z -= 4.f;
+				flashlight->aAng = camera.aTransform.aAng;
+				Graphics_UpdateLight( flashlight );
+			}
+		}
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
 			ModelDraw_t* renderable = entities->GetComponent< ModelDraw_t* >( player );
 
 			auto model = entities->GetComponent< HModel >( player );
-			Transform transform = entities->GetComponent< Transform >( player );
 			transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
 
 			renderable->aModelMatrix = transform.ToMatrix();
@@ -432,11 +456,9 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 	/* Copy the player transformation, and apply the view offsets to it. */
 	Transform transformView = transform;
-	// transformView.aPos += (camera.aTransform.aPos + glm::vec3(1, 1, cl_view_height_offset)) * velocity_scale.GetFloat();
 	transformView.aPos += camera.aTransform.aPos;
 	transformView.aAng = camera.aTransform.aAng;
 	//Transform transformView = transform;
-	//transformView.aPos += move.aViewOffset * velocity_scale.GetFloat();
 	//transformView.aAng += move.aViewAngOffset;
 
 	if ( cl_thirdperson.GetBool() )
@@ -780,7 +802,6 @@ CONVAR( phys_player_max_sep_dist, 1 );
 // Post Physics Simulation Update
 void PlayerMovement::UpdatePosition( Entity player )
 {
-#if BULLET_PHYSICS
 	apMove = &entities->GetComponent< CPlayerMoveData >( player );
 	apTransform = &entities->GetComponent< Transform >( player );
 	apRigidBody = &entities->GetComponent< CRigidBody >( player );
@@ -803,18 +824,7 @@ void PlayerMovement::UpdatePosition( Entity player )
 	{
 		WalkMovePostPhys();
 	}
-
-#else
-	SetPos( GetPos() + (apRigidBody->aVel * velocity_scale.GetFloat()) * game->aFrameTime );
-
-	// blech
-	//if ( IsOnGround() && aMoveType != MoveType::NoClip )
-	//	aTransform.position.y = ground_pos.GetFloat() * velocity_scale.GetFloat();
-#endif
 }
-
-
-CONVAR( cl_duck_time, 0.4 );
 
 
 float Math_EaseInOutCubic( float x )
@@ -888,16 +898,6 @@ bool PlayerMovement::CalcOnGround()
 		apMove->aPlayerFlags |= PlyOnGround;
 	else
 		apMove->aPlayerFlags &= ~PlyOnGround;
-
-#if 0
-	// aOnGround = GetPos().y <= ground_pos.GetFloat() * velocity_scale.GetFloat();
-	bool onGround = GetPos()[W_UP] <= ground_pos * velocity_scale;
-
-	if ( onGround )
-		apMove->aPlayerFlags |= PlyOnGround;
-	else
-		apMove->aPlayerFlags &= ~PlyOnGround;
-#endif
 
 	return apMove->aPlayerFlags & PlyOnGround;
 }
@@ -1077,13 +1077,6 @@ void PlayerMovement::BaseFlyMove(  )
 	AddFriction(  );
 	Accelerate( wishspeed, wishdir );
 }
-
-
-#define SET_VELOCITY() \
-glm::vec3 __vel{}; \
-for ( int i = 0; i < 3; i++ ) \
-	__vel[i] = apCamera->aForward[i]*apRigidBody->aAccel.x + apCamera->aRight[i]*apRigidBody->aAccel[W_RIGHT]; \
-apPhysObj->SetLinearVelocity( apPhysObj->GetLinearVelocity() + (__vel * velocity_scale2.GetFloat()) )
 
 
 void PlayerMovement::NoClipMove(  )

@@ -30,10 +30,10 @@ extern Handle*                              gLayoutMaterialBasic3DSets;
 
 extern UniformBufferArray_t                 gUniformLightInfo;
 
-extern LightUniformBuffer_t                 gUniformLightDirectional;
-extern LightUniformBuffer_t                 gUniformLightPoint;
-extern LightUniformBuffer_t                 gUniformLightCone;
-extern LightUniformBuffer_t                 gUniformLightCapsule;
+extern UniformBufferArray_t                 gUniformLightDirectional;
+extern UniformBufferArray_t                 gUniformLightPoint;
+extern UniformBufferArray_t                 gUniformLightCone;
+extern UniformBufferArray_t                 gUniformLightCapsule;
 
 // Material Handle, Buffer
 static std::unordered_map< Handle, Handle > gMaterialBuffers;

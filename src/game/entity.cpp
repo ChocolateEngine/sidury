@@ -27,6 +27,8 @@ int EntityManager::Init()
 	RegisterComponent< HModel >();
 	RegisterComponent< ModelDraw_t >();
 
+	RegisterComponent< Light_t* >();
+
 	//RegisterComponent< ModelData >();  // doesn't like this
 	RegisterComponent< CRigidBody >();
 	RegisterComponent< CGravity >();

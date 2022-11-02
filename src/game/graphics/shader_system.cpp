@@ -34,10 +34,10 @@ extern Handle*                                          gLayoutMaterialBasic3DSe
 
 extern UniformBufferArray_t                             gUniformLightInfo;
 
-extern LightUniformBuffer_t                             gUniformLightDirectional;
-extern LightUniformBuffer_t                             gUniformLightPoint;
-extern LightUniformBuffer_t                             gUniformLightCone;
-extern LightUniformBuffer_t                             gUniformLightCapsule;
+extern UniformBufferArray_t                             gUniformLightDirectional;
+extern UniformBufferArray_t                             gUniformLightPoint;
+extern UniformBufferArray_t                             gUniformLightCone;
+extern UniformBufferArray_t                             gUniformLightCapsule;
 
 
 CONCMD( shader_reload )
@@ -45,6 +45,19 @@ CONCMD( shader_reload )
 	render->WaitForQueues();
 
 	Graphics_ShaderInit( true );
+}
+
+
+CONCMD( shader_dump )
+{
+	Log_MsgF( gLC_ClientGraphics, "Shader Count: %zd\n", gShaderNames.size() );
+
+	for ( const auto& [name, shader] : gShaderNames )
+	{
+		Log_MsgF( gLC_ClientGraphics, "  %s\n", name.data() );
+	}
+
+	Log_Msg( gLC_ClientGraphics, "\n" );
 }
 
 
@@ -208,6 +221,21 @@ Handle Graphics_GetShader( std::string_view sName )
 
 	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %s\n", sName );
 	return InvalidHandle;
+}
+
+
+const char* Graphics_GetShaderName( Handle sShader )
+{
+	for ( const auto& [name, shader] : gShaderNames )
+	{
+		if ( shader == sShader )
+		{
+			return name.data();
+		}
+	}
+
+	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %zd\n", sShader );
+	return nullptr;
 }
 
 

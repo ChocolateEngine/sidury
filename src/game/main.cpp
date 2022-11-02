@@ -54,7 +54,6 @@ CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 
 CONVAR( vrcmdl_scale, 40 );
-CONVAR( fox_scale, 1 );
 
 extern ConVar en_timescale;
 
@@ -146,7 +145,7 @@ void CreatePhysEntity( const std::string& path )
 	PhysicsObjectInfo physInfo;
 	physInfo.aPos = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
 	physInfo.aAng = transform.aAng;
-	physInfo.aMass = 40.f;
+	physInfo.aMass = 1.f;
 	physInfo.aMotionType = PhysMotionType::Dynamic;
 	physInfo.aStartActive = true;
 
@@ -250,6 +249,8 @@ void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, U
 
 		default:
 		{
+			// static size_t i = 0;
+			// Log_MsgF( "erm %zd\n", i++ );
 			break;
 		}
 	}

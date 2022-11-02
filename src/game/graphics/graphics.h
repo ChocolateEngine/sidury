@@ -272,18 +272,6 @@ struct UniformBufferArray_t
 	std::vector< Handle > aSets;
 };
 
-struct LightUniformBuffer_t
-{
-	LightUniformBuffer_t( ELightType sType ) :
-		aLightType( sType )
-	{
-	}
-
-	Handle                aLayout = InvalidHandle;
-	std::vector< Handle > aSets;
-	ELightType            aLightType;
-};
-
 struct UBO_ViewInfo_t
 {
 	Handle                aLayout = InvalidHandle;
@@ -447,6 +435,7 @@ const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::ve
 
 bool               Graphics_ShaderInit( bool sRecreate );
 Handle             Graphics_GetShader( std::string_view sName );
+const char*        Graphics_GetShaderName( Handle sShader );
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();

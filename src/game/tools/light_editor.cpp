@@ -23,7 +23,7 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 {
 	ModelDraw_t& modelDraw = gDrawLights[ spLight ];
 
-	if ( spLight->aType == ELightType_Cone )
+	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
 		modelDraw.aModel = gModelLightCone;
 	else
 		modelDraw.aModel = gModelLightPoint;
@@ -32,7 +32,20 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 	Transform transform{};
 	transform.aPos         = spLight->aPos;
 	transform.aAng         = spLight->aAng;
-	modelDraw.aModelMatrix = transform.ToMatrix( false );
+
+	if ( spLight->aType == ELightType_Directional )
+	{
+		transform.aScale = {2.f, 2.f, 2.f};
+		modelDraw.aModelMatrix = transform.ToMatrix();
+	}
+	else
+	{
+		modelDraw.aModelMatrix = transform.ToMatrix( false );
+	}
+
+	// gViewInfo.aViewPos     = transformView.aPos;
+	// Game_SetView( viewMat );
+	// GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
 }
 
 

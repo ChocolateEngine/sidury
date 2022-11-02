@@ -76,10 +76,10 @@ bool                                             gViewInfoUpdate = false;
 
 UniformBufferArray_t                             gUniformLightInfo;
 
-LightUniformBuffer_t                             gUniformLightDirectional( ELightType_Directional );
-LightUniformBuffer_t                             gUniformLightPoint( ELightType_Point );
-LightUniformBuffer_t                             gUniformLightCone( ELightType_Cone );
-LightUniformBuffer_t                             gUniformLightCapsule( ELightType_Capsule );
+UniformBufferArray_t                             gUniformLightDirectional;
+UniformBufferArray_t                             gUniformLightPoint;
+UniformBufferArray_t                             gUniformLightCone;
+UniformBufferArray_t                             gUniformLightCapsule;
 
 std::unordered_map< Light_t*, Handle >           gLightBuffers;
 
@@ -100,6 +100,9 @@ static ResourceList< Model* >                    gModels;
 static std::unordered_map< std::string, Handle > gModelPaths;
 
 // --------------------------------------------------------------------------------------
+
+size_t                                           gModelDrawCalls = 0;
+size_t                                           gVertsDrawn = 0;
 
 
 // TEMP LIGHTING - WILL BE DEFINED IN MAP FORMAT LATER
@@ -355,7 +358,7 @@ bool Graphics_CreateLightInfoLayout( UniformBufferArray_t& srBuffer, const char*
 }
 
 
-bool Graphics_CreateLightLayout( LightUniformBuffer_t& srBuffer, const char* spLayoutName, const char* spSetName )
+bool Graphics_CreateLightLayout( UniformBufferArray_t& srBuffer, const char* spLayoutName, const char* spSetName )
 {
 	CreateVariableDescLayout_t createLayout{};
 	createLayout.apName   = spLayoutName;
@@ -420,7 +423,7 @@ bool Graphics_UpdateLightLayout( LightUniformBuffer_t& srBuffer, const char* spB
 #endif
 
 
-Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
+Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
 	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
 
@@ -441,7 +444,7 @@ Handle Graphics_AddLightBuffer( LightUniformBuffer_t& srBuffer, const char* spBu
 
 	for ( const auto& [ light, bufferHandle ] : gLightBuffers )
 	{
-		if ( light->aType == srBuffer.aLightType )
+		if ( light->aType == spLight->aType )
 			update.aBuffers.push_back( bufferHandle );
 	}
 
@@ -683,10 +686,7 @@ bool Graphics_Init()
 
 	// TEMP: make a world light
 	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
-	gpWorldLight->aColor = { 0.5, 1.0, 0.5 };
-	// gpWorldLight->aDir   = { 1.0, 0.5, 1.5, 0.f };
-
-	Graphics_UpdateLight( gpWorldLight );
+	gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
 
 	return render->InitImGui( gRenderPassGraphics );
 	// return render->InitImGui( gRenderPassGraphics );
@@ -745,8 +745,8 @@ void Graphics_CmdDrawModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 			0
 		);
 
-	// gModelDrawCalls++;
-	// gVertsDrawn += renderable->GetSurfaceVertexData( matIndex ).aCount;
+	gModelDrawCalls++;
+	gVertsDrawn += mesh.aVertexData.aCount;
 }
 
 
@@ -801,7 +801,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader )
 {
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to bind shader\n" );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", Graphics_GetShaderName( shader ) );
 		return;
 	}
 
@@ -960,8 +960,14 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aFov.x = glm::radians( spLight->aInnerFov );
 			light.aFov.y = glm::radians( spLight->aOuterFov );
 
+			Transform temp{};
+			temp.aPos = spLight->aPos;
+			temp.aAng = spLight->aAng;
+			
 			glm::mat4 matrix;
-			ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			matrix = temp.ToViewMatrixZ();
+			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
 
 			GetDirectionVectors( matrix, light.aDir );
 
@@ -998,7 +1004,13 @@ void Graphics_PrepareDrawData()
 	// 
 	// ImGui::Text( Vec2Str( gpWorldLight->aDir ).c_str() );
 
+	ImGui::Text( "Model Draw Calls: %zd", gModelDrawCalls );
+	ImGui::Text( "Verts Drawn: %zd", gVertsDrawn );
+
 	ImGui::Render();
+
+	gModelDrawCalls = 0;
+	gVertsDrawn     = 0;
 
 	for ( const auto& mat : gDirtyMaterials )
 	{
@@ -1428,25 +1440,6 @@ void Graphics_CreateIndexBuffer( Mesh& srMesh, const char* spDebugName )
 // Lighting
 
 
-template< typename T >
-T* Graphics_CreateLightInternal( LightUniformBuffer_t& srBuffer, const char* spName, std::vector< T* >& srLights, std::vector< T* >& srDirty )
-{
-	T* light = new T;
-	srLights.push_back( light );
-	// Graphics_AddLightBuffer( srBuffer, spName, sizeof( T ), light );
-	gNeedLightInfoUpdate = true;
-	srDirty.push_back( light );
-	return light;
-}
-
-
-template< typename T >
-void Graphics_UpdateLightInternal( std::vector< T* >& srDirty, T* spLight )
-{
-	if ( spLight )
-		srDirty.push_back( spLight );
-}
-
 Light_t* Graphics_CreateLight( ELightType sType )
 {
 	Light_t* light       = new Light_t;
@@ -1486,25 +1479,5 @@ void Graphics_DestroyLight( Light_t* spLight )
 	vec_remove_if( gDirtyLights, spLight );
 
 	delete spLight;
-}
-
-
-// ---------------------------------------------------------------------------------------
-// Render Targets
-
-
-struct CreateRenderTarget2_t
-{
-	Handle aRenderPass;
-};
-
-
-// RenderTarget_t Graphics_CreateRenderTarget( const CreateRenderTarget2_t& srCreate )
-void Graphics_CreateRenderTarget( const CreateRenderTarget2_t& srCreate )
-{
-	CreateFramebuffer_t createBuf{};
-	createBuf.aRenderPass = srCreate.aRenderPass;
-
-	Handle buffer         = render->CreateFramebuffer( createBuf );
 }
 
