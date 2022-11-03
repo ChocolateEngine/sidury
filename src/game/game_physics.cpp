@@ -434,8 +434,6 @@ GamePhysics::~GamePhysics()
 
 void GamePhysics::Init()
 {
-	GET_SYSTEM_ASSERT( ch_physics, Ch_IPhysics );
-
 	Phys_DebugInit();
 
 	gPhysDebugFuncs.apDrawLine          = Phys_DrawLine;

@@ -1,7 +1,12 @@
 #include "../../src/game/main.h"
 
 #include "core/profiler.h"
-#include "ch_iengine.h"
+
+#include "iinput.h"
+#include "render/irender.h"
+#include "igui.h"
+#include "iaudio.h"
+#include "physics/iphysics.h"
 
 #include "imgui/imgui.h"
 
@@ -10,11 +15,40 @@
 #include <functional>
 
 GameSystem *gamesystem = new GameSystem;
-Ch_IEngine *engine     = 0;
+static bool gRunning   = true;
 
 CONVAR( en_max_frametime, 0.1 );
 CONVAR( en_timescale, 1 );
 CONVAR( en_fps_max, 0 );
+
+
+CONCMD( exit )
+{
+	gRunning = false;
+}
+
+CONCMD( quit )
+{
+	gRunning = false;
+}
+
+
+extern BaseGuiSystem*   gui;
+extern IRender*         render;
+extern BaseInputSystem* input;
+extern BaseAudioSystem* audio;
+extern Ch_IPhysics*     ch_physics;
+
+
+static AppModules_t gAppModules[] = 
+{
+	{ (void**)&input,      "input",       IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (void**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_HASH },
+	{ (void**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
+	{ (void**)&audio,      "aduio",       IADUIO_NAME, IADUIO_HASH },
+	{ (void**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
+};
+
 
 extern "C"
 {
@@ -22,42 +56,18 @@ extern "C"
 	{
 		if ( Args_Find( "-debugger" ) )
 			sys_wait_for_debugger();
-		
-		Module pHandle;
-		Ch_IEngine *( *cengine_get )() = 0;
 
-		std::string path = FileSys_FindFile( "engine" EXT_DLL );
-
-		if ( path == "" )
-		{
-			Log_Fatal( "Couldn't find engine" EXT_DLL "!\n" );
-			return;
-		}
-
-		if ( !( pHandle = SDL_LoadObject( path.c_str() ) ) )
-		{
-			Log_FatalF( "Failed to load engine: %s!\n", SDL_GetError() );
-			return;
-		}
-		*( void** )( &cengine_get ) = SDL_LoadFunction( pHandle, "cengine_get" );
-		if ( !cengine_get )
-		{
-			Log_FatalF( "Failed to load engine's entry point: %s!\n", SDL_GetError() );
-			return;
-		}
-
+		// Needs to be done before Renderer is loaded
 		ImGui::CreateContext();
 
-		engine = cengine_get();
-
 		// Load Modules and Initialize them in this order
-		engine->Init({
-			"input",
-			"ch_graphics",
-			"ch_gui",
-			"aduio",
-			"ch_physics",
-		});
+		if ( !Mod_AddSystems( gAppModules, ARR_SIZE( gAppModules ) ) )
+		{
+			Log_Error( "Failed to Load Systems\n" );
+			return;
+		}
+
+		Mod_InitSystems();
 
 		gamesystem->Init();
 
@@ -70,7 +80,10 @@ extern "C"
 		
 		auto startTime = std::chrono::high_resolution_clock::now();
 
-		while ( engine->IsActive() )
+		// -------------------------------------------------------------------
+		// Main Loop
+
+		while ( gRunning )
 		{
 			// ZoneScoped
 			PROF_SCOPE();
@@ -107,9 +120,5 @@ extern "C"
 
 			profile_end_frame();
 		}
-
-		delete engine;
-
-		SDL_UnloadObject( pHandle );
 	}
 }

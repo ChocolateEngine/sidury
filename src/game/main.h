@@ -50,13 +50,12 @@ public:
 	GameSystem();
 	~GameSystem();
 
-	void Init() override;
+	bool Init() override;
 	void Update( float frameTime ) override;
 };
 
 extern GameSystem* game;
 
-void               Game_LoadModules();
 void               Game_RegisterKeys();
 
 bool               Game_InMap();

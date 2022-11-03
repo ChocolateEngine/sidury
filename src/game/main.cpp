@@ -258,14 +258,13 @@ void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, U
 #endif
 
 
-void GameSystem::Init()
+bool GameSystem::Init()
 {
-	Game_LoadModules();
 	Game_RegisterKeys();
 	Game_UpdateProjection();
 
 	if ( !Graphics_Init() )
-		return;
+		return false;
 
 #ifdef _WIN32
 	SDL_SetWindowsMessageHook( Game_WindowMessageHook, nullptr );
@@ -276,6 +275,8 @@ void GameSystem::Init()
 #if AUDIO_OPENAL
 	hAudioMusic = audio->RegisterChannel( "Music" );
 #endif
+
+	gamephys.Init();
 
 	LightEditor_Init();
 
@@ -298,6 +299,7 @@ void GameSystem::Init()
 	players->Spawn( gLocalPlayer );
 
 	Log_Msg( "Game Loaded!\n" );
+	return true;
 }
 
 
@@ -329,17 +331,6 @@ void Game_RegisterKeys()
 	input->RegisterKey( SDL_SCANCODE_Y ); // create a cone light
 
 	gameinput.Init();
-}
-
-
-void Game_LoadModules(  )
-{
-	GET_SYSTEM_CHECK( gui, BaseGuiSystem );
-	GET_SYSTEM_CHECK( render, IRender );
-	GET_SYSTEM_CHECK( input, BaseInputSystem );
-	GET_SYSTEM_CHECK( audio, BaseAudioSystem );
-
-	gamephys.Init();
 }
 
 
