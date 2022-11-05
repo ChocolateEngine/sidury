@@ -144,8 +144,8 @@ Handle Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate )
 		createData.aUsage  = EImageUsage_Sampled;
 
 		// create fallback textures
-		gFallbackAO        = render->LoadTexture( gpFallbackAOPath, createData );
-		gFallbackEmissive  = render->LoadTexture( gpFallbackEmissivePath, createData );
+		render->LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
+		render->LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
 	}
 
 	return gPipeline;

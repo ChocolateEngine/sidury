@@ -112,10 +112,14 @@ void LoadObj_Tiny( const std::string& srBasePath, const std::string &srPath, Mod
 			{
 				if ( !texname.empty() )
 				{
+					Handle texture = InvalidHandle;
+
 					if ( FileSys_IsRelative( texname ) )
-						Mat_SetVar( material, param, render->LoadTexture( baseDir2 + "/" + texname, createData ) );
+						render->LoadTexture( texture, baseDir2 + "/" + texname, createData );
 					else
-						Mat_SetVar( material, param, render->LoadTexture( texname, createData ) );
+						render->LoadTexture( texture, texname, createData );
+
+					Mat_SetVar( material, param, texture );
 				}
 			};
 

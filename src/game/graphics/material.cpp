@@ -385,7 +385,8 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				createData.aUsage  = EImageUsage_Sampled;
 				createData.aFilter = EImageFilter_Linear;
 
-				Mat_SetVar( handle, cur.apName, render->LoadTexture( cur.apString, createData ) );
+				Handle texture     = InvalidHandle;
+				Mat_SetVar( handle, cur.apName, render->LoadTexture( texture, cur.apString, createData ) );
 				break;
 			}
 
@@ -538,5 +539,11 @@ void Graphics_SetAllMaterialsDirty()
 
 	for ( const auto& [ mat, shader ] : gMaterialShaders )
 		gDirtyMaterials.emplace( mat );
+}
+
+
+CONCMD( r_mark_all_materials_dirty )
+{
+	Graphics_SetAllMaterialsDirty();
 }
 

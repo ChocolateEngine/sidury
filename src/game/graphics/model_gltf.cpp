@@ -254,11 +254,14 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 
 				// TODO: use std::string_view
 				const std::string texName = texture->name;
+				Handle            handle = InvalidHandle;
 
 				if ( FileSys_IsRelative( texName ) )
-					Mat_SetVar( material, param, render->LoadTexture( baseDir2 + "/" + texName, createData ) );
+					render->LoadTexture( handle, baseDir2 + "/" + texName, createData );
 				else
-					Mat_SetVar( material, param, render->LoadTexture( texName, createData ) );
+					render->LoadTexture( handle, texName, createData );
+
+				Mat_SetVar( material, param, handle );
 			};
 
 			if ( gltfMat.has_pbr_metallic_roughness )

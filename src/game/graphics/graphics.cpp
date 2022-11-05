@@ -124,6 +124,13 @@ CONVAR( r_world_dir_y, 35 );
 CONVAR( r_world_dir_z, 0 );
 
 
+CONCMD( r_reload_textures )
+{
+	render->ReloadTextures();
+	// Graphics_SetAllMaterialsDirty();
+}
+
+
 Handle Graphics_LoadModel( const std::string& srPath )
 {
 	// Have we loaded this model already?
@@ -871,12 +878,22 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Directional:
 		{
 			UBO_LightDirectional_t light;
-			light.aColor.x = spLight->aColor.y;
+			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
 			light.aColor.w = 1.f;
 
-			Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			Transform temp{};
+			temp.aAng = spLight->aAng;
+
+			glm::mat4 matrix;
+			ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			// matrix = temp.ToViewMatrixZ();
+			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
+
+			GetDirectionVectors( matrix, light.aDir );
+
+			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -884,7 +901,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Point:
 		{
 			UBO_LightPoint_t light;
-			light.aColor.x = spLight->aColor.y;
+			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
 			light.aColor.w = 1.f;
@@ -898,7 +915,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Cone:
 		{
 			UBO_LightCone_t light;
-			light.aColor.x = spLight->aColor.y;
+			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
 			light.aColor.w = 1.f;
@@ -927,7 +944,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Capsule:
 		{
 			UBO_LightCapsule_t light;
-			light.aColor.x   = spLight->aColor.y;
+			light.aColor.x   = spLight->aColor.x;
 			light.aColor.y   = spLight->aColor.y;
 			light.aColor.z   = spLight->aColor.z;
 			light.aColor.w   = 1.f;
@@ -947,6 +964,8 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 void Graphics_PrepareDrawData()
 {
+	render->PreRenderPass();
+	
 	// glm::vec3 ang( r_world_dir_x.GetFloat(), r_world_dir_y.GetFloat(), r_world_dir_z.GetFloat() );
 	// 
 	// Util_GetDirectionVectors( ang, nullptr, nullptr, &gpWorldLight->aDir );
