@@ -14,11 +14,8 @@ constexpr const char*                       gpVertShader           = "shaders/sk
 constexpr const char*                       gpFragShader           = "shaders/skybox.frag.spv";
 
 // descriptor set layouts
-extern Handle                               gLayoutSampler;
-extern Handle                               gLayoutViewProj;
-
-extern Handle                               gLayoutSamplerSets[ 2 ];
-extern Handle                               gLayoutViewProjSets[ 2 ];
+extern UniformBufferArray_t                 gUniformSampler;
+extern UniformBufferArray_t                 gUniformViewInfo;
 
 // Material Handle, Buffer
 static std::unordered_map< Handle, Handle > gMaterialBuffers;
@@ -46,7 +43,7 @@ Handle Shader_Skybox_Create( Handle sRenderPass, bool sRecreate )
 	PipelineLayoutCreate_t   pipelineCreateInfo{};
 	GraphicsPipelineCreate_t pipelineInfo{};
 
-	pipelineCreateInfo.aLayouts.push_back( gLayoutSampler );
+	pipelineCreateInfo.aLayouts.push_back( gUniformSampler.aLayout );
 	pipelineCreateInfo.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ) );
 
 	// --------------------------------------------------------------
@@ -73,16 +70,17 @@ Handle Shader_Skybox_Create( Handle sRenderPass, bool sRecreate )
 
 	// --------------------------------------------------------------
 
-	if ( sRecreate )
+	if ( !render->CreatePipelineLayout( gPipelineLayout, pipelineCreateInfo ) )
 	{
-		render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
-		render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
+		Log_Error( "Failed to create Pipeline Layout\n" );
+		return InvalidHandle;
 	}
-	else
+
+	pipelineInfo.aPipelineLayout = gPipelineLayout;
+	if ( !render->CreateGraphicsPipeline( gPipeline, pipelineInfo ) )
 	{
-		gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
-		pipelineInfo.aPipelineLayout = gPipelineLayout;
-		gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
+		Log_Error( "Failed to create Graphics Pipeline\n" );
+		return InvalidHandle;
 	}
 
 	return gPipeline;
@@ -120,7 +118,7 @@ void Shader_Skybox_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 
 void Shader_Skybox_Bind( Handle cmd, size_t sCmdIndex )
 {
-	Handle descSets[] = { gLayoutSamplerSets[ sCmdIndex ] };
+	Handle descSets[] = { gUniformSampler.aSets[ sCmdIndex ] };
 	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, descSets, 1 );
 }
 

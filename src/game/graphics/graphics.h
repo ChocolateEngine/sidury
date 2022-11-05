@@ -225,28 +225,31 @@ struct LightInfo_t
 // Light Types
 struct UBO_LightDirectional_t
 {
-	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec4 aColor{};
 	alignas( 16 ) glm::vec3 aDir{};
+	// int aShadow = -1;
 };
 
 struct UBO_LightPoint_t
 {
-	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec4 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
-	float     aRadius = 0.f;
+	float aRadius = 0.f;
+	// int   aShadow = -1;
 };
 
 struct UBO_LightCone_t
 {
-	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec4 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
 	alignas( 16 ) glm::vec3 aDir{};
 	alignas( 16 ) glm::vec2 aFov{};
+	int aShadow = -1;
 };
 
 struct UBO_LightCapsule_t
 {
-	alignas( 16 ) glm::vec3 aColor{};
+	alignas( 16 ) glm::vec4 aColor{};
 	alignas( 16 ) glm::vec3 aPos{};
 	alignas( 16 ) glm::vec3 aDir{};
 	float     aLength    = 0.f;
@@ -264,6 +267,7 @@ struct Light_t
 	float      aOuterFov = 45.f;
 	float      aRadius   = 0.f;
 	float      aLength   = 0.f;
+	bool       aShadow   = true;
 };
 
 struct UniformBufferArray_t
@@ -325,14 +329,13 @@ struct ShaderInfo_t
 // DO NOT ADD ANY LOCAL VARIABLES TO THIS WHEN YOU OVERRIDE IT !!!
 struct IShader
 {
-	// Must Override
-	
 	// Returns the shader name, and fills in data in the struct with general shader info 
-	virtual const char* GetShaderInfo( ShaderInfo_t& srInfo ) = 0;
+	virtual const char* GetShaderInfo( ShaderInfo_t& srInfo )                                             = 0;
 
-	virtual void GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
-	{
-	}
+	// Shader Creation Info
+	virtual void        GetPushConstantData( std::vector< PushConstantRange_t >& srPushConstants )        = 0;
+
+	virtual void        GetGraphicsCreateInfo( Handle sRenderPass, GraphicsPipelineCreate_t& srGraphics ) = 0;
 
 	// Optional to override
 	// Used if the shader has the push constants flag
@@ -436,6 +439,7 @@ const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::ve
 bool               Graphics_ShaderInit( bool sRecreate );
 Handle             Graphics_GetShader( std::string_view sName );
 const char*        Graphics_GetShaderName( Handle sShader );
+void               Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags );
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();

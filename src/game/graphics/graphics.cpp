@@ -25,12 +25,10 @@ void                         Graphics_LoadGltf( const std::string& srBasePath, c
 
 // shaders, fun
 void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
-
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
-void                         Shader_DeferredFS_Draw( Handle cmd, size_t sCmdIndex );
 
 // --------------------------------------------------------------------------------------
-// Rendering
+// General Rendering
 
 // TODO: rethink this so you can have draw ordering
 static std::unordered_map<
@@ -43,31 +41,22 @@ static size_t                                    gCmdIndex = 0;
 
 Handle                                           gRenderPassGraphics;
 
-static glm::mat4                                 gViewProjMat;
-static bool                                      gViewProjMatUpdate = false;
-static std::vector< Handle >                     gViewProjBuffers( 1 );
-
 // stores backbuffer color and depth
 static Handle                                    gBackBuffer[ 2 ];
 static Handle                                    gBackBufferTex[ 3 ];
 
-// descriptor set layouts
-Handle                                           gLayoutSampler         = InvalidHandle;
-Handle                                           gLayoutViewProj        = InvalidHandle;
-Handle                                           gLayoutMaterialBasic3D = InvalidHandle;  // blech
-
 // descriptor sets
-Handle                                           gLayoutSamplerSets[ 2 ];
-Handle                                           gLayoutViewProjSets[ 2 ];
-Handle*                                          gLayoutLightSets;
-Handle*                                          gLayoutMaterialBasic3DSets;
+UniformBufferArray_t                             gUniformSampler;
+UniformBufferArray_t                             gUniformViewInfo;
+UniformBufferArray_t                             gUniformMaterialBasic3D;
 constexpr u32                                    MAX_MATERIALS_BASIC3D = 500;
 
 extern std::set< Handle >                        gDirtyMaterials;
 
-static bool                                      gDrawingSkybox = false;
 static Handle                                    gSkyboxShader  = InvalidHandle;
 
+static glm::mat4                                 gViewProjMat;
+static std::vector< Handle >                     gViewInfoBuffers( 1 );
 ViewInfo_t                                       gViewInfo;
 bool                                             gViewInfoUpdate = false;
 
@@ -94,12 +83,36 @@ Light_t*                                         gpWorldLight         = nullptr;
 static bool                                      gNeedLightInfoUpdate = false;
 
 // --------------------------------------------------------------------------------------
+// Shadow Mapping
+
+struct ShadowPass_t
+{
+	Handle     aPass         = InvalidHandle;
+	Handle     aTexture[ 2 ] = { InvalidHandle, InvalidHandle };
+	glm::ivec2 aSize{};
+};
+
+struct Push_Shadow_t
+{
+	// model matrix
+	// view * projection
+};
+
+struct UBO_Shadow_t
+{
+};
+
+std::unordered_map< Light_t*, ShadowPass_t >     gLightShadows;
+UniformBufferArray_t                             gUniformShadows;
+
+// --------------------------------------------------------------------------------------
 // Assets
 
 static ResourceList< Model* >                    gModels;
 static std::unordered_map< std::string, Handle > gModelPaths;
 
 // --------------------------------------------------------------------------------------
+// Other
 
 size_t                                           gModelDrawCalls = 0;
 size_t                                           gVertsDrawn = 0;
@@ -325,65 +338,32 @@ bool Graphics_CreateRenderPasses()
 }
 
 
-bool Graphics_CreateLightInfoLayout( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize )
-{
-	CreateVariableDescLayout_t createLayout{};
-	createLayout.apName   = "Light Info Layout";
-	createLayout.aType    = EDescriptorType_UniformBuffer;
-	createLayout.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
-	createLayout.aBinding = 0;
-	createLayout.aCount   = 1;
-
-	srBuffer.aLayout      = render->CreateVariableDescLayout( createLayout );
-
-	if ( srBuffer.aLayout == InvalidHandle )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create Light Layout\n" );
-		return false;
-	}
-
-	AllocVariableDescLayout_t allocLayout{};
-	allocLayout.apName    = "Light Info Set";
-	allocLayout.aLayout   = srBuffer.aLayout;
-	allocLayout.aCount    = 1;
-	allocLayout.aSetCount = srBuffer.aSets.size();
-
-	if ( !render->AllocateVariableDescLayout( allocLayout, srBuffer.aSets.data() ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate Light Layout\n" );
-		return false;
-	}
-
-	return true;
-}
-
-
-bool Graphics_CreateLightLayout( UniformBufferArray_t& srBuffer, const char* spLayoutName, const char* spSetName )
+bool Graphics_CreateVariableUniformLayout( UniformBufferArray_t& srBuffer, const char* spLayoutName, const char* spSetName, int sCount )
 {
 	CreateVariableDescLayout_t createLayout{};
 	createLayout.apName   = spLayoutName;
 	createLayout.aType    = EDescriptorType_UniformBuffer;
 	createLayout.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
 	createLayout.aBinding = 0;
-	createLayout.aCount   = MAX_LIGHTS;
+	createLayout.aCount   = sCount;
 
 	srBuffer.aLayout      = render->CreateVariableDescLayout( createLayout );
 
 	if ( srBuffer.aLayout == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create Light Layout\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to create variable desc layout\n" );
 		return false;
 	}
 
 	AllocVariableDescLayout_t allocLayout{};
 	allocLayout.apName    = spSetName;
 	allocLayout.aLayout   = srBuffer.aLayout;
-	allocLayout.aCount    = MAX_LIGHTS;
+	allocLayout.aCount    = sCount;
 	allocLayout.aSetCount = srBuffer.aSets.size();
 
 	if ( !render->AllocateVariableDescLayout( allocLayout, srBuffer.aSets.data() ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate Light Layout\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to allocate variable desc layout\n" );
 		return false;
 	}
 
@@ -391,11 +371,10 @@ bool Graphics_CreateLightLayout( UniformBufferArray_t& srBuffer, const char* spL
 }
 
 
-#if 0
-bool Graphics_UpdateLightLayout( LightUniformBuffer_t& srBuffer, const char* spBufferName, size_t sBufferSize )
+bool Graphics_CreateUniformBuffers( UniformBufferArray_t& srUniform, std::vector< Handle >& srBuffers, const char* spBufferName, size_t sBufferSize )
 {
 	// create buffers for it
-	for ( size_t i = 0; i < srBuffer.aBuffers.size(); i++ )
+	for ( size_t i = 0; i < srBuffers.size(); i++ )
 	{
 		Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
 
@@ -405,22 +384,21 @@ bool Graphics_UpdateLightLayout( LightUniformBuffer_t& srBuffer, const char* spB
 			return false;
 		}
 
-		srBuffer.aBuffers[ i ] = buffer;
+		srBuffers[ i ] = buffer;
 	}
 
 	// update the descriptor sets
 	UpdateVariableDescSet_t update{};
 
-	for ( size_t i = 0; i < srBuffer.aSets.size(); i++ )
-		update.aDescSets.push_back( srBuffer.aSets[ i ] );
+	for ( size_t i = 0; i < srUniform.aSets.size(); i++ )
+		update.aDescSets.push_back( srUniform.aSets[ i ] );
 
 	update.aType    = EDescriptorType_UniformBuffer;
-	update.aBuffers = srBuffer.aBuffers;
+	update.aBuffers = srBuffers;
 	render->UpdateVariableDescSet( update );
 
 	return true;
 }
-#endif
 
 
 Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
@@ -458,118 +436,77 @@ bool Graphics_CreateDescriptorSets()
 {
 	// TODO: just create the sampler here and have a
 	// Graphics_LoadTexture() function to auto add to the image sampler sets
-	gLayoutSampler = render->GetSamplerLayout();
-	render->GetSamplerSets( gLayoutSamplerSets );
+	gUniformSampler.aLayout = render->GetSamplerLayout();
+	gUniformSampler.aSets.resize( 2 );
+	render->GetSamplerSets( gUniformSampler.aSets.data() );
 
 	// ------------------------------------------------------
 	// Create ViewInfo UBO
 	{
-		CreateVariableDescLayout_t createViewProj{};
-		createViewProj.aType    = EDescriptorType_UniformBuffer;
-		createViewProj.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
-		createViewProj.aBinding = 0;
-		createViewProj.aCount   = 2;
-
-		gLayoutViewProj         = render->CreateVariableDescLayout( createViewProj );
-
-		if ( gLayoutViewProj == InvalidHandle )
-		{
-			Log_Error( gLC_ClientGraphics, "Failed to create ViewProj UBO Layout\n" );
+		gUniformViewInfo.aSets.resize( 2 );
+		if ( !Graphics_CreateVariableUniformLayout( gUniformViewInfo, "View Info Layout", "View Info Set", 1 ) )
 			return false;
-		}
-
-		AllocVariableDescLayout_t allocViewProj{};
-		allocViewProj.aLayout   = gLayoutViewProj;
-		allocViewProj.aCount    = gViewProjBuffers.size();
-		allocViewProj.aSetCount = 2;
-
-		if ( !render->AllocateVariableDescLayout( allocViewProj, gLayoutViewProjSets ) )
-		{
-			Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout\n" );
-			return false;
-		}
 
 		// create buffer for it
 		// (NOTE: not changing this from a std::vector cause you could use this for multiple views in the future probably)
-		for ( u32 i = 0; i < gViewProjBuffers.size(); i++ )
+		for ( u32 i = 0; i < gViewInfoBuffers.size(); i++ )
 		{
 			Handle buffer = render->CreateBuffer( "View Info Buffer", sizeof( ViewInfo_t ), EBufferFlags_Uniform, EBufferMemory_Host );
 
 			if ( buffer == InvalidHandle )
 			{
-				Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
+				Log_Error( gLC_ClientGraphics, "Failed to Create View Info Uniform Buffer\n" );
 				return false;
 			}
 
-			gViewProjBuffers[ i ] = buffer;
+			gViewInfoBuffers[ i ] = buffer;
 		}
 
 		// update the material descriptor sets
 		UpdateVariableDescSet_t update{};
 
 		// what
-		update.aDescSets.push_back( gLayoutViewProjSets[ 0 ] );
-		update.aDescSets.push_back( gLayoutViewProjSets[ 1 ] );
+		update.aDescSets.push_back( gUniformViewInfo.aSets[ 0 ] );
+		update.aDescSets.push_back( gUniformViewInfo.aSets[ 1 ] );
 
 		update.aType    = EDescriptorType_UniformBuffer;
-		update.aBuffers = gViewProjBuffers;
+		update.aBuffers = gViewInfoBuffers;
 		render->UpdateVariableDescSet( update );
 	}
 
 	// ------------------------------------------------------
 	// Create Light Layouts
-	{
-		gUniformLightInfo.aSets.resize( 1 );
-		if ( !Graphics_CreateLightInfoLayout( gUniformLightInfo, "Light Info Buffer", sizeof( LightInfo_t ) ) )
-			return false;
 
-		gUniformLightDirectional.aSets.resize( 1 );
-		if ( !Graphics_CreateLightLayout( gUniformLightDirectional, "Light Directional Layout", "Light Directional Set" ) )
-			return false;
+	gUniformLightInfo.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLightInfo, "Light Info Layout", "Light Info Set", 1 ) )
+		return false;
 
-		gUniformLightPoint.aSets.resize( 1 );
-		if ( !Graphics_CreateLightLayout( gUniformLightPoint, "Light Point Layout", "Light Point Set" ) )
-			return false;
+	gUniformLightDirectional.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLightDirectional, "Light Directional Layout", "Light Directional Set", MAX_LIGHTS ) )
+		return false;
 
-		gUniformLightCone.aSets.resize( 1 );
-		if ( !Graphics_CreateLightLayout( gUniformLightCone, "Light Cone Layout", "Light Cone Set" ) )
-			return false;
+	gUniformLightPoint.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLightPoint, "Light Point Layout", "Light Point Set", MAX_LIGHTS ) )
+		return false;
 
-		gUniformLightCapsule.aSets.resize( 1 );
-		if ( !Graphics_CreateLightLayout( gUniformLightCapsule, "Light Capsule Layout", "Light Capsule Set" ) )
-			return false;
-	}
+	gUniformLightCone.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLightCone, "Light Cone Layout", "Light Cone Set", MAX_LIGHTS ) )
+		return false;
+
+	gUniformLightCapsule.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLightCapsule, "Light Capsule Layout", "Light Capsule Set", MAX_LIGHTS ) )
+		return false;
+
+	gUniformShadows.aSets.resize( 1 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformShadows, "Shadow Map Layout", "Shadow Map Set", MAX_LIGHTS ) )
+		return false;
 
 	// ------------------------------------------------------
 	// Create Material Buffers for Basic3D shader
 
-	CreateVariableDescLayout_t createBasic3DMat{};
-	createBasic3DMat.aType           = EDescriptorType_UniformBuffer;
-	createBasic3DMat.aStages         = ShaderStage_Vertex | ShaderStage_Fragment;
-	createBasic3DMat.aBinding        = 0;
-	createBasic3DMat.aCount          = MAX_MATERIALS_BASIC3D;
-
-	gLayoutMaterialBasic3D           = render->CreateVariableDescLayout( createBasic3DMat );
-
-	if ( gLayoutMaterialBasic3D == InvalidHandle )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create Basic 3D Material Layout\n" );
+	gUniformMaterialBasic3D.aSets.resize( 2 );
+	if ( !Graphics_CreateVariableUniformLayout( gUniformMaterialBasic3D, "Basic3D Materials Layout", "Basic3D Materials Set", MAX_MATERIALS_BASIC3D ) )
 		return false;
-	}
-
-	AllocVariableDescLayout_t allocBasic3DMat{};
-	allocBasic3DMat.aLayout    = gLayoutMaterialBasic3D;
-	allocBasic3DMat.aCount     = MAX_MATERIALS_BASIC3D; // max materials for basic 3d
-	allocBasic3DMat.aSetCount  = 2;
-
-	// wtf
-	gLayoutMaterialBasic3DSets = new Handle[ MAX_MATERIALS_BASIC3D ];
-
-	if ( !render->AllocateVariableDescLayout( allocBasic3DMat, gLayoutMaterialBasic3DSets ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate Basic 3D Material Layout\n" );
-		return false;
-	}
 
 	return true;
 }
@@ -709,7 +646,6 @@ void Graphics_NewFrame()
 	render->NewFrame();
 
 	gMeshDrawList.clear();
-	gDrawingSkybox = false;
 }
 
 
@@ -935,7 +871,10 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Directional:
 		{
 			UBO_LightDirectional_t light;
-			light.aColor = spLight->aColor;
+			light.aColor.x = spLight->aColor.y;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = 1.f;
 
 			Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 
@@ -945,7 +884,11 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Point:
 		{
 			UBO_LightPoint_t light;
-			light.aColor  = spLight->aColor;
+			light.aColor.x = spLight->aColor.y;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = 1.f;
+
 			light.aPos    = spLight->aPos;
 			light.aRadius = spLight->aRadius;
 
@@ -955,7 +898,11 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Cone:
 		{
 			UBO_LightCone_t light;
-			light.aColor = spLight->aColor;
+			light.aColor.x = spLight->aColor.y;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = 1.f;
+
 			light.aPos   = spLight->aPos;
 			light.aFov.x = glm::radians( spLight->aInnerFov );
 			light.aFov.y = glm::radians( spLight->aOuterFov );
@@ -980,7 +927,11 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		case ELightType_Capsule:
 		{
 			UBO_LightCapsule_t light;
-			light.aColor     = spLight->aColor;
+			light.aColor.x   = spLight->aColor.y;
+			light.aColor.y   = spLight->aColor.y;
+			light.aColor.z   = spLight->aColor.z;
+			light.aColor.w   = 1.f;
+
 			light.aPos       = spLight->aPos;
 			light.aLength    = spLight->aLength;
 			light.aThickness = spLight->aRadius;
@@ -1039,8 +990,8 @@ void Graphics_PrepareDrawData()
 	if ( gViewInfoUpdate )
 	{
 		gViewInfoUpdate = false;
-		for ( size_t i = 0; i < gViewProjBuffers.size(); i++ )
-			render->MemWriteBuffer( gViewProjBuffers[ i ], sizeof( ViewInfo_t ), &gViewInfo );
+		for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
+			render->MemWriteBuffer( gViewInfoBuffers[ i ], sizeof( ViewInfo_t ), &gViewInfo );
 	}
 
 	Shader_ResetPushData();
@@ -1167,10 +1118,7 @@ void Graphics_DrawModel( ModelDraw_t* spDrawInfo )
 		}
 
 		Handle shader = Mat_GetShader( mat );
-		gMeshDrawList[ shader ].emplace_front( spDrawInfo, i );
-
-		if ( shader == gSkyboxShader )
-			gDrawingSkybox = true;
+		gMeshDrawList[ shader ].push_front({ spDrawInfo, i });
 	}
 }
 

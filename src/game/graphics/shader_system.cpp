@@ -20,20 +20,13 @@ static std::unordered_map< Handle, Handle >             gShaderMaterials;  // [s
 // static Handle                                    gPipeline       = InvalidHandle;
 // static Handle                                    gPipelineLayout = InvalidHandle;
 
-// descriptor set layouts
-extern Handle                                           gLayoutSampler;
-// extern Handle                                    gLayoutStorage;
-extern Handle                                           gLayoutViewProj;
-// extern Handle                                           gLayoutModelMatrix;
-
 extern Handle                                           gRenderPassGraphics;
 
-extern Handle                                           gLayoutSamplerSets[ 2 ];
-extern Handle                                           gLayoutViewProjSets[ 2 ];
-extern Handle*                                          gLayoutMaterialBasic3DSets;
-
+// descriptor set layouts
+extern UniformBufferArray_t                             gUniformSampler;
+extern UniformBufferArray_t                             gUniformViewInfo;
+extern UniformBufferArray_t                             gUniformMaterialBasic3D;
 extern UniformBufferArray_t                             gUniformLightInfo;
-
 extern UniformBufferArray_t                             gUniformLightDirectional;
 extern UniformBufferArray_t                             gUniformLightPoint;
 extern UniformBufferArray_t                             gUniformLightCone;
@@ -64,18 +57,18 @@ CONCMD( shader_dump )
 // --------------------------------------------------------------------------------------
 
 // shaders, fun
+EShaderFlags Shader_Basic3D_Flags();
 Handle       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_Basic3D_Destroy();
-void         Shader_Basic3D_Bind( Handle cmd, size_t sCmdIndex );
 void         Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
 void         Shader_Basic3D_ResetPushData();
 void         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
 VertexFormat Shader_Basic3D_GetVertexFormat();
 Handle       Shader_Basic3D_GetPipelineLayout();
 
+EShaderFlags Shader_Skybox_Flags();
 Handle       Shader_Skybox_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_Skybox_Destroy();
-void         Shader_Skybox_Bind( Handle cmd, size_t sCmdIndex );
 void         Shader_Skybox_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
 void         Shader_Skybox_ResetPushData();
 void         Shader_Skybox_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
@@ -254,6 +247,54 @@ Handle Shader_GetPipelineLayout( Handle sShader )
 }
 
 
+void Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags )
+{
+	if ( sFlags & EShaderFlags_Sampler )
+		srPipeline.aLayouts.push_back( gUniformSampler.aLayout );
+
+	if ( sFlags & EShaderFlags_ViewInfo )
+		srPipeline.aLayouts.push_back( gUniformViewInfo.aLayout );
+
+	if ( sFlags & EShaderFlags_Lights )
+	{
+		srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
+		srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
+		srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
+		srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
+		srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
+	}
+
+	// if ( sFlags & EShaderFlags_MaterialUniform )
+}
+
+
+bool Graphics_ShaderInit2( bool sRecreate )
+{
+	// Basic 3D Shader
+	{
+		auto flags        = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights;
+		auto bindPoint    = EPipelineBindPoint_Graphics;
+		auto vertexFormat = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
+
+		PipelineLayoutCreate_t pipelineCreateInfo{};
+		Graphics_AddPipelineLayouts( pipelineCreateInfo, flags );
+
+		pipelineCreateInfo.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
+
+		Handle pipelineLayout = InvalidHandle;
+		if ( !render->CreatePipelineLayout( pipelineLayout, pipelineCreateInfo ) )
+		{
+			Log_Error( "Failed to create Pipeline Layout\n" );
+			return false;
+		}
+
+		Graphics_AddShader( "basic_3d", gTempShader, flags, bindPoint );
+	}
+
+	return true;
+}
+
+
 bool Graphics_ShaderInit( bool sRecreate )
 {
 	if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, sRecreate ) ) )
@@ -276,9 +317,7 @@ bool Graphics_ShaderInit( bool sRecreate )
 
 	if ( !sRecreate )
 	{
-		Graphics_AddShader( "basic_3d", gTempShader,
-		                    EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights,
-		                    EPipelineBindPoint_Graphics );
+		Graphics_AddShader( "basic_3d", gTempShader, Shader_Basic3D_Flags(), EPipelineBindPoint_Graphics );
 
 		Graphics_AddShader( "skybox", gSkyboxShader,
 		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
@@ -319,7 +358,7 @@ Handle* Shader_GetMaterialUniform( Handle sShader )
 {
 	// HACK HACK HACK
 	if ( sShader == gTempShader )
-		return gLayoutMaterialBasic3DSets;
+		return gUniformMaterialBasic3D.aSets.data();
 
 	Log_Error( gLC_ClientGraphics, "TODO: PROPERLY IMPLEMENT GETTING SHADER MATERIAL UNIFORM BUFFER!\n" );
 	return nullptr;
@@ -343,19 +382,10 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	std::vector< Handle > descSets;
 
 	if ( shaderFlags & EShaderFlags_Sampler )
-		descSets.push_back( gLayoutSamplerSets[ sIndex ] );
+		descSets.push_back( gUniformSampler.aSets[ sIndex ] );
 
 	if ( shaderFlags & EShaderFlags_ViewInfo )
-		descSets.push_back( gLayoutViewProjSets[ sIndex ] );
-
-	if ( shaderFlags & EShaderFlags_MaterialUniform )
-	{
-		Handle* mats = Shader_GetMaterialUniform( sShader );
-		if ( mats == nullptr )
-			return false;
-
-		descSets.push_back( mats[ sIndex ] );
-	}
+		descSets.push_back( gUniformViewInfo.aSets[ sIndex ] );
 
 	if ( shaderFlags & EShaderFlags_Lights )
 	{
@@ -373,6 +403,15 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 		
 		for ( const auto& set : gUniformLightCapsule.aSets )
 			descSets.push_back( set );
+	}
+
+	if ( shaderFlags & EShaderFlags_MaterialUniform )
+	{
+		Handle* mats = Shader_GetMaterialUniform( sShader );
+		if ( mats == nullptr )
+			return false;
+
+		descSets.push_back( mats[ sIndex ] );
 	}
 
 	if ( descSets.size() )

@@ -3,20 +3,18 @@
 #include "graphics.h"
 
 
-extern IRender*       render;
+extern IRender*             render;
 
-static Handle         gPipeline       = InvalidHandle;
-static Handle         gPipelineLayout = InvalidHandle;
+static Handle               gPipeline       = InvalidHandle;
+static Handle               gPipelineLayout = InvalidHandle;
 
 // constexpr const char* gpVertShader    = "shaders/basic3d.vert.spv";
 // constexpr const char* gpFragShader    = "shaders/basic3d.frag.spv";
 
-constexpr const char* gpVertShader    = "shaders/imgui.vert.spv";
-constexpr const char* gpFragShader    = "shaders/imgui.frag.spv";
+constexpr const char*       gpVertShader    = "shaders/imgui.vert.spv";
+constexpr const char*       gpFragShader    = "shaders/imgui.frag.spv";
 
-// descriptor set layouts
-extern Handle         gLayoutSampler;
-extern Handle         gLayoutSamplerSets[ 2 ];
+extern UniformBufferArray_t gUniformSampler;
 
 struct UI_Push
 {
@@ -39,7 +37,7 @@ static std::unordered_map< Handle, UI_Push > gPushData;
 Handle Shader_UI_Create( Handle sRenderPass, bool sRecreate )
 {
 	PipelineLayoutCreate_t pipelineCreateInfo{};
-	pipelineCreateInfo.aLayouts.push_back( gLayoutSampler );
+	pipelineCreateInfo.aLayouts.push_back( gUniformSampler.aLayout );
 	pipelineCreateInfo.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( UI_Push ) );
 
 	// --------------------------------------------------------------
@@ -62,16 +60,17 @@ Handle Shader_UI_Create( Handle sRenderPass, bool sRecreate )
 
 	// --------------------------------------------------------------
 
-	if ( sRecreate )
+	if ( !render->CreatePipelineLayout( gPipelineLayout, pipelineCreateInfo ) )
 	{
-		render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
-		render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
+		Log_Error( "Failed to create Pipeline Layout\n" );
+		return InvalidHandle;
 	}
-	else
+
+	pipelineInfo.aPipelineLayout = gPipelineLayout;
+	if ( !render->CreateGraphicsPipeline( gPipeline, pipelineInfo ) )
 	{
-		gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
-		pipelineInfo.aPipelineLayout = gPipelineLayout;
-		gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
+		Log_Error( "Failed to create Graphics Pipeline\n" );
+		return InvalidHandle;
 	}
 
 	return gPipeline;
@@ -103,7 +102,7 @@ void Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor )
 	push.index = render->GetTextureIndex( shColor );
 
 	render->CmdPushConstants( cmd, gPipelineLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( UI_Push ), &push );
-	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, &gLayoutSamplerSets[ sCmdIndex ], 1 );
+	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, &gUniformSampler.aSets[ sCmdIndex ], 1 );
 	render->CmdDraw( cmd, 3, 1, 0, 0 );
 }
 

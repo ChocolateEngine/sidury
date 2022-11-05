@@ -20,16 +20,10 @@ constexpr const char*                       gpVertShader           = "shaders/ba
 constexpr const char*                       gpFragShader           = "shaders/basic3d.frag.spv";
 
 // descriptor set layouts
-extern Handle                               gLayoutSampler;
-extern Handle                               gLayoutViewProj;
-extern Handle                               gLayoutMaterialBasic3D;
-
-extern Handle                               gLayoutSamplerSets[ 2 ];
-extern Handle                               gLayoutViewProjSets[ 2 ];
-extern Handle*                              gLayoutMaterialBasic3DSets;
-
+extern UniformBufferArray_t                 gUniformSampler;
+extern UniformBufferArray_t                 gUniformViewInfo;
+extern UniformBufferArray_t                 gUniformMaterialBasic3D;
 extern UniformBufferArray_t                 gUniformLightInfo;
-
 extern UniformBufferArray_t                 gUniformLightDirectional;
 extern UniformBufferArray_t                 gUniformLightPoint;
 extern UniformBufferArray_t                 gUniformLightCone;
@@ -88,96 +82,17 @@ static std::unordered_map< Handle, Basic3D_Material >          gMaterialData;
 CONVAR( r_basic3d_dbg_mode, 0 );
 
 
-struct ShaderBasic3D : public IShader
+EShaderFlags Shader_Basic3D_Flags()
 {
-	// Must Override
-	virtual const char* GetShaderInfo( ShaderInfo_t& srInfo ) override
-	{
-		srInfo.aBindPoint    = EPipelineBindPoint_Graphics;
-		srInfo.aVertexFormat = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
-
-		srInfo.aFlags = EShaderFlags_Sampler |
-		                EShaderFlags_ViewInfo |
-		                EShaderFlags_PushConstant |
-		                EShaderFlags_MaterialUniform |
-		                EShaderFlags_Lights;
-
-		return "basic_3d";
-	}
-
-	virtual void GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics ) override
-	{
-		// TODO: have shader system handle adding layouts here
-		srPipeline.aLayouts.push_back( gLayoutSampler );
-		srPipeline.aLayouts.push_back( gLayoutViewProj );
-		srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
-		srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
-		srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
-
-		// --------------------------------------------------------------
-
-		srGraphics.apName = "basic_3d";
-		srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-		srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
-
-		Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
-		Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
-
-		srGraphics.aColorBlendAttachments.emplace_back( false );
-
-		srGraphics.aPrimTopology   = EPrimTopology_Tri;
-		srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-		srGraphics.aCullMode       = ECullMode_Back;
-		srGraphics.aPipelineLayout = gPipelineLayout;
-		srGraphics.aRenderPass     = sRenderPass;
-		// TODO: expose the rest later
-	}
-
-	// Used if the shader has the push constants flag
-	virtual void ResetPushData() override
-	{
-	}
-
-	// kinda weird and tied to models, hmm
-	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo ) override
-	{
-	}
-
-	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo ) override
-	{
-	}
-
-	// Used if the shader has the material data flag
-	virtual void AddMaterial( Handle sMat )
-	{
-	}
-
-	virtual void RemoveMaterial( Handle sMat )
-	{
-	}
-
-	virtual void UpdateMaterialData( Handle sMat )
-	{
-	}
-};
+	return EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights;
+}
 
 
 // TODO: use this in a shader system later on, unless i go with json5 for the shader info
 void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
 {
-	// TODO: have shader system handle adding layouts here
-	srPipeline.aLayouts.push_back( gLayoutSampler );
-	srPipeline.aLayouts.push_back( gLayoutViewProj );
-	srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
-	srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
+	Graphics_AddPipelineLayouts( srPipeline, Shader_Basic3D_Flags() );
+	srPipeline.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
 
 	// --------------------------------------------------------------
@@ -209,17 +124,21 @@ Handle Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate )
 
 	// --------------------------------------------------------------
 
+	if ( !render->CreatePipelineLayout( gPipelineLayout, pipelineCreateInfo ) )
+	{
+		Log_Error( "Failed to create Pipeline Layout\n" );
+		return InvalidHandle;
+	}
+
+	pipelineInfo.aPipelineLayout = gPipelineLayout;
+	if ( !render->CreateGraphicsPipeline( gPipeline, pipelineInfo ) )
+	{
+		Log_Error( "Failed to create Graphics Pipeline\n" );
+		return InvalidHandle;
+	}
+
 	if ( sRecreate )
 	{
-		render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
-		render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
-	}
-	else
-	{
-		gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
-		pipelineInfo.aPipelineLayout = gPipelineLayout;
-		gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
-
 		TextureCreateData_t createData{};
 		createData.aFilter = EImageFilter_Nearest;
 		createData.aUsage  = EImageUsage_Sampled;
@@ -272,13 +191,6 @@ void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Shader_Basic3D_Bind( Handle cmd, size_t sCmdIndex )
-{
-	Handle descSets[] = { gLayoutSamplerSets[ sCmdIndex ], gLayoutViewProjSets[ sCmdIndex ], gLayoutMaterialBasic3DSets[ sCmdIndex ] };
-	render->CmdBindDescriptorSets( cmd, sCmdIndex, EPipelineBindPoint_Graphics, gPipelineLayout, descSets, 3 );
-}
-
-
 void Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData.at( &srDrawInfo );
@@ -306,8 +218,8 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	UpdateVariableDescSet_t update{};
 
 	// what
-	update.aDescSets.push_back( gLayoutMaterialBasic3DSets[ 0 ] );
-	update.aDescSets.push_back( gLayoutMaterialBasic3DSets[ 1 ] );
+	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 0 ] );
+	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 1 ] );
 
 	update.aType = EDescriptorType_UniformBuffer;
 
