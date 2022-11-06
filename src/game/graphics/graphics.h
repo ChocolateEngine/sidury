@@ -301,6 +301,14 @@ using FModelPushConstants = void( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw
 using FSetupModelPushData = void( ModelSurfaceDraw_t& srDrawInfo );
 
 
+struct ShaderInfo_t
+{
+	EPipelineBindPoint aBindPoint    = EPipelineBindPoint_Graphics;
+	EShaderFlags       aFlags        = EShaderFlags_None;
+	VertexFormat       aVertexFormat = VertexFormat_None;
+};
+
+
 struct IPushConstant
 {
 	virtual void ResetPushData()
@@ -318,15 +326,30 @@ struct IPushConstant
 };
 
 
-struct ShaderInfo_t
+struct IShaderMaterial
 {
-	EPipelineBindPoint aBindPoint    = EPipelineBindPoint_Graphics;
-	EShaderFlags       aFlags        = EShaderFlags_None;
-	VertexFormat       aVertexFormat = VertexFormat_None;
+	virtual void ResetPushData()
+	{
+	}
+
+	// kinda weird and tied to models, hmm
+	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
+
+	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
+	{
+	}
 };
 
 
 // DO NOT ADD ANY LOCAL VARIABLES TO THIS WHEN YOU OVERRIDE IT !!!
+struct IPipelineLayout
+{
+
+};
+
+
 struct IShader
 {
 	// Returns the shader name, and fills in data in the struct with general shader info 
@@ -476,6 +499,8 @@ void               Graphics_SetViewProjMatrix( const glm::mat4& srMat );
 const glm::mat4&   Graphics_GetViewProjMatrix();
 
 void               Graphics_DrawModel( ModelDraw_t* spDrawInfo );
+
+void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 
 // ---------------------------------------------------------------------------------------
 // Other

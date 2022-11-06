@@ -31,22 +31,11 @@ extern UniformBufferArray_t                 gUniformLightCapsule;
 
 // Material Handle, Buffer
 static std::unordered_map< Handle, Handle > gMaterialBuffers;
-// static std::vector< MaterialBuffer_t > gMaterialBuffers;
-// static std::unordered_map< Handle, u32 >                   gMaterialBufferIndex;
 static std::vector< Handle >                gMaterialBufferIndex;
-
-// constexpr const char*                gpVertShader = "shaders/unlit.vert.spv";
-// constexpr const char*                gpFragShader = "shaders/unlit.frag.spv";
 
 
 struct Basic3D_Push
 {
-	// glm::mat4 projView;
-	// glm::mat4 model;
-
-	// alignas( 16 ) glm::mat4 trans;
-	// alignas( 16 ) int index;
-
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
 	alignas( 16 ) int aMaterial = 0;         // material index
 	int aProjView = 0;         // projection * view index
@@ -65,14 +54,6 @@ struct Basic3D_Material
 	float aoPower       = 1.f;
 	float emissivePower = 1.f;
 };
-
-// struct Basic3D_UBO
-// {
-// 	int   diffuse = 0, ao = 0, emissive = 0;
-// 	float aoPower = 1.f, emissivePower = 1.f;
-// 
-// 	float morphWeight = 0.f;
-// };
 
 
 static std::unordered_map< ModelSurfaceDraw_t*, Basic3D_Push > gPushData;

@@ -252,6 +252,7 @@ void PlayerManager::Respawn( Entity player )
 	apMove->OnPlayerRespawn( player );
 }
 
+CONVAR( player_line_dist, 32.f );
 
 void PlayerManager::Update( float frameTime )
 {
@@ -285,7 +286,10 @@ void PlayerManager::Update( float frameTime )
 			{
 				flashlight->aPos = transform.aPos + camera.aTransform.aPos;
 				flashlight->aPos.z -= 4.f;
-				flashlight->aAng = camera.aTransform.aAng;
+				// weird stuff to get the angle of the light correct
+				flashlight->aAng.x = camera.aTransform.aAng.z;
+				flashlight->aAng.y = -camera.aTransform.aAng.y;
+				flashlight->aAng.z = -camera.aTransform.aAng.x + 90.f;
 				Graphics_UpdateLight( flashlight );
 			}
 		}
@@ -449,7 +453,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 	ClampAngles( transform, camera );
 
-	GetDirectionVectors( transform.ToViewMatrixZ(  ), dir.aForward, dir.aRight, dir.aUp );
+	Util_GetViewMatrixZDirection( transform.ToViewMatrixZ(), dir.aForward, dir.aRight, dir.aUp );
 
 	// MOVE ME ELSEWHERE IDK, MAYBE WHEN AN HEV SUIT COMPONENT IS MADE
 	CalcZoom( camera, player );
@@ -478,7 +482,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		gViewInfo.aViewPos = thirdPerson.aPos;
 		Game_SetView( viewMat );
-		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
 	else
 	{
@@ -492,7 +496,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		gViewInfo.aViewPos = transformView.aPos;
 		Game_SetView( viewMat );
-		GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
 
 	if ( info.aIsLocalPlayer )

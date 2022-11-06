@@ -19,7 +19,7 @@ static bool gRunning   = true;
 
 CONVAR( en_max_frametime, 0.1 );
 CONVAR( en_timescale, 1 );
-CONVAR( en_fps_max, 0 );
+CONVAR( en_fps_max, 300 );
 
 
 CONCMD( exit )

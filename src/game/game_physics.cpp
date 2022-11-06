@@ -34,15 +34,18 @@ static Handle                 gShader_DebugLine = InvalidHandle;
 static Handle                 gMatSolid         = InvalidHandle;
 static Handle                 gMatWire          = InvalidHandle;
 
-static ResourceList< Model* > gModels;
+static std::unordered_map< Handle, ModelDraw_t > gModelDraw;
 
 // ==============================================================
 
 
 void Phys_DebugInit()
 {
-	gMatSolid = Graphics_CreateMaterial( "__phys_debug_solid", gShader_Debug );
-	gMatWire  = Graphics_CreateMaterial( "__phys_debug_wire", gShader_DebugLine );
+	gShader_Debug     = Graphics_GetShader( "debug" );
+	gShader_DebugLine = Graphics_GetShader( "debug_line" );
+
+	gMatSolid         = Graphics_CreateMaterial( "__phys_debug_solid", gShader_Debug );
+	gMatWire          = Graphics_CreateMaterial( "__phys_debug_wire", gShader_DebugLine );
 
 	// apMatSolid->SetShader( "basic_3d" );
 }
@@ -83,9 +86,11 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 	Model*      model = new Model;
 	// gMeshes.push_back( mesh );
 
+	Handle      mat   = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
+
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "_phys_triangle_batch" );
-	meshBuilder.SetMaterial( gMatSolid );
+	meshBuilder.SetMaterial( mat );
 
 	// convert vertices
 	// vert.resize( inTriangleCount * 3 );
@@ -116,7 +121,9 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 	meshBuilder.End();
 
-	return gModels.Add( model );
+	Handle handle = Graphics_AddModel( model );
+	gModelDraw[ handle ];
+	return handle;
 }
 
 
@@ -124,41 +131,33 @@ Handle Phys_CreateTriangleBatchInd(
   const std::vector< PhysVertex_t >& srVerts,
   const std::vector< u32 >&          srInd )
 {
-#if 0
-	if ( inVertices == nullptr || inVertexCount == 0 || inIndices == nullptr || inIndexCount == 0 )
-		return nullptr;  // mEmptyBatch;
+	if ( srVerts.empty() || srInd.empty() )
+		return InvalidHandle;
 
-	PhysDebugMesh* mesh = new PhysDebugMesh;
-	aMeshes.push_back( mesh );
+	Model* model = new Model;
+
+	Handle mat = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
 
 	MeshBuilder meshBuilder;
-	meshBuilder.Start( matsys, mesh );
-	meshBuilder.SetMaterial( apMatSolid );
+	meshBuilder.Start( model, "__phys_model" );
+	meshBuilder.SetMaterial( mat );
 
 	// convert vertices
-	for ( int i = 0; i < inIndexCount; i++ )
+	for ( size_t i = 0; i < srInd.size(); i++ )
 	{
-		meshBuilder.SetPos( fromJolt( inVertices[ inIndices[ i ] ].mPosition ) );
-		// meshBuilder.SetNormal( fromJolt( inVertices[inIndices[i]].mNormal ) );
-		meshBuilder.SetColor( fromJolt( inVertices[ inIndices[ i ] ].mColor ) );
-		// meshBuilder.SetTexCoord( fromJolt( inVertices[inIndices[i]].mUV ) );
+		// pretty awful
+		meshBuilder.SetPos( srVerts[ srInd[ i ] ].aPos );
+		meshBuilder.SetNormal( srVerts[ srInd[ i ] ].aNorm );
+		meshBuilder.SetColor( srVerts[ srInd[ i ] ].aColor );
+		meshBuilder.SetTexCoord( srVerts[ srInd[ i ] ].aUV );
 		meshBuilder.NextVertex();
 	}
 
 	meshBuilder.End();
 
-	// create material
-	// IMaterial* mat = matsys->CreateMaterial();
-	// aMaterials.push_back( mat );
-	//
-	// mat->SetShader( "debug" );
-	// mat->SetVar( "color", vec4_default );
-	//
-	// mesh->SetMaterial( 0, mat );
-
-	return mesh;
-#endif
-	return InvalidHandle;
+	Handle handle = Graphics_AddModel( model );
+	gModelDraw[ handle ];
+	return handle;
 }
 
 
@@ -172,49 +171,15 @@ void Phys_DrawGeometry(
   bool             sCastShadow,
   bool             sWireframe )
 {
-#if 0
-	if ( inGeometry.GetPtr()->mLODs.empty() )
-		return;
+	Handle mat = Model_GetMaterial( sGeometry, 0 );
 
-	// TODO: handle LODs
-	auto&          lod  = inGeometry.GetPtr()->mLODs[ 0 ];
+	Mat_SetVar( mat, "color", srColor );
 
-	PhysDebugMesh* mesh = (PhysDebugMesh*)lod.mTriangleBatch.GetPtr();
+	auto& modelDraw = gModelDraw[ sGeometry ];
+	modelDraw.aModel = sGeometry;
+	modelDraw.aModelMatrix = srModelMatrix;
 
-	if ( mesh == nullptr )
-		return;
-
-	IMaterial*         mat    = mesh->GetMaterial( 0 );
-	const std::string& shader = mat->GetShaderName();
-
-	// AAAA
-	if ( inDrawMode == EDrawMode::Wireframe )
-	{
-		if ( shader != gShader_DebugLine )
-			mat->SetShader( gShader_DebugLine );
-	}
-	else
-	{
-		if ( shader != gShader_Debug )
-			mat->SetShader( gShader_Debug );
-	}
-
-	mat->SetVar(
-	  "color",
-	  {
-		inModelColor.r,
-		inModelColor.g,
-		inModelColor.b,
-		inModelColor.a,
-	  } );
-
-	// AWFUL
-	DefaultRenderable* renderable = new DefaultRenderable;
-	renderable->aMatrix           = fromJolt( inModelMatrix );
-	renderable->apModel           = mesh;
-
-	matsys->AddRenderable( renderable );
-#endif
+	Graphics_DrawModel( &modelDraw );
 }
 
 
@@ -383,7 +348,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		else
 			srData.apVertices = (glm::vec3*)malloc( ( origSize + vertData.aCount ) * sizeof( glm::vec3 ) );
 
-		for ( u32 i = 0, j = 0; i < vertData.aCount * 3; i += 3, j++ )
+		for ( u32 i = 0, j = 0; j < vertData.aCount; i += 3, j++ )
 		{
 			// srVerts.emplace_back( data[ i + 0 ], data[ i + 1 ], data[ i + 2 ] );
 
@@ -398,17 +363,17 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		u32 indSize = srData.aTriCount;
 
 		if ( srData.aTris )
-			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ind.size() ) * sizeof( PhysIndexedTriangle_t ) );
+			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ( ind.size() / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
 		else
 			srData.aTris = (PhysIndexedTriangle_t*)malloc( ( indSize + ind.size() ) * sizeof( PhysIndexedTriangle_t ) );
 
-		for ( u32 i = 0, j = 0; i < ind.size(); i += 3, j++ )
+		for ( u32 i = 0, j = 0; i < ind.size(); j++ )
 		{
 			// auto& tri     = srConvexData.emplace_back();
 
-			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + ind[ i + 0 ];
-			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + ind[ i + 1 ];
-			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + ind[ i + 2 ];
+			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + ind[ i++ ];
+			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + ind[ i++ ];
+			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + ind[ i++ ];
 
 			// srInd.emplace_back(
 			//   origSize + ind[ i + 0 ],
@@ -416,7 +381,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			//   origSize + ind[ i + 2 ] );
 		}
 
-		srData.aTriCount += ind.size();
+		srData.aTriCount += ind.size() / 3;
 	}
 }
 

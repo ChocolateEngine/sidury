@@ -60,6 +60,11 @@ static std::vector< Handle >                     gViewInfoBuffers( 1 );
 ViewInfo_t                                       gViewInfo;
 bool                                             gViewInfoUpdate = false;
 
+static MeshBuilder                               gDebugLineBuilder;
+static Model*                                    gDebugLineModel = nullptr;
+static ModelDraw_t                               gDebugLineDraw{};
+static Handle                                    gDebugLineMaterial = InvalidHandle;
+
 // --------------------------------------------------------------------------------------
 // Lighting
 
@@ -123,6 +128,7 @@ CONVAR( r_world_dir_x, 65 );
 CONVAR( r_world_dir_y, 35 );
 CONVAR( r_world_dir_z, 0 );
 
+CONVAR( g_debug_draw, 1 );
 
 CONCMD( r_reload_textures )
 {
@@ -195,6 +201,27 @@ Handle Graphics_AddModel( Model* spModel )
 
 void Graphics_FreeModel( Handle shModel )
 {
+	// HACK HACK PERF: we have to wait for queues to finish, so we could just free this model later
+	// maybe right before the next draw?
+	render->WaitForQueues();
+
+	Model* model = nullptr;
+	if ( !gModels.Get( shModel, &model ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Model_SetMaterial: Model is nullptr\n" );
+		return;
+	}
+
+	for ( auto& mesh : model->aMeshes )
+	{
+		for ( auto& buf : mesh.aVertexBuffers )
+			render->DestroyBuffer( buf );
+
+		render->DestroyBuffer( mesh.aIndexBuffer );
+	}
+
+	gModels.Remove( shModel );
+	delete model;
 }
 
 
@@ -628,6 +655,8 @@ bool Graphics_Init()
 	update.aBuffers.push_back( gLightInfoBuffer );
 	render->UpdateVariableDescSet( update );
 
+	gDebugLineMaterial = Graphics_CreateMaterial( "__debug_line_mat", Graphics_GetShader( "debug_line" ) );
+
 	// TEMP: make a world light
 	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
 	gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
@@ -653,6 +682,23 @@ void Graphics_NewFrame()
 	render->NewFrame();
 
 	gMeshDrawList.clear();
+	gDebugLineBuilder.Reset();
+
+	if ( gDebugLineModel )
+	{
+		Graphics_FreeModel( gDebugLineDraw.aModel );
+		gDebugLineModel = nullptr;
+	}
+
+	if ( !g_debug_draw )
+		return;
+
+	// blech
+	gDebugLineModel  = new Model;
+	gDebugLineDraw.aModel = gModels.Add( gDebugLineModel );
+
+	gDebugLineBuilder.Start( gDebugLineModel, "DebugLineMesh" );
+	gDebugLineBuilder.SetMaterial( gDebugLineMaterial );
 }
 
 
@@ -884,16 +930,19 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.w = 1.f;
 
 			Transform temp{};
+			temp.aPos = spLight->aPos;
 			temp.aAng = spLight->aAng;
+			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
 
-			glm::mat4 matrix;
-			ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			// glm::mat4 matrix;
+			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
 			// matrix = temp.ToViewMatrixZ();
 			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
 
-			GetDirectionVectors( matrix, light.aDir );
+			// GetDirectionVectors( matrix, light.aDir );
 
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -927,13 +976,14 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			Transform temp{};
 			temp.aPos = spLight->aPos;
 			temp.aAng = spLight->aAng;
+			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
 			
-			glm::mat4 matrix;
+			// glm::mat4 matrix;
 			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
-			matrix = temp.ToViewMatrixZ();
+			// matrix = temp.ToViewMatrixZ();
 			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
 
-			GetDirectionVectors( matrix, light.aDir );
+			// GetDirectionVectors( matrix, light.aDir );
 
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
@@ -953,7 +1003,13 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aLength    = spLight->aLength;
 			light.aThickness = spLight->aRadius;
 
-			Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			Transform temp{};
+			temp.aPos = spLight->aPos;
+			temp.aAng = spLight->aAng;
+			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
+
+			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -1002,8 +1058,8 @@ void Graphics_PrepareDrawData()
 	// Update Light Info UBO
 	if ( gNeedLightInfoUpdate )
 	{
-		render->MemWriteBuffer( gLightInfoBuffer, sizeof( LightInfo_t ), &gLightInfo );
 		gNeedLightInfoUpdate = false;
+		render->MemWriteBuffer( gLightInfoBuffer, sizeof( LightInfo_t ), &gLightInfo );
 	}
 
 	if ( gViewInfoUpdate )
@@ -1011,6 +1067,12 @@ void Graphics_PrepareDrawData()
 		gViewInfoUpdate = false;
 		for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
 			render->MemWriteBuffer( gViewInfoBuffers[ i ], sizeof( ViewInfo_t ), &gViewInfo );
+	}
+
+	if ( g_debug_draw && gDebugLineModel && gDebugLineBuilder.aSurfaces.size() && gDebugLineBuilder.aSurfaces[ 0 ].aVertices.size() )
+	{
+		gDebugLineBuilder.End();
+		Graphics_DrawModel( &gDebugLineDraw );
 	}
 
 	Shader_ResetPushData();
@@ -1139,6 +1201,21 @@ void Graphics_DrawModel( ModelDraw_t* spDrawInfo )
 		Handle shader = Mat_GetShader( mat );
 		gMeshDrawList[ shader ].push_front({ spDrawInfo, i });
 	}
+}
+
+
+void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
+{
+	if ( !g_debug_draw || !gDebugLineModel )
+		return;
+
+	gDebugLineBuilder.SetPos( sX );
+	gDebugLineBuilder.SetColor( sColor );
+	gDebugLineBuilder.NextVertex();
+
+	gDebugLineBuilder.SetPos( sY );
+	gDebugLineBuilder.SetColor( sColor );
+	gDebugLineBuilder.NextVertex();
 }
 
 

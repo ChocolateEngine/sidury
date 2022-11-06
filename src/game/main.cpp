@@ -161,7 +161,8 @@ void CreatePhysEntity( const std::string& path )
 #endif
 }
 
-#define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
+// #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
+#define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_25d.glb"
 
 CON_COMMAND( create_proto )
 {
@@ -563,42 +564,6 @@ glm::vec3 Util_VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 }
 
 
-void Util_GetDirectionVectors( const glm::vec3& srAngles, glm::vec3* spForward, glm::vec3* spRight, glm::vec3* spUp )
-{
-	glm::vec3 rad = glm::radians( srAngles );
-
-	float     sy  = sin( rad[ YAW ] );
-	float     cy  = cos( rad[ YAW ] );
-
-	float     sp  = sin( rad[ PITCH ] );
-	float     cp  = cos( rad[ PITCH ] );
-
-	float     sr  = sin( rad[ ROLL ] );
-	float     cr  = cos( rad[ ROLL ] );
-
-	if ( spForward )
-	{
-		spForward->x = cp * cy;
-		spForward->y = cp * sy;
-		spForward->z = -sp;
-	}
-
-	if ( spRight )
-	{
-		spRight->x = ( -1 * sr * sp * cy + -1 * cr * -sy );
-		spRight->y = ( -1 * sr * sp * sy + -1 * cr * cy );
-		spRight->z = -1 * sr * cp;
-	}
-
-	if ( spUp )
-	{
-		spUp->x = ( cr * sp * cy + -sr * -sy );
-		spUp->y = ( cr * sp * sy + -sr * cy );
-		spUp->z = cr * cp;
-	}
-}
-
-
 extern ConVar cl_view_height;
 
 CONVAR( proto_look, 1 );
@@ -663,6 +628,10 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 #endif
 
 
+CONVAR( r_proto_line_dist, 32.f );
+CONVAR( r_proto_line_dist2, 32.f );
+
+
 // will be used in the future for when updating bones and stuff
 void Game_SetupModels( float frameTime )
 {
@@ -693,37 +662,76 @@ void Game_SetupModels( float frameTime )
 
 		bool         matrixChanged  = false;
 
-		if ( proto_look.GetBool() )
+		// TESTING: BROKEN
+		if ( proto_look == 2.f )
+		{
+			glm::vec3 forward, right, up;
+			//AngleToVectors( protoTransform.aAng, forward, right, up );
+			// Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
+			Util_GetMatrixDirection( playerTransform.ToMatrix( false ), &forward, &right, &up );
+
+			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
+			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
+			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
+
+			glm::vec3 protoView    = protoTransform.aPos;
+			//protoView.z += cl_view_height;
+
+			glm::vec3 direction    = ( protoView - playerTransform.aPos );
+			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
+			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
+
+			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform.aPos, up );
+
+			glm::vec3 vForward, vRight, vUp;
+			Util_GetViewMatrixZDirection( protoViewMat, vForward, vRight, vUp );
+
+			glm::quat protoQuat   = protoViewMat;
+
+			glm::mat4 modelMatrix = glm::translate( protoTransform.aPos );
+
+			modelMatrix           = glm::scale( modelMatrix, glm::vec3( protoScale ) );
+
+			modelMatrix *= glm::toMat4( protoQuat );
+
+			modelDraw.aModelMatrix = modelMatrix;
+		}
+		else if ( proto_look.GetBool() )
 		{
 			matrixChanged = true;
 
 			glm::vec3 forward, right, up;
-			//AngleToVectors( protoTransform.aAng, forward, right, up );
 			Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
 
-			glm::vec3 protoView = protoTransform.aPos;
+			glm::vec3 protoView          = protoTransform.aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction = (protoView - playerTransform.aPos);
-			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
-			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
+			glm::vec3 direction          = ( protoView - playerTransform.aPos );
+			glm::vec3 rotationAxis       = Util_VectorToAngles( direction, up );
 
-			protoTransform.aAng = rotationAxis;
-			protoTransform.aAng[PITCH] = 0.f;
-			protoTransform.aAng[YAW] -= 90.f;
-			protoTransform.aAng[ROLL] = (-rotationAxis[PITCH]) + 90.f;
-			//protoTransform.aAng[ROLL] = 90.f;
+			protoTransform.aAng          = rotationAxis;
+			protoTransform.aAng[ PITCH ] = 0.f;
+			protoTransform.aAng[ YAW ] -= 90.f;
+			protoTransform.aAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
 		}
 
 		if ( protoTransform.aScale.x != protoScale )
 		{
-			// protoTransform.aScale = {protoScale, protoScale, protoScale};
 			protoTransform.aScale = glm::vec3( protoScale );
 			matrixChanged = true;
 		}
 
 		if ( matrixChanged )
-			modelDraw.aModelMatrix = protoTransform.ToMatrix();
+		 	modelDraw.aModelMatrix = protoTransform.ToMatrix();
+
+		// TEMP
+		{
+			glm::vec3 modelForward, modelRight, modelUp;
+			Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
+			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
+			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
+			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+		}
 
 		Graphics_DrawModel( &modelDraw );
 	}

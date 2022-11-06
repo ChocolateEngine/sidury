@@ -9,6 +9,8 @@ extern IRender*                                         render;
 static Handle                                           gTempShader       = InvalidHandle;
 static Handle                                           gSkyboxShader     = InvalidHandle;
 static Handle                                           gUIShader         = InvalidHandle;
+static Handle                                           gDbgShader        = InvalidHandle;
+static Handle                                           gDbgLineShader    = InvalidHandle;
 
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
@@ -79,6 +81,20 @@ Handle       Shader_Skybox_GetPipelineLayout();
 Handle       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
 void         Shader_UI_Destroy();
 void         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
+
+Handle       Shader_Debug_Create( Handle sRenderPass, bool sRecreate );
+void         Shader_Debug_Destroy();
+void         Shader_Debug_ResetPushData();
+void         Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
+void         Shader_Debug_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
+VertexFormat Shader_Debug_GetVertexFormat();
+Handle       Shader_Debug_GetPipelineLayout();
+
+Handle       Shader_DebugLine_Create( Handle sRenderPass, bool sRecreate );
+void         Shader_DebugLine_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
+void         Shader_DebugLine_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
+VertexFormat Shader_DebugLine_GetVertexFormat();
+Handle       Shader_DebugLine_GetPipelineLayout();
 
 // --------------------------------------------------------------------------------------
 
@@ -241,6 +257,12 @@ Handle Shader_GetPipelineLayout( Handle sShader )
 	if ( sShader == gSkyboxShader )
 		return Shader_Skybox_GetPipelineLayout();
 
+	if ( sShader == gDbgShader )
+		return Shader_Debug_GetPipelineLayout();
+
+	if ( sShader == gDbgLineShader )
+		return Shader_DebugLine_GetPipelineLayout();
+
 	Log_Warn( gLC_ClientGraphics, "Shader_GetPipelineLayout(): BAD CODE !!!!!!!\n" );
 
 	return InvalidHandle;
@@ -305,13 +327,25 @@ bool Graphics_ShaderInit( bool sRecreate )
 
 	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, sRecreate ) ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create temp shader\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to create basic_3d shader\n" );
 		return false;
 	}
 
 	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGraphics, sRecreate ) ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
+		return false;
+	}
+
+	if ( !( gDbgShader = Shader_Debug_Create( gRenderPassGraphics, sRecreate ) ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create debug shader\n" );
+		return false;
+	}
+
+	if ( !( gDbgLineShader = Shader_DebugLine_Create( gRenderPassGraphics, sRecreate ) ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create debug_line shader\n" );
 		return false;
 	}
 
@@ -325,6 +359,14 @@ bool Graphics_ShaderInit( bool sRecreate )
 
 		Graphics_AddShader( "imgui", gUIShader,
 		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
+		                    EPipelineBindPoint_Graphics );
+
+		Graphics_AddShader( "debug", gDbgShader,
+		                    EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+		                    EPipelineBindPoint_Graphics );
+
+		Graphics_AddShader( "debug_line", gDbgLineShader,
+		                    EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
 		                    EPipelineBindPoint_Graphics );
 	}
 
@@ -430,6 +472,7 @@ void Shader_ResetPushData()
 {
 	Shader_Basic3D_ResetPushData();
 	Shader_Skybox_ResetPushData();
+	Shader_Debug_ResetPushData();
 }
 
 
@@ -444,6 +487,12 @@ bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRende
 
 		else if ( sShader == gSkyboxShader )
 			Shader_Skybox_SetupPushData( srRenderable );
+
+		else if ( sShader == gDbgShader )
+			Shader_Debug_SetupPushData( srRenderable );
+
+		else if ( sShader == gDbgLineShader )
+			Shader_DebugLine_SetupPushData( srRenderable );
 	}
 
 	return true;
@@ -461,6 +510,12 @@ bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSur
 
 		else if ( sShader == gSkyboxShader )
 			Shader_Skybox_PushConstants( sCmd, sIndex, srRenderable );
+
+		else if ( sShader == gDbgShader )
+			Shader_Debug_PushConstants( sCmd, sIndex, srRenderable );
+
+		else if ( sShader == gDbgLineShader )
+			Shader_DebugLine_PushConstants( sCmd, sIndex, srRenderable );
 	}
 
 	return true;
@@ -475,6 +530,12 @@ VertexFormat Shader_GetVertexFormat( Handle sShader )
 
 	if ( sShader == gSkyboxShader )
 		return Shader_Skybox_GetVertexFormat();
+
+	if ( sShader == gDbgShader )
+		return Shader_Debug_GetVertexFormat();
+
+	if ( sShader == gDbgLineShader )
+		return Shader_DebugLine_GetVertexFormat();
 
 	return VertexFormat_None;
 }

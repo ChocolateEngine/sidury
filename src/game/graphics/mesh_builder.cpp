@@ -53,7 +53,7 @@ void MeshBuilder::End()
 
 		if ( surf.aVertices.empty() )
 		{
-			Log_DevF( gLC_ClientGraphics, 1, "Model Surface %zd has no vertices, skipping: \"%s\"", i, apDebugName ? apDebugName : "internal" );
+			Log_DevF( gLC_ClientGraphics, 1, "Model Surface %zd has no vertices, skipping: \"%s\"\n", i, apDebugName ? apDebugName : "internal" );
 			continue;
 		}
 

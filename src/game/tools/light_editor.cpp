@@ -18,9 +18,20 @@ extern Handle                                             gLocalPlayer;
 
 extern std::vector< Light_t* >                            gLights;
 
+static Light_t*                                           gpFlashlight = nullptr;
+
+
+CONVAR( r_light_line, 1 );
+CONVAR( r_light_line_dist, 64.f );
+CONVAR( r_light_line_dist2, 48.f );
+
 
 void LightEditor_UpdateLightDraw( Light_t* spLight )
 {
+	// HACK
+	if ( gpFlashlight == spLight )
+		return;
+
 	ModelDraw_t& modelDraw = gDrawLights[ spLight ];
 
 	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
@@ -30,22 +41,31 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 
 	// Dumb
 	Transform transform{};
-	transform.aPos         = spLight->aPos;
-	transform.aAng         = spLight->aAng;
+	transform.aPos = spLight->aPos;
+	transform.aAng = spLight->aAng;
 
 	if ( spLight->aType == ELightType_Directional )
 	{
-		transform.aScale = {2.f, 2.f, 2.f};
+		transform.aScale       = { 2.f, 2.f, 2.f };
 		modelDraw.aModelMatrix = transform.ToMatrix();
 	}
 	else
 	{
 		modelDraw.aModelMatrix = transform.ToMatrix( false );
 	}
+	
+	glm::vec3 modelForward, modelRight, modelUp;
+	Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
+	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelForward * r_light_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
+	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelRight * r_light_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
+	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelUp * r_light_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
 
-	// gViewInfo.aViewPos     = transformView.aPos;
-	// Game_SetView( viewMat );
-	// GetDirectionVectors( viewMat, camera.aForward, camera.aRight, camera.aUp );
+	if ( r_light_line )
+	{
+		glm::vec3 forward;
+		Util_GetDirectionVectors( spLight->aAng, &forward );
+		Graphics_DrawLine( spLight->aPos, spLight->aPos + ( forward * r_light_line_dist.GetFloat() ), { spLight->aColor.x, spLight->aColor.y, spLight->aColor.z } );
+	}
 }
 
 
@@ -111,7 +131,7 @@ void LightEditor_DrawEditor()
 		light->aPos         = playerTransform.aPos + camTransform.aPos;
 		// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
 		light->aColor       = { 1, 1, 1 };
-		light->aRadius      = 50;
+		light->aRadius      = 500;
 	}
 
 	if ( ImGui::Button( "Create Cone Light" ) )
@@ -119,11 +139,11 @@ void LightEditor_DrawEditor()
 		Light_t* light = Graphics_CreateLight( ELightType_Cone );
 
 		light->aPos    = playerTransform.aPos + camTransform.aPos;
-		light->aColor  = { 1, 1, 1 };
+		light->aColor  = { 10, 10, 10 };
 		light->aAng    = camTransform.aAng;
 
-		light->aInnerFov = glm::radians( 45.f );  // FOV
-		light->aOuterFov = glm::radians( 45.f );  // FOV
+		light->aInnerFov = 0.f;  // FOV
+		light->aOuterFov = 45.f;  // FOV
 	}
 
 	// Show list of lights
@@ -234,12 +254,17 @@ void LightEditor_DrawLightModels()
 	LightEditor_UpdateAllLightDraws();
 
 	for ( auto& [ light, draw ] : gDrawLights )
-		Graphics_DrawModel( &draw );
+	{
+		if ( gpFlashlight != light )
+			Graphics_DrawModel( &draw );
+	}
 }
 
 
 void LightEditor_Update()
 {
+	gpFlashlight = entities->GetComponent< Light_t* >( gLocalPlayer );
+
 	LightEditor_DrawLightModels();
 
 	if ( !gLightEditorEnabled )
