@@ -5,15 +5,6 @@
 
 extern IRender*                             render;
 
-constexpr VertexFormat                      gDbgVertexFormat       = VertexFormat_Position;
-constexpr VertexFormat                      gDbgLineVertexFormat   = VertexFormat_Position | VertexFormat_Color;
-
-static Handle                               gDbgPipeline           = InvalidHandle;
-static Handle                               gDbgPipelineLayout     = InvalidHandle;
-
-static Handle                               gDbgLinePipeline       = InvalidHandle;
-static Handle                               gDbgLinePipelineLayout = InvalidHandle;
-
 constexpr const char*                       gpVertColShader        = "shaders/debug_col.vert.spv";
 constexpr const char*                       gpVertShader           = "shaders/debug.vert.spv";
 constexpr const char*                       gpFragShader           = "shaders/debug.frag.spv";
@@ -32,158 +23,33 @@ struct Debug_Push
 static std::unordered_map< ModelSurfaceDraw_t*, Debug_Push > gDebugPushData;
 
 
-struct ShaderDebug : public IShader
+static void Shader_Debug_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	// Returns the shader name, and fills in data in the struct with general shader info
-	const char* GetShaderInfo( ShaderInfo_t& srInfo ) override
-	{
-	}
-
-	// Shader Creation Info
-	void GetPushConstantData( std::vector< PushConstantRange_t >& srPushConstants ) override
-	{
-		srPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
-	}
-
-	void GetGraphicsCreateInfo( Handle sRenderPass, GraphicsPipelineCreate_t& srGraphics ) override
-	{
-	}
-
-	// Optional to override
-	// Used if the shader has the push constants flag
-	void ResetPushData() override
-	{
-	}
-
-	// kinda weird and tied to models, hmm
-	void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo ) override
-	{
-	}
-
-	void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo ) override
-	{
-	}
-};
-
-
-// ShaderDebug gShaderDebug;
-
-
-Handle Shader_Debug_Create( Handle sRenderPass, bool sRecreate )
-{
-	PipelineLayoutCreate_t   pipelineCreateInfo{};
-	GraphicsPipelineCreate_t pipelineInfo{};
-
-	pipelineCreateInfo.aLayouts.push_back( gUniformViewInfo.aLayout );
-	pipelineCreateInfo.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
-
-	// --------------------------------------------------------------
-
-	pipelineInfo.apName = "debug";
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertColShader, "main" );
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
-
-	Graphics_GetVertexBindingDesc( gDbgVertexFormat, pipelineInfo.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( gDbgVertexFormat, pipelineInfo.aVertexAttributes );
-
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-
-	pipelineInfo.aPrimTopology   = EPrimTopology_Tri;
-	pipelineInfo.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-	pipelineInfo.aCullMode       = ECullMode_Back;
-	pipelineInfo.aPipelineLayout = gDbgPipelineLayout;
-	pipelineInfo.aRenderPass     = sRenderPass;
-
-	// --------------------------------------------------------------
-
-	if ( !render->CreatePipelineLayout( gDbgPipelineLayout, pipelineCreateInfo ) )
-	{
-		Log_Error( "Failed to create Pipeline Layout\n" );
-		return InvalidHandle;
-	}
-
-	pipelineInfo.aPipelineLayout = gDbgPipelineLayout;
-	if ( !render->CreateGraphicsPipeline( gDbgPipeline, pipelineInfo ) )
-	{
-		Log_Error( "Failed to create Graphics Pipeline\n" );
-		return InvalidHandle;
-	}
-
-	return gDbgPipeline;
+	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_ViewInfo );
+	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
 }
 
 
-Handle Shader_DebugLine_Create( Handle sRenderPass, bool sRecreate )
+static void Shader_Debug_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	PipelineLayoutCreate_t   pipelineCreateInfo{};
-	GraphicsPipelineCreate_t pipelineInfo{};
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertColShader, "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
 
-	pipelineCreateInfo.aLayouts.push_back( gUniformViewInfo.aLayout );
+	srGraphics.aColorBlendAttachments.emplace_back( true );
 
-	// --------------------------------------------------------------
-
-	pipelineInfo.apName = "debug_line";
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-	pipelineInfo.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
-
-	Graphics_GetVertexBindingDesc( gDbgLineVertexFormat, pipelineInfo.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( gDbgLineVertexFormat, pipelineInfo.aVertexAttributes );
-
-	pipelineInfo.aColorBlendAttachments.emplace_back( true );
-
-	pipelineInfo.aPrimTopology   = EPrimTopology_Line;
-	pipelineInfo.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-	pipelineInfo.aCullMode       = ECullMode_Back;
-	pipelineInfo.aPipelineLayout = gDbgLinePipelineLayout;
-	pipelineInfo.aRenderPass     = sRenderPass;
-
-	// --------------------------------------------------------------
-
-	if ( !render->CreatePipelineLayout( gDbgLinePipelineLayout, pipelineCreateInfo ) )
-	{
-		Log_Error( "Failed to create Pipeline Layout\n" );
-		return InvalidHandle;
-	}
-
-	pipelineInfo.aPipelineLayout = gDbgLinePipelineLayout;
-	if ( !render->CreateGraphicsPipeline( gDbgLinePipeline, pipelineInfo ) )
-	{
-		Log_Error( "Failed to create Graphics Pipeline\n" );
-		return InvalidHandle;
-	}
-
-	return gDbgLinePipeline;
+	srGraphics.aPrimTopology = EPrimTopology_Tri;
+	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode     = ECullMode_Back;
 }
 
 
-void Shader_Debug_Destroy()
-{
-	if ( gDbgPipelineLayout )
-		render->DestroyPipelineLayout( gDbgPipelineLayout );
-
-	if ( gDbgPipeline )
-		render->DestroyPipeline( gDbgPipeline );
-
-	if ( gDbgLinePipelineLayout )
-		render->DestroyPipelineLayout( gDbgLinePipelineLayout );
-
-	if ( gDbgLinePipeline )
-		render->DestroyPipeline( gDbgLinePipeline );
-
-	gDbgPipelineLayout     = InvalidHandle;
-	gDbgPipeline           = InvalidHandle;
-	gDbgLinePipelineLayout = InvalidHandle;
-	gDbgLinePipeline       = InvalidHandle;
-}
-
-
-void Shader_Debug_ResetPushData()
+static void Shader_Debug_ResetPushData()
 {
 	gDebugPushData.clear();
 }
 
 
-void Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
 	push.aModelMatrix = srDrawInfo.apDraw->aModelMatrix;
@@ -192,49 +58,61 @@ void Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Shader_Debug_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push = gDebugPushData.at( &srDrawInfo );
-	render->CmdPushConstants( cmd, gDbgPipelineLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
+	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
 }
 
 
-void Shader_DebugLine_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static IShaderPush gShaderPush_Debug = {
+	.apReset = Shader_Debug_ResetPushData,
+	.apSetup = Shader_Debug_SetupPushData,
+	.apPush  = Shader_Debug_PushConstants,
+};
+
+
+ShaderCreate_t gShaderCreate_Debug = {
+	.apName           = "debug",
+	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
+	.aBindPoint       = EPipelineBindPoint_Graphics,
+	.aFlags           = EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aVertexFormat    = VertexFormat_Position,
+	.apInit           = nullptr,
+	.apDestroy        = nullptr,
+	.apLayoutCreate   = Shader_Debug_GetPipelineLayoutCreate,
+	.apGraphicsCreate = Shader_Debug_GetGraphicsPipelineCreate,
+	.apShaderPush     = &gShaderPush_Debug,
+};
+
+
+static void Shader_DebugLine_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	// Debug_Push& push = gDebugPushData[ &srDrawInfo ];
-	// Handle mat       = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
-	// push.aColor      = Mat_GetVec4( mat, "color" );
+	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_ViewInfo );
 }
 
 
-void Shader_DebugLine_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	// Debug_Push& push = gDebugPushData.at( &srDrawInfo );
-	// render->CmdPushConstants( cmd, gDbgPipelineLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+
+	srGraphics.aColorBlendAttachments.emplace_back( true );
+
+	srGraphics.aPrimTopology = EPrimTopology_Line;
+	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode     = ECullMode_Back;
 }
 
 
-// blech, awful
-VertexFormat Shader_Debug_GetVertexFormat()
-{
-	return gDbgVertexFormat;
-}
-
-
-VertexFormat Shader_DebugLine_GetVertexFormat()
-{
-	return gDbgLineVertexFormat;
-}
-
-
-Handle Shader_Debug_GetPipelineLayout()
-{
-	return gDbgPipelineLayout;
-}
-
-
-Handle Shader_DebugLine_GetPipelineLayout()
-{
-	return gDbgLinePipelineLayout;
-}
+ShaderCreate_t gShaderCreate_DebugLine = {
+	.apName           = "debug_line",
+	.aBindPoint       = EPipelineBindPoint_Graphics,
+	.aFlags           = EShaderFlags_ViewInfo,
+	.aVertexFormat    = VertexFormat_Position | VertexFormat_Color,
+	.apInit           = nullptr,
+	.apDestroy        = nullptr,
+	.apLayoutCreate   = Shader_DebugLine_GetPipelineLayoutCreate,
+	.apGraphicsCreate = Shader_DebugLine_GetGraphicsPipelineCreate,
+};
 

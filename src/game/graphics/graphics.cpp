@@ -40,6 +40,7 @@ static std::vector< Handle >                     gCommandBuffers;
 static size_t                                    gCmdIndex = 0;
 
 Handle                                           gRenderPassGraphics;
+Handle                                           gRenderPassShadow;
 
 // stores backbuffer color and depth
 static Handle                                    gBackBuffer[ 2 ];

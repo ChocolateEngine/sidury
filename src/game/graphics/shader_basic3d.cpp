@@ -5,33 +5,25 @@
 
 extern IRender*                             render;
 
-static VertexFormat                         gVertexFormat          = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
-
-static Handle                               gPipeline              = InvalidHandle;
-static Handle                               gPipelineLayout        = InvalidHandle;
-
 static Handle                               gFallbackAO            = InvalidHandle;
 static Handle                               gFallbackEmissive      = InvalidHandle;
 
 constexpr const char*                       gpFallbackAOPath       = "materials/base/white.ktx";
 constexpr const char*                       gpFallbackEmissivePath = "materials/base/black.ktx";
 
-constexpr const char*                       gpVertShader           = "shaders/basic3d.vert.spv";
-constexpr const char*                       gpFragShader           = "shaders/basic3d.frag.spv";
-
 // descriptor set layouts
-extern UniformBufferArray_t                 gUniformSampler;
-extern UniformBufferArray_t                 gUniformViewInfo;
 extern UniformBufferArray_t                 gUniformMaterialBasic3D;
-extern UniformBufferArray_t                 gUniformLightInfo;
-extern UniformBufferArray_t                 gUniformLightDirectional;
-extern UniformBufferArray_t                 gUniformLightPoint;
-extern UniformBufferArray_t                 gUniformLightCone;
-extern UniformBufferArray_t                 gUniformLightCapsule;
 
 // Material Handle, Buffer
 static std::unordered_map< Handle, Handle > gMaterialBuffers;
 static std::vector< Handle >                gMaterialBufferIndex;
+
+constexpr EShaderFlags                      gShaderFlags =
+  EShaderFlags_Sampler |
+  EShaderFlags_ViewInfo |
+  EShaderFlags_PushConstant |
+  EShaderFlags_MaterialUniform |
+  EShaderFlags_Lights;
 
 
 struct Basic3D_Push
@@ -69,81 +61,22 @@ EShaderFlags Shader_Basic3D_Flags()
 }
 
 
-// TODO: use this in a shader system later on, unless i go with json5 for the shader info
-void Shader_Basic3D_GetCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
+static bool Shader_Basic3D_Init()
 {
-	Graphics_AddPipelineLayouts( srPipeline, Shader_Basic3D_Flags() );
-	srPipeline.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
+	TextureCreateData_t createData{};
+	createData.aFilter = EImageFilter_Nearest;
+	createData.aUsage  = EImageUsage_Sampled;
 
-	// --------------------------------------------------------------
+	// create fallback textures
+	render->LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
+	render->LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
 
-	srGraphics.apName = "basic_3d";
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
-
-	Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
-
-	srGraphics.aColorBlendAttachments.emplace_back( false ); 
-
-	srGraphics.aPrimTopology   = EPrimTopology_Tri;
-	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-	srGraphics.aCullMode       = ECullMode_Back;
-	srGraphics.aPipelineLayout = gPipelineLayout;
-	srGraphics.aRenderPass     = sRenderPass;
-	// TODO: expose the rest later
+	return true;
 }
 
 
-Handle Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate )
+static void Shader_Basic3D_Destroy()
 {
-	PipelineLayoutCreate_t   pipelineCreateInfo{};
-	GraphicsPipelineCreate_t pipelineInfo{};
-
-	Shader_Basic3D_GetCreateInfo( sRenderPass, pipelineCreateInfo, pipelineInfo );
-
-	// --------------------------------------------------------------
-
-	if ( !render->CreatePipelineLayout( gPipelineLayout, pipelineCreateInfo ) )
-	{
-		Log_Error( "Failed to create Pipeline Layout\n" );
-		return InvalidHandle;
-	}
-
-	pipelineInfo.aPipelineLayout = gPipelineLayout;
-	if ( !render->CreateGraphicsPipeline( gPipeline, pipelineInfo ) )
-	{
-		Log_Error( "Failed to create Graphics Pipeline\n" );
-		return InvalidHandle;
-	}
-
-	if ( sRecreate )
-	{
-		TextureCreateData_t createData{};
-		createData.aFilter = EImageFilter_Nearest;
-		createData.aUsage  = EImageUsage_Sampled;
-
-		// create fallback textures
-		render->LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
-		render->LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
-	}
-
-	return gPipeline;
-}
-
-
-void Shader_Basic3D_Destroy()
-{
-	if ( gPipelineLayout )
-		render->DestroyPipelineLayout( gPipelineLayout );
-
-	if ( gPipeline )
-		render->DestroyPipeline( gPipeline );
-
-	gPipelineLayout = InvalidHandle;
-	gPipeline       = InvalidHandle;
-
 	render->FreeTexture( gFallbackAO );
 	render->FreeTexture( gFallbackEmissive );
 
@@ -151,13 +84,34 @@ void Shader_Basic3D_Destroy()
 }
 
 
-void Shader_Basic3D_ResetPushData()
+static void Shader_Basic3D_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
+{
+	Graphics_AddPipelineLayouts( srPipeline, Shader_Basic3D_Flags() );
+	srPipeline.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
+	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
+}
+
+
+static void Shader_Basic3D_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
+{
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/basic3d.vert.spv", "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/basic3d.frag.spv", "main" );
+
+	srGraphics.aColorBlendAttachments.emplace_back( false ); 
+
+	srGraphics.aPrimTopology   = EPrimTopology_Tri;
+	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aCullMode       = ECullMode_Back;
+}
+
+
+static void Shader_Basic3D_ResetPushData()
 {
 	gPushData.clear();
 }
 
 
-void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix  = srDrawInfo.apDraw->aModelMatrix;
@@ -172,12 +126,32 @@ void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData.at( &srDrawInfo );
-
-	render->CmdPushConstants( cmd, gPipelineLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ), &push );
+	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ), &push );
 }
+
+
+static IShaderPush gShaderPush_Basic3D = {
+	.apReset = Shader_Basic3D_ResetPushData,
+	.apSetup = Shader_Basic3D_SetupPushData,
+	.apPush  = Shader_Basic3D_PushConstants,
+};
+
+
+ShaderCreate_t gShaderCreate_Basic3D = {
+	.apName           = "basic_3d",
+	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
+	.aBindPoint       = EPipelineBindPoint_Graphics,
+	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights,
+	.aVertexFormat    = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord,
+	.apInit           = Shader_Basic3D_Init,
+	.apDestroy        = Shader_Basic3D_Destroy,
+	.apLayoutCreate   = Shader_Basic3D_GetPipelineLayoutCreate,
+	.apGraphicsCreate = Shader_Basic3D_GetGraphicsPipelineCreate,
+	.apShaderPush     = &gShaderPush_Basic3D,
+};
 
 
 bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
@@ -250,18 +224,5 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	// write new material data to the buffer
 	Handle buffer = gMaterialBuffers[ sMat ];
 	render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
-}
-
-
-// blech, awful
-VertexFormat Shader_Basic3D_GetVertexFormat()
-{
-	return gVertexFormat;
-}
-
-
-Handle Shader_Basic3D_GetPipelineLayout()
-{
-	return gPipelineLayout;
 }
 

@@ -296,9 +296,16 @@ extern bool        gViewInfoUpdate;
 
 
 // Push Constant Function Pointers
-using FResetPushData = void();
-using FModelPushConstants = void( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-using FSetupModelPushData = void( ModelSurfaceDraw_t& srDrawInfo );
+using FShader_ResetPushData = void();
+using FShader_SetupPushData = void( ModelSurfaceDraw_t& srDrawInfo );
+// using FShader_GetPushData   = void*( u32& srSize, ModelSurfaceDraw_t& srDrawInfo );
+using FShader_PushConstants = void( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo );
+
+using FShader_Init = bool();
+using FShader_Destroy = void();
+
+using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeline );
+using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srGraphics );
 
 
 struct ShaderInfo_t
@@ -306,6 +313,32 @@ struct ShaderInfo_t
 	EPipelineBindPoint aBindPoint    = EPipelineBindPoint_Graphics;
 	EShaderFlags       aFlags        = EShaderFlags_None;
 	VertexFormat       aVertexFormat = VertexFormat_None;
+};
+
+
+struct IShaderPush
+{
+	FShader_ResetPushData* apReset = nullptr;
+	FShader_SetupPushData* apSetup = nullptr;
+	FShader_PushConstants* apPush  = nullptr;
+};
+
+
+struct ShaderCreate_t
+{
+	const char*                        apName           = nullptr;
+	ShaderStage                        aStages          = ShaderStage_None;
+	EPipelineBindPoint                 aBindPoint       = EPipelineBindPoint_Graphics;
+	EShaderFlags                       aFlags           = EShaderFlags_None;
+	VertexFormat                       aVertexFormat    = VertexFormat_None;
+
+	FShader_Init*                      apInit           = nullptr;
+	FShader_Destroy*                   apDestroy        = nullptr;
+
+	FShader_GetPipelineLayoutCreate*   apLayoutCreate   = nullptr;
+	FShader_GetGraphicsPipelineCreate* apGraphicsCreate = nullptr;
+
+	IShaderPush*                       apShaderPush     = nullptr;
 };
 
 

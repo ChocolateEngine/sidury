@@ -3,12 +3,19 @@
 #include "graphics.h"
 
 
+struct ShaderData_t
+{
+	ShaderStage    aStages = ShaderStage_None;
+};
+
+
 extern IRender*                                         render;
 
 // temp shader
 static Handle                                           gTempShader       = InvalidHandle;
 static Handle                                           gSkyboxShader     = InvalidHandle;
 static Handle                                           gUIShader         = InvalidHandle;
+static Handle                                           gShadowShader     = InvalidHandle;
 static Handle                                           gDbgShader        = InvalidHandle;
 static Handle                                           gDbgLineShader    = InvalidHandle;
 
@@ -18,11 +25,13 @@ static std::unordered_map< Handle, EShaderFlags >       gShaderFlags;      // [s
 static std::unordered_map< Handle, Handle >             gShaderLayouts;    // [shader] = pipeline layout
 static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point
 static std::unordered_map< Handle, Handle >             gShaderMaterials;  // [shader] = uniform layout
-
-// static Handle                                    gPipeline       = InvalidHandle;
-// static Handle                                    gPipelineLayout = InvalidHandle;
+static std::unordered_map< Handle, VertexFormat >       gShaderVertFormat; // [shader] = vertex format
+static std::unordered_map< Handle, FShader_Destroy* >   gShaderDestroy;    // [shader] = shader destroy function
+static std::unordered_map< Handle, IShaderPush* >       gShaderPush;       // [shader] = shader push interface (REMOVE THIS ONE DAY)
+static std::unordered_map< Handle, ShaderData_t >       gShaderData;       // [shader] = assorted shader data
 
 extern Handle                                           gRenderPassGraphics;
+extern Handle                                           gRenderPassShadow;
 
 // descriptor set layouts
 extern UniformBufferArray_t                             gUniformSampler;
@@ -34,6 +43,7 @@ extern UniformBufferArray_t                             gUniformLightPoint;
 extern UniformBufferArray_t                             gUniformLightCone;
 extern UniformBufferArray_t                             gUniformLightCapsule;
 
+static std::unordered_map< ModelSurfaceDraw_t*, void* > gShaderPushData;
 
 CONCMD( shader_reload )
 {
@@ -57,121 +67,25 @@ CONCMD( shader_dump )
 
 
 // --------------------------------------------------------------------------------------
+// Shaders
 
-// shaders, fun
-EShaderFlags Shader_Basic3D_Flags();
-Handle       Shader_Basic3D_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_Basic3D_Destroy();
-void         Shader_Basic3D_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-void         Shader_Basic3D_ResetPushData();
-void         Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
-VertexFormat Shader_Basic3D_GetVertexFormat();
-Handle       Shader_Basic3D_GetPipelineLayout();
-
-EShaderFlags Shader_Skybox_Flags();
-Handle       Shader_Skybox_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_Skybox_Destroy();
-void         Shader_Skybox_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-void         Shader_Skybox_ResetPushData();
-void         Shader_Skybox_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
-VertexFormat Shader_Skybox_GetVertexFormat();
-void         Shader_Skybox_UpdateMaterialData( Handle sMat );
-Handle       Shader_Skybox_GetPipelineLayout();
-
-Handle       Shader_UI_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_UI_Destroy();
-void         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
-
-Handle       Shader_Debug_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_Debug_Destroy();
-void         Shader_Debug_ResetPushData();
-void         Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
-void         Shader_Debug_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-VertexFormat Shader_Debug_GetVertexFormat();
-Handle       Shader_Debug_GetPipelineLayout();
-
-Handle       Shader_DebugLine_Create( Handle sRenderPass, bool sRecreate );
-void         Shader_DebugLine_SetupPushData( ModelSurfaceDraw_t& srDrawInfo );
-void         Shader_DebugLine_PushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo );
-VertexFormat Shader_DebugLine_GetVertexFormat();
-Handle       Shader_DebugLine_GetPipelineLayout();
+extern ShaderCreate_t gShaderCreate_Basic3D;
+extern ShaderCreate_t gShaderCreate_Debug;
+extern ShaderCreate_t gShaderCreate_DebugLine;
+extern ShaderCreate_t gShaderCreate_Skybox;
+// extern ShaderCreate_t gShaderCreate_ShadowMap;
 
 // --------------------------------------------------------------------------------------
 
 
-void Graphics_GetShaderCreateInfo( Handle sRenderPass, PipelineLayoutCreate_t& srPipeline, GraphicsPipelineCreate_t& srGraphics )
-{
-#if 0
-	// TODO: have shader system handle adding layouts here
-	srPipeline.aLayouts.push_back( gLayoutSampler );
-	srPipeline.aLayouts.push_back( gLayoutViewProj );
-	srPipeline.aLayouts.push_back( gLayoutMaterialBasic3D );
-	srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
-	srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
-
-	// --------------------------------------------------------------
-
-	srGraphics.apName = "basic_3d";
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
-
-	Graphics_GetVertexBindingDesc( gVertexFormat, srGraphics.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( gVertexFormat, srGraphics.aVertexAttributes );
-
-	srGraphics.aColorBlendAttachments.emplace_back( false );
-
-	srGraphics.aPrimTopology   = EPrimTopology_Tri;
-	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;
-	srGraphics.aCullMode       = ECullMode_Back;
-	srGraphics.aPipelineLayout = gPipelineLayout;
-	srGraphics.aRenderPass     = sRenderPass;
-	// TODO: expose the rest later
-#endif
-}
-
-
-bool Graphics_CreateShader( IShader* spShader, Handle sRenderPass, bool sRecreate )
-{
-	return false;
-
-	if ( spShader == nullptr )
-	{
-		Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Interface is nullptr!\n" );
-		return false;
-	}
-
-	ShaderInfo_t info{};
-	const char*  name = spShader->GetShaderInfo( info );
-
-	
-	PipelineLayoutCreate_t   pipelineCreateInfo{};
-	GraphicsPipelineCreate_t pipelineInfo{};
-
-	Graphics_GetShaderCreateInfo( sRenderPass, pipelineCreateInfo, pipelineInfo );
-
-	// --------------------------------------------------------------
-
-	if ( sRecreate )
-	{
-		// render->RecreatePipelineLayout( gPipelineLayout, pipelineCreateInfo );
-		// render->RecreateGraphicsPipeline( gPipeline, pipelineInfo );
-	}
-	else
-	{
-		// gPipelineLayout              = render->CreatePipelineLayout( pipelineCreateInfo );
-		// pipelineInfo.aPipelineLayout = gPipelineLayout;
-		// gPipeline                    = render->CreateGraphicsPipeline( pipelineInfo );
-	}
-
-	// gShaderLayouts[ pipeline ] = InvalidHandle;
-}
-
-
-void Graphics_AddShader( const char* spName, Handle sShader, EShaderFlags sFlags, EPipelineBindPoint sBindPoint )
+// TODO: this is mainly geared toward graphics shaders, compute shaders will be a little different
+void Graphics_AddShader(
+  const char*        spName,
+  Handle             sShader,
+  Handle             sLayout,
+  EShaderFlags       sFlags,
+  VertexFormat       sVertFormat,
+  EPipelineBindPoint sBindPoint )
 {
 	if ( !gShaderNames.empty() )
 	{
@@ -183,42 +97,11 @@ void Graphics_AddShader( const char* spName, Handle sShader, EShaderFlags sFlags
 		}
 	}
 
-	gShaderNames[ spName ]      = sShader;
-	gShaderFlags[ sShader ]     = sFlags;
-	gShaderBindPoint[ sShader ] = sBindPoint;
-}
-
-
-void Graphics_AddShader2( IShader* spShader )
-{
-	if ( spShader == nullptr )
-	{
-		Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Interface is nullptr!\n" );
-		return;
-	}
-
-	ShaderInfo_t info{};
-	const char*  name = spShader->GetShaderInfo( info );
-
-	if ( !gShaderNames.empty() )
-	{
-		auto it = gShaderNames.find( name );
-		if ( it != gShaderNames.end() )
-		{
-			Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Shader Already Registered: %s\n", name );
-			return;
-		}
-	}
-
-	gShaderNames[ name ]        = InvalidHandle;
-	// gShaderFlags[ sShader ]     = info.aFlags;
-	// gShaderBindPoint[ sShader ] = info.aBindPoint;
-
-	// if ( !Graphics_CreateShader( spShader ) )
-	// {
-	// 	Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader2: Failed to Create Shader \"%s\"\n", name );
-	// 	return;
-	// }
+	gShaderNames[ spName ]       = sShader;
+	gShaderFlags[ sShader ]      = sFlags;
+	gShaderLayouts[ sShader ]    = sLayout;
+	gShaderBindPoint[ sShader ]  = sBindPoint;
+	gShaderVertFormat[ sShader ] = sVertFormat;
 }
 
 
@@ -250,21 +133,11 @@ const char* Graphics_GetShaderName( Handle sShader )
 
 Handle Shader_GetPipelineLayout( Handle sShader )
 {
-	// HACK HACK HACK
-	if ( sShader == gTempShader )
-		return Shader_Basic3D_GetPipelineLayout();
+	auto it = gShaderLayouts.find( sShader );
+	if ( it != gShaderLayouts.end() )
+		return it->second;
 
-	if ( sShader == gSkyboxShader )
-		return Shader_Skybox_GetPipelineLayout();
-
-	if ( sShader == gDbgShader )
-		return Shader_Debug_GetPipelineLayout();
-
-	if ( sShader == gDbgLineShader )
-		return Shader_DebugLine_GetPipelineLayout();
-
-	Log_Warn( gLC_ClientGraphics, "Shader_GetPipelineLayout(): BAD CODE !!!!!!!\n" );
-
+	Log_ErrorF( gLC_ClientGraphics, "Shader_GetPipelineLayout(): Failed get Shader Pipeline Layout %zd\n", sShader );
 	return InvalidHandle;
 }
 
@@ -290,87 +163,176 @@ void Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFla
 }
 
 
-bool Graphics_ShaderInit2( bool sRecreate )
+bool Shader_CreatePipelineLayout( Handle& srLayout, FShader_GetPipelineLayoutCreate fCreate )
 {
-	// Basic 3D Shader
+	if ( fCreate == nullptr )
 	{
-		auto flags        = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights;
-		auto bindPoint    = EPipelineBindPoint_Graphics;
-		auto vertexFormat = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
+		Log_Error( gLC_ClientGraphics, "FShader_GetPipelineLayoutCreate is nullptr!\n" );
+		return false;
+	}
 
-		PipelineLayoutCreate_t pipelineCreateInfo{};
-		Graphics_AddPipelineLayouts( pipelineCreateInfo, flags );
+	PipelineLayoutCreate_t pipelineCreate{};
+	fCreate( pipelineCreate );
 
-		pipelineCreateInfo.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
+	if ( !render->CreatePipelineLayout( srLayout, pipelineCreate ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create Pipeline Layout\n" );
+		return false;
+	}
+	
+	return true;
+}
 
-		Handle pipelineLayout = InvalidHandle;
-		if ( !render->CreatePipelineLayout( pipelineLayout, pipelineCreateInfo ) )
-		{
-			Log_Error( "Failed to create Pipeline Layout\n" );
-			return false;
-		}
 
-		Graphics_AddShader( "basic_3d", gTempShader, flags, bindPoint );
+bool Shader_CreateGraphicsPipeline( ShaderCreate_t& srCreate, Handle& srPipeline, Handle& srLayout, Handle sRenderPass )
+{
+	if ( srCreate.apGraphicsCreate == nullptr )
+	{
+		Log_Error( gLC_ClientGraphics, "FShader_GetGraphicsPipelineCreate is nullptr!\n" );
+		return false;
+	}
+
+	GraphicsPipelineCreate_t pipelineCreate{};
+	srCreate.apGraphicsCreate( pipelineCreate );
+
+	Graphics_GetVertexBindingDesc( srCreate.aVertexFormat, pipelineCreate.aVertexBindings );
+	Graphics_GetVertexAttributeDesc( srCreate.aVertexFormat, pipelineCreate.aVertexAttributes );
+
+	pipelineCreate.aRenderPass     = sRenderPass;
+	pipelineCreate.apName          = srCreate.apName;
+	pipelineCreate.aPipelineLayout = srLayout;
+
+	if ( !render->CreateGraphicsPipeline( srPipeline, pipelineCreate ) )
+	{
+		Log_ErrorF( "Failed to create Graphics Pipeline for Shader \"%s\"\n", srCreate.apName );
+		return false;
 	}
 
 	return true;
 }
 
 
-bool Graphics_ShaderInit( bool sRecreate )
+bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& srCreate )
 {
-	if ( !( gUIShader = Shader_UI_Create( gRenderPassGraphics, sRecreate ) ) )
+	Handle layout   = InvalidHandle;
+	Handle pipeline = InvalidHandle;
+
+	auto   nameFind = gShaderNames.find( srCreate.apName );
+	if ( nameFind != gShaderNames.end() )
+		pipeline = nameFind->second;
+
+	if ( pipeline )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create ui shader\n" );
+		auto it = gShaderLayouts.find( pipeline );
+		if ( it != gShaderLayouts.end() )
+			layout = it->second;
+	}
+
+	if ( !Shader_CreatePipelineLayout( layout, srCreate.apLayoutCreate ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create Pipeline Layout\n" );
 		return false;
 	}
 
-	if ( !( gTempShader = Shader_Basic3D_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !Shader_CreateGraphicsPipeline( srCreate, pipeline, layout, sRenderPass ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create Graphics Pipeline\n" );
+		return false;
+	}
+
+	gShaderNames[ srCreate.apName ] = pipeline;
+	gShaderFlags[ pipeline ]        = srCreate.aFlags;
+	gShaderLayouts[ pipeline ]      = layout;
+	gShaderBindPoint[ pipeline ]    = srCreate.aBindPoint;
+	gShaderVertFormat[ pipeline ]   = srCreate.aVertexFormat;
+
+	if ( srCreate.apShaderPush )
+		gShaderPush[ pipeline ] = srCreate.apShaderPush;
+
+	gShaderData[ pipeline ]         = {
+				.aStages   = srCreate.aStages,
+	};
+
+	if ( !sRecreate )
+	{
+		if ( srCreate.apDestroy )
+			gShaderDestroy[ pipeline ] = srCreate.apDestroy;
+
+		if ( srCreate.apInit )
+			return srCreate.apInit();
+	}
+
+	return true;
+}
+
+
+void Shader_Destroy( Handle sShader )
+{
+	auto it = gShaderLayouts.find( sShader );
+	if ( it != gShaderLayouts.end() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Shader_Destroy: Failed to find shader: %zd\n", sShader );
+		return;
+	}
+
+	render->DestroyPipelineLayout( it->second );
+	render->DestroyPipeline( sShader );
+
+	for ( const auto& [ name, shader ] : gShaderNames )
+	{
+		if ( shader == sShader )
+		{
+			gShaderNames.erase( name );
+			break;
+		}
+	}
+
+	gShaderFlags.erase( sShader );
+	gShaderLayouts.erase( sShader );
+	gShaderBindPoint.erase( sShader );
+	gShaderVertFormat.erase( sShader );
+	gShaderData.erase( sShader );
+}
+
+
+bool Graphics_ShaderInit( bool sRecreate )
+{
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Basic3D ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create basic_3d shader\n" );
 		return false;
 	}
 
-	if ( !( gSkyboxShader = Shader_Skybox_Create( gRenderPassGraphics, sRecreate ) ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
-		return false;
-	}
-
-	if ( !( gDbgShader = Shader_Debug_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Debug ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create debug shader\n" );
 		return false;
 	}
 
-	if ( !( gDbgLineShader = Shader_DebugLine_Create( gRenderPassGraphics, sRecreate ) ) )
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_DebugLine ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create debug_line shader\n" );
 		return false;
 	}
 
-	if ( !sRecreate )
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Skybox ) )
 	{
-		Graphics_AddShader( "basic_3d", gTempShader, Shader_Basic3D_Flags(), EPipelineBindPoint_Graphics );
-
-		Graphics_AddShader( "skybox", gSkyboxShader,
-		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
-		                    EPipelineBindPoint_Graphics );
-
-		Graphics_AddShader( "imgui", gUIShader,
-		                    EShaderFlags_Sampler | EShaderFlags_PushConstant,
-		                    EPipelineBindPoint_Graphics );
-
-		Graphics_AddShader( "debug", gDbgShader,
-		                    EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
-		                    EPipelineBindPoint_Graphics );
-
-		Graphics_AddShader( "debug_line", gDbgLineShader,
-		                    EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
-		                    EPipelineBindPoint_Graphics );
+		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
+		return false;
 	}
 
+	// if ( !Graphics_CreateShader( sRecreate, gRenderPassShadow, gShaderCreate_ShadowMap ) )
+	// {
+	// 	Log_Error( gLC_ClientGraphics, "Failed to create shadow_map shader\n" );
+	// 	return false;
+	// }
+
 	return true;
+}
+
+
+void Graphics_ShaderDestroy()
+{
 }
 
 
@@ -396,14 +358,36 @@ EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 }
 
 
+IShaderPush* Shader_GetPushInterface( Handle sShader )
+{
+	auto it = gShaderPush.find( sShader );
+	if ( it != gShaderPush.end() )
+		return it->second;
+	
+	Log_Error( gLC_ClientGraphics, "Unable to find Shader Push Constants Interface!\n" );
+	return nullptr;
+}
+
+
+ShaderData_t* Shader_GetData( Handle sShader )
+{
+	auto it = gShaderData.find( sShader );
+	if ( it != gShaderData.end() )
+		return &it->second;
+	
+	Log_Error( gLC_ClientGraphics, "Unable to find Shader Data!\n" );
+	return nullptr;
+}
+
+
 Handle* Shader_GetMaterialUniform( Handle sShader )
 {
 	// HACK HACK HACK
-	if ( sShader == gTempShader )
-		return gUniformMaterialBasic3D.aSets.data();
+	// if ( sShader == gTempShader )
+	return gUniformMaterialBasic3D.aSets.data();
 
-	Log_Error( gLC_ClientGraphics, "TODO: PROPERLY IMPLEMENT GETTING SHADER MATERIAL UNIFORM BUFFER!\n" );
-	return nullptr;
+	// Log_Error( gLC_ClientGraphics, "TODO: PROPERLY IMPLEMENT GETTING SHADER MATERIAL UNIFORM BUFFER!\n" );
+	// return nullptr;
 
 	// auto it = gShaderMaterials.find( sShader );
 	// if ( it != gShaderMaterials.end() )
@@ -470,9 +454,17 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 
 void Shader_ResetPushData()
 {
-	Shader_Basic3D_ResetPushData();
-	Shader_Skybox_ResetPushData();
-	Shader_Debug_ResetPushData();
+	for ( auto& [ renderable, push ] : gShaderPush )
+	{
+		push->apReset();
+	}
+	
+	// for ( auto& [ renderable, data ] : gShaderPushData )
+	// {
+	// 	delete data;
+	// }
+	// 
+	// gShaderPushData.clear();
 }
 
 
@@ -482,17 +474,11 @@ bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRende
 
 	if ( shaderFlags & EShaderFlags_PushConstant )
 	{
-		if ( sShader == gTempShader )
-			Shader_Basic3D_SetupPushData( srRenderable );
+		IShaderPush* shaderPush = Shader_GetPushInterface( sShader );
+		if ( !shaderPush )
+			return false;
 
-		else if ( sShader == gSkyboxShader )
-			Shader_Skybox_SetupPushData( srRenderable );
-
-		else if ( sShader == gDbgShader )
-			Shader_Debug_SetupPushData( srRenderable );
-
-		else if ( sShader == gDbgLineShader )
-			Shader_DebugLine_SetupPushData( srRenderable );
+		shaderPush->apSetup( srRenderable );
 	}
 
 	return true;
@@ -501,21 +487,16 @@ bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRende
 
 bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable )
 {
-	EShaderFlags shaderFlags = Shader_GetFlags( sShader );
+	EShaderFlags  shaderFlags = Shader_GetFlags( sShader );
+	Handle        layout      = Shader_GetPipelineLayout( sShader );
 
 	if ( shaderFlags & EShaderFlags_PushConstant )
 	{
-		if ( sShader == gTempShader )
-			Shader_Basic3D_PushConstants( sCmd, sIndex, srRenderable );
+		IShaderPush* shaderPush = Shader_GetPushInterface( sShader );
+		shaderPush->apPush( sCmd, layout, srRenderable );
 
-		else if ( sShader == gSkyboxShader )
-			Shader_Skybox_PushConstants( sCmd, sIndex, srRenderable );
-
-		else if ( sShader == gDbgShader )
-			Shader_Debug_PushConstants( sCmd, sIndex, srRenderable );
-
-		else if ( sShader == gDbgLineShader )
-			Shader_DebugLine_PushConstants( sCmd, sIndex, srRenderable );
+		// void* data = gShaderPushData.at( &srRenderable );
+		// render->CmdPushConstants( sCmd, layout, shaderData->aStages, 0, shaderData->aPushSize, data );
 	}
 
 	return true;
@@ -524,19 +505,14 @@ bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSur
 
 VertexFormat Shader_GetVertexFormat( Handle sShader )
 {
-	// HACK HACK HACK
-	if ( sShader == gTempShader )
-		return Shader_Basic3D_GetVertexFormat();
+	auto it = gShaderVertFormat.find( sShader );
 
-	if ( sShader == gSkyboxShader )
-		return Shader_Skybox_GetVertexFormat();
+	if ( it == gShaderVertFormat.end() )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to find vertex format for shader!\n" );
+		return VertexFormat_None;
+	}
 
-	if ( sShader == gDbgShader )
-		return Shader_Debug_GetVertexFormat();
-
-	if ( sShader == gDbgLineShader )
-		return Shader_DebugLine_GetVertexFormat();
-
-	return VertexFormat_None;
+	return it->second;
 }
 
