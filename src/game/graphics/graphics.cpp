@@ -26,11 +26,13 @@ void                         Graphics_LoadGltf( const std::string& srBasePath, c
 // shaders, fun
 void                         Shader_Basic3D_UpdateMaterialData( Handle sMat );
 void                         Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor );
+void                         Shader_ShadowMap_SetViewInfo( int sViewInfo );
 
 // --------------------------------------------------------------------------------------
 // General Rendering
 
 // TODO: rethink this so you can have draw ordering
+// use the RenderLayer idea you had
 static std::unordered_map<
   Handle,
   std::forward_list< ModelSurfaceDraw_t > >
@@ -57,9 +59,11 @@ extern std::set< Handle >                        gDirtyMaterials;
 static Handle                                    gSkyboxShader  = InvalidHandle;
 
 static glm::mat4                                 gViewProjMat;
-static std::vector< Handle >                     gViewInfoBuffers( 1 );
+constexpr int                                    MAX_VIEW_INFO_BUFFERS = 32;
+static std::vector< Handle >                     gViewInfoBuffers( MAX_VIEW_INFO_BUFFERS + 1 );
 ViewInfo_t                                       gViewInfo;
 bool                                             gViewInfoUpdate = false;
+int                                              gViewInfoCount  = 1;
 
 static MeshBuilder                               gDebugLineBuilder;
 static Model*                                    gDebugLineModel = nullptr;
@@ -78,7 +82,7 @@ UniformBufferArray_t                             gUniformLightCapsule;
 
 std::unordered_map< Light_t*, Handle >           gLightBuffers;
 
-constexpr int                                    MAX_LIGHTS = 32;
+constexpr int                                    MAX_LIGHTS = MAX_VIEW_INFO_BUFFERS;
 std::vector< Light_t* >                          gLights;
 std::vector< Light_t* >                          gDirtyLights;
 
@@ -91,25 +95,19 @@ static bool                                      gNeedLightInfoUpdate = false;
 // --------------------------------------------------------------------------------------
 // Shadow Mapping
 
-struct ShadowPass_t
+struct ShadowMap_t
 {
-	Handle     aPass         = InvalidHandle;
-	Handle     aTexture[ 2 ] = { InvalidHandle, InvalidHandle };
+	Handle     aTexture     = InvalidHandle;
+	Handle     aFramebuffer = InvalidHandle;
 	glm::ivec2 aSize{};
+	ViewInfo_t aViewInfo{};
+	int        aViewInfoIndex = 0;
 };
 
-struct Push_Shadow_t
-{
-	// model matrix
-	// view * projection
-};
-
-struct UBO_Shadow_t
-{
-};
-
-std::unordered_map< Light_t*, ShadowPass_t >     gLightShadows;
+std::unordered_map< Light_t*, ShadowMap_t >      gLightShadows;
 UniformBufferArray_t                             gUniformShadows;
+
+CONVAR( r_shadowmap_size, 1024 );
 
 // --------------------------------------------------------------------------------------
 // Assets
@@ -337,6 +335,8 @@ bool Graphics_CreateRenderTargets()
 
 void Graphics_DestroyRenderPasses()
 {
+	if ( gRenderPassShadow != InvalidHandle )
+		render->DestroyRenderPass( gRenderPassShadow );
 }
 
 
@@ -344,30 +344,23 @@ bool Graphics_CreateRenderPasses()
 {
 	RenderPassCreate_t create{};
 
-	// ImGui Render Pass
-#if 0
+	// Shadow Map Render Pass
 	{
-		create.aAttachments.resize( 2 );
+		create.aAttachments.resize( 1 );
 
-		create.aAttachments[ 0 ].aFormat  = GraphicsFmt::BGRA8888_UNORM;
+		create.aAttachments[ 0 ].aFormat  = render->GetSwapFormatDepth();
 		create.aAttachments[ 0 ].aUseMSAA = false;
-		create.aAttachments[ 0 ].aType    = EAttachmentType_Color;
+		create.aAttachments[ 0 ].aType    = EAttachmentType_Depth;
 		create.aAttachments[ 0 ].aLoadOp  = EAttachmentLoadOp_Clear;
-
-		create.aAttachments[ 1 ].aFormat  = render->GetSwapFormatDepth();
-		create.aAttachments[ 1 ].aUseMSAA = false;
-		create.aAttachments[ 1 ].aType    = EAttachmentType_Depth;
-		create.aAttachments[ 1 ].aLoadOp  = EAttachmentLoadOp_Clear;
 
 		create.aSubpasses.resize( 1 );
 		create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
 
-		gRenderPassUI                     = render->CreateRenderPass( create );
+		gRenderPassShadow                 = render->CreateRenderPass( create );
 
-		if ( gRenderPassUI == InvalidHandle )
+		if ( gRenderPassShadow == InvalidHandle )
 			return false;
 	}
-#endif
 
 	return true;
 }
@@ -436,6 +429,43 @@ bool Graphics_CreateUniformBuffers( UniformBufferArray_t& srUniform, std::vector
 }
 
 
+void Graphics_AddShadowMap( Light_t* spLight )
+{
+	ShadowMap_t& shadowMap   = gLightShadows[ spLight ];
+	shadowMap.aSize          = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
+	shadowMap.aViewInfoIndex = gViewInfoCount++;
+
+	// Create Textures
+	TextureCreateInfo_t texCreate{};
+	texCreate.apName    = "Shadow Map";
+	texCreate.aSize     = shadowMap.aSize;
+	texCreate.aFormat   = render->GetSwapFormatDepth();
+	texCreate.aViewType = EImageView_2D;
+
+	TextureCreateData_t createData{};
+	createData.aUsage          = EImageUsage_AttachDepthStencil | EImageUsage_Sampled;
+	createData.aFilter         = EImageFilter_Linear;
+	// createData.aSamplerAddress = ESamplerAddressMode_ClampToEdge;
+	createData.aSamplerAddress = ESamplerAddressMode_ClampToBorder;
+
+	shadowMap.aTexture         = render->CreateTexture( texCreate, createData );
+
+	// Create Framebuffer
+	CreateFramebuffer_t frameBufCreate{};
+	frameBufCreate.aRenderPass = gRenderPassShadow;  // ImGui will be drawn onto the graphics RenderPass
+	frameBufCreate.aSize       = shadowMap.aSize;
+
+	// Create Color
+	frameBufCreate.aPass.aAttachDepth = shadowMap.aTexture;
+	shadowMap.aFramebuffer            = render->CreateFramebuffer( frameBufCreate );
+
+	if ( shadowMap.aFramebuffer == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create shadow map!\n" );
+	}
+}
+
+
 Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
 	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
@@ -463,6 +493,11 @@ Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBu
 
 	render->UpdateVariableDescSet( update );
 
+	if ( spLight->aType == ELightType_Cone )
+	{
+		Graphics_AddShadowMap( spLight );
+	}
+
 	return buffer;
 }
 
@@ -479,7 +514,7 @@ bool Graphics_CreateDescriptorSets()
 	// Create ViewInfo UBO
 	{
 		gUniformViewInfo.aSets.resize( 2 );
-		if ( !Graphics_CreateVariableUniformLayout( gUniformViewInfo, "View Info Layout", "View Info Set", 1 ) )
+		if ( !Graphics_CreateVariableUniformLayout( gUniformViewInfo, "View Info Layout", "View Info Set", gViewInfoBuffers.size() ) )
 			return false;
 
 		// create buffer for it
@@ -660,7 +695,8 @@ bool Graphics_Init()
 
 	// TEMP: make a world light
 	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
-	gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
+	// gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
+	gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
 
 	return render->InitImGui( gRenderPassGraphics );
 	// return render->InitImGui( gRenderPassGraphics );
@@ -787,7 +823,7 @@ void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Graphics_DrawShaderRenderables( Handle cmd, Handle shader )
+void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::forward_list< ModelSurfaceDraw_t >& srRenderList )
 {
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
@@ -795,10 +831,9 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader )
 		return;
 	}
 
-	auto&               renderList     = gMeshDrawList[ shader ];
 	ModelSurfaceDraw_t* prevRenderable = nullptr;
 
-	for ( auto& renderable : renderList )
+	for ( auto& renderable : srRenderList )
 	{
 		// if ( prevRenderable != renderable || prevMatIndex != matIndex )
 		// if ( prevRenderable && prevRenderable->aModel != renderable->aModel || prevMatIndex != matIndex )
@@ -812,6 +847,56 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader )
 			continue;
 
 		Graphics_CmdDrawModel( cmd, renderable );
+	}
+}
+
+
+CONVAR( r_shadowmap_constant, 1.25f );
+CONVAR( r_shadowmap_clamp, 0.f );
+CONVAR( r_shadowmap_slope, 1.75f );
+
+
+void Graphics_RenderShadowMaps( Handle cmd, Light_t* spLight, const ShadowMap_t& srShadowMap )
+{
+	// fun
+	static Handle shadow_map = Graphics_GetShader( "__shadow_map" );
+
+	if ( shadow_map == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "No Shadow Map Shader!\n" );
+		return;
+	}
+
+	Rect2D_t rect{};
+	rect.aOffset.x = 0;
+	rect.aOffset.y = 0;
+	rect.aExtent.x = srShadowMap.aSize.x;
+	rect.aExtent.y = srShadowMap.aSize.y;
+
+	render->CmdSetScissor( cmd, 0, &rect, 1 );
+
+	Viewport_t viewPort{};
+	viewPort.x        = 0.f;
+	viewPort.y        = 0.f;
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 1.f;
+	viewPort.width    = srShadowMap.aSize.x;
+	viewPort.height   = srShadowMap.aSize.y;
+
+	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+	render->CmdSetDepthBias( cmd, r_shadowmap_constant, r_shadowmap_clamp, r_shadowmap_slope );
+
+	// HACK: need to setup a view push and pop system?
+	Shader_ShadowMap_SetViewInfo( srShadowMap.aViewInfoIndex );
+
+	for ( auto& [ shader, renderList ] : gMeshDrawList )
+	{
+		EShaderFlags flags = Shader_GetFlags( shader );
+
+		// TODO: change this so meshes can specify whether they receive and/or cast shadows
+		if ( flags & EShaderFlags_Lights )
+			Graphics_DrawShaderRenderables( cmd, shadow_map, renderList );
 	}
 }
 
@@ -846,8 +931,6 @@ void Graphics_Render( Handle cmd )
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-	ModelSurfaceDraw_t* prevRenderable = nullptr;
-
 	// TODO: still could be better, but it's better than what we used to have
 	for ( auto& [ shader, renderList ] : gMeshDrawList )
 	{
@@ -857,7 +940,7 @@ void Graphics_Render( Handle cmd )
 			continue;
 		}
 
-		Graphics_DrawShaderRenderables( cmd, shader );
+		Graphics_DrawShaderRenderables( cmd, shader, renderList );
 	}
 
 	// Draw Skybox - and set depth for skybox
@@ -868,9 +951,14 @@ void Graphics_Render( Handle cmd )
 
 		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-		Graphics_DrawShaderRenderables( cmd, skybox );
+		Graphics_DrawShaderRenderables( cmd, skybox, gMeshDrawList[ skybox ] );
 	}
 }
+
+
+CONVAR( r_shadowmap_fov_hack, 90.f );
+CONVAR( r_shadowmap_nearz, 1.f );
+CONVAR( r_shadowmap_farz, 10000.f );
 
 
 void Graphics_UpdateLightBuffer( Light_t* spLight )
@@ -913,6 +1001,58 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 	else
 	{
 		buffer = it->second;
+	}
+
+	if ( spLight->aType == ELightType_Cone )
+	{
+		// update shadow map view info
+		ShadowMap_t& shadowMap = gLightShadows[ spLight ];
+
+		ViewportCamera_t view{};
+		view.aFarZ  = r_shadowmap_farz;
+		view.aNearZ = r_shadowmap_nearz;
+		// view.aFOV   = spLight->aOuterFov;
+		view.aFOV   = r_shadowmap_fov_hack;
+
+		Transform transform{};
+		transform.aPos = spLight->aPos;
+		// transform.aAng = spLight->aAng;
+
+		transform.aAng.x = -spLight->aAng.z + 90.f;
+		transform.aAng.y = -spLight->aAng.y;
+		transform.aAng.z = spLight->aAng.x;
+
+		// // transform.aAng.y = -spLight->aAng.y;
+		// transform.aAng.y = spLight->aAng.y;
+		// // transform.aAng.z = -spLight->aAng.x + 90.f;
+		// transform.aAng.z = spLight->aAng.x;
+
+		// uh
+		// transform.aAng.x += 180.f;
+		// transform.aAng.y += -90.f;
+		
+		view.aViewMat  = transform.ToViewMatrixZ();
+		// view.aViewMat  = transform.ToViewMatrixY();
+		view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
+
+		shadowMap.aViewInfo.aProjection = view.aProjMat;
+		shadowMap.aViewInfo.aView       = view.aViewMat;
+		shadowMap.aViewInfo.aProjView   = view.aProjViewMat;
+		shadowMap.aViewInfo.aNearZ      = view.aNearZ;
+		shadowMap.aViewInfo.aFarZ       = view.aFarZ;
+
+		{
+			glm::vec3 forward, right, up;
+			// Util_GetMatrixDirection( view.aViewMat, &forward, &right, &up );
+			Util_GetViewMatrixZDirection( view.aViewMat, forward, right, up );
+
+			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( forward * 32.f ), { 1, 0, 0 } );
+			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( right * 32.f ), { 0, 1, 0 } );
+			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( up * 32.f ), { 0, 0, 1 } );
+		}
+
+		Handle buffer = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
+		render->MemWriteBuffer( buffer, sizeof( ViewInfo_t ), &shadowMap.aViewInfo );
 	}
 
 	switch ( spLight->aType )
@@ -988,6 +1128,12 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+			
+			// get shadow map view info
+			ShadowMap_t& shadowMap = gLightShadows[ spLight ];
+			light.aViewInfo        = shadowMap.aViewInfoIndex;
+			// light.aShadow          = render->GetTextureIndex( shadowMap.aTexture[ 1 ] );
+			light.aShadow          = render->GetTextureIndex( shadowMap.aTexture );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -1021,6 +1167,9 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 void Graphics_PrepareDrawData()
 {
+	// fun
+	static Handle shadow_map = Graphics_GetShader( "__shadow_map" );
+
 	render->PreRenderPass();
 	
 	// glm::vec3 ang( r_world_dir_x.GetFloat(), r_world_dir_y.GetFloat(), r_world_dir_z.GetFloat() );
@@ -1051,8 +1200,9 @@ void Graphics_PrepareDrawData()
 	gDirtyMaterials.clear();
 
 	// Update UBO's for lights if needed
-	for ( Light_t* light : gDirtyLights )
-		Graphics_UpdateLightBuffer( light );
+	// for ( Light_t* light : gDirtyLights )
+	// for ( Light_t* light : gLights )
+	// 	Graphics_UpdateLightBuffer( light );
 
 	gDirtyLights.clear();
 
@@ -1066,7 +1216,8 @@ void Graphics_PrepareDrawData()
 	if ( gViewInfoUpdate )
 	{
 		gViewInfoUpdate = false;
-		for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
+		// for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
+		for ( size_t i = 0; i < 1; i++ )
 			render->MemWriteBuffer( gViewInfoBuffers[ i ], sizeof( ViewInfo_t ), &gViewInfo );
 	}
 
@@ -1083,6 +1234,12 @@ void Graphics_PrepareDrawData()
 		for ( auto& renderable : renderList )
 		{
 			Shader_SetupRenderableDrawData( shader, renderable );
+
+			EShaderFlags flags = Shader_GetFlags( shader );
+
+			// TODO: change this so meshes can specify whether they receive and/or cast shadows
+			if ( flags & EShaderFlags_Lights )
+				Shader_SetupRenderableDrawData( shadow_map, renderable );
 		}
 	}
 }
@@ -1101,6 +1258,9 @@ void Graphics_Present()
 	for ( gCmdIndex = 0; gCmdIndex < gCommandBuffers.size(); gCmdIndex++ )
 	{
 		auto c = gCommandBuffers[ gCmdIndex ];
+
+		for ( Light_t* light : gLights )
+			Graphics_UpdateLightBuffer( light );
 
 		render->BeginCommandBuffer( c );
 
@@ -1138,12 +1298,29 @@ void Graphics_Present()
 		render->EndRenderPass( c );
 #endif
 
+		for ( const auto& [ light, shadowMap ] : gLightShadows )
+		{
+			renderPassBegin.aRenderPass  = gRenderPassShadow;
+			renderPassBegin.aFrameBuffer = shadowMap.aFramebuffer;
+			renderPassBegin.aClear.resize( 1 );
+			renderPassBegin.aClear[ 0 ].aDepth   = 1.f;
+			renderPassBegin.aClear[ 0 ].aIsDepth = true;
+
+			if ( renderPassBegin.aFrameBuffer == InvalidHandle )
+				continue;
+
+			render->BeginRenderPass( c, renderPassBegin );
+			Graphics_RenderShadowMaps( c, light, shadowMap );
+			render->EndRenderPass( c );
+		}
+
 		// ----------------------------------------------------------
 		// Main RenderPass
 		renderPassBegin.aRenderPass  = gRenderPassGraphics;
 		renderPassBegin.aFrameBuffer = gBackBuffer[ gCmdIndex ];
 		renderPassBegin.aClear.resize( 2 );
 		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 0 ].aIsDepth = false;
 		renderPassBegin.aClear[ 1 ].aDepth   = 1.f;
 		renderPassBegin.aClear[ 1 ].aIsDepth = true;
 
@@ -1164,7 +1341,7 @@ void Graphics_Present()
 
 void Graphics_SetViewProjMatrix( const glm::mat4& srMat )
 {
-	gViewInfo.aViewProj = srMat;
+	gViewInfo.aProjView = srMat;
 	gViewProjMat = srMat;
 	gViewInfoUpdate = true;
 }

@@ -54,11 +54,11 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 		modelDraw.aModelMatrix = transform.ToMatrix( false );
 	}
 	
-	glm::vec3 modelForward, modelRight, modelUp;
-	Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
-	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelForward * r_light_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
-	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelRight * r_light_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
-	Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelUp * r_light_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
+	// glm::vec3 modelForward, modelRight, modelUp;
+	// Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
+	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelForward * r_light_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
+	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelRight * r_light_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
+	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelUp * r_light_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
 
 	if ( r_light_line )
 	{
@@ -128,22 +128,32 @@ void LightEditor_DrawEditor()
 	{
 		Light_t* light      = Graphics_CreateLight( ELightType_Point );
 
-		light->aPos         = playerTransform.aPos + camTransform.aPos;
-		// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
-		light->aColor       = { 1, 1, 1 };
-		light->aRadius      = 500;
+		if ( light != nullptr )
+		{
+			light->aPos         = playerTransform.aPos + camTransform.aPos;
+			// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
+			light->aColor       = { 1, 1, 1 };
+			light->aRadius      = 500;
+		}
 	}
 
 	if ( ImGui::Button( "Create Cone Light" ) )
 	{
 		Light_t* light = Graphics_CreateLight( ELightType_Cone );
 
-		light->aPos    = playerTransform.aPos + camTransform.aPos;
-		light->aColor  = { 10, 10, 10 };
-		light->aAng    = camTransform.aAng;
+		if ( light != nullptr )
+		{
+			light->aPos    = playerTransform.aPos + camTransform.aPos;
+			light->aColor  = { 10, 10, 10 };
 
-		light->aInnerFov = 0.f;  // FOV
-		light->aOuterFov = 45.f;  // FOV
+			// weird stuff to get the angle of the light correct from the player's view matrix stuff
+			light->aAng.x =  camTransform.aAng.z;
+			light->aAng.y = -camTransform.aAng.y;
+			light->aAng.z = -camTransform.aAng.x + 90.f;
+
+			light->aInnerFov = 0.f;  // FOV
+			light->aOuterFov = 45.f;  // FOV
+		}
 	}
 
 	// Show list of lights

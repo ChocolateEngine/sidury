@@ -244,6 +244,7 @@ struct UBO_LightCone_t
 	alignas( 16 ) glm::vec3 aPos{};
 	alignas( 16 ) glm::vec3 aDir{};
 	alignas( 16 ) glm::vec2 aFov{};
+	int aViewInfo = -1;
 	int aShadow = -1;
 };
 
@@ -285,10 +286,12 @@ struct UBO_ViewInfo_t
 
 struct ViewInfo_t
 {
-	glm::mat4 aViewProj{};
+	glm::mat4 aProjView{};
 	glm::mat4 aProjection{};
 	glm::mat4 aView{};
 	glm::vec3 aViewPos{};
+	float     aNearZ = 0.f;
+	float     aFarZ  = 0.f;
 };
 
 extern ViewInfo_t  gViewInfo;
@@ -501,7 +504,9 @@ bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
 bool               Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable );
 bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
+
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
+EShaderFlags       Shader_GetFlags( Handle sShader );
 
 // ---------------------------------------------------------------------------------------
 // Buffers

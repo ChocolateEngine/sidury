@@ -73,7 +73,7 @@ extern ShaderCreate_t gShaderCreate_Basic3D;
 extern ShaderCreate_t gShaderCreate_Debug;
 extern ShaderCreate_t gShaderCreate_DebugLine;
 extern ShaderCreate_t gShaderCreate_Skybox;
-// extern ShaderCreate_t gShaderCreate_ShadowMap;
+extern ShaderCreate_t gShaderCreate_ShadowMap;
 
 // --------------------------------------------------------------------------------------
 
@@ -111,7 +111,7 @@ Handle Graphics_GetShader( std::string_view sName )
 	if ( it != gShaderNames.end() )
 		return it->second;
 
-	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %s\n", sName );
+	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %s\n", sName.data() );
 	return InvalidHandle;
 }
 
@@ -321,11 +321,11 @@ bool Graphics_ShaderInit( bool sRecreate )
 		return false;
 	}
 
-	// if ( !Graphics_CreateShader( sRecreate, gRenderPassShadow, gShaderCreate_ShadowMap ) )
-	// {
-	// 	Log_Error( gLC_ClientGraphics, "Failed to create shadow_map shader\n" );
-	// 	return false;
-	// }
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassShadow, gShaderCreate_ShadowMap ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create shadow_map shader\n" );
+		return false;
+	}
 
 	return true;
 }
