@@ -27,35 +27,23 @@ struct SiduryMap
 	MapInfo *aMapInfo = nullptr;
 	ModelDraw_t aRenderable{};
 
-#if BULLET_PHYSICS
 	std::vector< IPhysicsShape* >  aWorldPhysShapes;
 	std::vector< IPhysicsObject* > aWorldPhysObjs;
-#endif
 };
 
 
-class MapManager
-{
-public:
-	MapManager();
-	~MapManager();
+bool      MapManager_LoadMap( const std::string& path );
+void      MapManager_CloseMap();
+bool      MapManager_HasMap();
 
-	bool            LoadMap( const std::string& path );
-	void            CloseMap();
+void      MapManager_Update();
 
-	void            Update();
+MapInfo*  MapManager_ParseMapInfo( const std::string& path );
+bool      MapManager_LoadWorldModel();
+// void            MapManager_ParseEntities( const std::string &path );
+void      MapManager_SpawnPlayer();
 
-	MapInfo        *ParseMapInfo( const std::string &path );
-	bool            LoadWorldModel();
-	// void            ParseEntities( const std::string &path );
-	void            SpawnPlayer();
+glm::vec3 MapManager_GetSpawnPos();
+glm::vec3 MapManager_GetSpawnAng();
 
-	glm::vec3       GetSpawnPos();
-	glm::vec3       GetSpawnAng();
-
-	SiduryMap      *apMap = nullptr;
-};
-
-
-extern MapManager *mapmanager;
 

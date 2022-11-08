@@ -101,84 +101,82 @@ struct CPlayerInfo
 
 
 // This is really just the old Player class just jammed into one "system"
-class PlayerMovement: public System
+class PlayerMovement : public System
 {
-public:
-	void                    OnPlayerSpawn( Entity player );
-	void                    OnPlayerRespawn( Entity player );
+  public:
+	void             OnPlayerSpawn( Entity player );
+	void             OnPlayerRespawn( Entity player );
 
-	void                    MovePlayer( Entity player );
+	void             MovePlayer( Entity player );
 
-	void                    UpdateInputs(  );
-	void                    UpdatePosition( Entity player );
+	void             UpdateInputs();
+	void             UpdatePosition( Entity player );
 
-	void                    DisplayPlayerStats( Entity player ) const;
-	float                   GetViewHeight(  );
+	void             DisplayPlayerStats( Entity player ) const;
+	float            GetViewHeight();
 
-	void                    SetPos( const glm::vec3& origin );
-	const glm::vec3&        GetPos(  ) const;
+	void             SetPos( const glm::vec3& origin );
+	const glm::vec3& GetPos() const;
 
-	void                    SetAng( const glm::vec3& angles );
-	const glm::vec3&        GetAng(  ) const;
+	void             SetAng( const glm::vec3& angles );
+	const glm::vec3& GetAng() const;
 
-	void                    DetermineMoveType(  );
+	void             DetermineMoveType();
 
 	// std::string             GetStepSound(  );
-	Handle                  GetStepSound(  );
+	Handle           GetStepSound();
 
-	void                    PlayStepSound(  );
-	void                    StopStepSound( bool force = false );  // Temp Hack for sound system
+	void             PlayStepSound();
+	void             StopStepSound( bool force = false );  // Temp Hack for sound system
 
 	// Sound for colliding onto stuff or landing on the ground
-	void                    PlayImpactSound(  );
-	void                    StopImpactSound(  );  // Temp Hack for sound system
+	void             PlayImpactSound();
+	void             StopImpactSound();  // Temp Hack for sound system
 
-	bool                    CalcOnGround(  );
-	bool                    IsOnGround(  );
-	bool                    WasOnGround(  );
-	void                    DoRayCollision(  );
+	bool             CalcOnGround();
+	bool             IsOnGround();
+	bool             WasOnGround();
 
-	float                   GetMoveSpeed( glm::vec3 &wishDir, glm::vec3 &wishVel );
-	float                   GetMaxSpeed(  );
-	float                   GetMaxSpeedBase(  );
-	float                   GetMaxSprintSpeed(  );
-	float                   GetMaxDuckSpeed(  );
+	float            GetMoveSpeed( glm::vec3& wishDir, glm::vec3& wishVel );
+	float            GetMaxSpeed();
+	float            GetMaxSpeedBase();
+	float            GetMaxSprintSpeed();
+	float            GetMaxDuckSpeed();
 
-	void                    BaseFlyMove(  );
-	void                    NoClipMove(  );
-	void                    FlyMove(  );
-	void                    WalkMove(  );
+	void             BaseFlyMove();
+	void             NoClipMove();
+	void             FlyMove();
+	void             WalkMove();
 
-	void                    WalkMovePostPhys(  );  // um
+	void             WalkMovePostPhys();  // um
 
-	void                    DoSmoothDuck(  );
-	void                    DoSmoothLand( bool wasOnGround );
-	void                    DoViewBob(  );
-	void                    DoViewTilt(  );
+	void             DoSmoothDuck();
+	void             DoSmoothLand( bool wasOnGround );
+	void             DoViewBob();
+	void             DoViewTilt();
 
 	// TODO: remove these first 2 when physics finally works to a decent degree
-	void                    AddFriction(  );
-	void                    AddGravity(  );
-	void                    Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
+	void             AddFriction();
+	void             Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
-	void                    SetMoveType( CPlayerMoveData& move, PlayerMoveType type );
-	void                    SetCollisionEnabled( bool enable );
-	void                    SetGravity( const glm::vec3& gravity );
-	void                    EnableGravity( bool enabled );
+	void             SetMoveType( CPlayerMoveData& move, PlayerMoveType type );
+	void             SetCollisionEnabled( bool enable );
+	void             SetGravity( const glm::vec3& gravity );
+	void             EnableGravity( bool enabled );
 
-	inline bool             IsInSprint(  )      { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
-	inline bool             IsInDuck(  )        { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
+	inline bool      IsInSprint() { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
+	inline bool      IsInDuck() { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
 
-	inline bool             WasInSprint(  )     { return apMove ? apMove->aPrevPlayerFlags & PlyInSprint : false; }
-	inline bool             WasInDuck(  )       { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
+	inline bool      WasInSprint() { return apMove ? apMove->aPrevPlayerFlags & PlyInSprint : false; }
+	inline bool      WasInDuck() { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
 	// store it for use in functions, save on GetComponent calls
-	Entity                  aPlayer = ENT_INVALID;
-	CPlayerMoveData*        apMove = nullptr;
-	CRigidBody*             apRigidBody = nullptr;
-	Transform*              apTransform = nullptr;
-	CCamera*                apCamera = nullptr;
-	CDirection*             apDir = nullptr;
+	Entity           aPlayer     = ENT_INVALID;
+	CPlayerMoveData* apMove      = nullptr;
+	CRigidBody*      apRigidBody = nullptr;
+	Transform*       apTransform = nullptr;
+	CCamera*         apCamera    = nullptr;
+	CDirection*      apDir       = nullptr;
 
 	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;

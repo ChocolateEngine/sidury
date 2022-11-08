@@ -39,12 +39,7 @@ ConVar max_speed( "sv_max_speed", DEFAULT_SPEED );  // 320.f
 ConVar accel_speed( "sv_accel_speed", 10 );
 ConVar accel_speed_air( "sv_accel_speed_air", 30 );
 ConVar jump_force( "sv_jump_force", 250 );
-
-#if BULLET_PHYSICS
 ConVar stop_speed( "sv_stop_speed", 25 );
-#else
-ConVar stop_speed( "sv_stop_speed", 75 );
-#endif
 
 CONVAR( sv_friction, 8 );  // 4.f
 CONVAR( sv_friction_enable, 1 );
@@ -85,6 +80,26 @@ CONVAR( cl_zoom_fov, 40 );
 CONVAR( cl_zoom_duration, 0.4 );
 
 CONVAR( cl_duck_time, 0.4 );
+
+CONVAR( cl_land_smoothing, 1 );
+CONVAR( cl_land_max_speed, 1000 );
+CONVAR( cl_land_power, 1 );          // 2
+CONVAR( cl_land_vel_scale, 1 );      // 0.01
+CONVAR( cl_land_power_scale, 100 );  // 0.01
+CONVAR( cl_land_timevar, 2 );
+
+CONVAR( cl_bob_enabled, 1 );
+CONVAR( cl_bob_magnitude, 2 );
+CONVAR( cl_bob_freq, 4.5 );
+CONVAR( cl_bob_speed_scale, 0.013 );
+CONVAR( cl_bob_exit_lerp, 0.1 );
+CONVAR( cl_bob_exit_threshold, 0.1 );
+CONVAR( cl_bob_sound_threshold, 0.1 );
+CONVAR( cl_bob_offset, 0.25 );
+CONVAR( cl_bob_time_offset, -0.6 );
+CONVAR( cl_bob_debug, 0 );
+
+CONVAR( r_flashlight_brightness, 10.f );
 
 extern ConVar   m_yaw, m_pitch;
 
@@ -131,10 +146,8 @@ float vec3_norm(glm::vec3& v)
 PlayerManager* players = nullptr;
 
 // HACKY HACKY HACK
-#if BULLET_PHYSICS
 IPhysicsObject* apPhysObj = nullptr;
 IPhysicsShape*  apPhysShape = nullptr;
-#endif
 
 PlayerManager::PlayerManager()
 {
@@ -174,7 +187,7 @@ Entity PlayerManager::Create()
 	Light_t* flashlight = Graphics_CreateLight( ELightType_Cone );
 	flashlight->aInnerFov = 0.f ;
 	flashlight->aOuterFov = 45.f;
-	flashlight->aColor    = { 2.f, 2.f, 2.f };
+	flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 
 	entities->AddComponent< Light_t* >( player, flashlight );
 
@@ -206,7 +219,7 @@ Entity PlayerManager::Create()
 	apPhysObj->SetLinearVelocity( {0, 0, 0} );
 	apPhysObj->SetAngularVelocity( {0, 0, 0} );
 
-	gamephys.SetMaxVelocities( apPhysObj );
+	Phys_SetMaxVelocities( apPhysObj );
 
 	apPhysObj->SetFriction( phys_friction_player );
 
@@ -233,26 +246,25 @@ void PlayerManager::Spawn( Entity player )
 
 void PlayerManager::Respawn( Entity player )
 {
-	auto& rigidBody = GetRigidBody( player );
-	auto& transform = GetTransform( player );
+	auto& rigidBody    = GetRigidBody( player );
+	auto& transform    = GetTransform( player );
 	auto& camTransform = GetCamera( player ).aTransform;
-	auto& zoom = GetPlayerZoom( player );
+	auto& zoom         = GetPlayerZoom( player );
 
-	transform.aPos = mapmanager->GetSpawnPos();
-	transform.aAng = {0, mapmanager->GetSpawnAng().y, 0};
-	camTransform.aAng = mapmanager->GetSpawnAng();
-	rigidBody.aVel = {0, 0, 0};
-	rigidBody.aAccel = {0, 0, 0};
+	transform.aPos     = MapManager_GetSpawnPos();
+	transform.aAng     = { 0, MapManager_GetSpawnAng().y, 0 };
+	camTransform.aAng  = MapManager_GetSpawnAng();
+	rigidBody.aVel     = { 0, 0, 0 };
+	rigidBody.aAccel   = { 0, 0, 0 };
 
-	zoom.aOrigFov = r_fov;
-	zoom.aNewFov = r_fov;
+	zoom.aOrigFov      = r_fov;
+	zoom.aNewFov       = r_fov;
 
 	apPhysObj->SetLinearVelocity( { 0, 0, 0 } );
 
 	apMove->OnPlayerRespawn( player );
 }
 
-CONVAR( player_line_dist, 32.f );
 
 void PlayerManager::Update( float frameTime )
 {
@@ -271,25 +283,21 @@ void PlayerManager::Update( float frameTime )
 
 			if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
 			{
-				if ( flashlight->aColor.x != 0.f )
-				{
-					flashlight->aColor = { 0, 0, 0 };
-					Graphics_UpdateLight( flashlight );
-				}
-				else
-				{
-					flashlight->aColor = { 10, 10, 10 };
-				}
+				flashlight->aEnabled = !flashlight->aEnabled;
 			}
 
-			if ( flashlight->aColor.x != 0.f )
+			if ( flashlight->aEnabled )
 			{
+				flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+
 				flashlight->aPos = transform.aPos + camera.aTransform.aPos;
 				flashlight->aPos.z -= 4.f;
+
 				// weird stuff to get the angle of the light correct
 				flashlight->aAng.x = camera.aTransform.aAng.z;
 				flashlight->aAng.y = -camera.aTransform.aAng.y;
 				flashlight->aAng.z = -camera.aTransform.aAng.x + 90.f;
+
 				Graphics_UpdateLight( flashlight );
 			}
 		}
@@ -537,13 +545,11 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 {
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 
-#if BULLET_PHYSICS
 	Transform transform = entities->GetComponent< Transform >( player );
 	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
 	transform.aPos.z += phys_player_offset;
 
 	apPhysObj->SetPos( transform.aPos );
-#endif
 
 	// Init Smooth Duck
 	move.aTargetViewHeight = GetViewHeight();
@@ -561,7 +567,6 @@ void PlayerMovement::MovePlayer( Entity player )
 	apDir = &entities->GetComponent< CDirection >( player );
 	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
 
-#if BULLET_PHYSICS
 	apPhysObj->SetAllowDebugDraw( phys_dbg_player );
 
 	// update velocity
@@ -571,7 +576,6 @@ void PlayerMovement::MovePlayer( Entity player )
 	//apPhysObj->SetAngularFactor( 0 );
 	//apPhysObj->SetAngularVelocity( {0, 0, 0} );
 	apPhysObj->SetFriction( phys_friction_player );
-#endif
 
 	UpdateInputs();
 
@@ -652,18 +656,13 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, PlayerMoveType type )
 
 void PlayerMovement::SetCollisionEnabled( bool enable )
 {
-#if BULLET_PHYSICS
 	apPhysObj->SetCollisionEnabled( enable );
-#endif
 }
 
 
 void PlayerMovement::EnableGravity( bool enabled )
 {
-#if BULLET_PHYSICS
-	// apPhysObj->SetGravity( enabled ? physenv->GetGravity() : glm::vec3(0, 0, 0) );
 	apPhysObj->SetGravityEnabled( enabled );
-#endif
 }
 
 // ============================================================
@@ -879,12 +878,6 @@ void PlayerMovement::DoSmoothDuck()
 }
 
 
-// temporarily using bullet directly until i abstract this
-void PlayerMovement::DoRayCollision(  )
-{
-}
-
-
 CONVAR( phys_player_max_slope_ang, 40 );
 
 
@@ -907,10 +900,11 @@ bool PlayerMovement::CalcOnGround()
 }
 
 
-bool PlayerMovement::IsOnGround(  )
+bool PlayerMovement::IsOnGround()
 {
 	return apMove->aPlayerFlags & PlyOnGround;
 }
+
 
 bool PlayerMovement::WasOnGround()
 {
@@ -932,24 +926,28 @@ float PlayerMovement::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 	return wishspeed;
 }
 
-float PlayerMovement::GetMaxSpeed(  )
+
+float PlayerMovement::GetMaxSpeed()
 {
 	return apMove->aMaxSpeed;
 }
 
-float PlayerMovement::GetMaxSpeedBase(  )
+
+float PlayerMovement::GetMaxSpeedBase()
 {
 	return max_speed;
 }
 
-float PlayerMovement::GetMaxSprintSpeed(  )
+
+float PlayerMovement::GetMaxSprintSpeed()
 {
-	return GetMaxSpeedBase(  ) * sv_sprint_mult;
+	return GetMaxSpeedBase() * sv_sprint_mult;
 }
 
-float PlayerMovement::GetMaxDuckSpeed(  )
+
+float PlayerMovement::GetMaxDuckSpeed()
 {
-	return GetMaxSpeedBase(  ) * sv_duck_mult;
+	return GetMaxSpeedBase() * sv_duck_mult;
 }
 
 
@@ -1000,7 +998,7 @@ void PlayerMovement::StopStepSound( bool force )
 }
 
 
-void PlayerMovement::PlayStepSound(  )
+void PlayerMovement::PlayStepSound()
 {
 	if ( !cl_step_sound.GetBool() )
 		return;
@@ -1067,54 +1065,40 @@ void PlayerMovement::PlayImpactSound()
 }
 
 
-void PlayerMovement::BaseFlyMove(  )
+void PlayerMovement::BaseFlyMove()
 {
-	glm::vec3 wishvel(0,0,0);
-	glm::vec3 wishdir(0,0,0);
+	glm::vec3 wishvel( 0, 0, 0 );
+	glm::vec3 wishdir( 0, 0, 0 );
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[i] = apCamera->aForward[i]*apRigidBody->aAccel.x + apCamera->aRight[i]*apRigidBody->aAccel[W_RIGHT];
+		wishvel[ i ] = apCamera->aForward[ i ] * apRigidBody->aAccel.x + apCamera->aRight[ i ] * apRigidBody->aAccel[ W_RIGHT ];
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	AddFriction(  );
+	AddFriction();
 	Accelerate( wishspeed, wishdir );
 }
 
 
-void PlayerMovement::NoClipMove(  )
+void PlayerMovement::NoClipMove()
 {
-	BaseFlyMove(  );
-
-#if BULLET_PHYSICS
-	//SET_VELOCITY();
+	BaseFlyMove();
 	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
-#else
-	UpdatePosition( aPlayer );
-#endif
 }
 
 
-void PlayerMovement::FlyMove(  )
+void PlayerMovement::FlyMove()
 {
-	BaseFlyMove(  );
-
-#if BULLET_PHYSICS
-	//SET_VELOCITY();
+	BaseFlyMove();
 	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
-#else
-	UpdatePosition( aPlayer );
-#endif
-
-	DoRayCollision(  );
 }
 
 
 CONVAR( cl_land_sound_threshold, 0.1 );
 
 
-void PlayerMovement::WalkMove(  )
+void PlayerMovement::WalkMove()
 {
 	glm::vec3 wishvel = apDir->aForward*apRigidBody->aAccel.x + apDir->aRight*apRigidBody->aAccel[W_RIGHT];
 	wishvel[W_UP] = 0.f;
@@ -1128,37 +1112,22 @@ void PlayerMovement::WalkMove(  )
 
 	if ( onGround )
 	{
-#if 1 // !BULLET_PHYSICS
-		// bullet friction is kinda meh
+		// physics engine friction is kinda meh
 		if ( sv_friction_enable )
-			AddFriction(  );
-#endif
+			AddFriction();
+
 		Accelerate( wishspeed, wishdir, false );
 	}
 	else
 	{	// not on ground, so little effect on velocity
 		Accelerate( wishspeed, wishvel, true );
-
-#if !BULLET_PHYSICS
-		// Apply Gravity
-		apRigidBody->aVel[W_UP] -= sv_gravity * game->aFrameTime;
-#endif
 	}
 
-#if BULLET_PHYSICS
-	//SET_VELOCITY();
-	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
-
 	// uhhh
+	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
-
-#else
-	UpdatePosition( aPlayer );
-#endif
-
-	DoRayCollision(  );
 	
-	StopStepSound(  );
+	StopStepSound();
 
 	if ( IsOnGround() && !onGround )
 	{
@@ -1169,28 +1138,18 @@ void PlayerMovement::WalkMove(  )
 		//	PlayStepSound();
 	}
 
-	// something is wrong with this here on bullet
-#if 1 // !BULLET_PHYSICS
 	DoSmoothLand( wasOnGround );
-#endif
-
-	DoViewBob(  );
-	DoViewTilt(  );
-
-	// if ( IsOnGround() )
-	//	apRigidBody->aVel[W_UP] = 0;
+	DoViewBob();
+	DoViewTilt();
 
 	wasOnGround = IsOnGround();
 }
 
 
-void PlayerMovement::WalkMovePostPhys(  )
+void PlayerMovement::WalkMovePostPhys()
 {
 	bool onGroundPrev = IsOnGround();
 	bool onGround = CalcOnGround();
-
-	// uhhh
-	// apRigidBody->aVel = apPhysObj->GetLinearVelocity();
 
 	if ( onGround && !onGroundPrev )
 		PlayImpactSound();
@@ -1199,13 +1158,6 @@ void PlayerMovement::WalkMovePostPhys(  )
 		apRigidBody->aVel[W_UP] = 0.f;
 }
 
-
-CONVAR( cl_land_smoothing, 1 );
-CONVAR( cl_land_max_speed, 1000 );
-CONVAR( cl_land_power, 1 ); // 2
-CONVAR( cl_land_vel_scale, 1 ); // 0.01
-CONVAR( cl_land_power_scale, 100 ); // 0.01
-CONVAR( cl_land_timevar, 2 );
 
 void PlayerMovement::DoSmoothLand( bool wasOnGround )
 {
@@ -1240,25 +1192,12 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 }
 
 
-CONVAR( cl_bob_enabled, 1 );
-CONVAR( cl_bob_magnitude, 2 );
-CONVAR( cl_bob_freq, 4.5 );
-CONVAR( cl_bob_speed_scale, 0.013 );
-CONVAR( cl_bob_exit_lerp, 0.1 );
-CONVAR( cl_bob_exit_threshold, 0.1 );
-CONVAR( cl_bob_sound_threshold, 0.1 );
-CONVAR( cl_bob_offset, 0.25 );
-CONVAR( cl_bob_time_offset, -0.6 );
-
-CONVAR( cl_bob_debug, 0 );
-
-
 // TODO: doesn't smoothly transition out of viewbob still
 // TODO: maybe make a minimum speed threshold and start lerping to 0
 //  or some check if your movements changed compared to the previous frame
 //  so if you start moving again faster than min speed, or movements change,
 //  you restart the view bob, or take a new step right there
-void PlayerMovement::DoViewBob(  )
+void PlayerMovement::DoViewBob()
 {
 	if ( !cl_bob_enabled )
 		return;
@@ -1338,7 +1277,7 @@ CONVAR( cl_tilt_scale, 0.2 );
 CONVAR( cl_tilt_threshold_new, 12 );
 
 
-void PlayerMovement::DoViewTilt(  )
+void PlayerMovement::DoViewTilt()
 {
 	if ( cl_tilt == false )
 		return;
@@ -1387,7 +1326,7 @@ CONVAR( sv_friction_power, 2 );*/
 
 // TODO: make your own version of this that uses this to find the friction value:
 // log(-playerSpeed) + 1
-void PlayerMovement::AddFriction(  )
+void PlayerMovement::AddFriction()
 {
 #if 0
 
@@ -1451,13 +1390,5 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 
 	for ( int i = 0; i < 3; i++ )
 		apRigidBody->aVel[i] += addspeed * wishDir[i];
-}
-
-
-void PlayerMovement::AddGravity(  )
-{
-#if !BULLET_PHYSICS
-	apRigidBody->aVel[W_UP] -= sv_gravity * game->aFrameTime;
-#endif
 }
 

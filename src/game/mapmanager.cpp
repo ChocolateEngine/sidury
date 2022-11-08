@@ -19,7 +19,7 @@ Loads Sidury Map Files (smf)
 
 LOG_REGISTER_CHANNEL( Map, LogColor::DarkGreen );
 
-MapManager *mapmanager = nullptr;
+SiduryMap*    gpMap      = nullptr;
 
 extern ConVar velocity_scale;
 extern Entity gLocalPlayer;
@@ -46,69 +46,53 @@ void map_dropdown(
 
 CONCMD_DROP( map, map_dropdown )
 {
-	if ( !mapmanager )
-	{
-		Log_Warn( gMapChannel, "Map Manager doesn't exist yet, oops\n" );
-		return;
-	}
-
 	if ( args.size() == 0 )
 	{
 		Log_Warn( gMapChannel, "No Map Path/Name specified!\n" );
 		return;
 	}
 
-	mapmanager->LoadMap( args[0] );
+	MapManager_LoadMap( args[0] );
 }
 
 
-MapManager::MapManager()
+void MapManager_Update()
 {
-	Skybox_Init();
-}
-
-MapManager::~MapManager()
-{
-}
-
-
-void MapManager::Update()
-{
-	if ( !apMap )
+	if ( !gpMap )
 		return;
 
 	Skybox_Draw();
 
-	Graphics_DrawModel( &apMap->aRenderable );
+	Graphics_DrawModel( &gpMap->aRenderable );
 }
 
 
-void MapManager::CloseMap()
+void MapManager_CloseMap()
 {
-	if ( apMap == nullptr )
+	if ( gpMap == nullptr )
 		return;
 
-	if ( apMap->aRenderable.aModel != InvalidHandle )
-		Graphics_FreeModel( apMap->aRenderable.aModel );
+	if ( gpMap->aRenderable.aModel != InvalidHandle )
+		Graphics_FreeModel( gpMap->aRenderable.aModel );
 
-	for ( auto physObj: apMap->aWorldPhysObjs )
+	for ( auto physObj : gpMap->aWorldPhysObjs )
 		physenv->DestroyObject( physObj );
 
-	for ( auto physShape: apMap->aWorldPhysShapes )
+	for ( auto physShape : gpMap->aWorldPhysShapes )
 		physenv->DestroyShape( physShape );
 
-	apMap->aWorldPhysObjs.clear();
-	apMap->aWorldPhysShapes.clear();
+	gpMap->aWorldPhysObjs.clear();
+	gpMap->aWorldPhysShapes.clear();
 
-	delete apMap;
-	apMap = nullptr;
+	delete gpMap;
+	gpMap = nullptr;
 }
 
 
-bool MapManager::LoadMap( const std::string &path )
+bool MapManager_LoadMap( const std::string &path )
 {
-	if ( apMap )
-		CloseMap();
+	if ( gpMap )
+		MapManager_CloseMap();
 
 	std::string absPath = FileSys_FindDir( "maps/" + path );
 
@@ -118,65 +102,71 @@ bool MapManager::LoadMap( const std::string &path )
 		return false;
 	}
 
-	MapInfo *mapInfo = ParseMapInfo( absPath + "/mapInfo.smf" );
+	MapInfo* mapInfo = MapManager_ParseMapInfo( absPath + "/mapInfo.smf" );
 
 	if ( mapInfo == nullptr )
 		return false;
 
-	apMap = new SiduryMap;
-	apMap->aMapInfo = mapInfo;
+	gpMap = new SiduryMap;
+	gpMap->aMapInfo = mapInfo;
 
 	Skybox_SetMaterial( mapInfo->skybox );
 
-	if ( !LoadWorldModel() )
+	if ( !MapManager_LoadWorldModel() )
 	{
-		CloseMap();
+		MapManager_CloseMap();
 		return false;
 	}
 
 	// ParseEntities( absPath + "/entities.smf" );
 
-	SpawnPlayer();
+	MapManager_SpawnPlayer();
 
 	return true;
 }
 
 
-bool MapManager::LoadWorldModel()
+bool MapManager_HasMap()
 {
-	if ( !( apMap->aRenderable.aModel = Graphics_LoadModel( apMap->aMapInfo->modelPath ) ) )
+	return gpMap != nullptr;
+}
+
+
+bool MapManager_LoadWorldModel()
+{
+	if ( !( gpMap->aRenderable.aModel = Graphics_LoadModel( gpMap->aMapInfo->modelPath ) ) )
 	{
 		return false;
 	}
 
 	// rotate the world model
 	Transform mapTransform{};
-	mapTransform.aAng = apMap->aMapInfo->ang;
+	mapTransform.aAng               = gpMap->aMapInfo->ang;
 	
-	apMap->aRenderable.aModelMatrix = mapTransform.ToMatrix();
+	gpMap->aRenderable.aModelMatrix = mapTransform.ToMatrix();
 	
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 
-	Phys_GetModelInd( apMap->aRenderable.aModel, shapeInfo.aConcaveData );
+	Phys_GetModelInd( gpMap->aRenderable.aModel, shapeInfo.aConcaveData );
 	
 	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
 
 	if ( physShape == nullptr )
 	{
-		Graphics_FreeModel( apMap->aRenderable.aModel );
-		apMap->aRenderable.aModel = InvalidHandle;
+		Graphics_FreeModel( gpMap->aRenderable.aModel );
+		gpMap->aRenderable.aModel = InvalidHandle;
 		return false;
 	}
 
 	Assert( physShape );
 	
 	PhysicsObjectInfo physInfo;
-	physInfo.aAng = glm::radians( apMap->aMapInfo->physAng );
+	physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
 	
 	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
 	
-	apMap->aWorldPhysShapes.push_back( physShape );
-	apMap->aWorldPhysObjs.push_back( physObj );
+	gpMap->aWorldPhysShapes.push_back( physShape );
+	gpMap->aWorldPhysObjs.push_back( physObj );
 
 	return true;
 }
@@ -197,7 +187,7 @@ struct MapInfoKeys
 gMapInfoKeys;
 
 
-MapInfo *MapManager::ParseMapInfo( const std::string &path )
+MapInfo *MapManager_ParseMapInfo( const std::string &path )
 {
 	if ( !FileSys_Exists( path ) )
 	{
@@ -292,19 +282,19 @@ MapInfo *MapManager::ParseMapInfo( const std::string &path )
 }
 
 
-void MapManager::SpawnPlayer()
+void MapManager_SpawnPlayer()
 {
 	players->Respawn( gLocalPlayer );
 }
 
 
-glm::vec3 MapManager::GetSpawnPos()
+glm::vec3 MapManager_GetSpawnPos()
 {
-	return (apMap) ? apMap->aMapInfo->spawnPos : glm::vec3( 0, 0, 0 );
+	return ( gpMap ) ? gpMap->aMapInfo->spawnPos : glm::vec3( 0, 0, 0 );
 }
 
-glm::vec3 MapManager::GetSpawnAng()
+glm::vec3 MapManager_GetSpawnAng()
 {
-	return (apMap) ? apMap->aMapInfo->spawnAng : glm::vec3( 0, 0, 0 );
+	return ( gpMap ) ? gpMap->aMapInfo->spawnAng : glm::vec3( 0, 0, 0 );
 }
 

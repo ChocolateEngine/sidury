@@ -227,7 +227,8 @@ struct UBO_LightDirectional_t
 {
 	alignas( 16 ) glm::vec4 aColor{};
 	alignas( 16 ) glm::vec3 aDir{};
-	// int aShadow = -1;
+	int aViewInfo = -1;
+	int aShadow   = -1;
 };
 
 struct UBO_LightPoint_t
@@ -269,6 +270,7 @@ struct Light_t
 	float      aRadius   = 0.f;
 	float      aLength   = 0.f;
 	bool       aShadow   = true;
+	bool       aEnabled  = true;
 };
 
 struct UniformBufferArray_t

@@ -9,8 +9,6 @@ extern IRender*          render;
 IPhysicsEnvironment*     physenv    = nullptr;
 Ch_IPhysics*             ch_physics = nullptr;
 
-GamePhysics              gamephys;
-
 static Phys_DebugFuncs_t gPhysDebugFuncs;
 
 
@@ -257,6 +255,7 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 	}
 }
 
+
 void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 {
 	Model* model = Graphics_GetModelData( sModel );
@@ -312,6 +311,7 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 		}
 	}
 }
+
 
 void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 {
@@ -386,18 +386,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 }
 
 
-GamePhysics::GamePhysics()
-{
-}
-
-
-GamePhysics::~GamePhysics()
-{
-	ch_physics->DestroyPhysEnv( physenv );
-}
-
-
-void GamePhysics::Init()
+void Phys_Init()
 {
 	Phys_DebugInit();
 
@@ -416,7 +405,13 @@ void GamePhysics::Init()
 }
 
 
-void GamePhysics::SetMaxVelocities( IPhysicsObject* spPhysObj )
+void Phys_Shutdown()
+{
+	ch_physics->DestroyPhysEnv( physenv );
+}
+
+
+void Phys_SetMaxVelocities( IPhysicsObject* spPhysObj )
 {
 	if ( !spPhysObj )
 		return;

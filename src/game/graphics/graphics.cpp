@@ -493,7 +493,8 @@ Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBu
 
 	render->UpdateVariableDescSet( update );
 
-	if ( spLight->aType == ELightType_Cone )
+	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
+	// if ( spLight->aType == ELightType_Cone  )
 	{
 		Graphics_AddShadowMap( spLight );
 	}
@@ -695,8 +696,8 @@ bool Graphics_Init()
 
 	// TEMP: make a world light
 	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
-	// gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
-	gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
+	gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
+	// gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
 
 	return render->InitImGui( gRenderPassGraphics );
 	// return render->InitImGui( gRenderPassGraphics );
@@ -960,6 +961,11 @@ CONVAR( r_shadowmap_fov_hack, 90.f );
 CONVAR( r_shadowmap_nearz, 1.f );
 CONVAR( r_shadowmap_farz, 10000.f );
 
+CONVAR( r_shadowmap_othro_left, -1000.f );
+CONVAR( r_shadowmap_othro_right, 1000.f );
+CONVAR( r_shadowmap_othro_bottom, -1000.f );
+CONVAR( r_shadowmap_othro_top, 1000.f );
+
 
 void Graphics_UpdateLightBuffer( Light_t* spLight )
 {
@@ -1003,58 +1009,6 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		buffer = it->second;
 	}
 
-	if ( spLight->aType == ELightType_Cone )
-	{
-		// update shadow map view info
-		ShadowMap_t& shadowMap = gLightShadows[ spLight ];
-
-		ViewportCamera_t view{};
-		view.aFarZ  = r_shadowmap_farz;
-		view.aNearZ = r_shadowmap_nearz;
-		// view.aFOV   = spLight->aOuterFov;
-		view.aFOV   = r_shadowmap_fov_hack;
-
-		Transform transform{};
-		transform.aPos = spLight->aPos;
-		// transform.aAng = spLight->aAng;
-
-		transform.aAng.x = -spLight->aAng.z + 90.f;
-		transform.aAng.y = -spLight->aAng.y;
-		transform.aAng.z = spLight->aAng.x;
-
-		// // transform.aAng.y = -spLight->aAng.y;
-		// transform.aAng.y = spLight->aAng.y;
-		// // transform.aAng.z = -spLight->aAng.x + 90.f;
-		// transform.aAng.z = spLight->aAng.x;
-
-		// uh
-		// transform.aAng.x += 180.f;
-		// transform.aAng.y += -90.f;
-		
-		view.aViewMat  = transform.ToViewMatrixZ();
-		// view.aViewMat  = transform.ToViewMatrixY();
-		view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
-
-		shadowMap.aViewInfo.aProjection = view.aProjMat;
-		shadowMap.aViewInfo.aView       = view.aViewMat;
-		shadowMap.aViewInfo.aProjView   = view.aProjViewMat;
-		shadowMap.aViewInfo.aNearZ      = view.aNearZ;
-		shadowMap.aViewInfo.aFarZ       = view.aFarZ;
-
-		{
-			glm::vec3 forward, right, up;
-			// Util_GetMatrixDirection( view.aViewMat, &forward, &right, &up );
-			Util_GetViewMatrixZDirection( view.aViewMat, forward, right, up );
-
-			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( forward * 32.f ), { 1, 0, 0 } );
-			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( right * 32.f ), { 0, 1, 0 } );
-			Graphics_DrawLine( spLight->aPos, spLight->aPos + ( up * 32.f ), { 0, 0, 1 } );
-		}
-
-		Handle buffer = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
-		render->MemWriteBuffer( buffer, sizeof( ViewInfo_t ), &shadowMap.aViewInfo );
-	}
-
 	switch ( spLight->aType )
 	{
 		default:
@@ -1084,6 +1038,47 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+			
+			// update shadow map view info
+		#if 1
+			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
+
+			ViewportCamera_t view{};
+			view.aFarZ  = r_shadowmap_farz;
+			view.aNearZ = r_shadowmap_nearz;
+			// view.aFOV   = spLight->aOuterFov;
+			view.aFOV   = r_shadowmap_fov_hack;
+
+			Transform transform{};
+			transform.aPos                  = spLight->aPos;
+			// transform.aAng = spLight->aAng;
+
+			transform.aAng.x                = -spLight->aAng.z + 90.f;
+			transform.aAng.y                = -spLight->aAng.y;
+			transform.aAng.z                = spLight->aAng.x;
+
+			// shadowMap.aViewInfo.aProjection = glm::ortho< float >( -10, 10, -10, 10, -10, 20 );
+
+			shadowMap.aViewInfo.aProjection = glm::ortho< float >(
+			  r_shadowmap_othro_left,
+			  r_shadowmap_othro_right,
+			  r_shadowmap_othro_bottom,
+			  r_shadowmap_othro_top,
+			  view.aNearZ,
+			  view.aFarZ );
+
+			// shadowMap.aViewInfo.aView       = view.aViewMat;
+			shadowMap.aViewInfo.aView       = glm::lookAt( -light.aDir, glm::vec3( 0, 0, 0 ), glm::vec3( 0, -1, 0 ) );
+			shadowMap.aViewInfo.aProjView   = shadowMap.aViewInfo.aProjection * shadowMap.aViewInfo.aView;
+			shadowMap.aViewInfo.aNearZ      = view.aNearZ;
+			shadowMap.aViewInfo.aFarZ       = view.aFarZ;
+
+			Handle shadowBuffer             = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
+			render->MemWriteBuffer( shadowBuffer, sizeof( ViewInfo_t ), &shadowMap.aViewInfo );
+#endif
+			// get shadow map view info
+			light.aViewInfo = shadowMap.aViewInfoIndex;
+			light.aShadow   = render->GetTextureIndex( shadowMap.aTexture );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -1119,22 +1114,42 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			temp.aAng = spLight->aAng;
 			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
 			
-			// glm::mat4 matrix;
-			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
-			// matrix = temp.ToViewMatrixZ();
-			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
+			// update shadow map view info
+			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
 
-			// GetDirectionVectors( matrix, light.aDir );
+#if 1
+			ViewportCamera_t view{};
+			view.aFarZ  = r_shadowmap_farz;
+			view.aNearZ = r_shadowmap_nearz;
+			// view.aFOV   = spLight->aOuterFov;
+			view.aFOV   = r_shadowmap_fov_hack;
 
-			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
-			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
-			
+			Transform transform{};
+			transform.aPos = spLight->aPos;
+			// transform.aAng = spLight->aAng;
+
+			transform.aAng.x = -spLight->aAng.z + 90.f;
+			transform.aAng.y = -spLight->aAng.y;
+			transform.aAng.z = spLight->aAng.x;
+		
+			view.aViewMat  = transform.ToViewMatrixZ();
+			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
+
+			shadowMap.aViewInfo.aProjection = view.aProjMat;
+			shadowMap.aViewInfo.aView       = view.aViewMat;
+			shadowMap.aViewInfo.aProjView   = view.aProjViewMat;
+			shadowMap.aViewInfo.aNearZ      = view.aNearZ;
+			shadowMap.aViewInfo.aFarZ       = view.aFarZ;
+
+			Handle shadowBuffer = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
+			render->MemWriteBuffer( shadowBuffer, sizeof( ViewInfo_t ), &shadowMap.aViewInfo );
+#endif
+
 			// get shadow map view info
-			ShadowMap_t& shadowMap = gLightShadows[ spLight ];
 			light.aViewInfo        = shadowMap.aViewInfoIndex;
-			// light.aShadow          = render->GetTextureIndex( shadowMap.aTexture[ 1 ] );
 			light.aShadow          = render->GetTextureIndex( shadowMap.aTexture );
 
+			// Update Light Buffer
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
 		}
@@ -1265,46 +1280,17 @@ void Graphics_Present()
 		render->BeginCommandBuffer( c );
 
 		RenderPassBegin_t renderPassBegin{};
-
-		// ----------------------------------------------------------
-		// ImGui RenderPass
-		// renderPassBegin.aRenderPass  = gRenderPassUI;
-		// renderPassBegin.aFrameBuffer = gImGuiBuffer[ gCmdIndex ];
-		// renderPassBegin.aClear.resize( 2 );
-		// renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
-		// renderPassBegin.aClear[ 1 ].aIsDepth = true;
-		// 
-		// render->BeginRenderPass( c, renderPassBegin );
-		// render->DrawImGui( ImGui::GetDrawData(), c );
-		// render->EndRenderPass( c );
-
-		// ----------------------------------------------------------
-		// G-Buffer RenderPass
-
-#if 0
-		renderPassBegin.aRenderPass  = gRenderPassGBuffer;
-		renderPassBegin.aFrameBuffer = gGBuffer[ gCmdIndex ];
-		renderPassBegin.aClear.resize( 6 );
-		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear[ 1 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear[ 2 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear[ 3 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear[ 4 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
-		renderPassBegin.aClear[ 5 ].aIsDepth = true;
-		renderPassBegin.aClear[ 1 ].aIsDepth = false;
-
-		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
-		Graphics_SetupGBuffer( c );
-		render->EndRenderPass( c );
-#endif
+		renderPassBegin.aClear.resize( 1 );
+		renderPassBegin.aClear[ 0 ].aDepth   = 1.f;
+		renderPassBegin.aClear[ 0 ].aIsDepth = true;
 
 		for ( const auto& [ light, shadowMap ] : gLightShadows )
 		{
+			if ( !light->aEnabled || !light->aShadow )
+				continue;
+
 			renderPassBegin.aRenderPass  = gRenderPassShadow;
 			renderPassBegin.aFrameBuffer = shadowMap.aFramebuffer;
-			renderPassBegin.aClear.resize( 1 );
-			renderPassBegin.aClear[ 0 ].aDepth   = 1.f;
-			renderPassBegin.aClear[ 0 ].aIsDepth = true;
 
 			if ( renderPassBegin.aFrameBuffer == InvalidHandle )
 				continue;
@@ -1316,6 +1302,7 @@ void Graphics_Present()
 
 		// ----------------------------------------------------------
 		// Main RenderPass
+
 		renderPassBegin.aRenderPass  = gRenderPassGraphics;
 		renderPassBegin.aFrameBuffer = gBackBuffer[ gCmdIndex ];
 		renderPassBegin.aClear.resize( 2 );

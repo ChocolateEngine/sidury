@@ -12,7 +12,6 @@
 #include "game_physics.h"
 #include "player.h"
 #include "entity.h"
-#include "terrain/terrain.h"
 #include "graphics/graphics.h"
 #include "mapmanager.h"
 #include "inputsystem.h"
@@ -63,11 +62,7 @@ extern ConVar velocity_scale;
 struct ModelPhysTest
 {
 	Model* mdl;
-#if BULLET_PHYSICS
 	std::vector<IPhysicsObject*> physObj;
-#else
-	int* physObj;
-#endif
 };
 
 
@@ -152,7 +147,7 @@ void CreatePhysEntity( const std::string& path )
 	IPhysicsObject* phys = physenv->CreateObject( shape, physInfo );
 	phys->SetFriction( phys_friction );
 
-	gamephys.SetMaxVelocities( phys );
+	Phys_SetMaxVelocities( phys );
 
 	entities->AddComponent< IPhysicsShape * >( physEnt, shape );
 	entities->AddComponent< IPhysicsObject * >( physEnt, phys );
@@ -172,6 +167,12 @@ CON_COMMAND( create_proto )
 CON_COMMAND( create_gltf_proto )
 {
 	CreateProtogen( "materials/models/protogen_wip_25d/protogen_25d.glb" );
+}
+
+CON_COMMAND( create_look_entity )
+{
+	if ( args.size() )
+		CreateProtogen( args[ 0 ] );
 }
 
 CON_COMMAND( delete_protos )
@@ -203,10 +204,8 @@ GameSystem::GameSystem()
 
 GameSystem::~GameSystem(  )
 {
-#if BULLET_PHYSICS
-	if ( physenv )
-		delete physenv;
-#endif
+	Skybox_Destroy();
+	Phys_Shutdown();
 
 	//if ( aLocalPlayer )
 	//	delete aLocalPlayer;
@@ -277,11 +276,9 @@ bool GameSystem::Init()
 	hAudioMusic = audio->RegisterChannel( "Music" );
 #endif
 
-	gamephys.Init();
-
+	Phys_Init();
 	LightEditor_Init();
-
-	mapmanager = new MapManager;
+	Skybox_Init();
 
 	entities = new EntityManager;
 	entities->Init();
@@ -345,7 +342,7 @@ void CenterMouseOnScreen()
 
 bool Game_InMap()
 {
-	return mapmanager->apMap != nullptr;
+	return MapManager_HasMap();
 }
 
 
@@ -356,6 +353,9 @@ Model* g_streamModel = nullptr;
 
 ConVar snd_cube_scale("snd_cube_scale", "0.05");
 extern ConVar velocity_scale;
+
+
+CONVAR( r_render, 1 );
 
 
 void GameSystem::Update( float frameTime )
@@ -369,9 +369,10 @@ void GameSystem::Update( float frameTime )
 
 	LightEditor_Update();
 
-	if ( !(SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED) )
+	gui->Update( frameTime );
+
+	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
-		gui->Update( frameTime );
 		Graphics_Present();
 	}
 	else
@@ -401,7 +402,7 @@ void EntUpdate()
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
-			ToMatrix( model.aModelMatrix, phys->GetPos(), phys->GetAng() );
+			Util_ToMatrix( model.aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
 
 		Graphics_DrawModel( &model );
@@ -430,7 +431,7 @@ void Game_Update( float frameTime )
 
 	gCurTime += gFrameTime;
 
-	mapmanager->Update();
+	MapManager_Update();
 
 	// WORLD GLOBAL AXIS
 	// if ( dbg_global_axis )
