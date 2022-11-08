@@ -508,7 +508,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 		Game_UpdateProjection();
 
 		// i feel like there's gonna be a lot more here in the future...
-		GetSkybox().SetAng( transformView.aAng );
+		Skybox_SetAng( transformView.aAng );
 		audio->SetListenerTransform( transformView.aPos, transform.aAng );
 
 #if AUDIO_OPENAL

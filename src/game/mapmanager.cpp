@@ -64,7 +64,7 @@ CONCMD_DROP( map, map_dropdown )
 
 MapManager::MapManager()
 {
-	GetSkybox().Init();
+	Skybox_Init();
 }
 
 MapManager::~MapManager()
@@ -77,7 +77,7 @@ void MapManager::Update()
 	if ( !apMap )
 		return;
 
-	GetSkybox().Draw();
+	Skybox_Draw();
 
 	Graphics_DrawModel( &apMap->aRenderable );
 }
@@ -126,7 +126,7 @@ bool MapManager::LoadMap( const std::string &path )
 	apMap = new SiduryMap;
 	apMap->aMapInfo = mapInfo;
 
-	GetSkybox().SetSkybox( mapInfo->skybox );
+	Skybox_SetMaterial( mapInfo->skybox );
 
 	if ( !LoadWorldModel() )
 	{
@@ -160,6 +160,14 @@ bool MapManager::LoadWorldModel()
 	Phys_GetModelInd( apMap->aRenderable.aModel, shapeInfo.aConcaveData );
 	
 	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+
+	if ( physShape == nullptr )
+	{
+		Graphics_FreeModel( apMap->aRenderable.aModel );
+		apMap->aRenderable.aModel = InvalidHandle;
+		return false;
+	}
+
 	Assert( physShape );
 	
 	PhysicsObjectInfo physInfo;
