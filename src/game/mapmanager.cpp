@@ -135,15 +135,10 @@ bool MapManager_HasMap()
 bool MapManager_LoadWorldModel()
 {
 	if ( !( gpMap->aRenderable.aModel = Graphics_LoadModel( gpMap->aMapInfo->modelPath ) ) )
-	{
 		return false;
-	}
 
 	// rotate the world model
-	Transform mapTransform{};
-	mapTransform.aAng               = gpMap->aMapInfo->ang;
-	
-	gpMap->aRenderable.aModelMatrix = mapTransform.ToMatrix();
+	Util_ToMatrix( gpMap->aRenderable.aModelMatrix, {}, gpMap->aMapInfo->ang );
 	
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 
@@ -152,11 +147,7 @@ bool MapManager_LoadWorldModel()
 	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
 
 	if ( physShape == nullptr )
-	{
-		Graphics_FreeModel( gpMap->aRenderable.aModel );
-		gpMap->aRenderable.aModel = InvalidHandle;
 		return false;
-	}
 
 	Assert( physShape );
 	
@@ -175,14 +166,14 @@ bool MapManager_LoadWorldModel()
 // here so we don't need calculate sizes all the time for string comparing
 struct MapInfoKeys
 {
-	std::string version = "version";
-	std::string mapName = "mapName";
+	std::string version   = "version";
+	std::string mapName   = "mapName";
 	std::string modelPath = "modelPath";
-	std::string ang = "ang";
-	std::string physAng = "physAng";
-	std::string skybox = "skybox";
-	std::string spawnPos = "spawnPos";
-	std::string spawnAng = "spawnAng";
+	std::string ang       = "ang";
+	std::string physAng   = "physAng";
+	std::string skybox    = "skybox";
+	std::string spawnPos  = "spawnPos";
+	std::string spawnAng  = "spawnAng";
 }
 gMapInfoKeys;
 
