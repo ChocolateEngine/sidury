@@ -284,6 +284,9 @@ void PlayerManager::Update( float frameTime )
 			if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
 			{
 				flashlight->aEnabled = !flashlight->aEnabled;
+
+				if ( !flashlight->aEnabled )
+					Graphics_UpdateLight( flashlight );
 			}
 
 			if ( flashlight->aEnabled )

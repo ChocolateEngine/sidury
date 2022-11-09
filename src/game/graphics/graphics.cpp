@@ -107,7 +107,20 @@ struct ShadowMap_t
 std::unordered_map< Light_t*, ShadowMap_t >      gLightShadows;
 UniformBufferArray_t                             gUniformShadows;
 
-CONVAR( r_shadowmap_size, 1024 );
+CONVAR( r_shadowmap_size, 2048 );
+
+CONVAR( r_shadowmap_constant, 16.f );  // 1.25f
+CONVAR( r_shadowmap_clamp, 0.f );
+CONVAR( r_shadowmap_slope, 1.75f );
+
+CONVAR( r_shadowmap_fov_hack, 90.f );
+CONVAR( r_shadowmap_nearz, 1.f );
+CONVAR( r_shadowmap_farz, 10000.f );
+
+CONVAR( r_shadowmap_othro_left, -1000.f );
+CONVAR( r_shadowmap_othro_right, 1000.f );
+CONVAR( r_shadowmap_othro_bottom, -1000.f );
+CONVAR( r_shadowmap_othro_top, 1000.f );
 
 // --------------------------------------------------------------------------------------
 // Assets
@@ -348,10 +361,13 @@ bool Graphics_CreateRenderPasses()
 	{
 		create.aAttachments.resize( 1 );
 
-		create.aAttachments[ 0 ].aFormat  = render->GetSwapFormatDepth();
-		create.aAttachments[ 0 ].aUseMSAA = false;
-		create.aAttachments[ 0 ].aType    = EAttachmentType_Depth;
-		create.aAttachments[ 0 ].aLoadOp  = EAttachmentLoadOp_Clear;
+		create.aAttachments[ 0 ].aFormat         = render->GetSwapFormatDepth();
+		create.aAttachments[ 0 ].aUseMSAA        = false;
+		create.aAttachments[ 0 ].aType           = EAttachmentType_Depth;
+		create.aAttachments[ 0 ].aLoadOp         = EAttachmentLoadOp_Clear;
+		create.aAttachments[ 0 ].aStoreOp        = EAttachmentStoreOp_Store;
+		create.aAttachments[ 0 ].aStencilLoadOp  = EAttachmentLoadOp_Load;
+		create.aAttachments[ 0 ].aStencilStoreOp = EAttachmentStoreOp_Store;
 
 		create.aSubpasses.resize( 1 );
 		create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
@@ -493,8 +509,8 @@ Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBu
 
 	render->UpdateVariableDescSet( update );
 
-	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
-	// if ( spLight->aType == ELightType_Cone  )
+	// if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
+	if ( spLight->aType == ELightType_Cone )
 	{
 		Graphics_AddShadowMap( spLight );
 	}
@@ -777,7 +793,7 @@ void Graphics_CmdDrawModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 }
 
 
-void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
+void Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, ModelSurfaceDraw_t& srDrawInfo )
 {
 	// get model and check if it's nullptr
 	if ( srDrawInfo.apDraw->aModel == InvalidHandle )
@@ -803,19 +819,28 @@ void Graphics_BindModel( Handle cmd, ModelSurfaceDraw_t& srDrawInfo )
 	
 	// Bind the mesh's vertex and index buffers
 
-	// um
-	// std::vector< size_t > offsets( mesh.aVertexBuffers.size() );
+	// Get Vertex Buffers the shader wants
+	// TODO: what about if we don't have an attribute the shader wants???
+	std::vector< Handle > vertexBuffers;
 
-	size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * mesh.aVertexBuffers.size() );
+	for ( size_t i = 0; i < mesh.aVertexData.aData.size(); i++ )
+	{
+		VertAttribData_t& data = mesh.aVertexData.aData[ i ];
+
+		if ( sVertexFormat & ( 1 << data.aAttrib ) )
+			vertexBuffers.push_back( mesh.aVertexBuffers[ i ] );
+	}
+
+	size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * vertexBuffers.size() );
 	if ( offsets == nullptr )
 	{
 		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: Failed to allocate vertex buffer offsets!\n" );
 		return;
 	}
 
-	memset( offsets, 0, sizeof( size_t ) * mesh.aVertexBuffers.size() );
+	memset( offsets, 0, sizeof( size_t ) * vertexBuffers.size() );
 
-	render->CmdBindVertexBuffers( cmd, 0, mesh.aVertexBuffers.size(), mesh.aVertexBuffers.data(), offsets );
+	render->CmdBindVertexBuffers( cmd, 0, vertexBuffers.size(), vertexBuffers.data(), offsets );
 
 	// TODO: store index type here somewhere
 	render->CmdBindIndexBuffer( cmd, mesh.aIndexBuffer, 0, EIndexType_U32 );
@@ -834,6 +859,8 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::forward_lis
 
 	ModelSurfaceDraw_t* prevRenderable = nullptr;
 
+	VertexFormat vertexFormat = Shader_GetVertexFormat( shader );
+
 	for ( auto& renderable : srRenderList )
 	{
 		// if ( prevRenderable != renderable || prevMatIndex != matIndex )
@@ -841,7 +868,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::forward_lis
 		if ( !prevRenderable || prevRenderable->apDraw->aModel != renderable.apDraw->aModel || prevRenderable->aSurface != renderable.aSurface )
 		{
 			prevRenderable = &renderable;
-			Graphics_BindModel( cmd, renderable );
+			Graphics_BindModel( cmd, vertexFormat, renderable );
 		}
 
 		if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, renderable ) )
@@ -850,11 +877,6 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::forward_lis
 		Graphics_CmdDrawModel( cmd, renderable );
 	}
 }
-
-
-CONVAR( r_shadowmap_constant, 1.25f );
-CONVAR( r_shadowmap_clamp, 0.f );
-CONVAR( r_shadowmap_slope, 1.75f );
 
 
 void Graphics_RenderShadowMaps( Handle cmd, Light_t* spLight, const ShadowMap_t& srShadowMap )
@@ -957,16 +979,6 @@ void Graphics_Render( Handle cmd )
 }
 
 
-CONVAR( r_shadowmap_fov_hack, 90.f );
-CONVAR( r_shadowmap_nearz, 1.f );
-CONVAR( r_shadowmap_farz, 10000.f );
-
-CONVAR( r_shadowmap_othro_left, -1000.f );
-CONVAR( r_shadowmap_othro_right, 1000.f );
-CONVAR( r_shadowmap_othro_bottom, -1000.f );
-CONVAR( r_shadowmap_othro_top, 1000.f );
-
-
 void Graphics_UpdateLightBuffer( Light_t* spLight )
 {
 	Handle buffer = InvalidHandle;
@@ -1022,7 +1034,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = 1.f;
+			light.aColor.w = spLight->aEnabled;
 
 			Transform temp{};
 			temp.aPos = spLight->aPos;
@@ -1040,7 +1052,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
 			
 			// update shadow map view info
-		#if 1
+#if 0
 			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
 
 			ViewportCamera_t view{};
@@ -1075,10 +1087,15 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 			Handle shadowBuffer             = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
 			render->MemWriteBuffer( shadowBuffer, sizeof( ViewInfo_t ), &shadowMap.aViewInfo );
-#endif
+
 			// get shadow map view info
 			light.aViewInfo = shadowMap.aViewInfoIndex;
 			light.aShadow   = render->GetTextureIndex( shadowMap.aTexture );
+#else
+			// get shadow map view info
+			light.aViewInfo = 0;
+			light.aShadow   = -1;
+#endif
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
 			return;
@@ -1089,7 +1106,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = 1.f;
+			light.aColor.w = spLight->aEnabled;
 
 			light.aPos    = spLight->aPos;
 			light.aRadius = spLight->aRadius;
@@ -1103,7 +1120,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = 1.f;
+			light.aColor.w = spLight->aEnabled;
 
 			light.aPos   = spLight->aPos;
 			light.aFov.x = glm::radians( spLight->aInnerFov );
@@ -1159,7 +1176,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x   = spLight->aColor.x;
 			light.aColor.y   = spLight->aColor.y;
 			light.aColor.z   = spLight->aColor.z;
-			light.aColor.w   = 1.f;
+			light.aColor.w   = spLight->aEnabled;
 
 			light.aPos       = spLight->aPos;
 			light.aLength    = spLight->aLength;
@@ -1215,9 +1232,8 @@ void Graphics_PrepareDrawData()
 	gDirtyMaterials.clear();
 
 	// Update UBO's for lights if needed
-	// for ( Light_t* light : gDirtyLights )
-	// for ( Light_t* light : gLights )
-	// 	Graphics_UpdateLightBuffer( light );
+	for ( Light_t* light : gDirtyLights )
+		Graphics_UpdateLightBuffer( light );
 
 	gDirtyLights.clear();
 
@@ -1274,8 +1290,8 @@ void Graphics_Present()
 	{
 		auto c = gCommandBuffers[ gCmdIndex ];
 
-		for ( Light_t* light : gLights )
-			Graphics_UpdateLightBuffer( light );
+		// for ( Light_t* light : gLights )
+		// 	Graphics_UpdateLightBuffer( light );
 
 		render->BeginCommandBuffer( c );
 
@@ -1661,13 +1677,6 @@ Light_t* Graphics_CreateLight( ELightType sType )
 	return light;
 }
 
-void Graphics_EnableLight( Light_t* spLight )
-{
-}
-
-void Graphics_DisableLight( Light_t* spLight )
-{
-}
 
 void Graphics_UpdateLight( Light_t* spLight )
 {
@@ -1690,3 +1699,22 @@ void Graphics_DestroyLight( Light_t* spLight )
 	delete spLight;
 }
 
+
+void Graphics_EnableLight( Light_t* spLight )
+{
+	spLight->aEnabled = true;
+	Graphics_UpdateLight( spLight );
+}
+
+
+void Graphics_DisableLight( Light_t* spLight )
+{
+	spLight->aEnabled = false;
+	Graphics_UpdateLight( spLight );
+}
+
+
+bool Graphics_IsLightEnabled( Light_t* spLight )
+{
+	return spLight->aEnabled;
+}

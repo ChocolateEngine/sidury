@@ -212,6 +212,14 @@ struct ModelSurfaceDraw_t
 	size_t       aSurface;
 };
 
+
+struct ModelBBox_t
+{
+	glm::vec3 aMin{};
+	glm::vec3 aMax{};
+};
+
+
 // TODO: use descriptor indexing on forward rendering
 // would allow you to do all lighting on a model in one draw call
 struct LightInfo_t
@@ -520,10 +528,12 @@ void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebug
 // Lighting
 
 Light_t*           Graphics_CreateLight( ELightType sType );
-void               Graphics_EnableLight( Light_t* spLight );
-void               Graphics_DisableLight( Light_t* spLight );
 void               Graphics_UpdateLight( Light_t* spLight );
 void               Graphics_DestroyLight( Light_t* spLight );
+
+void               Graphics_EnableLight( Light_t* spLight );
+void               Graphics_DisableLight( Light_t* spLight );
+bool               Graphics_IsLightEnabled( Light_t* spLight );
 
 // ---------------------------------------------------------------------------------------
 // Rendering

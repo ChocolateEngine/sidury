@@ -7,6 +7,7 @@ struct ShadowMap_Push
 {
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
 	int aViewInfo = 0;                       // view info index
+	int aAlbedo   = 0;                       // albedo texture index
 };
 
 
@@ -18,14 +19,15 @@ static int                                                       gViewInfoIndex 
 
 static void Shader_ShadowMap_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_ViewInfo | EShaderFlags_PushConstant );
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex, 0, sizeof( ShadowMap_Push ) );
+	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant );
+	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ) );
 }
 
 
 static void Shader_ShadowMap_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
 	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/shadow.vert.spv", "main" );
+	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/shadow.frag.spv", "main" );
 	srGraphics.aColorBlendAttachments.emplace_back( false );
 	srGraphics.aPrimTopology    = EPrimTopology_Tri;
 	srGraphics.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_DepthBias;
@@ -52,6 +54,31 @@ static void Shader_ShadowMap_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = srDrawInfo.apDraw->aModelMatrix;
 	push.aViewInfo       = gViewInfoIndex;
+	push.aAlbedo         = -1;
+
+	Handle mat           = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
+	Handle texture       = Mat_GetTexture( mat, "diffuse" );
+
+	if ( texture == InvalidHandle )
+		return;
+
+	GraphicsFmt format   = render->GetTextureFormat( texture );
+	bool        hasAlpha = false;
+
+	// Check the texture format to see if it has an alpha channel
+	switch ( format )
+	{
+		default:
+			break;
+
+		case GraphicsFmt::BC1_RGBA_SRGB_BLOCK:
+		case GraphicsFmt::BC3_SRGB_BLOCK:
+		case GraphicsFmt::BC7_SRGB_BLOCK:
+			hasAlpha = true;
+	}
+
+	if ( hasAlpha )
+		push.aAlbedo = render->GetTextureIndex( texture );
 }
 
 
@@ -59,7 +86,7 @@ static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, ModelSur
 {
 	ShadowMap_Push& push = gPushData.at( &srDrawInfo );
 	push.aViewInfo       = gViewInfoIndex;
-	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex, 0, sizeof( ShadowMap_Push ), &push );
+	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ), &push );
 }
 
 
@@ -74,8 +101,8 @@ ShaderCreate_t gShaderCreate_ShadowMap = {
 	.apName           = "__shadow_map",
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
-	.aVertexFormat    = VertexFormat_Position,
+	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aVertexFormat    = VertexFormat_Position | VertexFormat_TexCoord,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,
 	.apLayoutCreate   = Shader_ShadowMap_GetPipelineLayoutCreate,
