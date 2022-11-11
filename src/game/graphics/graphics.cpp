@@ -1331,12 +1331,11 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::vector< Mod
 
 		if ( prevRenderable )
 		{
-			bindModel |= prevRenderable->apDraw->aModel != renderable->apDraw->aModel;
+			// bindModel |= prevRenderable->apDraw->aModel != renderable->apDraw->aModel;
 			// bindModel |= prevRenderable->aSurface != renderable->aSurface;
 
 			if ( prevModel )
 			{
-				bindModel |= prevModel != model;
 				bindModel |= prevModel->apBuffers != model->apBuffers;
 				bindModel |= prevModel->apVertexData != model->apVertexData;
 			}
