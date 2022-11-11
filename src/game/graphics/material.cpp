@@ -3,6 +3,7 @@
 #include "render/irender.h"
 
 #include "core/json5.h"
+#include "core/string.hpp"
 
 #include <set>
 
@@ -10,36 +11,36 @@ extern IRender* render;
 
 struct MaterialVar
 {
-	MaterialVar( const std::string &name, EMatVar type ):
+	MaterialVar( const ChString &name, EMatVar type ):
 		aName( name ), aType( type )
 	{}
 
-	MaterialVar( const std::string& name, Handle data ) :
+	MaterialVar( const ChString& name, Handle data ) :
 		MaterialVar( name, EMatVar_Texture )
 	{ aDataTexture = data; }
 
-	MaterialVar( const std::string &name, float data ):
+	MaterialVar( const ChString& name, float data ) :
 		MaterialVar( name, EMatVar_Float )
 	{ aDataFloat = data; }
 
-	MaterialVar( const std::string &name, int data ):
+	MaterialVar( const ChString& name, int data ) :
 		MaterialVar( name, EMatVar_Int )
 	{ aDataInt = data; }
 
-	MaterialVar( const std::string &name, const glm::vec2 &data ):
+	MaterialVar( const ChString& name, const glm::vec2& data ) :
 		MaterialVar( name, EMatVar_Vec2 )
 	{ aDataVec2 = data; }
 
-	MaterialVar( const std::string &name, const glm::vec3 &data ):
+	MaterialVar( const ChString& name, const glm::vec3& data ) :
 		MaterialVar( name, EMatVar_Vec3 )
 	{ aDataVec3 = data; }
 
-	MaterialVar( const std::string &name, const glm::vec4 &data ):
+	MaterialVar( const ChString& name, const glm::vec4& data ) :
 		MaterialVar( name, EMatVar_Vec4 )
 	{ aDataVec4 = data; }
 
-	std::string aName;
-	EMatVar     aType;
+	ChString aName;
+	EMatVar  aType;
 	
 	// TODO: can this be smaller somehow? this takes up 16 bytes due to the vec4
 	// which will only be used very, very rarely!!
@@ -68,17 +69,18 @@ struct MaterialVar
 	inline void             SetVar( const glm::vec4 &val )                { aType = EMatVar_Vec4; aDataVec4 = val; }
 
 	inline Handle           GetTexture( Handle fallback = InvalidHandle ) { return ( aType == EMatVar_Texture ) ? aDataTexture : fallback; }
-	inline const float&     GetFloat( float fallback = 0.f )              { return (aType == EMatVar_Float) ? aDataFloat : fallback; }
-	inline const int&       GetInt( int fallback = 0 )                    { return (aType == EMatVar_Int) ? aDataInt : fallback; }
-	inline const glm::vec2& GetVec2( const glm::vec2 &fallback )          { return (aType == EMatVar_Vec2) ? aDataVec2 : fallback; }
-	inline const glm::vec3& GetVec3( const glm::vec3 &fallback )          { return (aType == EMatVar_Vec3) ? aDataVec3 : fallback; }
-	inline const glm::vec4& GetVec4( const glm::vec4 &fallback )          { return (aType == EMatVar_Vec4) ? aDataVec4 : fallback; }
+	inline const float&     GetFloat( float fallback = 0.f )              { return ( aType == EMatVar_Float ) ? aDataFloat : fallback; }
+	inline const int&       GetInt( int fallback = 0 )                    { return ( aType == EMatVar_Int ) ? aDataInt : fallback; }
+	inline const glm::vec2& GetVec2( const glm::vec2 &fallback )          { return ( aType == EMatVar_Vec2 ) ? aDataVec2 : fallback; }
+	inline const glm::vec3& GetVec3( const glm::vec3 &fallback )          { return ( aType == EMatVar_Vec3 ) ? aDataVec3 : fallback; }
+	inline const glm::vec4& GetVec4( const glm::vec4 &fallback )          { return ( aType == EMatVar_Vec4 ) ? aDataVec4 : fallback; }
 };
 
 
 struct MaterialData_t
 {
-	std::vector< MaterialVar > aVars;
+	// std::vector< MaterialVar > aVars;
+	ChVector< MaterialVar > aVars;
 };
 
 
@@ -130,11 +132,11 @@ EMatVar Mat_GetVarType( Handle mat, size_t sIndex )
 
 	if ( sIndex >= data->aVars.size() )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Mat_GetVarType: Index out of bounds (index: %zu - size: %zu)\n", sIndex, data->aVars.size() );
+		Log_ErrorF( gLC_ClientGraphics, "Mat_GetVarType: Index out of bounds (index: %zu - size: %zd)\n", sIndex, data->aVars.size() );
 		return EMatVar_Invalid;
 	}
 
-	return data->aVars.at( sIndex ).aType;
+	return data->aVars[ sIndex ].aType;
 }
 
 
@@ -196,7 +198,10 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 		}
 	}
 
-	data->aVars.emplace_back( name, value );
+	// data->aVars.emplace_back( name, value );
+	MaterialVar& var = data->aVars.emplace_back( true );
+	var.aName = name.data();
+	var.SetVar( value );
 }
 
 
@@ -453,7 +458,7 @@ Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
 		return nameIt->second;
 	}
 
-	Handle handle = gMaterials.Add( new MaterialData_t{} );
+	Handle handle = gMaterials.Add( new MaterialData_t );
 
 	char*  name   = new char[ srName.size() + 1 ];
 	strncpy( name, srName.c_str(), srName.size() );

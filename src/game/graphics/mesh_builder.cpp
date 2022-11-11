@@ -83,7 +83,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 		mesh.aVertexOffset = origVertCount;
 		mesh.aVertexCount  = surf.aVertices.size();
 
-		std::vector< VertexAttribute > attribs;
+		ChVector< VertexAttribute > attribs;
 		for ( int attrib = 0; attrib < VertexAttribute_Count; attrib++ )
 		{
 			// does this format contain this attribute?
@@ -94,7 +94,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 			}
 		}
 
-		vertData->aData.resize( std::max( vertData->aData.size(), attribs.size() ) );
+		vertData->aData.resize( std::max( vertData->aData.size(), attribs.size() ), true );
 
 		size_t attribIndex = 0;
 
@@ -178,12 +178,12 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 #if MESH_BUILDER_USE_IND
 		// Now Copy Indices
-		std::vector< u32 >& ind       = vertData->aIndices;
-		size_t              origSize  = ind.size();
+		ChVector< u32 >& ind       = vertData->aIndices;
+		size_t              origSize = ind.size();
 
-		mesh.aIndexOffset             = origSize;
-		mesh.aVertexOffset            = 0;
-		mesh.aIndexCount              = surf.aIndices.size();
+		mesh.aIndexOffset            = origSize;
+		mesh.aVertexOffset           = 0;
+		mesh.aIndexCount             = surf.aIndices.size();
 
 		ind.resize( ind.size() + surf.aIndices.size() );
 
@@ -226,17 +226,17 @@ void MeshBuilder::Reset()
 // ------------------------------------------------------------------------
 
 
-size_t MeshBuilder::GetVertexCount( size_t i ) const
+uint32_t MeshBuilder::GetVertexCount( uint32_t i ) const
 {
 	Assert( i > aSurfaces.size() );
-	return aSurfaces[i].aVertices.size();
+	return aSurfaces[ i ].aVertices.size();
 }
 
 
-size_t MeshBuilder::GetVertexCount() const
+uint32_t MeshBuilder::GetVertexCount() const
 {
 	Assert( aSurfaces.size() );
-	return aSurfaces[aSurf].aVertices.size();
+	return aSurfaces[ aSurf ].aVertices.size();
 }
 
 
@@ -260,16 +260,16 @@ void MeshBuilder::NextVertex()
 		apSurf->aVertices.push_back( apSurf->aVertex );
 		apSurf->aIndices.push_back( 0 );
 
-		apSurf->aVertInd[apSurf->aVertex] = 0;
+		aSurfacesInd[ aSurf ][ apSurf->aVertex ] = 0;
 
 		return;
 	}
 
 #if MESH_BUILDER_USE_IND
-	auto it = apSurf->aVertInd.find( apSurf->aVertex );
+	auto it = aSurfacesInd[ aSurf ].find( apSurf->aVertex );
 
 	// not a unique vertex
-	if ( it != apSurf->aVertInd.end() )
+	if ( it != aSurfacesInd[ aSurf ].end() )
 	{
 		apSurf->aIndices.push_back( it->second );
 		return;
@@ -280,13 +280,13 @@ void MeshBuilder::NextVertex()
 	apSurf->aVertices.push_back( apSurf->aVertex );
 
 #if MESH_BUILDER_USE_IND
-	u32 indCount = apSurf->aVertInd.size();
+	u32 indCount = aSurfacesInd[ aSurf ].size();
 #else
 	u32 indCount = apSurf->aIndices.size();
 #endif
 
 	apSurf->aIndices.push_back( indCount );
-	apSurf->aVertInd[apSurf->aVertex] = indCount;
+	aSurfacesInd[ aSurf ][ apSurf->aVertex ] = indCount;
 }
 
 
@@ -412,7 +412,8 @@ void MeshBuilder::SetMaterial( Handle sMaterial )
 
 void MeshBuilder::SetSurfaceCount( size_t sCount )
 {
-	aSurfaces.resize( sCount );
+	aSurfaces.resize( sCount, true );
+	aSurfacesInd.resize( sCount );
 
 	// kind of a hack? not really supposed to do this but im lazy
 	// apMesh->SetSurfaceCount( aSurfaces.size() );

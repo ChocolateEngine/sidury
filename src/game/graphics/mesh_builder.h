@@ -118,30 +118,28 @@ struct MeshBuilder
 
 	struct Surface
 	{
-		std::vector< MeshBuilderVertex >             aVertices;
-		std::vector< u32 >                           aIndices;
+		ChVector< MeshBuilderVertex > aVertices;
+		ChVector< u32 >               aIndices;
 
-		// uh
-		std::unordered_map< MeshBuilderVertex, u32 > aVertInd;
-
-		MeshBuilderVertex                            aVertex;
-		VertexFormat                                 aFormat   = VertexFormat_None;
-		Handle                                       aMaterial = InvalidHandle;
+		MeshBuilderVertex               aVertex;
+		VertexFormat                    aFormat   = VertexFormat_None;
+		Handle                          aMaterial = InvalidHandle;
 
 		// is this a per surface thing? i would imagine so
-		std::vector< BlendShapeData >                aBlendShapes;
+		std::vector< BlendShapeData >   aBlendShapes;
 	};
 
-	const char*               apDebugName  = nullptr;
+	const char*                                                 apDebugName  = nullptr;
 
-	Model*                    apMesh       = nullptr;
-	ModelBuffers_t*            apBuffers    = nullptr;
-	VertexData_t*             apVertexData = nullptr;
+	Model*                                                      apMesh       = nullptr;
+	ModelBuffers_t*                                             apBuffers    = nullptr;
+	VertexData_t*                                               apVertexData = nullptr;
 
-	std::vector< BlendShape > aBlendShapes;
-	std::vector< Surface >    aSurfaces;
-	size_t                    aSurf  = 0;
-	Surface*                  apSurf = 0;  // pointer to current surface
+	ChVector< BlendShape >                                    aBlendShapes;
+	ChVector< Surface >                                       aSurfaces;
+	std::vector< std::unordered_map< MeshBuilderVertex, u32 > > aSurfacesInd;  // kinda weird, but can't put it in ChVector cause of constructor garbage
+	uint32_t                                                    aSurf  = 0;
+	Surface*                                                    apSurf = 0;  // pointer to current surface
 
 	// ------------------------------------------------------------------------
 
@@ -149,8 +147,8 @@ struct MeshBuilder
 	void                     End( bool sCreateBuffers = true );
 	void                     Reset();
 
-	size_t                   GetVertexCount( size_t i ) const;
-	size_t                   GetVertexCount() const;
+	uint32_t                 GetVertexCount( uint32_t i ) const;
+	uint32_t                 GetVertexCount() const;
 
 	// ------------------------------------------------------------------------
 	// Building Functions

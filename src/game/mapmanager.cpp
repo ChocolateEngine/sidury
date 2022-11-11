@@ -144,9 +144,11 @@ bool MapManager_LoadWorldModel()
 	
 	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aRenderable.aScene ); i++ )
 	{
-		Handle           model = Graphics_GetSceneModel( gpMap->aRenderable.aScene, i );
+		Handle       model     = Graphics_GetSceneModel( gpMap->aRenderable.aScene, i );
 
-		gpMap->aRenderable.aDraw.emplace_back( model, modelMatrix );
+		ModelDraw_t& modelDraw = gpMap->aRenderable.aDraw.emplace_back();
+		modelDraw.aModel       = model;
+		modelDraw.aModelMatrix = modelMatrix;
 
 #if 0
 		PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );

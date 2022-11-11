@@ -181,30 +181,26 @@ struct VertAttribData_t
 	{
 		if ( apData )
 			free( apData );
-
-		// TEST
-		apData = nullptr;
 	}
 
-	// disabled because of std::vector::resize()
-// private:
-// 	VertAttribData_t( const VertAttribData_t& other );
+private:
+	VertAttribData_t( const VertAttribData_t& other );
 };
 
 
 struct VertexData_t
 {
-	VertexFormat                    aFormat = VertexFormat_None;
-	u32                             aCount  = 0;
-	std::vector< VertAttribData_t > aData;
-	std::vector< uint32_t >         aIndices;
+	VertexFormat                   aFormat = VertexFormat_None;
+	u32                            aCount  = 0;
+	ChVector< VertAttribData_t > aData;
+	ChVector< uint32_t >         aIndices;
 };
 
 
 struct ModelBuffers_t
 {
-	std::vector< Handle > aVertex;
-	Handle                aIndex = InvalidHandle;
+	ChVector< Handle > aVertex;
+	Handle               aIndex = InvalidHandle;
 };
 
 
@@ -222,10 +218,10 @@ struct Mesh
 
 struct Model
 {
-	ModelBuffers_t*     apBuffers    = nullptr;
-	VertexData_t*       apVertexData = nullptr;
+	ModelBuffers_t*    apBuffers    = nullptr;
+	VertexData_t*      apVertexData = nullptr;
 
-	std::vector< Mesh > aMeshes;
+	ChVector< Mesh > aMeshes;
 };
 
 
@@ -258,14 +254,14 @@ struct ModelSurfaceDraw_t
 struct Scene_t
 {
 	// std::vector< Model* > aModels;
-	std::vector< Handle > aModels{};
+	ChVector< Handle > aModels{};
 };
 
 
 struct SceneDraw_t
 {
-	Handle                     aScene;
-	std::vector< ModelDraw_t > aDraw;
+	Handle                    aScene;
+	ChVector< ModelDraw_t > aDraw;
 };
 
 

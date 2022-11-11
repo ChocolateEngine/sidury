@@ -47,12 +47,12 @@ struct ViewRenderList_t
 {
 	std::unordered_map<
 		Handle,
-		std::vector< ModelSurfaceDraw_t* > > aRenderLists;
+		ChVector< ModelSurfaceDraw_t* > > aRenderLists;
 };
 
 static std::unordered_map<
   Handle,
-  std::vector< ModelSurfaceDraw_t > >
+  ChVector< ModelSurfaceDraw_t > >
 												 gModelDrawList;
 
 std::vector< ViewRenderList_t >                  gViewRenderLists;
@@ -93,8 +93,8 @@ int                                              gViewInfoIndex  = 0;
 static Model*                                    gDebugLineModel = nullptr;
 static ModelDraw_t                               gDebugLineDraw{};
 static Handle                                    gDebugLineMaterial = InvalidHandle;
-static std::vector< glm::vec3 >                  gDebugLineVertPos;
-static std::vector< glm::vec3 >                  gDebugLineVertColor;
+static ChVector< glm::vec3 >                   gDebugLineVertPos;
+static ChVector< glm::vec3 >                   gDebugLineVertColor;
 static size_t                                    gDebugLineBufferSize = 0;
 
 // --------------------------------------------------------------------------------------
@@ -1040,8 +1040,8 @@ void Graphics_NewFrame()
 		gDebugLineModel->apVertexData = new VertexData_t;
 		gDebugLineModel->apBuffers    = new ModelBuffers_t;
 
-		gDebugLineModel->apBuffers->aVertex.resize( 2 );
-		gDebugLineModel->apVertexData->aData.resize( 2 );
+		gDebugLineModel->apBuffers->aVertex.resize( 2, true );
+		gDebugLineModel->apVertexData->aData.resize( 2, true );
 		gDebugLineModel->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
 		gDebugLineModel->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
 
@@ -1095,7 +1095,7 @@ bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel,
 
 	// Get Vertex Buffers the shader wants
 	// TODO: what about if we don't have an attribute the shader wants???
-	std::vector< Handle > vertexBuffers;
+	ChVector< Handle > vertexBuffers;
 
 	// TODO: THIS CAN BE DONE WHEN ADDING THE MODEL TO THE MAIN DRAW LIST, AND PUT IN ModelSurfaceDraw_t
 	for ( size_t i = 0; i < spModel->apVertexData->aData.size(); i++ )
@@ -1284,13 +1284,14 @@ bool Graphics_ViewFrustumTest( ModelSurfaceDraw_t& srSurfaceDraw, int sViewInfoI
 	// 
 	// AABB_t& globalAABB = it->second;
 
-	ModelBBox_t& bbox = gModelBBox[ srSurfaceDraw.apDraw->aModel ];
+	// ModelBBox_t& bbox = gModelBBox[ srSurfaceDraw.apDraw->aModel ];
+	ModelBBox_t& bbox = srSurfaceDraw.apDraw->aAABB;
 
 	return frustum.IsBoxVisible( bbox.aMin, bbox.aMax );
 }
 
 
-void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, std::vector< ModelSurfaceDraw_t* >& srRenderList )
+void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelSurfaceDraw_t* >& srRenderList )
 {
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
@@ -1980,9 +1981,9 @@ void Graphics_Present()
 			gCurFramebuffer = renderPassBegin.aFrameBuffer;
 			gViewInfoIndex  = shadowMap.aViewInfoIndex;
 
-			render->BeginRenderPass( c, renderPassBegin );
-			Graphics_RenderShadowMaps( c, light, shadowMap );
-			render->EndRenderPass( c );
+			// render->BeginRenderPass( c, renderPassBegin );
+			// Graphics_RenderShadowMaps( c, light, shadowMap );
+			// render->EndRenderPass( c );
 		}
 
 		// ----------------------------------------------------------
@@ -2115,7 +2116,10 @@ void Graphics_AddModelDraw( ModelDraw_t* spDrawInfo )
 		}
 
 		Handle shader = Mat_GetShader( mat );
-		gModelDrawList[ shader ].emplace_back( spDrawInfo, i );
+
+		auto&  surfaceDraw   = gModelDrawList[ shader ].emplace_back();
+		surfaceDraw.apDraw   = spDrawInfo;
+		surfaceDraw.aSurface = i;
 	}
 
 	// auto it = gModelAABB.find( spDrawInfo->aModel );
@@ -2158,7 +2162,7 @@ void Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo )
 		{
 			if ( it->second[ j ].apDraw == spDrawInfo )
 			{
-				vec_remove_index( it->second, j );
+				it->second.remove( j );
 				break;
 			}
 		}
@@ -2476,7 +2480,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		attribs.push_back( &data );
 	}
 
-	spBuffer->aVertex.clear();
+	spBuffer->aVertex.resize( attribs.size() );
 
 	for ( size_t j = 0; j < attribs.size(); j++ )
 	{
@@ -2501,7 +2505,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		  Graphics_GetVertexAttributeSize( data->aAttrib ) * spVertexData->aCount,
 		  EBufferFlags_Vertex );
 
-		spBuffer->aVertex.push_back( buffer );
+		spBuffer->aVertex[ j ] = buffer;
 	}
 }
 
@@ -2529,7 +2533,8 @@ void Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVerte
 	spBuffer->aIndex = CreateModelBuffer(
 	  bufferName ? bufferName : "IB",
 	  spVertexData->aIndices.data(),
-	  sizeof( u32 ) * spVertexData->aIndices.size(),
+	  // sizeof( u32 ) * spVertexData->aIndices.size(),
+	  spVertexData->aIndices.size_bytes(),
 	  EBufferFlags_Index );
 }
 
