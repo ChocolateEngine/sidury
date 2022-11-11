@@ -14,9 +14,14 @@ constexpr const char*                       gpFallbackEmissivePath = "materials/
 // descriptor set layouts
 extern UniformBufferArray_t                 gUniformMaterialBasic3D;
 
+struct Basic3D_MaterialBuf_t
+{
+	Handle aBuffer;
+	int    aIndex;
+};
+
 // Material Handle, Buffer
-static std::unordered_map< Handle, Handle > gMaterialBuffers;
-static std::vector< Handle >                gMaterialBufferIndex;
+static std::unordered_map< Handle, Basic3D_MaterialBuf_t > gMaterialBuffers;
 
 constexpr EShaderFlags                      gShaderFlags =
   EShaderFlags_Sampler |
@@ -58,6 +63,77 @@ CONVAR( r_basic3d_dbg_mode, 0 );
 EShaderFlags Shader_Basic3D_Flags()
 {
 	return EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights;
+}
+
+
+bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
+{
+	// IDEA: since materials shouldn't be updated very often,
+	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
+
+	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Host );
+
+	if ( buffer == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
+		return false;
+	}
+
+	gMaterialBuffers[ sMat ] = { buffer, 0 };
+
+	// update the material descriptor sets
+	UpdateVariableDescSet_t update{};
+
+	// what
+	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 0 ] );
+	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 1 ] );
+
+	update.aType = EDescriptorType_UniformBuffer;
+
+	int i = 0;
+	for ( auto& [ mat, buffer ] : gMaterialBuffers )
+	{
+		buffer.aIndex = i++;
+		update.aBuffers.push_back( buffer.aBuffer );
+	}
+
+	render->UpdateVariableDescSet( update );
+
+	return true;
+}
+
+
+// TODO: this doesn't handle shaders being changed on materials, or materials being freed
+void Shader_Basic3D_UpdateMaterialData( Handle sMat )
+{
+	Basic3D_Material* mat = nullptr;
+
+	auto it = gMaterialData.find( sMat );
+
+	if ( it != gMaterialData.end() )
+	{
+		mat = &it->second;
+	}
+	else
+	{
+		// New Material Using this shader
+		if ( !Shader_Basic3D_CreateMaterialBuffer( sMat ) )
+			return;
+
+		// create new material data
+		mat = &gMaterialData[ sMat ];
+	}
+
+	mat->diffuse       = Mat_GetTextureIndex( sMat, "diffuse" );
+	mat->ao            = Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
+	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
+
+	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
+	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
+
+	// write new material data to the buffer
+	Handle buffer = gMaterialBuffers[ sMat ].aBuffer;
+	render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
 }
 
 
@@ -117,9 +193,18 @@ static void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 	push.aModelMatrix  = srDrawInfo.apDraw->aModelMatrix;
 
 	Handle mat         = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
-	// push.aMaterial     = GET_HANDLE_INDEX( mat );
-	// push.aMaterial     = gMaterialBufferIndex[ mat ];
-	push.aMaterial     = vec_index( gMaterialBufferIndex, mat );
+	// push.aMaterial     = std::distance( std::begin( gMaterialBuffers ), gMaterialBuffers.find( mat ) );
+
+	auto it            = gMaterialBuffers.find( mat );
+	if ( it == gMaterialBuffers.end() )
+	{
+		push.aMaterial = 0;
+		Shader_Basic3D_UpdateMaterialData( mat );
+	}
+	else
+	{
+		push.aMaterial = it->second.aIndex;
+	}
 
 	push.aProjView     = 0;
 	push.aDebugDraw    = r_basic3d_dbg_mode;
@@ -152,77 +237,4 @@ ShaderCreate_t gShaderCreate_Basic3D = {
 	.apGraphicsCreate = Shader_Basic3D_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_Basic3D,
 };
-
-
-bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
-{
-	// IDEA: since materials shouldn't be updated very often,
-	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
-
-	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Host );
-
-	if ( buffer == InvalidHandle )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
-		return false;
-	}
-
-	gMaterialBuffers[ sMat ] = buffer;
-
-	// update the material descriptor sets
-	UpdateVariableDescSet_t update{};
-
-	// what
-	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 0 ] );
-	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 1 ] );
-
-	update.aType = EDescriptorType_UniformBuffer;
-
-	// blech
-	gMaterialBufferIndex.clear();
-	for ( const auto& [ mat, buffer ] : gMaterialBuffers )
-	{
-		update.aBuffers.push_back( buffer );
-		gMaterialBufferIndex.push_back( mat );
-	}
-
-	// update.aBuffers = gMaterialBuffers[ sMat ];
-	render->UpdateVariableDescSet( update );
-
-	return true;
-}
-
-
-// TODO: this doesn't handle shaders being changed on materials, or materials being freed
-void Shader_Basic3D_UpdateMaterialData( Handle sMat )
-{
-	Basic3D_Material* mat = nullptr;
-
-	auto it = gMaterialData.find( sMat );
-
-	if ( it != gMaterialData.end() )
-	{
-		mat = &it->second;
-	}
-	else
-	{
-		// New Material Using this shader
-		if ( !Shader_Basic3D_CreateMaterialBuffer( sMat ) )
-			return;
-
-		// create new material data
-		mat = &gMaterialData[ sMat ];
-	}
-
-	mat->diffuse       = Mat_GetTextureIndex( sMat, "diffuse" );
-	mat->ao            = Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
-	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
-
-	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
-	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
-
-	// write new material data to the buffer
-	Handle buffer = gMaterialBuffers[ sMat ];
-	render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
-}
 

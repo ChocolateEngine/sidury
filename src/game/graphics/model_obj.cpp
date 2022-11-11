@@ -12,6 +12,7 @@ Class dedicated for loading models, and caches them too for multiple uses
 #include "mesh_builder.h"
 
 #include <chrono>
+#include <set>
 
 extern IRender* render;
 
@@ -47,7 +48,7 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 
 	MeshBuilder meshBuilder;
   #ifdef _DEBUG
-	meshBuilder.Start( spModel, srPath.c_str() );
+	meshBuilder.Start( spModel, srBasePath.c_str() );
   #else
 	meshBuilder.Start( spModel );
   #endif
@@ -181,5 +182,171 @@ void Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath,
 	time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 
 	Log_DevF( gLC_ClientGraphics, 1, "Obj Load Time: %.6f sec: %s\n", time, srBasePath.c_str() );
+}
+
+
+void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& srPath, Scene_t* spScene )
+{
+	fastObjMesh* obj = fast_obj_read( srPath.c_str() );
+
+	if ( obj == nullptr )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to parse obj\n", srPath.c_str() );
+		return;
+	}
+
+	std::string baseDir  = GetBaseDir( srPath );
+	std::string baseDir2 = GetBaseDir( srBasePath );
+
+	std::vector< Handle > materials;
+
+	for ( unsigned int i = 0; i < obj->material_count; i++ )
+	{
+		fastObjMaterial& objMat   = obj->materials[ i ];
+		std::string      matName  = baseDir2 + "/" + objMat.name;
+		Handle           material = Graphics_FindMaterial( matName.c_str() );
+
+		if ( material == InvalidHandle )
+		{
+			std::string matPath = matName + ".cmt";
+			if ( FileSys_IsFile( matPath ) )
+				material = Graphics_LoadMaterial( matPath );
+		}
+
+		// fallback if there is no cmt file
+		if ( material == InvalidHandle )
+		{
+			material = Graphics_CreateMaterial( objMat.name, Graphics_GetShader( gDefaultShader ) );
+
+			TextureCreateData_t createData{};
+			createData.aUsage  = EImageUsage_Sampled;
+			createData.aFilter = EImageFilter_Linear;
+
+			auto SetTexture    = [ & ]( const std::string& param, const char* texname )
+			{
+				if ( texname == nullptr )
+					return;
+
+				Handle texture = InvalidHandle;
+
+				if ( FileSys_IsRelative( texname ) )
+					render->LoadTexture( texture, baseDir2 + "/" + texname, createData );
+				else
+					render->LoadTexture( texture, texname, createData );
+
+				Mat_SetVar( material, param, texture );
+			};
+
+			SetTexture( MatVar_Diffuse, objMat.map_Kd.path );
+			SetTexture( MatVar_Emissive, objMat.map_Ke.path );
+		}
+
+		materials.push_back( material );
+	}
+
+	u64             totalIndexOffset = 0;
+
+	VertexData_t*   vertData         = new VertexData_t;
+	ModelBuffers_t* modelBuffers     = new ModelBuffers_t;
+
+	// std::vector< MeshBuilder > builders( obj->object_count );
+	for ( u32 objIndex = 0; objIndex < obj->object_count; objIndex++ )
+	// for ( u32 objIndex = 0; objIndex < obj->group_count; objIndex++ )
+	{
+		fastObjGroup& group = obj->objects[ objIndex ];
+		// fastObjGroup& group = obj->groups[objIndex];
+
+		// index_offset += group.index_offset;
+		Model*        model = new Model;
+		model->apBuffers    = modelBuffers;
+		model->apVertexData = vertData;
+
+		spScene->aModels.push_back( Graphics_AddModel( model ) );
+
+		char* groupName = nullptr;
+
+#ifdef _DEBUG
+		if ( group.name )
+		{
+			groupName = new char[ strlen( group.name ) ];
+			strcpy( groupName, group.name );
+		}
+#endif
+
+		MeshBuilder meshBuilder;
+		meshBuilder.Start( model, groupName );
+		// meshBuilder.SetSurfaceCount( obj->material_count );
+
+		// uh
+		std::vector< u32 > mats;
+
+		for ( u32 faceIndex = 0; faceIndex < group.face_count; faceIndex++ )
+		// for ( u32 faceIndex = 0; faceIndex < obj->face_count; faceIndex++ )
+		{
+			u32& faceVertCount = obj->face_vertices[ group.face_offset + faceIndex ];
+			u32& faceMat       = obj->face_materials[ group.face_offset + faceIndex ];
+
+			size_t index = vec_index( mats, faceMat );
+			if ( index == SIZE_MAX )
+			{
+				index = mats.size();
+				mats.push_back( faceMat );
+			}
+
+			meshBuilder.SetSurfaceCount( mats.size() );
+			meshBuilder.SetCurrentSurface( index );
+			meshBuilder.SetMaterial( materials[ faceMat ] );
+
+			for ( u32 faceVertIndex = 0; faceVertIndex < faceVertCount; faceVertIndex++ )
+			{
+				// NOTE: mesh->indices holds each face "fastObjIndex" as three
+				// seperate index objects contiguously laid out one after the other
+				// fastObjIndex objIndex = obj->indices[totalIndexOffset + faceVertIndex];
+				fastObjIndex objIndex = obj->indices[ totalIndexOffset + faceVertIndex ];
+
+				if ( faceVertIndex >= 3 )
+				{
+					auto ind0                   = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 3 ];
+					auto ind1                   = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 1 ];
+
+					meshBuilder.apSurf->aVertex = meshBuilder.apSurf->aVertices[ ind0 ];
+					meshBuilder.NextVertex();
+
+					meshBuilder.apSurf->aVertex = meshBuilder.apSurf->aVertices[ ind1 ];
+					meshBuilder.NextVertex();
+				}
+
+				const u32 position_index = objIndex.p * 3;
+				const u32 texcoord_index = objIndex.t * 2;
+				const u32 normal_index   = objIndex.n * 3;
+
+				meshBuilder.SetPos(
+				  obj->positions[ position_index ],
+				  obj->positions[ position_index + 1 ],
+				  obj->positions[ position_index + 2 ] );
+
+				meshBuilder.SetNormal(
+				  obj->normals[ normal_index ],
+				  obj->normals[ normal_index + 1 ],
+				  obj->normals[ normal_index + 2 ] );
+
+				meshBuilder.SetTexCoord(
+				  obj->texcoords[ texcoord_index ],
+				  1.0f - obj->texcoords[ texcoord_index + 1 ] );
+
+				meshBuilder.NextVertex();
+			}
+
+			// indexOffset += faceVertCount;
+			totalIndexOffset += faceVertCount;
+		}
+
+		meshBuilder.End( false );
+	}
+
+	Graphics_CreateVertexBuffers( modelBuffers, vertData, srBasePath.c_str() );
+	Graphics_CreateIndexBuffer( modelBuffers, vertData, srBasePath.c_str() );
+
+	fast_obj_destroy( obj );
 }
 

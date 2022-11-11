@@ -3,12 +3,6 @@
 #include "graphics.h"
 
 
-struct ShaderData_t
-{
-	ShaderStage    aStages = ShaderStage_None;
-};
-
-
 extern IRender*                                         render;
 
 // temp shader
@@ -21,13 +15,10 @@ static Handle                                           gDbgLineShader    = Inva
 
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
-static std::unordered_map< Handle, EShaderFlags >       gShaderFlags;      // [shader] = flags
-static std::unordered_map< Handle, Handle >             gShaderLayouts;    // [shader] = pipeline layout
 static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point
 static std::unordered_map< Handle, Handle >             gShaderMaterials;  // [shader] = uniform layout
 static std::unordered_map< Handle, VertexFormat >       gShaderVertFormat; // [shader] = vertex format
 static std::unordered_map< Handle, FShader_Destroy* >   gShaderDestroy;    // [shader] = shader destroy function
-static std::unordered_map< Handle, IShaderPush* >       gShaderPush;       // [shader] = shader push interface (REMOVE THIS ONE DAY)
 static std::unordered_map< Handle, ShaderData_t >       gShaderData;       // [shader] = assorted shader data
 
 extern Handle                                           gRenderPassGraphics;
@@ -78,33 +69,6 @@ extern ShaderCreate_t gShaderCreate_ShadowMap;
 // --------------------------------------------------------------------------------------
 
 
-// TODO: this is mainly geared toward graphics shaders, compute shaders will be a little different
-void Graphics_AddShader(
-  const char*        spName,
-  Handle             sShader,
-  Handle             sLayout,
-  EShaderFlags       sFlags,
-  VertexFormat       sVertFormat,
-  EPipelineBindPoint sBindPoint )
-{
-	if ( !gShaderNames.empty() )
-	{
-		auto it = gShaderNames.find( spName );
-		if ( it != gShaderNames.end() )
-		{
-			Log_WarnF( gLC_ClientGraphics, "Graphics_AddShader: Shader Already Registered: %s\n", spName );
-			return;
-		}
-	}
-
-	gShaderNames[ spName ]       = sShader;
-	gShaderFlags[ sShader ]      = sFlags;
-	gShaderLayouts[ sShader ]    = sLayout;
-	gShaderBindPoint[ sShader ]  = sBindPoint;
-	gShaderVertFormat[ sShader ] = sVertFormat;
-}
-
-
 Handle Graphics_GetShader( std::string_view sName )
 {
 	auto it = gShaderNames.find( sName );
@@ -128,17 +92,6 @@ const char* Graphics_GetShaderName( Handle sShader )
 
 	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %zd\n", sShader );
 	return nullptr;
-}
-
-
-Handle Shader_GetPipelineLayout( Handle sShader )
-{
-	auto it = gShaderLayouts.find( sShader );
-	if ( it != gShaderLayouts.end() )
-		return it->second;
-
-	Log_ErrorF( gLC_ClientGraphics, "Shader_GetPipelineLayout(): Failed get Shader Pipeline Layout %zd\n", sShader );
-	return InvalidHandle;
 }
 
 
@@ -214,44 +167,46 @@ bool Shader_CreateGraphicsPipeline( ShaderCreate_t& srCreate, Handle& srPipeline
 
 bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& srCreate )
 {
-	Handle layout   = InvalidHandle;
 	Handle pipeline = InvalidHandle;
 
 	auto   nameFind = gShaderNames.find( srCreate.apName );
 	if ( nameFind != gShaderNames.end() )
 		pipeline = nameFind->second;
 
+	ShaderData_t shaderData{};
+
 	if ( pipeline )
 	{
-		auto it = gShaderLayouts.find( pipeline );
-		if ( it != gShaderLayouts.end() )
-			layout = it->second;
+		auto it = gShaderData.find( pipeline );
+		if ( it != gShaderData.end() )
+		{
+			shaderData = it->second;
+		}
 	}
 
-	if ( !Shader_CreatePipelineLayout( layout, srCreate.apLayoutCreate ) )
+	if ( !Shader_CreatePipelineLayout( shaderData.aLayout, srCreate.apLayoutCreate ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create Pipeline Layout\n" );
 		return false;
 	}
 
-	if ( !Shader_CreateGraphicsPipeline( srCreate, pipeline, layout, sRenderPass ) )
+	if ( !Shader_CreateGraphicsPipeline( srCreate, pipeline, shaderData.aLayout, sRenderPass ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create Graphics Pipeline\n" );
 		return false;
 	}
 
 	gShaderNames[ srCreate.apName ] = pipeline;
-	gShaderFlags[ pipeline ]        = srCreate.aFlags;
-	gShaderLayouts[ pipeline ]      = layout;
 	gShaderBindPoint[ pipeline ]    = srCreate.aBindPoint;
 	gShaderVertFormat[ pipeline ]   = srCreate.aVertexFormat;
 
-	if ( srCreate.apShaderPush )
-		gShaderPush[ pipeline ] = srCreate.apShaderPush;
+	shaderData.aFlags               = srCreate.aFlags;
+	shaderData.aStages              = srCreate.aStages;
 
-	gShaderData[ pipeline ]         = {
-				.aStages   = srCreate.aStages,
-	};
+	if ( srCreate.apShaderPush )
+		shaderData.apPush = srCreate.apShaderPush;
+
+	gShaderData[ pipeline ] = shaderData;
 
 	if ( !sRecreate )
 	{
@@ -268,14 +223,16 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 
 void Shader_Destroy( Handle sShader )
 {
-	auto it = gShaderLayouts.find( sShader );
-	if ( it != gShaderLayouts.end() )
+	auto it = gShaderData.find( sShader );
+	if ( it != gShaderData.end() )
 	{
 		Log_WarnF( gLC_ClientGraphics, "Shader_Destroy: Failed to find shader: %zd\n", sShader );
 		return;
 	}
 
-	render->DestroyPipelineLayout( it->second );
+	ShaderData_t& shaderData = it->second;
+
+	render->DestroyPipelineLayout( shaderData.aLayout );
 	render->DestroyPipeline( sShader );
 
 	for ( const auto& [ name, shader ] : gShaderNames )
@@ -287,8 +244,6 @@ void Shader_Destroy( Handle sShader )
 		}
 	}
 
-	gShaderFlags.erase( sShader );
-	gShaderLayouts.erase( sShader );
 	gShaderBindPoint.erase( sShader );
 	gShaderVertFormat.erase( sShader );
 	gShaderData.erase( sShader );
@@ -336,17 +291,6 @@ void Graphics_ShaderDestroy()
 }
 
 
-EShaderFlags Shader_GetFlags( Handle sShader )
-{
-	auto it = gShaderFlags.find( sShader );
-	if ( it != gShaderFlags.end() )
-		return it->second;
-	
-	Log_Error( gLC_ClientGraphics, "Unable to find Shader Flags!\n" );
-	return EShaderFlags_None;
-}
-
-
 EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 {
 	auto it = gShaderBindPoint.find( sShader );
@@ -355,17 +299,6 @@ EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 	
 	Log_Error( gLC_ClientGraphics, "Unable to find Shader Pipeline Bind Point!\n" );
 	return EPipelineBindPoint_Graphics;
-}
-
-
-IShaderPush* Shader_GetPushInterface( Handle sShader )
-{
-	auto it = gShaderPush.find( sShader );
-	if ( it != gShaderPush.end() )
-		return it->second;
-	
-	Log_Error( gLC_ClientGraphics, "Unable to find Shader Push Constants Interface!\n" );
-	return nullptr;
 }
 
 
@@ -400,20 +333,22 @@ Handle* Shader_GetMaterialUniform( Handle sShader )
 
 bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 {
+	ShaderData_t* shaderData = Shader_GetData( sShader );
+	if ( !shaderData )
+		return false;
+
 	if ( !render->CmdBindPipeline( sCmd, sShader ) )
 		return false;
 
-	EShaderFlags shaderFlags = Shader_GetFlags( sShader );
-
 	std::vector< Handle > descSets;
 
-	if ( shaderFlags & EShaderFlags_Sampler )
+	if ( shaderData->aFlags & EShaderFlags_Sampler )
 		descSets.push_back( gUniformSampler.aSets[ sIndex ] );
 
-	if ( shaderFlags & EShaderFlags_ViewInfo )
+	if ( shaderData->aFlags & EShaderFlags_ViewInfo )
 		descSets.push_back( gUniformViewInfo.aSets[ sIndex ] );
 
-	if ( shaderFlags & EShaderFlags_Lights )
+	if ( shaderData->aFlags & EShaderFlags_Lights )
 	{
 		for ( const auto& set : gUniformLightInfo.aSets )
 			descSets.push_back( set );
@@ -431,7 +366,7 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 			descSets.push_back( set );
 	}
 
-	if ( shaderFlags & EShaderFlags_MaterialUniform )
+	if ( shaderData->aFlags & EShaderFlags_MaterialUniform )
 	{
 		Handle* mats = Shader_GetMaterialUniform( sShader );
 		if ( mats == nullptr )
@@ -442,10 +377,9 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 
 	if ( descSets.size() )
 	{
-		Handle             layout    = Shader_GetPipelineLayout( sShader );
 		EPipelineBindPoint bindPoint = Shader_GetPipelineBindPoint( sShader );
 
-		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, layout, descSets.data(), static_cast< u32 >( descSets.size() ) );
+		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), static_cast< u32 >( descSets.size() ) );
 	}
 
 	return true;
@@ -454,9 +388,11 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 
 void Shader_ResetPushData()
 {
-	for ( auto& [ renderable, push ] : gShaderPush )
+	// this is where data oriented would be better, but the way i did it was slow
+	for ( auto& [ shader, data ] : gShaderData )
 	{
-		push->apReset();
+		if ( data.apPush )
+			data.apPush->apReset();
 	}
 	
 	// for ( auto& [ renderable, data ] : gShaderPushData )
@@ -468,17 +404,17 @@ void Shader_ResetPushData()
 }
 
 
-bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable )
+bool Shader_SetupRenderableDrawData( ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable )
 {
-	EShaderFlags shaderFlags = Shader_GetFlags( sShader );
+	if ( !spShaderData )
+		return false;
 
-	if ( shaderFlags & EShaderFlags_PushConstant )
+	if ( spShaderData->aFlags & EShaderFlags_PushConstant )
 	{
-		IShaderPush* shaderPush = Shader_GetPushInterface( sShader );
-		if ( !shaderPush )
+		if ( !spShaderData->apPush )
 			return false;
 
-		shaderPush->apSetup( srRenderable );
+		spShaderData->apPush->apSetup( srRenderable );
 	}
 
 	return true;
@@ -487,13 +423,16 @@ bool Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRende
 
 bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable )
 {
-	EShaderFlags  shaderFlags = Shader_GetFlags( sShader );
-	Handle        layout      = Shader_GetPipelineLayout( sShader );
+	ShaderData_t* shaderData = Shader_GetData( sShader );
+	if ( !shaderData )
+		return false;
 
-	if ( shaderFlags & EShaderFlags_PushConstant )
+	if ( shaderData->aFlags & EShaderFlags_PushConstant )
 	{
-		IShaderPush* shaderPush = Shader_GetPushInterface( sShader );
-		shaderPush->apPush( sCmd, layout, srRenderable );
+		if ( !shaderData->apPush )
+			return false;
+
+		shaderData->apPush->apPush( sCmd, shaderData->aLayout, srRenderable );
 
 		// void* data = gShaderPushData.at( &srRenderable );
 		// render->CmdPushConstants( sCmd, layout, shaderData->aStages, 0, shaderData->aPushSize, data );

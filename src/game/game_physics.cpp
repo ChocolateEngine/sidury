@@ -177,7 +177,7 @@ void Phys_DrawGeometry(
 	modelDraw.aModel = sGeometry;
 	modelDraw.aModelMatrix = srModelMatrix;
 
-	Graphics_DrawModel( &modelDraw );
+	// Graphics_DrawModel( &modelDraw );
 }
 
 
@@ -194,15 +194,15 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 {
 	Model* model = Graphics_GetModelData( sModel );
 
-	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	// TODO: use this for physics materials later on
+	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
 	{
-		Mesh&  mesh     = model->aMeshes[ s ];
+		// Mesh&  mesh     = model->aMeshes[ s ];
 
-		auto&  ind      = mesh.aIndices;
-		auto&  vertData = mesh.aVertexData;
+		auto&  vertData = model->apVertexData;
 
 		float* data     = nullptr;
-		for ( auto& attrib : vertData.aData )
+		for ( auto& attrib : vertData->aData )
 		{
 			if ( attrib.aAttrib == VertexAttribute_Position )
 			{
@@ -217,7 +217,7 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 			return;
 		}
 
-		u32 newSize  = static_cast< u32 >( ind.size() );
+		u32 newSize = static_cast< u32 >( vertData->aIndices.size() );
 		if ( newSize == 0 )
 			newSize = srData.aVertCount;
 
@@ -228,29 +228,29 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 		else
 			srData.apVertices = (glm::vec3*)malloc( ( origSize + newSize ) * sizeof( glm::vec3 ) );
 
-		if ( ind.size() )
+		if ( vertData->aIndices.size() )
 		{
-			for ( size_t i = 0; i < ind.size(); i++ )
+			for ( size_t i = 0; i < vertData->aIndices.size(); i++ )
 			{
-				size_t i0 = ind[ i ] * 3;
+				size_t i0                           = vertData->aIndices[ i ] * 3;
 
 				srData.apVertices[ origSize + i ].x = data[ i0 + 0 ];
 				srData.apVertices[ origSize + i ].y = data[ i0 + 1 ];
 				srData.apVertices[ origSize + i ].z = data[ i0 + 2 ];
 			}
 
-			srData.aVertCount += ind.size();
+			srData.aVertCount += vertData->aIndices.size();
 		}
 		else
 		{
-			for ( size_t i = 0, j = 0; i < vertData.aCount * 3; j++ )
+			for ( size_t i = 0, j = 0; i < vertData->aCount * 3; j++ )
 			{
 				srData.apVertices[ origSize + j ].x = data[ i++ ];
 				srData.apVertices[ origSize + j ].y = data[ i++ ];
 				srData.apVertices[ origSize + j ].z = data[ i++ ];
 			}
 
-			srData.aVertCount += vertData.aCount;
+			srData.aVertCount += vertData->aCount;
 		}
 	}
 }
@@ -260,15 +260,15 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 {
 	Model* model = Graphics_GetModelData( sModel );
 
-	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	// TODO: use this for physics materials later on
+	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
 	{
-		Mesh&  mesh     = model->aMeshes[ s ];
+		// Mesh&  mesh     = model->aMeshes[ s ];
 
-		auto&  ind      = mesh.aIndices;
-		auto&  vertData = mesh.aVertexData;
+		auto&  vertData = model->apVertexData;
 
 		float* data     = nullptr;
-		for ( auto& attrib : vertData.aData )
+		for ( auto& attrib : vertData->aData )
 		{
 			if ( attrib.aAttrib == VertexAttribute_Position )
 			{
@@ -279,13 +279,13 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 
 		// shouldn't be using this function if we have indices lol
 		// could even calculate them in GetModelInd as well
-		if ( ind.size() )
+		if ( vertData->aIndices.size() )
 		{
-			for ( size_t i = 0; i < ind.size(); i += 3 )
+			for ( size_t i = 0; i < vertData->aIndices.size(); i += 3 )
 			{
-				size_t    i0   = ind[ i + 0 ] * 3;
-				size_t    i1   = ind[ i + 1 ] * 3;
-				size_t    i2   = ind[ i + 2 ] * 3;
+				size_t    i0   = vertData->aIndices[ i + 0 ] * 3;
+				size_t    i1   = vertData->aIndices[ i + 1 ] * 3;
+				size_t    i2   = vertData->aIndices[ i + 2 ] * 3;
 
 				auto& tri = srTris.emplace_back();
 
@@ -298,7 +298,7 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 		}
 		else
 		{
-			for ( size_t i = 0; i < vertData.aCount * 3; )
+			for ( size_t i = 0; i < vertData->aCount * 3; )
 			{
 				auto&     tri  = srTris.emplace_back();
 
@@ -318,15 +318,15 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 	u32    origSize = srData.aVertCount;
 	Model* model    = Graphics_GetModelData( sModel );
 
-	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	// TODO: use this for physics materials later on
+	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
 	{
-		Mesh&  mesh     = model->aMeshes[ s ];
+		// Mesh&  mesh     = model->aMeshes[ s ];
 
-		auto&  ind      = mesh.aIndices;
-		auto&  vertData = mesh.aVertexData;
+		auto&  vertData = model->apVertexData;
 
 		float* data     = nullptr;
-		for ( auto& attrib : vertData.aData )
+		for ( auto& attrib : vertData->aData )
 		{
 			if ( attrib.aAttrib == VertexAttribute_Position )
 			{
@@ -344,11 +344,11 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		origSize = srData.aVertCount;
 
 		if ( srData.apVertices )
-			srData.apVertices = (glm::vec3*)realloc( srData.apVertices, ( origSize + vertData.aCount ) * sizeof( glm::vec3 ) );
+			srData.apVertices = (glm::vec3*)realloc( srData.apVertices, ( origSize + vertData->aCount ) * sizeof( glm::vec3 ) );
 		else
-			srData.apVertices = (glm::vec3*)malloc( ( origSize + vertData.aCount ) * sizeof( glm::vec3 ) );
+			srData.apVertices = (glm::vec3*)malloc( ( origSize + vertData->aCount ) * sizeof( glm::vec3 ) );
 
-		for ( u32 i = 0, j = 0; j < vertData.aCount; i += 3, j++ )
+		for ( u32 i = 0, j = 0; j < vertData->aCount; i += 3, j++ )
 		{
 			// srVerts.emplace_back( data[ i + 0 ], data[ i + 1 ], data[ i + 2 ] );
 
@@ -359,21 +359,21 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			// srVerts.push_back( what );
 		}
 
-		srData.aVertCount += vertData.aCount;
+		srData.aVertCount += vertData->aCount;
 		u32 indSize = srData.aTriCount;
 
 		if ( srData.aTris )
-			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ( ind.size() / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
+			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ( vertData->aIndices.size() / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
 		else
-			srData.aTris = (PhysIndexedTriangle_t*)malloc( ( indSize + ind.size() ) * sizeof( PhysIndexedTriangle_t ) );
+			srData.aTris = (PhysIndexedTriangle_t*)malloc( ( indSize + vertData->aIndices.size() ) * sizeof( PhysIndexedTriangle_t ) );
 
-		for ( u32 i = 0, j = 0; i < ind.size(); j++ )
+		for ( u32 i = 0, j = 0; i < vertData->aIndices.size(); j++ )
 		{
 			// auto& tri     = srConvexData.emplace_back();
 
-			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + ind[ i++ ];
-			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + ind[ i++ ];
-			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + ind[ i++ ];
+			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + vertData->aIndices[ i++ ];
+			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + vertData->aIndices[ i++ ];
+			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + vertData->aIndices[ i++ ];
 
 			// srInd.emplace_back(
 			//   origSize + ind[ i + 0 ],
@@ -381,7 +381,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			//   origSize + ind[ i + 2 ] );
 		}
 
-		srData.aTriCount += ind.size() / 3;
+		srData.aTriCount += vertData->aIndices.size() / 3;
 	}
 }
 

@@ -93,6 +93,7 @@ void CreateProtogen( const std::string& path )
 	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
 
 	g_protos.push_back( proto );
+	Graphics_AddModelDraw( &entities->GetComponent< ModelDraw_t >( proto ) );
 #endif
 }
 
@@ -122,6 +123,8 @@ void CreatePhysEntity( const std::string& path )
 	ModelDraw_t modelDraw{};
 	modelDraw.aModel = Graphics_LoadModel( path );
 	entities->AddComponent< ModelDraw_t >( physEnt, modelDraw );
+
+	Graphics_AddModelDraw( &entities->GetComponent< ModelDraw_t >( physEnt ) );
 
 	Transform& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
@@ -180,8 +183,10 @@ CON_COMMAND( delete_protos )
 	for ( auto& proto : g_protos )
 	{
 		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
+		Graphics_RemoveModelDraw( &entities->GetComponent< ModelDraw_t >( proto ) );
 		entities->DeleteEntity( proto );
 	}
+
 	g_protos.clear();
 }
 
@@ -404,8 +409,6 @@ void EntUpdate()
 			phys->SetFriction( phys_friction );
 			Util_ToMatrix( model.aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
-
-		Graphics_DrawModel( &model );
 	}
 }
 
@@ -464,7 +467,6 @@ void Game_Update( float frameTime )
 		CenterMouseOnScreen();
 	}
 }
-
 
 
 void Game_SetPaused( bool paused )
@@ -568,6 +570,8 @@ glm::vec3 Util_VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
 extern ConVar cl_view_height;
 
 CONVAR( proto_look, 1 );
+CONVAR( proto_follow, 0 );
+CONVAR( proto_follow_speed, 400 );
 
 
 struct ProtoLookData_t
@@ -722,8 +726,21 @@ void Game_SetupModels( float frameTime )
 			matrixChanged = true;
 		}
 
+		if ( proto_follow.GetBool() && !gPaused )
+		{
+			matrixChanged = true;
+
+			glm::vec3 modelUp;
+			Util_GetMatrixDirection( modelDraw.aModelMatrix, nullptr, nullptr, &modelUp );
+
+			protoTransform.aPos = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
+		}
+
 		if ( matrixChanged )
+		{
 		 	modelDraw.aModelMatrix = protoTransform.ToMatrix();
+			Graphics_UpdateModelAABB( &modelDraw );
+		}
 
 		// TEMP
 		{
@@ -733,8 +750,6 @@ void Game_SetupModels( float frameTime )
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
 		}
-
-		Graphics_DrawModel( &modelDraw );
 	}
 #endif
 }
@@ -877,8 +892,10 @@ void Game_SetView( const glm::mat4& srViewMat )
 	gView.ComputeProjection( width, height );
 
 	// um
-	gViewInfo.aProjection = gView.aProjMat;
-	gViewInfo.aView       = gView.aViewMat;
+	gViewInfo[ 0 ].aProjection = gView.aProjMat;
+	gViewInfo[ 0 ].aView       = gView.aViewMat;
+	gViewInfo[ 0 ].aNearZ      = gView.aNearZ;
+	gViewInfo[ 0 ].aFarZ       = gView.aFarZ;
 
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
 	gViewInfoUpdate  = true;
@@ -896,8 +913,10 @@ void Game_UpdateProjection()
 	gView.ComputeProjection( width, height );
 
 	// um
-	gViewInfo.aProjection = gView.aProjMat;
-	gViewInfo.aView       = gView.aViewMat;
+	gViewInfo[ 0 ].aProjection = gView.aProjMat;
+	gViewInfo[ 0 ].aView       = gView.aViewMat;
+	gViewInfo[ 0 ].aNearZ      = gView.aNearZ;
+	gViewInfo[ 0 ].aFarZ       = gView.aFarZ;
 
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
 	gViewInfoUpdate  = true;

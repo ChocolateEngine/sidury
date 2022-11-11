@@ -14,7 +14,7 @@ struct ShadowMap_Push
 extern IRender*                                                  render;
 
 static std::unordered_map< ModelSurfaceDraw_t*, ShadowMap_Push > gPushData;
-static int                                                       gViewInfoIndex = 0;
+static int                                                       gShadowViewInfoIndex = 0;
 
 
 static void Shader_ShadowMap_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
@@ -39,7 +39,7 @@ static void Shader_ShadowMap_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t
 // blech
 void Shader_ShadowMap_SetViewInfo( int sViewInfo )
 {
-	gViewInfoIndex = sViewInfo;
+	gShadowViewInfoIndex = sViewInfo;
 }
 
 
@@ -53,7 +53,7 @@ static void Shader_ShadowMap_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 {
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = srDrawInfo.apDraw->aModelMatrix;
-	push.aViewInfo       = gViewInfoIndex;
+	push.aViewInfo       = gShadowViewInfoIndex;
 	push.aAlbedo         = -1;
 
 	Handle mat           = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
@@ -85,7 +85,7 @@ static void Shader_ShadowMap_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
 static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
 {
 	ShadowMap_Push& push = gPushData.at( &srDrawInfo );
-	push.aViewInfo       = gViewInfoIndex;
+	push.aViewInfo       = gShadowViewInfoIndex;
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ), &push );
 }
 

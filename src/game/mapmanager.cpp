@@ -60,10 +60,6 @@ void MapManager_Update()
 {
 	if ( !gpMap )
 		return;
-
-	Skybox_Draw();
-
-	Graphics_DrawModel( &gpMap->aRenderable );
 }
 
 
@@ -72,8 +68,11 @@ void MapManager_CloseMap()
 	if ( gpMap == nullptr )
 		return;
 
-	if ( gpMap->aRenderable.aModel != InvalidHandle )
-		Graphics_FreeModel( gpMap->aRenderable.aModel );
+	if ( gpMap->aRenderable.aScene != InvalidHandle )
+	{
+		Graphics_RemoveSceneDraw( &gpMap->aRenderable );
+		Graphics_FreeScene( gpMap->aRenderable.aScene );
+	}
 
 	for ( auto physObj : gpMap->aWorldPhysObjs )
 		physenv->DestroyObject( physObj );
@@ -122,6 +121,8 @@ bool MapManager_LoadMap( const std::string &path )
 
 	MapManager_SpawnPlayer();
 
+	Graphics_AddSceneDraw( &gpMap->aRenderable );
+
 	return true;
 }
 
@@ -134,30 +135,40 @@ bool MapManager_HasMap()
 
 bool MapManager_LoadWorldModel()
 {
-	if ( !( gpMap->aRenderable.aModel = Graphics_LoadModel( gpMap->aMapInfo->modelPath ) ) )
+	if ( !( gpMap->aRenderable.aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
 		return false;
 
 	// rotate the world model
-	Util_ToMatrix( gpMap->aRenderable.aModelMatrix, {}, gpMap->aMapInfo->ang );
+	glm::mat4 modelMatrix;
+	Util_ToMatrix( modelMatrix, {}, gpMap->aMapInfo->ang );
 	
-	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
+	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aRenderable.aScene ); i++ )
+	{
+		Handle           model = Graphics_GetSceneModel( gpMap->aRenderable.aScene, i );
 
-	Phys_GetModelInd( gpMap->aRenderable.aModel, shapeInfo.aConcaveData );
-	
-	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+		gpMap->aRenderable.aDraw.emplace_back( model, modelMatrix );
 
-	if ( physShape == nullptr )
-		return false;
+#if 0
+		PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 
-	Assert( physShape );
+		Phys_GetModelInd( model, shapeInfo.aConcaveData );
 	
-	PhysicsObjectInfo physInfo;
-	physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
+		IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+
+		if ( physShape == nullptr )
+			return false;
+
+		Assert( physShape );
 	
-	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
+		PhysicsObjectInfo physInfo;
+		physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
 	
-	gpMap->aWorldPhysShapes.push_back( physShape );
-	gpMap->aWorldPhysObjs.push_back( physObj );
+		IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
+	
+		gpMap->aWorldPhysShapes.push_back( physShape );
+		gpMap->aWorldPhysObjs.push_back( physObj );
+#endif
+	}
 
 	return true;
 }

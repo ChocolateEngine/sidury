@@ -25,7 +25,7 @@ struct MeshBuilderVertex
 		if ( this == &srOther )
 			return true;
 
-		return !( std::memcmp( &pos, &srOther.pos, sizeof( MeshBuilderVertex ) ) );
+		return std::memcmp( &pos, &srOther.pos, sizeof( MeshBuilderVertex ) ) == 0;
 	}
 };
 
@@ -132,9 +132,11 @@ struct MeshBuilder
 		std::vector< BlendShapeData >                aBlendShapes;
 	};
 
-	const char*               apDebugName = nullptr;
+	const char*               apDebugName  = nullptr;
 
-	Model*                    apMesh = nullptr;
+	Model*                    apMesh       = nullptr;
+	ModelBuffers_t*            apBuffers    = nullptr;
+	VertexData_t*             apVertexData = nullptr;
 
 	std::vector< BlendShape > aBlendShapes;
 	std::vector< Surface >    aSurfaces;
@@ -144,7 +146,7 @@ struct MeshBuilder
 	// ------------------------------------------------------------------------
 
 	void                     Start( Model* spMesh, const char* spDebugName = nullptr );
-	void                     End();
+	void                     End( bool sCreateBuffers = true );
 	void                     Reset();
 
 	size_t                   GetVertexCount( size_t i ) const;
@@ -187,5 +189,4 @@ struct MeshBuilder
 	void                     CalculateNormals( size_t sIndex );
 	void                     CalculateAllNormals();
 };
-
 

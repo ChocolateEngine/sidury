@@ -265,8 +265,8 @@ void LightEditor_DrawLightModels()
 
 	for ( auto& [ light, draw ] : gDrawLights )
 	{
-		if ( gpFlashlight != light )
-			Graphics_DrawModel( &draw );
+		// if ( gpFlashlight != light )
+		// 	Graphics_DrawModel( &draw );
 	}
 }
 

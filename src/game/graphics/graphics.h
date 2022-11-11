@@ -97,6 +97,17 @@ enum ELightType // : char
 // ======================================================
 
 
+inline glm::mat4 Util_ComputeProjection( float sWidth, float sHeight, float sNearZ, float sFarZ, float sFov )
+{
+	float hAspect = (float)sWidth / (float)sHeight;
+	float vAspect = (float)sHeight / (float)sWidth;
+
+	float V       = 2.0f * atanf( tanf( glm::radians( sFov ) / 2.0f ) * vAspect );
+
+	return glm::perspective( V, hAspect, sNearZ, sFarZ );
+}
+
+
 struct ViewportCamera_t
 {
 	void ComputeProjection( float sWidth, float sHeight )
@@ -123,9 +134,24 @@ struct ViewportCamera_t
 };
 
 
-struct RenderTarget_t
+enum EFrustum
 {
+	EFrustum_Top,
+	EFrustum_Bottom,
+	EFrustum_Right,
+	EFrustum_Left,
+	EFrustum_Near,
+	EFrustum_Far,
+	EFrustum_Count,
+};
 
+
+struct Frustum_t
+{
+	glm::vec4 aPlanes[ EFrustum_Count ];
+	glm::vec3 aPoints[ 8 ];
+
+	bool IsBoxVisible( const glm::vec3& minp, const glm::vec3& maxp ) const;
 };
 
 
@@ -168,41 +194,57 @@ struct VertAttribData_t
 
 struct VertexData_t
 {
-	VertexFormat                    aFormat;
-	u32                             aCount;
+	VertexFormat                    aFormat = VertexFormat_None;
+	u32                             aCount  = 0;
 	std::vector< VertAttribData_t > aData;
-	bool                            aLocked;  // if locked, we can create a vertex buffer
+	std::vector< uint32_t >         aIndices;
+};
+
+
+struct ModelBuffers_t
+{
+	std::vector< Handle > aVertex;
+	Handle                aIndex = InvalidHandle;
 };
 
 
 struct Mesh
 {
-	std::vector< Handle >   aVertexBuffers;
-	Handle                  aIndexBuffer;
+	u32    aVertexOffset;
+	u32    aVertexCount;
 
-	Handle                  aMaterial;
+	u32    aIndexOffset;
+	u32    aIndexCount;
 
-	// NOTE: these could be a pointer, and multiple surfaces could share the same vertex data and indices
-	VertexData_t            aVertexData;
-	std::vector< uint32_t > aIndices;
+	Handle aMaterial;
 };
 
 
 struct Model
 {
-	std::vector< Mesh > aMeshes;
+	ModelBuffers_t*     apBuffers    = nullptr;
+	VertexData_t*       apVertexData = nullptr;
 
-	void SetSurfaceCount( size_t sCount )
-	{
-		aMeshes.resize( sCount );
-	}
+	std::vector< Mesh > aMeshes;
+};
+
+
+struct ModelBBox_t
+{
+	glm::vec3 aMin{};
+	glm::vec3 aMax{};
 };
 
 
 struct ModelDraw_t
 {
-	Handle    aModel;
-	glm::mat4 aModelMatrix;
+	Handle      aModel;
+	glm::mat4   aModelMatrix;
+
+	ModelBBox_t aAABB;
+	bool        aTestVis    = true;
+
+	bool        aCastShadow = true;
 };
 
 
@@ -213,10 +255,23 @@ struct ModelSurfaceDraw_t
 };
 
 
-struct ModelBBox_t
+struct Scene_t
 {
-	glm::vec3 aMin{};
-	glm::vec3 aMax{};
+	// std::vector< Model* > aModels;
+	std::vector< Handle > aModels{};
+};
+
+
+struct SceneDraw_t
+{
+	Handle                     aScene;
+	std::vector< ModelDraw_t > aDraw;
+};
+
+
+struct RenderLayer_t
+{
+
 };
 
 
@@ -289,13 +344,6 @@ struct UniformBufferArray_t
 
 struct UBO_ViewInfo_t
 {
-	Handle                aLayout = InvalidHandle;
-	std::vector< Handle > aSets;
-	Handle                aBuffer;
-};
-
-struct ViewInfo_t
-{
 	glm::mat4 aProjView{};
 	glm::mat4 aProjection{};
 	glm::mat4 aView{};
@@ -304,14 +352,26 @@ struct ViewInfo_t
 	float     aFarZ  = 0.f;
 };
 
-extern ViewInfo_t  gViewInfo;
-extern bool        gViewInfoUpdate;
+struct ViewInfo_t
+{
+	glm::mat4  aProjView{};
+	glm::mat4  aProjection{};
+	glm::mat4  aView{};
+	glm::vec3  aViewPos{};
+	float      aNearZ = 0.f;
+	float      aFarZ  = 0.f;
+
+	glm::uvec2 aSize{};
+	bool       aActive = true;
+};
+
+extern std::vector< ViewInfo_t > gViewInfo;
+extern bool                      gViewInfoUpdate;
 
 
 // Push Constant Function Pointers
 using FShader_ResetPushData = void();
 using FShader_SetupPushData = void( ModelSurfaceDraw_t& srDrawInfo );
-// using FShader_GetPushData   = void*( u32& srSize, ModelSurfaceDraw_t& srDrawInfo );
 using FShader_PushConstants = void( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo );
 
 using FShader_Init = bool();
@@ -319,14 +379,6 @@ using FShader_Destroy = void();
 
 using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeline );
 using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srGraphics );
-
-
-struct ShaderInfo_t
-{
-	EPipelineBindPoint aBindPoint    = EPipelineBindPoint_Graphics;
-	EShaderFlags       aFlags        = EShaderFlags_None;
-	VertexFormat       aVertexFormat = VertexFormat_None;
-};
 
 
 struct IShaderPush
@@ -355,84 +407,13 @@ struct ShaderCreate_t
 };
 
 
-struct IPushConstant
+// stored data internally
+struct ShaderData_t
 {
-	virtual void ResetPushData()
-	{
-	}
-
-	// kinda weird and tied to models, hmm
-	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-
-	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-};
-
-
-struct IShaderMaterial
-{
-	virtual void ResetPushData()
-	{
-	}
-
-	// kinda weird and tied to models, hmm
-	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-
-	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-};
-
-
-// DO NOT ADD ANY LOCAL VARIABLES TO THIS WHEN YOU OVERRIDE IT !!!
-struct IPipelineLayout
-{
-
-};
-
-
-struct IShader
-{
-	// Returns the shader name, and fills in data in the struct with general shader info 
-	virtual const char* GetShaderInfo( ShaderInfo_t& srInfo )                                             = 0;
-
-	// Shader Creation Info
-	virtual void        GetPushConstantData( std::vector< PushConstantRange_t >& srPushConstants )        = 0;
-
-	virtual void        GetGraphicsCreateInfo( Handle sRenderPass, GraphicsPipelineCreate_t& srGraphics ) = 0;
-
-	// Optional to override
-	// Used if the shader has the push constants flag
-	virtual void ResetPushData()
-	{
-	}
-
-	// kinda weird and tied to models, hmm
-	virtual void ModelPushConstants( Handle cmd, size_t sCmdIndex, ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-
-	virtual void SetupModelPushData( ModelSurfaceDraw_t& srDrawInfo )
-	{
-	}
-
-	// Used if the shader has the material data flag
-	virtual void AddMaterial( Handle sMat )
-	{
-	}
-
-	virtual void RemoveMaterial( Handle sMat )
-	{
-	}
-
-	virtual void UpdateMaterialData( Handle sMat )
-	{
-	}
+	ShaderStage  aStages = ShaderStage_None;
+	EShaderFlags aFlags  = EShaderFlags_None;
+	Handle       aLayout = InvalidHandle;
+	IShaderPush* apPush  = nullptr;
 };
 
 
@@ -443,9 +424,22 @@ Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_AddModel( Model* spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
+void               Graphics_UpdateModelAABB( ModelDraw_t* spDraw );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
+
+// ---------------------------------------------------------------------------------------
+// Scenes
+
+Handle             Graphics_LoadScene( const std::string& srPath );
+void               Graphics_FreeScene( Handle sScene );
+
+void               Graphics_AddSceneDraw( SceneDraw_t* spScene );
+void               Graphics_RemoveSceneDraw( SceneDraw_t* spScene );
+
+size_t             Graphics_GetSceneModelCount( Handle sScene );
+Handle             Graphics_GetSceneModel( Handle sScene, size_t sIndex );
 
 // ---------------------------------------------------------------------------------------
 // Materials
@@ -512,17 +506,18 @@ void               Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeli
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
-bool               Shader_SetupRenderableDrawData( Handle sShader, ModelSurfaceDraw_t& srRenderable );
+bool               Shader_SetupRenderableDrawData(  ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable );
 bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
-EShaderFlags       Shader_GetFlags( Handle sShader );
+ShaderData_t*      Shader_GetData( Handle sShader );
 
 // ---------------------------------------------------------------------------------------
 // Buffers
 
-void               Graphics_CreateVertexBuffers( Mesh& spMesh, const char* spDebugName = nullptr );
-void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebugName = nullptr );
+void               Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr );
+void               Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr );
+// void               Graphics_CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVertexData, bool sCreateIndex, const char* spDebugName );
 
 // ---------------------------------------------------------------------------------------
 // Lighting
@@ -530,10 +525,6 @@ void               Graphics_CreateIndexBuffer( Mesh& spMesh, const char* spDebug
 Light_t*           Graphics_CreateLight( ELightType sType );
 void               Graphics_UpdateLight( Light_t* spLight );
 void               Graphics_DestroyLight( Light_t* spLight );
-
-void               Graphics_EnableLight( Light_t* spLight );
-void               Graphics_DisableLight( Light_t* spLight );
-bool               Graphics_IsLightEnabled( Light_t* spLight );
 
 // ---------------------------------------------------------------------------------------
 // Rendering
@@ -548,9 +539,24 @@ void               Graphics_Present();
 void               Graphics_SetViewProjMatrix( const glm::mat4& srMat );
 const glm::mat4&   Graphics_GetViewProjMatrix();
 
-void               Graphics_DrawModel( ModelDraw_t* spDrawInfo );
+void               Graphics_PushViewInfo( const ViewInfo_t& srViewInfo );
+void               Graphics_PopViewInfo();
+ViewInfo_t&        Graphics_GetViewInfo();
+
+// TODO: add a "RegisterModelDraw" here or whatever, and use Handles for that
+// that way, if you free it without removing it from the draw list, it doesn't cause a crash
+// and it can throw a warning and remove it itself
+void               Graphics_AddModelDraw( ModelDraw_t* spDrawInfo );
+void               Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo );
+
+// ---------------------------------------------------------------------------------------
+// Debug Rendering
 
 void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
+void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
+void               Graphics_DrawProjView( const glm::mat4& srProjView );
+void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
+void               Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo );
 
 // ---------------------------------------------------------------------------------------
 // Other

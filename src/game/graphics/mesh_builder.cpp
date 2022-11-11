@@ -13,8 +13,12 @@
 // - Add a way to add bones and weights to the vertex
 // - Add a way to add morph targets to the vertex
 // - probably add a "AddBlendShape( std::string_view name )" function
+// 
+// - Replace the "MeshBuilderVertex" struct with individual vertex vectors
+//   This way, you can just fill the contents of a vertex attribute right away
+//   The current interface will still remain
+// 
 
-	
 
 // std::vector< Vertex >   aVertices;
 // VertexFormat            aFormat = VertexFormat_None;
@@ -38,7 +42,7 @@ void MeshBuilder::Start( Model* spMesh, const char* spDebugName )
 }
 
 
-void MeshBuilder::End()
+void MeshBuilder::End( bool sCreateBuffers )
 {
 	if ( apMesh->aMeshes.size() )
 	{
@@ -46,6 +50,18 @@ void MeshBuilder::End()
 	}
 
 	// apMesh->SetSurfaceCount( aSurfaces.size() );
+
+	VertexData_t* vertData = nullptr;
+
+	if ( apMesh->apVertexData )
+	{
+		vertData = apMesh->apVertexData;
+	}
+	else if ( !vertData )
+	{
+		vertData             = new VertexData_t;
+		apMesh->apVertexData = vertData;
+	}
 
 	for ( size_t i = 0; i < aSurfaces.size(); i++ )
 	{
@@ -57,11 +73,15 @@ void MeshBuilder::End()
 			continue;
 		}
 
-		Mesh&         mesh     = apMesh->aMeshes.emplace_back();
-		VertexData_t& vertData = mesh.aVertexData;
+		Mesh& mesh = apMesh->aMeshes.emplace_back();
 
-		vertData.aFormat       = surf.aFormat;
-		vertData.aCount        = surf.aVertices.size();
+		size_t origVertCount = vertData->aCount;
+
+		vertData->aFormat |= surf.aFormat;
+		vertData->aCount += surf.aVertices.size();
+
+		mesh.aVertexOffset = origVertCount;
+		mesh.aVertexCount  = surf.aVertices.size();
 
 		std::vector< VertexAttribute > attribs;
 		for ( int attrib = 0; attrib < VertexAttribute_Count; attrib++ )
@@ -74,22 +94,53 @@ void MeshBuilder::End()
 			}
 		}
 
-		// size_t formatSize = Graphics_GetVertexFormatSize( surf.aFormat );
+		vertData->aData.resize( std::max( vertData->aData.size(), attribs.size() ) );
 
-		vertData.aData.resize( attribs.size() );
+		size_t attribIndex = 0;
 
-		size_t j = 0;
 		for ( VertexAttribute attrib : attribs )
 		{
-			size_t size = Graphics_GetVertexAttributeSize( attrib );
+			size_t size        = Graphics_GetVertexAttributeSize( attrib );
 
-			// VertAttribData_t* attribData = &vertData.aData.emplace_back();
-			// vertData.aData.push_back( {} );
-			VertAttribData_t& attribData = vertData.aData[j];
-			// VertAttribData_t* attribData = &vertData.aData.back();
+			for ( ; attribIndex < vertData->aData.size(); attribIndex++ )
+			{
+				if ( attrib == VertexAttribute_Position && vertData->aData[ attribIndex ].aAttrib == attrib )
+				{
+					if ( attribIndex == 0 )
+						break;
+				}
 
-			attribData.aAttrib = attrib;
-			attribData.apData = malloc( size * vertData.aCount );
+				if ( attribIndex == 0 )
+					continue;
+
+				// default is set to position
+				if ( vertData->aData[ attribIndex ].aAttrib == attrib || vertData->aData[ attribIndex ].aAttrib == VertexAttribute_Position )
+					break;
+			}
+
+			Assert( attribIndex < vertData->aData.size() );
+
+			if ( attribIndex >= vertData->aData.size() )
+				continue;
+
+			VertAttribData_t& attribData = vertData->aData[ attribIndex++ ];
+			attribData.aAttrib           = attrib;
+
+			if ( origVertCount > 0 )
+			{
+				void* newBuffer = realloc( attribData.apData, size * vertData->aCount );
+				if ( newBuffer == nullptr )
+				{
+					Log_ErrorF( gLC_ClientGraphics, "Failed to allocate memory for vertex attribute buffer (%zd bytes)\n", size * vertData->aCount );
+					return;
+				}
+
+				attribData.apData = newBuffer;
+			}
+			else
+			{
+				attribData.apData = malloc( size * vertData->aCount );
+			}
 
 			// char* data = (char*)attribData.apData;
 
@@ -98,24 +149,24 @@ void MeshBuilder::End()
 				{ \
 					for ( size_t v = 0; v < surf.aVertices.size(); v++ ) \
 					{ \
-						memcpy( (float*)attribData.apData + (v * elemCount), &surf.aVertices[v].attribName, size ); \
+						memcpy( (float*)attribData.apData + ( origVertCount * elemCount ) + ( v * elemCount ), &surf.aVertices[ v ].attribName, size ); \
 					} \
 				}
 
 			if ( attrib == VertexAttribute_Position )
 			{
-				float* data = (float*)attribData.apData;
+				float* data = (float*)attribData.apData + origVertCount * 3;
 				for ( size_t v = 0; v < surf.aVertices.size(); v++ )
 				{
 					// memcpy( data + v * size, &surf.aVertices[v].pos, size );
-					memcpy( (float*)attribData.apData + (v * 3), &surf.aVertices[v].pos, size);
-
+					memcpy( data + ( v * 3 ), &surf.aVertices[ v ].pos, size );
+			
 					// memcpy( data, &surf.aVertices[v].pos, size );
 					// data += size;
 				}
 			}
 
-			// MOVE_VERT_DATA( VertexAttribute_Position, pos )
+			// MOVE_VERT_DATA( VertexAttribute_Position, pos, 3 )
 			else MOVE_VERT_DATA( VertexAttribute_Normal,   normal,   3 )
 			else MOVE_VERT_DATA( VertexAttribute_Color,    color,    3 )
 			else MOVE_VERT_DATA( VertexAttribute_TexCoord, texCoord, 2 )
@@ -123,36 +174,43 @@ void MeshBuilder::End()
 			// else MOVE_VERT_DATA( VertexAttribute_MorphPos, morphPos, 3 )
 
 			#undef MOVE_VERT_DATA
-			j++;
 		}
 
 #if MESH_BUILDER_USE_IND
 		// Now Copy Indices
-		std::vector< u32 >& ind = apMesh->aMeshes[ i ].aIndices;
-		ind.resize( surf.aIndices.size() );
+		std::vector< u32 >& ind       = vertData->aIndices;
+		size_t              origSize  = ind.size();
 
-		memcpy( ind.data(), surf.aIndices.data(), sizeof( u32 ) * ind.size() );
+		mesh.aIndexOffset             = origSize;
+		mesh.aVertexOffset            = 0;
+		mesh.aIndexCount              = surf.aIndices.size();
+
+		ind.resize( ind.size() + surf.aIndices.size() );
+
+		for ( size_t v = 0; v < surf.aIndices.size(); v++ )
+		{
+			ind[ origSize + v ] = surf.aIndices[ v ] + origVertCount;
+		}
+
+		// memcpy( &ind[ origIndex ], surf.aIndices.data(), sizeof( u32 ) * surf.aIndices.size() );
 #endif
 
 		// apMesh->SetVertexDataLocked( i, true );
 		apMesh->aMeshes[ i ].aMaterial = surf.aMaterial;
+		apMesh->aMeshes[ i ].aMaterial = surf.aMaterial;
+	}
 
-		char* debugName = nullptr;
-#ifdef _DEBUG
-		if ( apDebugName )
-		{
-			size_t nameLen = strlen( apDebugName );
-			debugName = new char[ nameLen + 13 ];  // MEMORY LEAK - need string memory pool
-			snprintf( debugName, nameLen + 13, "%s | Surface %zd", apDebugName, i );
-		}
-#endif
+	if ( !sCreateBuffers )
+		return;
 
-		Graphics_CreateVertexBuffers( apMesh->aMeshes[ i ], debugName );
+	if ( apMesh->apBuffers == nullptr )
+		apMesh->apBuffers = new ModelBuffers_t;
+
+	Graphics_CreateVertexBuffers( apMesh->apBuffers, vertData, apDebugName );
 
 #if MESH_BUILDER_USE_IND
-		Graphics_CreateIndexBuffer( apMesh->aMeshes[ i ], debugName );
+	Graphics_CreateIndexBuffer( apMesh->apBuffers, vertData, apDebugName );
 #endif
-	}
 }
 
 
@@ -418,7 +476,7 @@ void MeshBuilder::CalculateNormals( size_t sIndex )
 	Assert( aSurfaces.size() );
 
 	Surface& surf = aSurfaces[sIndex];
-	VertexData_t& vertData = apMesh->aMeshes[ sIndex ].aVertexData;
+	VertexData_t* vertData = apMesh->apVertexData;
 
 #if 0
 	vec3_t v1 = ( vec3_t ){ c->x - b->x, c->y - b->y, c->z - b->z };
@@ -448,5 +506,4 @@ void MeshBuilder::CalculateAllNormals()
 
 
 #undef VERT_EMPTY_CHECK
-
 

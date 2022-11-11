@@ -23,14 +23,16 @@ static Handle           gSkyboxShader = InvalidHandle;
 
 bool Skybox_Init()
 {
-	Model* model       = new Model;
-	gSkyboxDraw.aModel = Graphics_AddModel( model );
+	Model* model            = new Model;
+	gSkyboxDraw.aModel      = Graphics_AddModel( model );
+	gSkyboxDraw.aCastShadow = false;
+	gSkyboxDraw.aTestVis    = false;
 
-	gSkyboxShader      = Graphics_GetShader( "skybox" );
+	gSkyboxShader           = Graphics_GetShader( "skybox" );
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
-	Handle      mat    = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
+	Handle      mat         = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
 
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "__skybox_model" );
@@ -93,8 +95,6 @@ void Skybox_Destroy()
 
 void Skybox_Draw()
 {
-	if ( gSkyboxValid && g_skybox )
-		Graphics_DrawModel( &gSkyboxDraw );
 }
 
 
@@ -111,6 +111,8 @@ void Skybox_SetAng( const glm::vec3& srAng )
 void Skybox_SetMaterial( const std::string& srPath )
 {
 	gSkyboxValid = false;
+
+	Graphics_RemoveModelDraw( &gSkyboxDraw );
 
 	Handle prevMat = Model_GetMaterial( gSkyboxDraw.aModel, 0 );
 
@@ -136,6 +138,8 @@ void Skybox_SetMaterial( const std::string& srPath )
 	}
 
 	gSkyboxValid = true;
+
+	Graphics_AddModelDraw( &gSkyboxDraw );
 
 	Mat_SetVar( mat, "ang", vec3_zero );
 }

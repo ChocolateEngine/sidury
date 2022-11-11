@@ -249,12 +249,12 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			// auto SetTexture = [&]( const std::string& param, const std::string &texname )
 			auto SetTexture = [&]( const std::string& param, cgltf_texture* texture )
 			{
-				if ( !texture || !texture->name )
+				if ( !texture || !texture->image || !texture->image->uri )
 					return;
 
 				// TODO: use std::string_view
-				const std::string texName = texture->name;
-				Handle            handle = InvalidHandle;
+				std::string texName = texture->image->uri;
+				Handle handle = InvalidHandle;
 
 				if ( FileSys_IsRelative( texName ) )
 					render->LoadTexture( handle, baseDir2 + "/" + texName, createData );

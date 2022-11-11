@@ -11,6 +11,8 @@
 
 #include "mapmanager.h"
 
+#include "imgui/imgui.h"
+
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
@@ -100,6 +102,8 @@ CONVAR( cl_bob_time_offset, -0.6 );
 CONVAR( cl_bob_debug, 0 );
 
 CONVAR( r_flashlight_brightness, 10.f );
+CONVAR( r_flashlight_lock, 0.f );
+CONVAR( r_flashlight_offset, -4.f );
 
 extern ConVar   m_yaw, m_pitch;
 
@@ -266,6 +270,54 @@ void PlayerManager::Respawn( Entity player )
 }
 
 
+void Player_UpdateFlashlight( Entity player )
+{
+	Transform& transform       = entities->GetComponent< Transform >( player );
+	CCamera&   camera          = entities->GetComponent< CCamera >( player );
+	Light_t*   flashlight      = entities->GetComponent< Light_t* >( player );
+
+	auto      UpdateTransform = [ & ]()
+	{
+		// weird stuff to get the angle of the light correct
+		flashlight->aAng.x = camera.aTransform.aAng.z;
+		flashlight->aAng.y = -camera.aTransform.aAng.y;
+		flashlight->aAng.z = -camera.aTransform.aAng.x + 90.f;
+
+		flashlight->aPos = transform.aPos + camera.aTransform.aPos;
+
+		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat());
+
+		flashlight->aPos += offset * camera.aUp;
+	};
+
+	if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
+	{
+		flashlight->aEnabled = !flashlight->aEnabled;
+
+		if ( !flashlight->aEnabled )
+		{
+			Graphics_UpdateLight( flashlight );
+		}
+		else
+		{
+			UpdateTransform();
+		}
+	}
+
+	if ( flashlight->aEnabled )
+	{
+		flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+
+		if ( !r_flashlight_lock.GetBool() )
+		{
+			UpdateTransform();
+		}
+
+		Graphics_UpdateLight( flashlight );
+	}
+}
+
+
 void PlayerManager::Update( float frameTime )
 {
 	for ( Entity player: aPlayerList )
@@ -280,29 +332,7 @@ void PlayerManager::Update( float frameTime )
 		{
 			DoMouseLook( player );
 			apMove->MovePlayer( player );
-
-			if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
-			{
-				flashlight->aEnabled = !flashlight->aEnabled;
-
-				if ( !flashlight->aEnabled )
-					Graphics_UpdateLight( flashlight );
-			}
-
-			if ( flashlight->aEnabled )
-			{
-				flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
-
-				flashlight->aPos = transform.aPos + camera.aTransform.aPos;
-				flashlight->aPos.z -= 4.f;
-
-				// weird stuff to get the angle of the light correct
-				flashlight->aAng.x = camera.aTransform.aAng.z;
-				flashlight->aAng.y = -camera.aTransform.aAng.y;
-				flashlight->aAng.z = -camera.aTransform.aAng.x + 90.f;
-
-				Graphics_UpdateLight( flashlight );
-			}
+			Player_UpdateFlashlight( player );
 		}
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
@@ -315,7 +345,7 @@ void PlayerManager::Update( float frameTime )
 			renderable->aModelMatrix = transform.ToMatrix();
 			renderable->aModel = model.handle;
 
-			Graphics_DrawModel( renderable );
+			// Graphics_DrawModel( renderable );
 		}
 
 		UpdateView( playerInfo, player );
@@ -491,7 +521,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ(  );
 
-		gViewInfo.aViewPos = thirdPerson.aPos;
+		gViewInfo[ 0 ].aViewPos = thirdPerson.aPos;
 		Game_SetView( viewMat );
 		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
@@ -505,7 +535,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		glm::mat4 viewMat = transformView.ToViewMatrixZ();
 
-		gViewInfo.aViewPos = transformView.aPos;
+		gViewInfo[ 0 ].aViewPos = transformView.aPos;
 		Game_SetView( viewMat );
 		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
 	}
