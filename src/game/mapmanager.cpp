@@ -68,10 +68,10 @@ void MapManager_CloseMap()
 	if ( gpMap == nullptr )
 		return;
 
-	if ( gpMap->aRenderable.aScene != InvalidHandle )
+	if ( gpMap->aScene != InvalidHandle )
 	{
-		Graphics_RemoveSceneDraw( &gpMap->aRenderable );
-		Graphics_FreeScene( gpMap->aRenderable.aScene );
+		Graphics_RemoveSceneDraw( gpMap->aRenderable );
+		Graphics_FreeScene( gpMap->aScene );
 	}
 
 	for ( auto physObj : gpMap->aWorldPhysObjs )
@@ -121,7 +121,7 @@ bool MapManager_LoadMap( const std::string &path )
 
 	MapManager_SpawnPlayer();
 
-	Graphics_AddSceneDraw( &gpMap->aRenderable );
+	gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
 
 	return true;
 }
@@ -135,20 +135,23 @@ bool MapManager_HasMap()
 
 bool MapManager_LoadWorldModel()
 {
-	if ( !( gpMap->aRenderable.aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
+	if ( !( gpMap->aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
 		return false;
 
 	// rotate the world model
 	glm::mat4 modelMatrix;
 	Util_ToMatrix( modelMatrix, {}, gpMap->aMapInfo->ang );
 	
-	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aRenderable.aScene ); i++ )
+	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
 	{
-		Handle       model     = Graphics_GetSceneModel( gpMap->aRenderable.aScene, i );
+		Handle       model     = Graphics_GetSceneModel( gpMap->aScene, i );
+		ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
 
-		ModelDraw_t& modelDraw = gpMap->aRenderable.aDraw.emplace_back();
-		modelDraw.aModel       = model;
-		modelDraw.aModelMatrix = modelMatrix;
+		if ( modelDraw )
+			continue;
+
+		modelDraw->aModel       = model;
+		modelDraw->aModelMatrix = modelMatrix;
 
 #if 0
 		PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );

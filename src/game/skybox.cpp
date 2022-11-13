@@ -16,17 +16,16 @@ extern ViewportCamera_t gView;
 constexpr float         SKYBOX_SCALE = 100.0f;
 constexpr glm::vec3     vec3_zero( 0, 0, 0 );
 
-static bool             gSkyboxValid = false;
-static ModelDraw_t      gSkyboxDraw{};
+static bool             gSkyboxValid  = false;
+static ModelDraw_t*     gpSkyboxDraw  = nullptr;
+static Handle           gSkyboxModel  = InvalidHandle;
 static Handle           gSkyboxShader = InvalidHandle;
 
 
 bool Skybox_Init()
 {
-	Model* model            = new Model;
-	gSkyboxDraw.aModel      = Graphics_AddModel( model );
-	gSkyboxDraw.aCastShadow = false;
-	gSkyboxDraw.aTestVis    = false;
+	Model* model              = new Model;
+	gSkyboxModel              = Graphics_AddModel( model );
 
 	gSkyboxShader           = Graphics_GetShader( "skybox" );
 
@@ -89,36 +88,32 @@ bool Skybox_Init()
 
 void Skybox_Destroy()
 {
-	Graphics_FreeModel( gSkyboxDraw.aModel );
-}
-
-
-void Skybox_Draw()
-{
+	Graphics_FreeModel( gpSkyboxDraw->aModel );
+	Graphics_RemoveModelDraw( gpSkyboxDraw );
 }
 
 
 void Skybox_SetAng( const glm::vec3& srAng )
 {
-	if ( !gSkyboxValid || g_skybox_ang_freeze || gSkyboxDraw.aModel == InvalidHandle || Model_GetMaterial( gSkyboxDraw.aModel, 0 ) == InvalidHandle )
+	if ( !gSkyboxValid || g_skybox_ang_freeze || !gSkyboxModel || !Model_GetMaterial( gSkyboxModel, 0 ) )
 		return;
 
-	Util_ToViewMatrixY( gSkyboxDraw.aModelMatrix, srAng );
-	gSkyboxDraw.aModelMatrix = gView.aProjMat * gSkyboxDraw.aModelMatrix;
+	Util_ToViewMatrixY( gpSkyboxDraw->aModelMatrix, srAng );
+	gpSkyboxDraw->aModelMatrix = gView.aProjMat * gpSkyboxDraw->aModelMatrix;
 }
 
 
 void Skybox_SetMaterial( const std::string& srPath )
 {
-	gSkyboxValid = false;
+	Graphics_RemoveModelDraw( gpSkyboxDraw );
+	gpSkyboxDraw   = nullptr;
+	gSkyboxValid   = false;
 
-	Graphics_RemoveModelDraw( &gSkyboxDraw );
-
-	Handle prevMat = Model_GetMaterial( gSkyboxDraw.aModel, 0 );
+	Handle prevMat = Model_GetMaterial( gSkyboxModel, 0 );
 
 	if ( prevMat )
 	{
-		Model_SetMaterial( gSkyboxDraw.aModel, 0, InvalidHandle );
+		Model_SetMaterial( gSkyboxModel, 0, InvalidHandle );
 		Graphics_FreeMaterial( prevMat );
 	}
 
@@ -129,7 +124,7 @@ void Skybox_SetMaterial( const std::string& srPath )
 	if ( mat == InvalidHandle )
 		return;
 
-	Model_SetMaterial( gSkyboxDraw.aModel, 0, mat );
+	Model_SetMaterial( gSkyboxModel, 0, mat );
 
 	if ( Mat_GetShader( mat ) != gSkyboxShader )
 	{
@@ -137,9 +132,17 @@ void Skybox_SetMaterial( const std::string& srPath )
 		return;
 	}
 
-	gSkyboxValid = true;
+	gpSkyboxDraw = Graphics_AddModelDraw( gSkyboxModel );
 
-	Graphics_AddModelDraw( &gSkyboxDraw );
+	if ( !gpSkyboxDraw )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create skybox model draw!\n" );
+		return;
+	}
+
+	gpSkyboxDraw->aCastShadow = false;
+	gpSkyboxDraw->aTestVis    = false;
+	gSkyboxValid              = true;
 
 	Mat_SetVar( mat, "ang", vec3_zero );
 }

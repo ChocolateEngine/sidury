@@ -41,12 +41,12 @@ static void Shader_Skybox_ResetPushData()
 }
 
 
-static void Shader_Skybox_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Skybox_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Skybox_Push& push = gSkyboxPushData[ &srDrawInfo ];
-	push.aModelMatrix = srDrawInfo.apDraw->aModelMatrix;
+	push.aModelMatrix = spModelDraw->aModelMatrix;
 
-	Handle mat        = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
+	Handle mat        = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 	push.aSky         = Mat_GetTextureIndex( mat, "sky" );
 }
 

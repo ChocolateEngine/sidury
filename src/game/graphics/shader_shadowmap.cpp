@@ -49,15 +49,18 @@ static void Shader_ShadowMap_ResetPushData()
 }
 
 
-static void Shader_ShadowMap_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_ShadowMap_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
 {
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
-	push.aModelMatrix    = srDrawInfo.apDraw->aModelMatrix;
+	push.aModelMatrix    = spModelDraw->aModelMatrix;
 	push.aViewInfo       = gShadowViewInfoIndex;
 	push.aAlbedo         = -1;
 
-	Handle mat           = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
-	Handle texture       = Mat_GetTexture( mat, "diffuse" );
+	Handle mat           = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+	if ( mat == InvalidHandle )
+		return;
+
+	Handle texture = Mat_GetTexture( mat, "diffuse" );
 
 	if ( texture == InvalidHandle )
 		return;

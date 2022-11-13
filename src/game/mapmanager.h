@@ -24,9 +24,9 @@ struct MapInfo
 
 struct SiduryMap
 {
-	MapInfo *aMapInfo = nullptr;
-	// ModelDraw_t aRenderable{};
-	SceneDraw_t aRenderable{};
+	MapInfo*                       aMapInfo    = nullptr;
+	SceneDraw_t*                   aRenderable = nullptr;
+	Handle                         aScene      = InvalidHandle;
 
 	std::vector< IPhysicsShape* >  aWorldPhysShapes;
 	std::vector< IPhysicsObject* > aWorldPhysObjs;

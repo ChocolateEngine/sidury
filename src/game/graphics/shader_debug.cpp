@@ -49,11 +49,11 @@ static void Shader_Debug_ResetPushData()
 }
 
 
-static void Shader_Debug_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_SetupPushData( ModelDraw_t* spDrawData, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
-	push.aModelMatrix = srDrawInfo.apDraw->aModelMatrix;
-	Handle mat        = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
+	push.aModelMatrix = spDrawData->aModelMatrix;
+	Handle mat        = Model_GetMaterial( spDrawData->aModel, srDrawInfo.aSurface );
 	push.aColor       = Mat_GetVec4( mat, "color" );
 }
 

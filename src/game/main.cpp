@@ -81,9 +81,9 @@ void CreateProtogen( const std::string& path )
 #if 1
 	Entity proto = entities->CreateEntity();
 
-	ModelDraw_t modelDraw{};
-	modelDraw.aModel = Graphics_LoadModel( path );
-	entities->AddComponent< ModelDraw_t >( proto, modelDraw );
+	Handle       model     = Graphics_LoadModel( path );
+	ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
+	entities->AddComponent< ModelDraw_t* >( proto, modelDraw );
 
 	Transform& transform = entities->AddComponent< Transform >( proto );
 
@@ -93,7 +93,6 @@ void CreateProtogen( const std::string& path )
 	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
 
 	g_protos.push_back( proto );
-	Graphics_AddModelDraw( &entities->GetComponent< ModelDraw_t >( proto ) );
 #endif
 }
 
@@ -118,19 +117,18 @@ void CreateModelEntity( const std::string& path )
 void CreatePhysEntity( const std::string& path )
 {
 #if 1
-	Entity physEnt = entities->CreateEntity();
+	Entity       physEnt   = entities->CreateEntity();
 
-	ModelDraw_t modelDraw{};
-	modelDraw.aModel = Graphics_LoadModel( path );
-	entities->AddComponent< ModelDraw_t >( physEnt, modelDraw );
+	Handle       model     = Graphics_LoadModel( path );
+	ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
 
-	Graphics_AddModelDraw( &entities->GetComponent< ModelDraw_t >( physEnt ) );
+	entities->AddComponent< ModelDraw_t* >( physEnt, modelDraw );
 
 	Transform& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
 
-	Phys_GetModelVerts( modelDraw.aModel, shapeInfo.aConvexData );
+	Phys_GetModelVerts( modelDraw->aModel, shapeInfo.aConvexData );
 
 	IPhysicsShape* shape = physenv->CreateShape( shapeInfo );
 
@@ -183,7 +181,7 @@ CON_COMMAND( delete_protos )
 	for ( auto& proto : g_protos )
 	{
 		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
-		Graphics_RemoveModelDraw( &entities->GetComponent< ModelDraw_t >( proto ) );
+		Graphics_RemoveModelDraw( entities->GetComponent< ModelDraw_t* >( proto ) );
 		entities->DeleteEntity( proto );
 	}
 
@@ -394,9 +392,9 @@ void EntUpdate()
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
-		ModelDraw_t& model = entities->GetComponent< ModelDraw_t >( ent );
+		ModelDraw_t* model = entities->GetComponent< ModelDraw_t* >( ent );
 
-		if ( model.aModel == InvalidHandle )
+		if ( model->aModel == InvalidHandle )
 			continue;
 
 		// Model *physObjList = &entities->GetComponent< Model >( ent );
@@ -407,7 +405,7 @@ void EntUpdate()
 		if ( phys )
 		{
 			phys->SetFriction( phys_friction );
-			Util_ToMatrix( model.aModelMatrix, phys->GetPos(), phys->GetAng() );
+			Util_ToMatrix( model->aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
 	}
 }
@@ -662,7 +660,7 @@ void Game_SetupModels( float frameTime )
 #if 1
 	for ( auto& proto: g_protos )
 	{
-		ModelDraw_t& modelDraw      = entities->GetComponent< ModelDraw_t >( proto );
+		ModelDraw_t* modelDraw      = entities->GetComponent< ModelDraw_t* >( proto );
 		auto&        protoTransform = entities->GetComponent< Transform >( proto );
 
 		bool         matrixChanged  = false;
@@ -699,7 +697,7 @@ void Game_SetupModels( float frameTime )
 
 			modelMatrix *= glm::toMat4( protoQuat );
 
-			modelDraw.aModelMatrix = modelMatrix;
+			modelDraw->aModelMatrix = modelMatrix;
 		}
 		else if ( proto_look.GetBool() )
 		{
@@ -731,21 +729,21 @@ void Game_SetupModels( float frameTime )
 			matrixChanged = true;
 
 			glm::vec3 modelUp;
-			Util_GetMatrixDirection( modelDraw.aModelMatrix, nullptr, nullptr, &modelUp );
+			Util_GetMatrixDirection( modelDraw->aModelMatrix, nullptr, nullptr, &modelUp );
 
 			protoTransform.aPos = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
 		}
 
 		if ( matrixChanged )
 		{
-		 	modelDraw.aModelMatrix = protoTransform.ToMatrix();
-			Graphics_UpdateModelAABB( &modelDraw );
+		 	modelDraw->aModelMatrix = protoTransform.ToMatrix();
+			Graphics_UpdateModelAABB( modelDraw );
 		}
 
 		// TEMP
 		{
 			glm::vec3 modelForward, modelRight, modelUp;
-			Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
+			Util_GetMatrixDirection( modelDraw->aModelMatrix, &modelForward, &modelRight, &modelUp );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );

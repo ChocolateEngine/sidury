@@ -45,79 +45,82 @@ void                         Shader_ShadowMap_SetViewInfo( int sViewInfo );
 
 struct ViewRenderList_t
 {
-	std::unordered_map<
-		Handle,
-		ChVector< ModelSurfaceDraw_t* > > aRenderLists;
+	std::unordered_map< Handle, ChVector< ModelSurfaceDraw_t > > aRenderLists;
 };
 
-static std::unordered_map<
-  Handle,
-  ChVector< ModelSurfaceDraw_t > >
-												 gModelDrawList;
+// static std::unordered_map<
+//   Handle,
+//   ChVector< ModelSurfaceDraw_t > >
+// 												 gModelDrawList;
 
-std::vector< ViewRenderList_t >                  gViewRenderLists;
+static ResourceList< ModelDraw_t >                gModelDraws;
+static ChVector< Handle >                         gModelDrawList;
+static std::unordered_map< ModelDraw_t*, Handle > gModelDrawHandles;
 
-static std::vector< Handle >                     gCommandBuffers;
-static size_t                                    gCmdIndex = 0;
+std::vector< ViewRenderList_t >                   gViewRenderLists;
 
-Handle                                           gRenderPassGraphics;
-Handle                                           gRenderPassShadow;
+static std::vector< Handle >                      gCommandBuffers;
+static size_t                                     gCmdIndex = 0;
 
-Handle                                           gCurFramebuffer = InvalidHandle;
+Handle                                            gRenderPassGraphics;
+Handle                                            gRenderPassShadow;
+
+Handle                                            gCurFramebuffer = InvalidHandle;
 
 // stores backbuffer color and depth
-static Handle                                    gBackBuffer[ 2 ];
-static Handle                                    gBackBufferTex[ 3 ];
+static Handle                                     gBackBuffer[ 2 ];
+static Handle                                     gBackBufferTex[ 3 ];
 
 // descriptor sets
-UniformBufferArray_t                             gUniformSampler;
-UniformBufferArray_t                             gUniformViewInfo;
-UniformBufferArray_t                             gUniformMaterialBasic3D;
-constexpr u32                                    MAX_MATERIALS_BASIC3D = 500;
+UniformBufferArray_t                              gUniformSampler;
+UniformBufferArray_t                              gUniformViewInfo;
+UniformBufferArray_t                              gUniformMaterialBasic3D;
+constexpr u32                                     MAX_MATERIALS_BASIC3D = 500;
 
-extern std::set< Handle >                        gDirtyMaterials;
+extern std::set< Handle >                         gDirtyMaterials;
 
-static Handle                                    gSkyboxShader  = InvalidHandle;
+static Handle                                     gSkyboxShader = InvalidHandle;
 
-static glm::mat4                                 gViewProjMat;
-constexpr int                                    MAX_VIEW_INFO_BUFFERS = 32;
-static std::vector< Handle >                     gViewInfoBuffers( MAX_VIEW_INFO_BUFFERS + 1 );
-std::vector< ViewInfo_t >                        gViewInfo( 1 );
-std::vector< Frustum_t >                         gViewInfoFrustums;
-std::stack< ViewInfo_t >                         gViewInfoStack;
-bool                                             gViewInfoUpdate = false;
-int                                              gViewInfoCount  = 1;
-int                                              gViewInfoIndex  = 0;
+static glm::mat4                                  gViewProjMat;
+constexpr int                                     MAX_VIEW_INFO_BUFFERS = 32;
+static std::vector< Handle >                      gViewInfoBuffers( MAX_VIEW_INFO_BUFFERS + 1 );
+std::vector< ViewInfo_t >                         gViewInfo( 1 );
+std::vector< Frustum_t >                          gViewInfoFrustums;
+std::stack< ViewInfo_t >                          gViewInfoStack;
+bool                                              gViewInfoUpdate    = false;
+int                                               gViewInfoCount     = 1;
+int                                               gViewInfoIndex     = 0;
 
 // static MeshBuilder                               gDebugLineBuilder;
-static Model*                                    gDebugLineModel = nullptr;
-static ModelDraw_t                               gDebugLineDraw{};
-static Handle                                    gDebugLineMaterial = InvalidHandle;
-static ChVector< glm::vec3 >                   gDebugLineVertPos;
-static ChVector< glm::vec3 >                   gDebugLineVertColor;
-static size_t                                    gDebugLineBufferSize = 0;
+static Model*                                     gpDebugLineModel   = nullptr;
+static ModelDraw_t*                               gpDebugLineDraw    = nullptr;
+static Handle                                     gDebugLineMaterial = InvalidHandle;
+static ChVector< glm::vec3 >                      gDebugLineVertPos;
+static ChVector< glm::vec3 >                      gDebugLineVertColor;
+static size_t                                     gDebugLineBufferSize = 0;
 
 // --------------------------------------------------------------------------------------
 // Lighting
 
-UniformBufferArray_t                             gUniformLightInfo;
+UniformBufferArray_t                              gUniformLightInfo;
 
-UniformBufferArray_t                             gUniformLightDirectional;
-UniformBufferArray_t                             gUniformLightPoint;
-UniformBufferArray_t                             gUniformLightCone;
-UniformBufferArray_t                             gUniformLightCapsule;
+UniformBufferArray_t                              gUniformLightDirectional;
+UniformBufferArray_t                              gUniformLightPoint;
+UniformBufferArray_t                              gUniformLightCone;
+UniformBufferArray_t                              gUniformLightCapsule;
 
-std::unordered_map< Light_t*, Handle >           gLightBuffers;
+std::unordered_map< Light_t*, Handle >            gLightBuffers;
 
-constexpr int                                    MAX_LIGHTS = MAX_VIEW_INFO_BUFFERS;
-std::vector< Light_t* >                          gLights;
-std::vector< Light_t* >                          gDirtyLights;
+constexpr int                                     MAX_LIGHTS = MAX_VIEW_INFO_BUFFERS;
+std::vector< Light_t* >                           gLights;
+std::vector< Light_t* >                           gDirtyLights;
 
-LightInfo_t                                      gLightInfo;
-Handle                                           gLightInfoBuffer     = InvalidHandle;
-Light_t*                                         gpWorldLight         = nullptr;
+LightInfo_t                                       gLightInfo;
+Handle                                            gLightInfoStagingBuffer = InvalidHandle;
+Handle                                            gLightInfoBuffer        = InvalidHandle;
+Light_t*                                          gpWorldLight            = nullptr;
 
-static bool                                      gNeedLightInfoUpdate = false;
+static bool                                       gNeedLightInfoUpdate    = false;
 
 // --------------------------------------------------------------------------------------
 // Shadow Mapping
@@ -157,11 +160,18 @@ CONVAR( r_draw_aabb, 1 );
 // --------------------------------------------------------------------------------------
 // Assets
 
-static ResourceList< Model* >                    gModels;
-static std::unordered_map< std::string, Handle > gModelPaths;
-static std::unordered_map< Handle, ModelBBox_t > gModelBBox;
+struct ModelAABBUpdate_t
+{
+	ModelDraw_t* apModelDraw;
+	ModelBBox_t  aBBox;
+};
+
+static ResourceList< Model* >                          gModels;
+static std::unordered_map< std::string, Handle >       gModelPaths;
+static std::unordered_map< Handle, ModelBBox_t >       gModelBBox;
 // static std::unordered_map< Handle, AABB_t >      gModelAABB;
-static std::set< ModelDraw_t* >                  gModelAABBUpdate;
+static std::unordered_map< ModelDraw_t*, ModelBBox_t > gModelAABBUpdate;
+// static std::set< ModelAABBUpdate_t >             gModelAABBUpdate;
 
 static ResourceList< Scene_t* >                  gScenes;
 static std::unordered_map< std::string, Handle > gScenePaths;
@@ -352,7 +362,7 @@ Model* Graphics_GetModelData( Handle shModel )
 
 void Graphics_UpdateModelAABB( ModelDraw_t* spDraw )
 {
-	gModelAABBUpdate.emplace( spDraw );
+	gModelAABBUpdate.emplace( spDraw, gModelBBox[ spDraw->aModel ] );
 }
 
 
@@ -483,22 +493,27 @@ void Graphics_FreeScene( Handle sScene )
 }
 
 
-void Graphics_AddSceneDraw( SceneDraw_t* spScene )
+SceneDraw_t* Graphics_AddSceneDraw( Handle sScene )
 {
-	if ( !spScene )
-		return;
+	if ( !sScene )
+		return nullptr;
 
-	// Scene_t* scene = nullptr;
-	// if ( !gScenes.Get( spScene->aScene, &scene ) )
-	// {
-	// 	Log_Error( gLC_ClientGraphics, "Graphics_DrawScene: Failed to find Scene\n" );
-	// 	return;
-	// }
-
-	for ( auto& modelDraw : spScene->aDraw )
+	Scene_t* scene = nullptr;
+	if ( !gScenes.Get( sScene, &scene ) )
 	{
-		Graphics_AddModelDraw( &modelDraw );
+		Log_Error( gLC_ClientGraphics, "Graphics_DrawScene: Failed to find Scene\n" );
+		return nullptr;
 	}
+
+	SceneDraw_t* sceneDraw = new SceneDraw_t;
+	sceneDraw->aScene      = sScene;
+
+	for ( auto& model : scene->aModels )
+	{
+		sceneDraw->aDraw.push_back( Graphics_AddModelDraw( model ) );
+	}
+
+	return sceneDraw;
 }
 
 
@@ -516,8 +531,10 @@ void Graphics_RemoveSceneDraw( SceneDraw_t* spScene )
 
 	for ( auto& modelDraw : spScene->aDraw )
 	{
-		Graphics_RemoveModelDraw( &modelDraw );
+		Graphics_RemoveModelDraw( modelDraw );
 	}
+
+	delete spScene;
 }
 
 
@@ -967,7 +984,8 @@ bool Graphics_Init()
 	}
 
 	// Create Light Info Buffer
-	gLightInfoBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform, EBufferMemory_Host );
+	gLightInfoStagingBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform, EBufferMemory_Host );
+	gLightInfoBuffer        = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform, EBufferMemory_Device );
 
 	if ( gLightInfoBuffer == InvalidHandle )
 	{
@@ -1017,37 +1035,38 @@ void Graphics_NewFrame()
 
 	if ( !r_debug_draw )
 	{
-		if ( gDebugLineModel )
+		if ( gpDebugLineModel )
 		{
-			Graphics_RemoveModelDraw( &gDebugLineDraw );
-			Graphics_FreeModel( gDebugLineDraw.aModel );
-			gDebugLineModel = nullptr;
+			Graphics_RemoveModelDraw( gpDebugLineDraw );
+			Graphics_FreeModel( gpDebugLineDraw->aModel );
+			gpDebugLineModel = nullptr;
+			gpDebugLineDraw  = nullptr;
 		}
 
 		return;
 	}
 
-	if ( !gDebugLineModel )
+	if ( !gpDebugLineModel )
 	{
-		gDebugLineModel            = new Model;
+		gpDebugLineModel             = new Model;
 
-		gDebugLineDraw.aModel      = gModels.Add( gDebugLineModel );
-		gDebugLineDraw.aTestVis    = false;
-		gDebugLineDraw.aCastShadow = false;
+		Handle handle                = gModels.Add( gpDebugLineModel );
 
-		gDebugLineModel->aMeshes.resize( 1 );
+		gpDebugLineDraw              = Graphics_AddModelDraw( handle );
+		gpDebugLineDraw->aTestVis    = false;
+		gpDebugLineDraw->aCastShadow = false;
 
-		gDebugLineModel->apVertexData = new VertexData_t;
-		gDebugLineModel->apBuffers    = new ModelBuffers_t;
+		gpDebugLineModel->aMeshes.resize( 1 );
 
-		gDebugLineModel->apBuffers->aVertex.resize( 2, true );
-		gDebugLineModel->apVertexData->aData.resize( 2, true );
-		gDebugLineModel->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
-		gDebugLineModel->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
+		gpDebugLineModel->apVertexData = new VertexData_t;
+		gpDebugLineModel->apBuffers    = new ModelBuffers_t;
 
-		Model_SetMaterial( gDebugLineDraw.aModel, 0, gDebugLineMaterial );
+		gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
+		gpDebugLineModel->apVertexData->aData.resize( 2, true );
+		gpDebugLineModel->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
+		gpDebugLineModel->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
 
-		Graphics_AddModelDraw( &gDebugLineDraw );
+		Model_SetMaterial( handle, 0, gDebugLineMaterial );
 	}
 }
 
@@ -1223,12 +1242,13 @@ Frustum_t Graphics_CreateFrustum( const glm::mat4& srViewInfo )
 }
 
 
-ModelBBox_t Graphics_CreateWorldAABB( ModelDraw_t& srModel )
+ModelBBox_t Graphics_CreateWorldAABB( ModelDraw_t& srModel, ModelBBox_t& srBBox )
 {
-	ModelBBox_t& bbox = gModelBBox[ srModel.aModel ];
+	glm::vec3    globalMin{ srModel.aModelMatrix * glm::vec4( srBBox.aMin, 1.f ) };
+	glm::vec3    globalMax{ srModel.aModelMatrix * glm::vec4( srBBox.aMax, 1.f ) };
 
 	// Calculate AABB
-	ModelBBox_t  aabb( bbox.aMin, bbox.aMax );
+	ModelBBox_t  aabb( globalMin, globalMax );
 	return aabb;
 
 #if 0
@@ -1263,35 +1283,26 @@ ModelBBox_t Graphics_CreateWorldAABB( ModelDraw_t& srModel )
 }
 
 
-bool Graphics_ViewFrustumTest( ModelSurfaceDraw_t& srSurfaceDraw, int sViewInfoIndex )
+bool Graphics_ViewFrustumTest( ModelDraw_t* spModelDraw, int sViewInfoIndex )
 {
-	if ( gViewInfo.size() <= sViewInfoIndex || !r_vis )
+	if ( !spModelDraw )
+		return false;
+
+	if ( gViewInfo.size() <= sViewInfoIndex || !r_vis || !spModelDraw->aTestVis )
 		return true;
 
-	if ( !srSurfaceDraw.apDraw->aTestVis )
-		return true;
-
-	ViewInfo_t&     viewInfo = gViewInfo[ sViewInfoIndex ];
+	ViewInfo_t& viewInfo = gViewInfo[ sViewInfoIndex ];
 
 	if ( !viewInfo.aActive )
 		return false;
 
-	Frustum_t&      frustum  = gViewInfoFrustums[ sViewInfoIndex ];
+	Frustum_t& frustum  = gViewInfoFrustums[ sViewInfoIndex ];
 
-	// auto it = gModelAABB.find( srSurfaceDraw.apDraw->aModel );
-	// if ( it == gModelAABB.end() )
-	// 	return true;
-	// 
-	// AABB_t& globalAABB = it->second;
-
-	// ModelBBox_t& bbox = gModelBBox[ srSurfaceDraw.apDraw->aModel ];
-	ModelBBox_t& bbox = srSurfaceDraw.apDraw->aAABB;
-
-	return frustum.IsBoxVisible( bbox.aMin, bbox.aMax );
+	return frustum.IsBoxVisible( spModelDraw->aAABB.aMin, spModelDraw->aAABB.aMax );
 }
 
 
-void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelSurfaceDraw_t* >& srRenderList )
+void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelSurfaceDraw_t >& srRenderList )
 {
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
@@ -1304,20 +1315,32 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 
 	VertexFormat        vertexFormat     = Shader_GetVertexFormat( shader );
 
-	for ( auto& renderable : srRenderList )
+	for ( uint32_t i = 0; i < srRenderList.size(); )
 	{
+		auto&        renderable = srRenderList[ i ];
+
+		ModelDraw_t* modelDraw = nullptr;
+		if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+		{
+			Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+			srRenderList.remove( i );
+			continue;
+		}
+
 		// get model and check if it's nullptr
-		if ( renderable->apDraw->aModel == InvalidHandle )
+		if ( modelDraw->aModel == InvalidHandle )
 		{
 			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model handle is InvalidHandle\n" );
+			srRenderList.remove( i );
 			continue;
 		}
 
 		// get model data
 		Model* model = nullptr;
-		if ( !gModels.Get( renderable->apDraw->aModel, &model ) )
+		if ( !gModels.Get( modelDraw->aModel, &model ) )
 		{
 			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
+			srRenderList.remove( i );
 			continue;
 		}
 
@@ -1325,6 +1348,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
 		{
 			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
+			srRenderList.remove( i );
 			continue;
 		}
 
@@ -1345,15 +1369,16 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 		if ( bindModel )
 		{
 			prevModel      = model;
-			prevRenderable = renderable;
-			if ( !Graphics_BindModel( cmd, vertexFormat, model, *renderable ) )
+			prevRenderable = &renderable;
+			if ( !Graphics_BindModel( cmd, vertexFormat, model, renderable ) )
 				continue;
 		}
 
-		if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, *renderable ) )
+		if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, renderable ) )
 			continue;
 
-		Graphics_CmdDrawSurface( cmd, model, renderable->aSurface );
+		Graphics_CmdDrawSurface( cmd, model, renderable.aSurface );
+		i++;
 	}
 }
 
@@ -1587,7 +1612,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 #endif
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			return;
+			break;
 		}
 		case ELightType_Point:
 		{
@@ -1601,7 +1626,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aRadius = spLight->aRadius;
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			return;
+			break;
 		}
 		case ELightType_Cone:
 		{
@@ -1660,7 +1685,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 			// Update Light Buffer
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			return;
+			break;
 		}
 		case ELightType_Capsule:
 		{
@@ -1683,7 +1708,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
 
 			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			return;
+			break;
 		}
 	}
 }
@@ -1731,8 +1756,8 @@ void Graphics_PrepareDrawData()
 	gDirtyMaterials.clear();
 
 	// update model AABB's
-	for ( ModelDraw_t* model : gModelAABBUpdate )
-		model->aAABB = Graphics_CreateWorldAABB( *model );
+	for ( auto& [model, bbox] : gModelAABBUpdate )
+		model->aAABB = Graphics_CreateWorldAABB( *model, bbox );
 
 	gModelAABBUpdate.clear();
 
@@ -1746,7 +1771,8 @@ void Graphics_PrepareDrawData()
 	if ( gNeedLightInfoUpdate )
 	{
 		gNeedLightInfoUpdate = false;
-		render->MemWriteBuffer( gLightInfoBuffer, sizeof( LightInfo_t ), &gLightInfo );
+		render->MemWriteBuffer( gLightInfoStagingBuffer, sizeof( LightInfo_t ), &gLightInfo );
+		render->MemCopyBuffer( gLightInfoStagingBuffer, gLightInfoBuffer, sizeof( LightInfo_t ) );
 	}
 
 	if ( gViewInfoUpdate )
@@ -1754,7 +1780,9 @@ void Graphics_PrepareDrawData()
 		gViewInfoUpdate = false;
 		// for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
 		for ( size_t i = 0; i < 1; i++ )
+		{
 			render->MemWriteBuffer( gViewInfoBuffers[ i ], sizeof( UBO_ViewInfo_t ), &gViewInfo[ i ] );
+		}
 	}
 
 	// update view frustums
@@ -1791,25 +1819,57 @@ void Graphics_PrepareDrawData()
 		gViewRenderLists.resize( gViewInfoCount );
 
 		for ( ViewRenderList_t& viewList : gViewRenderLists )
-			viewList.aRenderLists.clear();
+			for ( auto& [ handle, vec ] : viewList.aRenderLists )
+				vec.clear();
 
-		for ( auto& [ shader, modelList ] : gModelDrawList )
+		for ( uint32_t i = 0; i < gModelDrawList.size(); )
 		{
-			ShaderData_t* shaderData = Shader_GetData( shader );
-			if ( !shaderData )
-				continue;
-
-			for ( auto& renderable : modelList )
+			ModelDraw_t* modelDraw = nullptr;
+			if ( !gModelDraws.Get( gModelDrawList[ i ], &modelDraw ) )
 			{
-				// check if we need this in any views
-				for ( int viewIndex = 0; viewIndex < gViewInfoCount; viewIndex++ )
-				{
-					if ( !Graphics_ViewFrustumTest( renderable, viewIndex ) )
-						continue;
+				Log_Warn( gLC_ClientGraphics, "ModelDraw handle is invalid!\n" );
+				gModelDrawList.remove( i );
+				continue;
+			}
 
-					gViewRenderLists[ viewIndex ].aRenderLists[ shader ].push_back( &renderable );
+			Model* model = nullptr;
+			if ( !gModels.Get( modelDraw->aModel, &model ) )
+			{
+				Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
+				gModelDrawList.remove( i );
+				continue;
+			}
+
+			// check if we need this in any views
+			for ( int viewIndex = 0; viewIndex < gViewInfoCount; viewIndex++ )
+			{
+				// Is this model visible in this view?
+				if ( !Graphics_ViewFrustumTest( modelDraw, viewIndex ) )
+					continue;
+
+				// Add each surface to the shader draw list
+				for ( uint32_t surf = 0; surf < model->aMeshes.size(); surf++ )
+				{
+					Handle mat = model->aMeshes[ surf ].aMaterial;
+
+					// TODO: add Mat_IsValid()
+					if ( mat == InvalidHandle )
+					{
+						Log_ErrorF( gLC_ClientGraphics, "Model part \"%d\" has no material!\n", surf );
+						// gModelDrawList.remove( i );
+						continue;
+					}
+
+					Handle shader = Mat_GetShader( mat );
+
+					// check if we need this in any views
+					ModelSurfaceDraw_t& surfDraw = gViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
+					surfDraw.aDrawData           = gModelDrawList[ i ];
+					surfDraw.aSurface            = surf;
 				}
 			}
+
+			i++;
 		}
 	}
 
@@ -1826,35 +1886,44 @@ void Graphics_PrepareDrawData()
 			for ( auto& renderable : modelList )
 			{
 				// hack to not draw this AABB multiple times, need to change this render list system
-				if ( renderable->aSurface == 0 )
+				if ( renderable.aSurface == 0 )
 				{
 					// Graphics_DrawModelAABB( renderable->apDraw );
 
-					ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
-					Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
+					ModelDraw_t* modelDraw = nullptr;
+					if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+					{
+						Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+						return;
+					}
+
+					Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+					
+					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
+					// Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
 				}
 			}
 		}
 	}
 
-	if ( r_debug_draw && gDebugLineModel && gDebugLineVertPos.size() )
+	if ( r_debug_draw && gpDebugLineModel && gDebugLineVertPos.size() )
 	{
 		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
 
-		if ( !gDebugLineModel->apVertexData )
-			gDebugLineModel->apVertexData = new VertexData_t;
+		if ( !gpDebugLineModel->apVertexData )
+			gpDebugLineModel->apVertexData = new VertexData_t;
 
-		if ( !gDebugLineModel->apBuffers )
-			gDebugLineModel->apBuffers = new ModelBuffers_t;
+		if ( !gpDebugLineModel->apBuffers )
+			gpDebugLineModel->apBuffers = new ModelBuffers_t;
 
 		// Is our current buffer size too small? If so, free the old ones
 		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )
 		{
-			if ( gDebugLineModel->apBuffers && gDebugLineModel->apBuffers->aVertex.size() )
+			if ( gpDebugLineModel->apBuffers && gpDebugLineModel->apBuffers->aVertex.size() )
 			{
-				render->DestroyBuffer( gDebugLineModel->apBuffers->aVertex[ 0 ] );
-				render->DestroyBuffer( gDebugLineModel->apBuffers->aVertex[ 1 ] );
-				gDebugLineModel->apBuffers->aVertex.clear();
+				render->DestroyBuffer( gpDebugLineModel->apBuffers->aVertex[ 0 ] );
+				render->DestroyBuffer( gpDebugLineModel->apBuffers->aVertex[ 1 ] );
+				gpDebugLineModel->apBuffers->aVertex.clear();
 			}
 
 			gDebugLineBufferSize = gDebugLineVertPos.size();
@@ -1863,22 +1932,22 @@ void Graphics_PrepareDrawData()
 		size_t bufferSize = ( 3 * sizeof( float ) ) * gDebugLineVertPos.size();
 
 		// Create new Buffers if needed
-		if ( gDebugLineModel->apBuffers->aVertex.empty() )
+		if ( gpDebugLineModel->apBuffers->aVertex.empty() )
 		{
-			gDebugLineModel->apBuffers->aVertex.resize( 2 );
-			gDebugLineModel->apBuffers->aVertex[ 0 ] = render->CreateBuffer( "DebugLine Position", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
-			gDebugLineModel->apBuffers->aVertex[ 1 ] = render->CreateBuffer( "DebugLine Color", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
+			gpDebugLineModel->apBuffers->aVertex.resize( 2 );
+			gpDebugLineModel->apBuffers->aVertex[ 0 ] = render->CreateBuffer( "DebugLine Position", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
+			gpDebugLineModel->apBuffers->aVertex[ 1 ] = render->CreateBuffer( "DebugLine Color", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
 		}
 
-		gDebugLineModel->apVertexData->aCount       = gDebugLineVertPos.size();
+		gpDebugLineModel->apVertexData->aCount      = gDebugLineVertPos.size();
 
-		gDebugLineModel->aMeshes[ 0 ].aIndexCount   = 0;
-		gDebugLineModel->aMeshes[ 0 ].aVertexOffset = 0;
-		gDebugLineModel->aMeshes[ 0 ].aVertexCount  = gDebugLineVertPos.size();
+		gpDebugLineModel->aMeshes[ 0 ].aIndexCount   = 0;
+		gpDebugLineModel->aMeshes[ 0 ].aVertexOffset = 0;
+		gpDebugLineModel->aMeshes[ 0 ].aVertexCount  = gDebugLineVertPos.size();
 
 		// Update the Buffers
-		render->MemWriteBuffer( gDebugLineModel->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
-		render->MemWriteBuffer( gDebugLineModel->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+		render->MemWriteBuffer( gpDebugLineModel->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
+		render->MemWriteBuffer( gpDebugLineModel->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
 	}
 
 	// --------------------------------------------------------------------
@@ -1896,13 +1965,20 @@ void Graphics_PrepareDrawData()
 
 			for ( auto& renderable : modelList )
 			{
-				Shader_SetupRenderableDrawData( shaderData, *renderable );
+				ModelDraw_t* modelDraw = nullptr;
+				if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+				{
+					Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+					continue;
+				}
 
-				if ( !renderable->apDraw->aCastShadow )
+				Shader_SetupRenderableDrawData( modelDraw, shaderData, renderable );
+
+				if ( !modelDraw->aCastShadow )
 					continue;
 
 				if ( shaderData->aFlags & EShaderFlags_Lights && usingShadow && shadowShaderData )
-					Shader_SetupRenderableDrawData( shadowShaderData, *renderable );
+					Shader_SetupRenderableDrawData( modelDraw, shadowShaderData, renderable );
 			}
 		}
 	}
@@ -2060,7 +2136,7 @@ ViewInfo_t& Graphics_GetViewInfo()
 
 void Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo )
 {
-	if ( !r_debug_draw || !gDebugLineModel )
+	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
 
 #if 0
@@ -2092,39 +2168,40 @@ void Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo )
 }
 
 
-void Graphics_AddModelDraw( ModelDraw_t* spDrawInfo )
+ModelDraw_t* Graphics_AddModelDraw( Handle sModel )
 {
-	if ( !spDrawInfo )
-		return;
-
 	Model* model = nullptr;
-	if ( !gModels.Get( spDrawInfo->aModel, &model ) )
+	if ( !gModels.Get( sModel, &model ) )
 	{
 		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
-		return;
+		return nullptr;
 	}
 
-	for ( size_t i = 0; i < model->aMeshes.size(); i++ )
+	ModelDraw_t* modelDraw  = nullptr;
+	Handle       drawHandle = InvalidHandle;
+
+	if ( !( drawHandle = gModelDraws.Create( &modelDraw ) ) )
 	{
-		Handle mat = model->aMeshes[ i ].aMaterial;
-
-		// TODO: add Mat_IsValid()
-		if ( mat == InvalidHandle )
-		{
-			Log_ErrorF( gLC_ClientGraphics, "Model part \"%d\" has no material!\n", i );
-			continue;
-		}
-
-		Handle shader = Mat_GetShader( mat );
-
-		auto&  surfaceDraw   = gModelDrawList[ shader ].emplace_back();
-		surfaceDraw.apDraw   = spDrawInfo;
-		surfaceDraw.aSurface = i;
+		Log_ErrorF( gLC_ClientGraphics, "Failed to create ModelDraw_t\n" );
+		return nullptr;
 	}
 
-	// auto it = gModelAABB.find( spDrawInfo->aModel );
-	// if ( it == gModelAABB.end() )
-		Graphics_UpdateModelAABB( spDrawInfo );
+	modelDraw->aModel             = sModel;
+	modelDraw->aModelMatrix       = glm::identity< glm::mat4 >();
+	modelDraw->aTestVis           = true;
+	modelDraw->aCastShadow        = true;
+
+	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
+	// Graphics_UpdateModelAABB( modelDraw );
+	modelDraw->aAABB              = Graphics_CreateWorldAABB( *modelDraw, gModelBBox[ modelDraw->aModel ] );
+
+	// Add the handle to the draw list
+	gModelDrawList.emplace_back() = drawHandle;
+
+	// blech
+	gModelDrawHandles[ modelDraw ] = drawHandle;
+
+	return modelDraw;
 }
 
 
@@ -2133,46 +2210,25 @@ void Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo )
 	if ( !spDrawInfo )
 		return;
 
-	Model* model = nullptr;
-	if ( !gModels.Get( spDrawInfo->aModel, &model ) )
+	auto it = gModelDrawHandles.find( spDrawInfo );
+
+	if ( it == gModelDrawHandles.end() )
 	{
-		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
+		Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 		return;
 	}
 
-	for ( size_t i = 0; i < model->aMeshes.size(); i++ )
-	{
-		Handle mat = model->aMeshes[ i ].aMaterial;
+	Handle drawHandle = it->second;
 
-		// TODO: add Mat_IsValid()
-		if ( mat == InvalidHandle )
-		{
-			Log_ErrorF( gLC_ClientGraphics, "Model part \"%d\" has no material!\n", i );
-			continue;
-		}
-
-		Handle shader = Mat_GetShader( mat );
-
-		auto it = gModelDrawList.find( shader );
-
-		if ( it == gModelDrawList.end() )
-			continue;
-
-		for ( size_t j = 0; j < it->second.size(); j++ )
-		{
-			if ( it->second[ j ].apDraw == spDrawInfo )
-			{
-				it->second.remove( j );
-				break;
-			}
-		}
-	}
+	gModelDrawHandles.erase( spDrawInfo );
+	gModelDrawList.erase( drawHandle );
+	gModelDraws.Remove( drawHandle );
 }
 
 
 void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
 {
-	if ( !r_debug_draw || !gDebugLineModel )
+	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
 
 	gDebugLineVertPos.push_back( sX );
@@ -2194,7 +2250,7 @@ void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm:
 
 void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )
 {
-	if ( !r_debug_draw || !gDebugLineModel )
+	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
 
 	// bottom
@@ -2219,7 +2275,7 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 
 void Graphics_DrawProjView( const glm::mat4& srProjView )
 {
-	if ( !r_debug_draw || !gDebugLineModel )
+	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
 
 	glm::mat4 inv = glm::inverse( srProjView );
@@ -2253,7 +2309,7 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 
 void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 {
-	if ( !r_debug_draw || !gDebugLineModel )
+	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
 
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );

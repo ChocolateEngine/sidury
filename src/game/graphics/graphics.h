@@ -236,18 +236,22 @@ struct ModelDraw_t
 {
 	Handle      aModel;
 	glm::mat4   aModelMatrix;
-
 	ModelBBox_t aAABB;
-	bool        aTestVis    = true;
-
-	bool        aCastShadow = true;
+	bool        aTestVis;
+	bool        aCastShadow;
 };
 
 
 struct ModelSurfaceDraw_t
 {
-	ModelDraw_t* apDraw;
-	size_t       aSurface;
+	Handle aDrawData;
+	size_t aSurface;
+};
+
+
+struct Renderable_t
+{
+
 };
 
 
@@ -260,14 +264,19 @@ struct Scene_t
 
 struct SceneDraw_t
 {
-	Handle                    aScene;
-	ChVector< ModelDraw_t > aDraw;
+	Handle                   aScene;
+	ChVector< ModelDraw_t* > aDraw;
 };
 
 
 struct RenderLayer_t
 {
+	// specify a render pass?
 
+	// contain depth options
+
+	// List of Renderables
+	ChVector< ModelDraw_t* > aModels;
 };
 
 
@@ -367,7 +376,7 @@ extern bool                      gViewInfoUpdate;
 
 // Push Constant Function Pointers
 using FShader_ResetPushData = void();
-using FShader_SetupPushData = void( ModelSurfaceDraw_t& srDrawInfo );
+using FShader_SetupPushData = void( ModelDraw_t* spDrawData, ModelSurfaceDraw_t& srDrawInfo );
 using FShader_PushConstants = void( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo );
 
 using FShader_Init = bool();
@@ -431,7 +440,7 @@ Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
 Handle             Graphics_LoadScene( const std::string& srPath );
 void               Graphics_FreeScene( Handle sScene );
 
-void               Graphics_AddSceneDraw( SceneDraw_t* spScene );
+SceneDraw_t*       Graphics_AddSceneDraw( Handle sScene );
 void               Graphics_RemoveSceneDraw( SceneDraw_t* spScene );
 
 size_t             Graphics_GetSceneModelCount( Handle sScene );
@@ -502,7 +511,7 @@ void               Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeli
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
-bool               Shader_SetupRenderableDrawData(  ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable );
+bool               Shader_SetupRenderableDrawData( ModelDraw_t* spModelDraw, ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable );
 bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
@@ -542,7 +551,7 @@ ViewInfo_t&        Graphics_GetViewInfo();
 // TODO: add a "RegisterModelDraw" here or whatever, and use Handles for that
 // that way, if you free it without removing it from the draw list, it doesn't cause a crash
 // and it can throw a warning and remove it itself
-void               Graphics_AddModelDraw( ModelDraw_t* spDrawInfo );
+ModelDraw_t*       Graphics_AddModelDraw( Handle sModel );
 void               Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo );
 
 // ---------------------------------------------------------------------------------------

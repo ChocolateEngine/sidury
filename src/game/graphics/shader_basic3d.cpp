@@ -14,15 +14,6 @@ constexpr const char*                       gpFallbackEmissivePath = "materials/
 // descriptor set layouts
 extern UniformBufferArray_t                 gUniformMaterialBasic3D;
 
-struct Basic3D_MaterialBuf_t
-{
-	Handle aBuffer;
-	int    aIndex;
-};
-
-// Material Handle, Buffer
-static std::unordered_map< Handle, Basic3D_MaterialBuf_t > gMaterialBuffers;
-
 constexpr EShaderFlags                      gShaderFlags =
   EShaderFlags_Sampler |
   EShaderFlags_ViewInfo |
@@ -53,8 +44,19 @@ struct Basic3D_Material
 };
 
 
+struct Basic3D_MaterialBuf_t
+{
+	Handle aBuffer;
+	int    aIndex;
+};
+
+// Material Handle, Buffer
+static std::unordered_map< Handle, Basic3D_MaterialBuf_t >     gMaterialBuffers;
 static std::unordered_map< ModelSurfaceDraw_t*, Basic3D_Push > gPushData;
 static std::unordered_map< Handle, Basic3D_Material >          gMaterialData;
+
+
+static Handle                                                  gStagingBuffer = InvalidHandle;
 
 
 CONVAR( r_basic3d_dbg_mode, 0 );
@@ -71,7 +73,7 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	// IDEA: since materials shouldn't be updated very often,
 	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
 
-	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Host );
+	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Device );
 
 	if ( buffer == InvalidHandle )
 	{
@@ -106,6 +108,9 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 // TODO: this doesn't handle shaders being changed on materials, or materials being freed
 void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 {
+	if ( sMat == 0 )
+		return;
+
 	Basic3D_Material* mat = nullptr;
 
 	auto it = gMaterialData.find( sMat );
@@ -129,11 +134,23 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
 
 	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
-	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
+	mat->emissivePower   = Mat_GetFloat( sMat, "emissivePower", 0.f );
+
+	if ( !gStagingBuffer )
+		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Host );
+
+	if ( gStagingBuffer == InvalidHandle )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to Create Staging Material Uniform Buffer\n" );
+		return;
+	}
+
+	render->MemWriteBuffer( gStagingBuffer, sizeof( Basic3D_Material ), mat );
 
 	// write new material data to the buffer
 	Handle buffer = gMaterialBuffers[ sMat ].aBuffer;
-	render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
+	// render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
+	render->MemCopyBuffer( gStagingBuffer, buffer, sizeof( Basic3D_Material ) );
 }
 
 
@@ -187,15 +204,18 @@ static void Shader_Basic3D_ResetPushData()
 }
 
 
-static void Shader_Basic3D_SetupPushData( ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData[ &srDrawInfo ];
-	push.aModelMatrix  = srDrawInfo.apDraw->aModelMatrix;
+	push.aModelMatrix  = spModelDraw->aModelMatrix;
 
-	Handle mat         = Model_GetMaterial( srDrawInfo.apDraw->aModel, srDrawInfo.aSurface );
+	Handle mat         = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 	// push.aMaterial     = std::distance( std::begin( gMaterialBuffers ), gMaterialBuffers.find( mat ) );
 
-	auto it            = gMaterialBuffers.find( mat );
+	if ( !mat )
+		return;
+
+	auto it = gMaterialBuffers.find( mat );
 	if ( it == gMaterialBuffers.end() )
 	{
 		push.aMaterial = 0;

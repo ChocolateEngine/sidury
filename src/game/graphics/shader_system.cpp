@@ -404,7 +404,7 @@ void Shader_ResetPushData()
 }
 
 
-bool Shader_SetupRenderableDrawData( ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable )
+bool Shader_SetupRenderableDrawData( ModelDraw_t* spModelDraw, ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable )
 {
 	if ( !spShaderData )
 		return false;
@@ -414,7 +414,7 @@ bool Shader_SetupRenderableDrawData( ShaderData_t* spShaderData, ModelSurfaceDra
 		if ( !spShaderData->apPush )
 			return false;
 
-		spShaderData->apPush->apSetup( srRenderable );
+		spShaderData->apPush->apSetup( spModelDraw, srRenderable );
 	}
 
 	return true;
