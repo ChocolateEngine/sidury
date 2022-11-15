@@ -12,7 +12,7 @@ struct Skybox_Push
 
 extern IRender*                                               render;
 
-static std::unordered_map< ModelSurfaceDraw_t*, Skybox_Push > gSkyboxPushData;
+static std::unordered_map< SurfaceDraw_t*, Skybox_Push > gSkyboxPushData;
 
 
 static void Shader_Skybox_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
@@ -41,7 +41,7 @@ static void Shader_Skybox_ResetPushData()
 }
 
 
-static void Shader_Skybox_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Skybox_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	Skybox_Push& push = gSkyboxPushData[ &srDrawInfo ];
 	push.aModelMatrix = spModelDraw->aModelMatrix;
@@ -51,7 +51,7 @@ static void Shader_Skybox_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceD
 }
 
 
-static void Shader_Skybox_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Skybox_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
 	Skybox_Push& push = gSkyboxPushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ), &push );
@@ -70,6 +70,7 @@ ShaderCreate_t gShaderCreate_Skybox = {
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_Sampler | EShaderFlags_PushConstant,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,

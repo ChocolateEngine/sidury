@@ -32,7 +32,7 @@ static Handle                 gShader_DebugLine = InvalidHandle;
 static Handle                 gMatSolid         = InvalidHandle;
 static Handle                 gMatWire          = InvalidHandle;
 
-static std::unordered_map< Handle, ModelDraw_t > gModelDraw;
+static std::unordered_map< Handle, Renderable_t > gModelDraw;
 
 // ==============================================================
 

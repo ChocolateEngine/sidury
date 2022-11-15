@@ -82,8 +82,8 @@ void CreateProtogen( const std::string& path )
 	Entity proto = entities->CreateEntity();
 
 	Handle       model     = Graphics_LoadModel( path );
-	ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
-	entities->AddComponent< ModelDraw_t* >( proto, modelDraw );
+	Renderable_t* modelDraw = Graphics_AddModelDraw( model );
+	entities->AddComponent< Renderable_t* >( proto, modelDraw );
 
 	Transform& transform = entities->AddComponent< Transform >( proto );
 
@@ -120,9 +120,9 @@ void CreatePhysEntity( const std::string& path )
 	Entity       physEnt   = entities->CreateEntity();
 
 	Handle       model     = Graphics_LoadModel( path );
-	ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
+	Renderable_t* modelDraw = Graphics_AddModelDraw( model );
 
-	entities->AddComponent< ModelDraw_t* >( physEnt, modelDraw );
+	entities->AddComponent< Renderable_t* >( physEnt, modelDraw );
 
 	Transform& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
@@ -181,7 +181,7 @@ CON_COMMAND( delete_protos )
 	for ( auto& proto : g_protos )
 	{
 		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
-		Graphics_RemoveModelDraw( entities->GetComponent< ModelDraw_t* >( proto ) );
+		Graphics_RemoveModelDraw( entities->GetComponent< Renderable_t* >( proto ) );
 		entities->DeleteEntity( proto );
 	}
 
@@ -392,7 +392,7 @@ void EntUpdate()
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
-		ModelDraw_t* model = entities->GetComponent< ModelDraw_t* >( ent );
+		Renderable_t* model = entities->GetComponent< Renderable_t* >( ent );
 
 		if ( model->aModel == InvalidHandle )
 			continue;
@@ -660,7 +660,7 @@ void Game_SetupModels( float frameTime )
 #if 1
 	for ( auto& proto: g_protos )
 	{
-		ModelDraw_t* modelDraw      = entities->GetComponent< ModelDraw_t* >( proto );
+		Renderable_t* modelDraw      = entities->GetComponent< Renderable_t* >( proto );
 		auto&        protoTransform = entities->GetComponent< Transform >( proto );
 
 		bool         matrixChanged  = false;

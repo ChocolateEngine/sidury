@@ -52,7 +52,7 @@ struct Basic3D_MaterialBuf_t
 
 // Material Handle, Buffer
 static std::unordered_map< Handle, Basic3D_MaterialBuf_t >     gMaterialBuffers;
-static std::unordered_map< ModelSurfaceDraw_t*, Basic3D_Push > gPushData;
+static std::unordered_map< SurfaceDraw_t*, Basic3D_Push > gPushData;
 static std::unordered_map< Handle, Basic3D_Material >          gMaterialData;
 
 
@@ -73,7 +73,7 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	// IDEA: since materials shouldn't be updated very often,
 	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
 
-	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Device );
+	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( buffer == InvalidHandle )
 	{
@@ -137,7 +137,7 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	mat->emissivePower   = Mat_GetFloat( sMat, "emissivePower", 0.f );
 
 	if ( !gStagingBuffer )
-		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform, EBufferMemory_Host );
+		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	if ( gStagingBuffer == InvalidHandle )
 	{
@@ -204,7 +204,7 @@ static void Shader_Basic3D_ResetPushData()
 }
 
 
-static void Shader_Basic3D_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix  = spModelDraw->aModelMatrix;
@@ -231,7 +231,7 @@ static void Shader_Basic3D_SetupPushData( ModelDraw_t* spModelDraw, ModelSurface
 }
 
 
-static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
 	Basic3D_Push& push = gPushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ), &push );
@@ -250,6 +250,7 @@ ShaderCreate_t gShaderCreate_Basic3D = {
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord,
 	.apInit           = Shader_Basic3D_Init,
 	.apDestroy        = Shader_Basic3D_Destroy,

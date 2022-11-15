@@ -34,7 +34,7 @@ extern UniformBufferArray_t                             gUniformLightPoint;
 extern UniformBufferArray_t                             gUniformLightCone;
 extern UniformBufferArray_t                             gUniformLightCapsule;
 
-static std::unordered_map< ModelSurfaceDraw_t*, void* > gShaderPushData;
+static std::unordered_map< SurfaceDraw_t*, void* > gShaderPushData;
 
 CONCMD( shader_reload )
 {
@@ -202,6 +202,7 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 
 	shaderData.aFlags               = srCreate.aFlags;
 	shaderData.aStages              = srCreate.aStages;
+	shaderData.aDynamicState        = srCreate.aDynamicState;
 
 	if ( srCreate.apShaderPush )
 		shaderData.apPush = srCreate.apShaderPush;
@@ -404,7 +405,7 @@ void Shader_ResetPushData()
 }
 
 
-bool Shader_SetupRenderableDrawData( ModelDraw_t* spModelDraw, ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable )
+bool Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
 {
 	if ( !spShaderData )
 		return false;
@@ -421,7 +422,7 @@ bool Shader_SetupRenderableDrawData( ModelDraw_t* spModelDraw, ShaderData_t* spS
 }
 
 
-bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable )
+bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable )
 {
 	ShaderData_t* shaderData = Shader_GetData( sShader );
 	if ( !shaderData )

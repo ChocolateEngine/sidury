@@ -20,7 +20,7 @@ struct Debug_Push
 };
 
 
-static std::unordered_map< ModelSurfaceDraw_t*, Debug_Push > gDebugPushData;
+static std::unordered_map< SurfaceDraw_t*, Debug_Push > gDebugPushData;
 
 
 static void Shader_Debug_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
@@ -49,7 +49,7 @@ static void Shader_Debug_ResetPushData()
 }
 
 
-static void Shader_Debug_SetupPushData( ModelDraw_t* spDrawData, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_SetupPushData( Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
 	push.aModelMatrix = spDrawData->aModelMatrix;
@@ -58,7 +58,7 @@ static void Shader_Debug_SetupPushData( ModelDraw_t* spDrawData, ModelSurfaceDra
 }
 
 
-static void Shader_Debug_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push = gDebugPushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
@@ -77,6 +77,7 @@ ShaderCreate_t gShaderCreate_Debug = {
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,
@@ -100,7 +101,7 @@ static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t
 	srGraphics.aColorBlendAttachments.emplace_back( true );
 
 	srGraphics.aPrimTopology = EPrimTopology_Line;
-	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;
+	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth;
 	srGraphics.aCullMode     = ECullMode_Back;
 }
 
@@ -109,6 +110,7 @@ ShaderCreate_t gShaderCreate_DebugLine = {
 	.apName           = "debug_line",
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_ViewInfo,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_Color,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,

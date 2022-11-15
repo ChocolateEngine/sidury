@@ -17,7 +17,7 @@ constexpr float         SKYBOX_SCALE = 100.0f;
 constexpr glm::vec3     vec3_zero( 0, 0, 0 );
 
 static bool             gSkyboxValid  = false;
-static ModelDraw_t*     gpSkyboxDraw  = nullptr;
+static Renderable_t*    gpSkyboxDraw  = nullptr;
 static Handle           gSkyboxModel  = InvalidHandle;
 static Handle           gSkyboxShader = InvalidHandle;
 

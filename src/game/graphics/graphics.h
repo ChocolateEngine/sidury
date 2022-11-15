@@ -232,26 +232,23 @@ struct ModelBBox_t
 };
 
 
-struct ModelDraw_t
+struct Renderable_t
 {
+	// used in actual drawing
 	Handle      aModel;
 	glm::mat4   aModelMatrix;
+
+	// used for calculating render lists
 	ModelBBox_t aAABB;
 	bool        aTestVis;
 	bool        aCastShadow;
 };
 
 
-struct ModelSurfaceDraw_t
+struct SurfaceDraw_t
 {
 	Handle aDrawData;
 	size_t aSurface;
-};
-
-
-struct Renderable_t
-{
-
 };
 
 
@@ -265,7 +262,15 @@ struct Scene_t
 struct SceneDraw_t
 {
 	Handle                   aScene;
-	ChVector< ModelDraw_t* > aDraw;
+	// ChVector< Renderable_t* > aDraw;
+	std::vector< Renderable_t* > aDraw;
+};
+
+
+struct RenderList_t
+{
+	// List of Renderables
+	ChVector< Renderable_t* > aModels;
 };
 
 
@@ -276,7 +281,7 @@ struct RenderLayer_t
 	// contain depth options
 
 	// List of Renderables
-	ChVector< ModelDraw_t* > aModels;
+	ChVector< Renderable_t* > aModels;
 };
 
 
@@ -368,6 +373,9 @@ struct ViewInfo_t
 
 	glm::uvec2 aSize{};
 	bool       aActive = true;
+
+	// HACK: if this is set, it overrides the shader used for all renderables in this view
+	Handle     aShaderOverride = InvalidHandle;
 };
 
 extern std::vector< ViewInfo_t > gViewInfo;
@@ -376,8 +384,8 @@ extern bool                      gViewInfoUpdate;
 
 // Push Constant Function Pointers
 using FShader_ResetPushData = void();
-using FShader_SetupPushData = void( ModelDraw_t* spDrawData, ModelSurfaceDraw_t& srDrawInfo );
-using FShader_PushConstants = void( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo );
+using FShader_SetupPushData = void( Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
+using FShader_PushConstants = void( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo );
 
 using FShader_Init = bool();
 using FShader_Destroy = void();
@@ -400,6 +408,7 @@ struct ShaderCreate_t
 	ShaderStage                        aStages          = ShaderStage_None;
 	EPipelineBindPoint                 aBindPoint       = EPipelineBindPoint_Graphics;
 	EShaderFlags                       aFlags           = EShaderFlags_None;
+	EDynamicState                      aDynamicState    = EDynamicState_None;
 	VertexFormat                       aVertexFormat    = VertexFormat_None;
 
 	FShader_Init*                      apInit           = nullptr;
@@ -415,10 +424,11 @@ struct ShaderCreate_t
 // stored data internally
 struct ShaderData_t
 {
-	ShaderStage  aStages = ShaderStage_None;
-	EShaderFlags aFlags  = EShaderFlags_None;
-	Handle       aLayout = InvalidHandle;
-	IShaderPush* apPush  = nullptr;
+	ShaderStage   aStages       = ShaderStage_None;
+	EShaderFlags  aFlags        = EShaderFlags_None;
+	EDynamicState aDynamicState = EDynamicState_None;
+	Handle        aLayout       = InvalidHandle;
+	IShaderPush*  apPush        = nullptr;
 };
 
 
@@ -429,7 +439,7 @@ Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_AddModel( Model* spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
-void               Graphics_UpdateModelAABB( ModelDraw_t* spDraw );
+void               Graphics_UpdateModelAABB( Renderable_t* spDraw );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
@@ -445,6 +455,34 @@ void               Graphics_RemoveSceneDraw( SceneDraw_t* spScene );
 
 size_t             Graphics_GetSceneModelCount( Handle sScene );
 Handle             Graphics_GetSceneModel( Handle sScene, size_t sIndex );
+
+// ---------------------------------------------------------------------------------------
+// Render Lists
+
+// RenderList_t*      Graphics_CreateRenderList();
+// void               Graphics_DestroyRenderList( RenderList_t* spList );
+// void               Graphics_DrawRenderList( RenderList_t* spList );
+
+// ---------------------------------------------------------------------------------------
+// Render Layers
+
+// RenderLayer_t*     Graphics_CreateRenderLayer();
+// void               Graphics_DestroyRenderLayer( RenderLayer_t* spLayer );
+
+// control ordering of them somehow?
+// maybe do Graphics_DrawRenderLayer() ?
+
+// render layers, to the basic degree that i want, is something contains a list of models to render
+// you can manually sort these render layers to draw them in a specific order
+// (viewmodel first, standard view next, skybox last)
+// and is also able to control depth, for skybox and viewmodel drawing
+// or should that be done outside of that? hmm, no idea
+// 
+// maybe don't add items to the render list struct directly
+// or, just straight up make the "RenderLayer_t" thing as a Handle
+// how would this work with immediate mode style drawing? good for a rythem like game
+// and how would it work for VR, or multiple viewports in a level editor or something?
+// and shadowmapping? overthinking this? probably
 
 // ---------------------------------------------------------------------------------------
 // Materials
@@ -511,8 +549,8 @@ void               Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeli
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
-bool               Shader_SetupRenderableDrawData( ModelDraw_t* spModelDraw, ShaderData_t* spShaderData, ModelSurfaceDraw_t& srRenderable );
-bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, ModelSurfaceDraw_t& srRenderable );
+bool               Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
+bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable );
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
 ShaderData_t*      Shader_GetData( Handle sShader );
@@ -551,8 +589,10 @@ ViewInfo_t&        Graphics_GetViewInfo();
 // TODO: add a "RegisterModelDraw" here or whatever, and use Handles for that
 // that way, if you free it without removing it from the draw list, it doesn't cause a crash
 // and it can throw a warning and remove it itself
-ModelDraw_t*       Graphics_AddModelDraw( Handle sModel );
-void               Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo );
+Renderable_t*      Graphics_AddModelDraw( Handle sModel );
+void               Graphics_RemoveModelDraw( Renderable_t* spDrawInfo );
+
+ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox );
 
 // ---------------------------------------------------------------------------------------
 // Debug Rendering
@@ -561,7 +601,7 @@ void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, 
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
-void               Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo );
+void               Graphics_DrawModelAABB( Renderable_t* spDrawInfo );
 
 // ---------------------------------------------------------------------------------------
 // Other

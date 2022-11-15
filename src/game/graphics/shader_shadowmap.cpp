@@ -13,7 +13,7 @@ struct ShadowMap_Push
 
 extern IRender*                                                  render;
 
-static std::unordered_map< ModelSurfaceDraw_t*, ShadowMap_Push > gPushData;
+static std::unordered_map< SurfaceDraw_t*, ShadowMap_Push > gPushData;
 static int                                                       gShadowViewInfoIndex = 0;
 
 
@@ -49,7 +49,7 @@ static void Shader_ShadowMap_ResetPushData()
 }
 
 
-static void Shader_ShadowMap_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = spModelDraw->aModelMatrix;
@@ -85,7 +85,7 @@ static void Shader_ShadowMap_SetupPushData( ModelDraw_t* spModelDraw, ModelSurfa
 }
 
 
-static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, ModelSurfaceDraw_t& srDrawInfo )
+static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
 	ShadowMap_Push& push = gPushData.at( &srDrawInfo );
 	push.aViewInfo       = gShadowViewInfoIndex;
@@ -105,6 +105,7 @@ ShaderCreate_t gShaderCreate_ShadowMap = {
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_TexCoord,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,

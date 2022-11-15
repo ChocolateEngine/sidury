@@ -11,7 +11,7 @@
 #include <set>
 
 
-LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::DarkMagenta )
+LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::Green )
 
 // --------------------------------------------------------------------------------------
 // Interfaces
@@ -39,23 +39,23 @@ void                         Shader_ShadowMap_SetViewInfo( int sViewInfo );
 
 // struct RenderList_t
 // {
-// 	Handle                             aShader;
-// 	std::forward_list< ModelSurfaceDraw_t* > aSurfaces;
+// 	std::forward_list< SurfaceDraw_t* > aSurfaces;
 // };
 
 struct ViewRenderList_t
 {
-	std::unordered_map< Handle, ChVector< ModelSurfaceDraw_t > > aRenderLists;
+	// TODO: needs improvement and further sorting
+	// [ Shader ] = vector of surfaces to draw
+	std::unordered_map< Handle, ChVector< SurfaceDraw_t > > aRenderLists;
 };
 
 // static std::unordered_map<
 //   Handle,
-//   ChVector< ModelSurfaceDraw_t > >
+//   ChVector< SurfaceDraw_t > >
 // 												 gModelDrawList;
 
-static ResourceList< ModelDraw_t >                gModelDraws;
-static ChVector< Handle >                         gModelDrawList;
-static std::unordered_map< ModelDraw_t*, Handle > gModelDrawHandles;
+static ResourceList< Renderable_t >                gModelDraws;
+static std::unordered_map< Renderable_t*, Handle > gModelDrawHandles;  // really dumb
 
 std::vector< ViewRenderList_t >                   gViewRenderLists;
 
@@ -93,7 +93,7 @@ int                                               gViewInfoIndex     = 0;
 
 // static MeshBuilder                               gDebugLineBuilder;
 static Model*                                     gpDebugLineModel   = nullptr;
-static ModelDraw_t*                               gpDebugLineDraw    = nullptr;
+static Renderable_t*                              gpDebugLineDraw    = nullptr;
 static Handle                                     gDebugLineMaterial = InvalidHandle;
 static ChVector< glm::vec3 >                      gDebugLineVertPos;
 static ChVector< glm::vec3 >                      gDebugLineVertColor;
@@ -114,6 +114,7 @@ std::unordered_map< Light_t*, Handle >            gLightBuffers;
 constexpr int                                     MAX_LIGHTS = MAX_VIEW_INFO_BUFFERS;
 std::vector< Light_t* >                           gLights;
 std::vector< Light_t* >                           gDirtyLights;
+std::vector< Light_t* >                           gDestroyLights;
 
 LightInfo_t                                       gLightInfo;
 Handle                                            gLightInfoStagingBuffer = InvalidHandle;
@@ -137,6 +138,37 @@ struct ShadowMap_t
 std::unordered_map< Light_t*, ShadowMap_t >      gLightShadows;
 UniformBufferArray_t                             gUniformShadows;
 
+// --------------------------------------------------------------------------------------
+// Assets
+
+struct ModelAABBUpdate_t
+{
+	Renderable_t* apModelDraw;
+	ModelBBox_t  aBBox;
+};
+
+static ResourceList< Model* >                          gModels;
+static std::unordered_map< std::string, Handle >       gModelPaths;
+static std::unordered_map< Handle, ModelBBox_t >       gModelBBox;
+// static std::unordered_map< Handle, AABB_t >      gModelAABB;
+static std::unordered_map< Renderable_t*, ModelBBox_t > gModelAABBUpdate;
+// static std::set< ModelAABBUpdate_t >             gModelAABBUpdate;
+
+static ResourceList< Scene_t* >                  gScenes;
+static std::unordered_map< std::string, Handle > gScenePaths;
+
+// --------------------------------------------------------------------------------------
+// Other
+
+size_t                                           gModelDrawCalls = 0;
+size_t                                           gVertsDrawn = 0;
+
+
+// TEMP LIGHTING - WILL BE DEFINED IN MAP FORMAT LATER
+CONVAR( r_world_dir_x, 65 );
+CONVAR( r_world_dir_y, 35 );
+CONVAR( r_world_dir_z, 0 );
+
 CONVAR( r_shadowmap_size, 2048 );
 
 CONVAR( r_shadowmap_constant, 16.f );  // 1.25f
@@ -155,40 +187,12 @@ CONVAR( r_shadowmap_othro_top, 1000.f );
 CONVAR( r_vis, 1 );
 CONVAR( r_vis_lock, 0 );
 
-CONVAR( r_draw_aabb, 1 );
-
-// --------------------------------------------------------------------------------------
-// Assets
-
-struct ModelAABBUpdate_t
-{
-	ModelDraw_t* apModelDraw;
-	ModelBBox_t  aBBox;
-};
-
-static ResourceList< Model* >                          gModels;
-static std::unordered_map< std::string, Handle >       gModelPaths;
-static std::unordered_map< Handle, ModelBBox_t >       gModelBBox;
-// static std::unordered_map< Handle, AABB_t >      gModelAABB;
-static std::unordered_map< ModelDraw_t*, ModelBBox_t > gModelAABBUpdate;
-// static std::set< ModelAABBUpdate_t >             gModelAABBUpdate;
-
-static ResourceList< Scene_t* >                  gScenes;
-static std::unordered_map< std::string, Handle > gScenePaths;
-
-// --------------------------------------------------------------------------------------
-// Other
-
-size_t                                           gModelDrawCalls = 0;
-size_t                                           gVertsDrawn = 0;
-
-
-// TEMP LIGHTING - WILL BE DEFINED IN MAP FORMAT LATER
-CONVAR( r_world_dir_x, 65 );
-CONVAR( r_world_dir_y, 35 );
-CONVAR( r_world_dir_z, 0 );
-
+// Debug Drawing
 CONVAR( r_debug_draw, 1 );
+CONVAR( r_debug_aabb, 1 );
+CONVAR( r_debug_frustums, 0 );
+
+CONVAR( r_line_thickness, 2 );
 
 CONCMD( r_reload_textures )
 {
@@ -336,9 +340,13 @@ void Graphics_FreeModel( Handle shModel )
 	if ( model->apBuffers )
 	{
 		for ( auto& buf : model->apBuffers->aVertex )
-			render->DestroyBuffer( buf );
+				render->DestroyBuffer( buf );
 
-		render->DestroyBuffer( model->apBuffers->aIndex );
+		if ( model->apBuffers->aIndex )
+			render->DestroyBuffer( model->apBuffers->aIndex );
+
+		model->apBuffers->aVertex.clear();
+		model->apBuffers->aIndex = InvalidHandle;
 	}
 
 	gModels.Remove( shModel );
@@ -360,7 +368,7 @@ Model* Graphics_GetModelData( Handle shModel )
 }
 
 
-void Graphics_UpdateModelAABB( ModelDraw_t* spDraw )
+void Graphics_UpdateModelAABB( Renderable_t* spDraw )
 {
 	gModelAABBUpdate.emplace( spDraw, gModelBBox[ spDraw->aModel ] );
 }
@@ -507,10 +515,11 @@ SceneDraw_t* Graphics_AddSceneDraw( Handle sScene )
 
 	SceneDraw_t* sceneDraw = new SceneDraw_t;
 	sceneDraw->aScene      = sScene;
+	sceneDraw->aDraw.resize( scene->aModels.size() );
 
-	for ( auto& model : scene->aModels )
+	for ( uint32_t i = 0; i < scene->aModels.size(); i++ )
 	{
-		sceneDraw->aDraw.push_back( Graphics_AddModelDraw( model ) );
+		sceneDraw->aDraw[ i ] = Graphics_AddModelDraw( scene->aModels[ i ] );
 	}
 
 	return sceneDraw;
@@ -735,7 +744,11 @@ void Graphics_AddShadowMap( Light_t* spLight )
 	ShadowMap_t& shadowMap   = gLightShadows[ spLight ];
 	shadowMap.aSize          = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
 	shadowMap.aViewInfoIndex = gViewInfoCount++;
-	gViewInfo.emplace_back();
+
+	// gViewInfo.resize( gViewInfoCount );
+	// ViewInfo_t& viewInfo     = gViewInfo.at( shadowMap.aViewInfoIndex );
+	ViewInfo_t& viewInfo     = gViewInfo.emplace_back();
+	viewInfo.aShaderOverride = Graphics_GetShader( "__shadow_map" );
 
 	// Create Textures
 	TextureCreateInfo_t texCreate{};
@@ -765,6 +778,25 @@ void Graphics_AddShadowMap( Light_t* spLight )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create shadow map!\n" );
 	}
+}
+
+
+void Graphics_DestroyShadowMap( Light_t* spLight )
+{
+	auto it = gLightShadows.find( spLight );
+	if ( it == gLightShadows.end() )
+	{
+		Log_Error( gLC_ClientGraphics, "Light Shadow Map not found for deletion!\n" );
+		return;
+	}
+
+	if ( it->second.aFramebuffer )
+		render->DestroyFramebuffer( it->second.aFramebuffer );
+
+	if ( it->second.aTexture )
+		render->FreeTexture( it->second.aTexture );
+
+	gLightShadows.erase( spLight );
 }
 
 
@@ -802,6 +834,287 @@ Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBu
 	}
 
 	return buffer;
+}
+
+
+void Graphics_DestroyLightBuffer( Light_t* spLight )
+{
+	auto it = gLightBuffers.find( spLight );
+	if ( it == gLightBuffers.end() )
+	{
+		Log_Error( gLC_ClientGraphics, "Light not found for deletion!\n" );
+		return;
+	}
+
+	render->DestroyBuffer( it->second );
+	gLightBuffers.erase( spLight );
+
+	if ( spLight->aType == ELightType_Cone )
+	{
+		Graphics_DestroyShadowMap( spLight );
+	}
+
+	// update the descriptor sets
+	UpdateVariableDescSet_t update{};
+	update.aType = EDescriptorType_UniformBuffer;
+
+	UniformBufferArray_t* buffer = nullptr;
+	switch ( spLight->aType )
+	{
+		default:
+			Assert( false );
+			Log_ErrorF( gLC_ClientGraphics, "Unknown Light Buffer: %d\n", spLight->aType );
+			return;
+		case ELightType_Directional:
+			buffer = &gUniformLightDirectional;
+			gLightInfo.aCountWorld--;
+			break;
+		case ELightType_Point:
+			buffer = &gUniformLightPoint;
+			gLightInfo.aCountPoint--;
+			break;
+		case ELightType_Cone:
+			buffer = &gUniformLightCone;
+			gLightInfo.aCountCone--;
+			break;
+		case ELightType_Capsule:
+			buffer = &gUniformLightCapsule;
+			gLightInfo.aCountCapsule--;
+			break;
+	}
+
+	for ( size_t i = 0; i < buffer->aSets.size(); i++ )
+		update.aDescSets.push_back( buffer->aSets[ i ] );
+
+	for ( const auto& [ light, bufferHandle ] : gLightBuffers )
+	{
+		if ( light->aType == spLight->aType )
+			update.aBuffers.push_back( bufferHandle );
+	}
+
+	render->UpdateVariableDescSet( update );
+
+	vec_remove( gLights, spLight );
+	delete spLight;
+}
+
+
+void Graphics_UpdateLightBuffer( Light_t* spLight )
+{
+	Handle buffer = InvalidHandle;
+
+	auto   it     = gLightBuffers.find( spLight );
+
+	if ( it == gLightBuffers.end() )
+	{
+		switch ( spLight->aType )
+		{
+			case ELightType_Directional:
+				buffer = Graphics_AddLightBuffer( gUniformLightDirectional, "Light Directional Buffer", sizeof( UBO_LightDirectional_t ), spLight );
+				gLightInfo.aCountWorld++;
+				break;
+			case ELightType_Point:
+				buffer = Graphics_AddLightBuffer( gUniformLightPoint, "Light Point Buffer", sizeof( UBO_LightPoint_t ), spLight );
+				gLightInfo.aCountPoint++;
+				break;
+			case ELightType_Cone:
+				buffer = Graphics_AddLightBuffer( gUniformLightCone, "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
+				gLightInfo.aCountCone++;
+				break;
+			case ELightType_Capsule:
+				buffer = Graphics_AddLightBuffer( gUniformLightCapsule, "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
+				gLightInfo.aCountCapsule++;
+				break;
+		}
+
+		if ( buffer == InvalidHandle )
+		{
+			Log_Warn( gLC_ClientGraphics, "Failed to Create Light Buffer!\n" );
+			return;
+		}
+
+		gLightBuffers[ spLight ] = buffer;
+		gNeedLightInfoUpdate     = true;
+	}
+	else
+	{
+		buffer = it->second;
+	}
+
+	switch ( spLight->aType )
+	{
+		default:
+		{
+			Log_Error( gLC_ClientGraphics, "Unknown Light Type!\n" );
+			return;
+		}
+		case ELightType_Directional:
+		{
+			UBO_LightDirectional_t light;
+			light.aColor.x = spLight->aColor.x;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = spLight->aEnabled;
+
+			Transform temp{};
+			temp.aPos = spLight->aPos;
+			temp.aAng = spLight->aAng;
+			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
+
+			// glm::mat4 matrix;
+			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			// matrix = temp.ToViewMatrixZ();
+			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
+
+			// GetDirectionVectors( matrix, light.aDir );
+
+			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+
+			// update shadow map view info
+#if 0
+			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
+
+			ViewportCamera_t view{};
+			view.aFarZ  = r_shadowmap_farz;
+			view.aNearZ = r_shadowmap_nearz;
+			// view.aFOV   = spLight->aOuterFov;
+			view.aFOV   = r_shadowmap_fov_hack;
+
+			Transform transform{};
+			transform.aPos                  = spLight->aPos;
+			// transform.aAng = spLight->aAng;
+
+			transform.aAng.x                = -spLight->aAng.z + 90.f;
+			transform.aAng.y                = -spLight->aAng.y;
+			transform.aAng.z                = spLight->aAng.x;
+
+			// shadowMap.aViewInfo.aProjection = glm::ortho< float >( -10, 10, -10, 10, -10, 20 );
+
+			shadowMap.aViewInfo.aProjection = glm::ortho< float >(
+			  r_shadowmap_othro_left,
+			  r_shadowmap_othro_right,
+			  r_shadowmap_othro_bottom,
+			  r_shadowmap_othro_top,
+			  view.aNearZ,
+			  view.aFarZ );
+
+			// shadowMap.aViewInfo.aView       = view.aViewMat;
+			shadowMap.aViewInfo.aView       = glm::lookAt( -light.aDir, glm::vec3( 0, 0, 0 ), glm::vec3( 0, -1, 0 ) );
+			shadowMap.aViewInfo.aProjView   = shadowMap.aViewInfo.aProjection * shadowMap.aViewInfo.aView;
+			shadowMap.aViewInfo.aNearZ      = view.aNearZ;
+			shadowMap.aViewInfo.aFarZ       = view.aFarZ;
+
+			Handle shadowBuffer             = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
+			render->MemWriteBuffer( shadowBuffer, sizeof( UBO_ViewInfo_t ), &shadowMap.aViewInfo );
+
+			// get shadow map view info
+			light.aViewInfo = shadowMap.aViewInfoIndex;
+			light.aShadow   = render->GetTextureIndex( shadowMap.aTexture );
+#else
+			// get shadow map view info
+			light.aViewInfo = 0;
+			light.aShadow   = -1;
+#endif
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			break;
+		}
+		case ELightType_Point:
+		{
+			UBO_LightPoint_t light;
+			light.aColor.x = spLight->aColor.x;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = spLight->aEnabled;
+
+			light.aPos     = spLight->aPos;
+			light.aRadius  = spLight->aRadius;
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			break;
+		}
+		case ELightType_Cone:
+		{
+			UBO_LightCone_t light;
+			light.aColor.x = spLight->aColor.x;
+			light.aColor.y = spLight->aColor.y;
+			light.aColor.z = spLight->aColor.z;
+			light.aColor.w = spLight->aEnabled;
+
+			light.aPos     = spLight->aPos;
+			light.aFov.x   = glm::radians( spLight->aInnerFov );
+			light.aFov.y   = glm::radians( spLight->aOuterFov );
+
+			glm::mat4 matrix;
+			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			Util_GetMatrixDirection( matrix, nullptr, nullptr, &light.aDir );
+#if 1
+			// update shadow map view info
+			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
+
+			ViewportCamera_t view{};
+			view.aFarZ  = r_shadowmap_farz;
+			view.aNearZ = r_shadowmap_nearz;
+			// view.aFOV   = spLight->aOuterFov;
+			view.aFOV   = r_shadowmap_fov_hack;
+
+			Transform transform{};
+			transform.aPos   = spLight->aPos;
+			// transform.aAng = spLight->aAng;
+
+			transform.aAng.x = -spLight->aAng.z + 90.f;
+			transform.aAng.y = -spLight->aAng.y;
+			transform.aAng.z = spLight->aAng.x;
+
+			view.aViewMat    = transform.ToViewMatrixZ();
+			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
+
+			gViewInfo[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
+			gViewInfo[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
+			gViewInfo[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
+			gViewInfo[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
+			gViewInfo[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
+			gViewInfo[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
+
+			Handle shadowBuffer                               = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
+			render->MemWriteBuffer( shadowBuffer, sizeof( UBO_ViewInfo_t ), &gViewInfo[ shadowMap.aViewInfoIndex ] );
+
+			// get shadow map view info
+			light.aViewInfo                               = shadowMap.aViewInfoIndex;
+			light.aShadow                                 = render->GetTextureIndex( shadowMap.aTexture );
+
+			gViewInfo[ shadowMap.aViewInfoIndex ].aActive = spLight->aShadow && spLight->aEnabled;
+#endif
+
+			// Update Light Buffer
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			break;
+		}
+		case ELightType_Capsule:
+		{
+			UBO_LightCapsule_t light;
+			light.aColor.x   = spLight->aColor.x;
+			light.aColor.y   = spLight->aColor.y;
+			light.aColor.z   = spLight->aColor.z;
+			light.aColor.w   = spLight->aEnabled;
+
+			light.aPos       = spLight->aPos;
+			light.aLength    = spLight->aLength;
+			light.aThickness = spLight->aRadius;
+
+			Transform temp{};
+			temp.aPos = spLight->aPos;
+			temp.aAng = spLight->aAng;
+			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
+
+			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+
+			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			break;
+		}
+	}
 }
 
 
@@ -984,8 +1297,8 @@ bool Graphics_Init()
 	}
 
 	// Create Light Info Buffer
-	gLightInfoStagingBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform, EBufferMemory_Host );
-	gLightInfoBuffer        = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform, EBufferMemory_Device );
+	gLightInfoStagingBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
+	gLightInfoBuffer        = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( gLightInfoBuffer == InvalidHandle )
 	{
@@ -1061,7 +1374,7 @@ void Graphics_NewFrame()
 		gpDebugLineModel->apVertexData = new VertexData_t;
 		gpDebugLineModel->apBuffers    = new ModelBuffers_t;
 
-		gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
+		// gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
 		gpDebugLineModel->apVertexData->aData.resize( 2, true );
 		gpDebugLineModel->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
 		gpDebugLineModel->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
@@ -1100,7 +1413,7 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 }
 
 
-bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel, ModelSurfaceDraw_t& srDrawInfo )
+bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel, SurfaceDraw_t& srDrawInfo )
 {
 	if ( srDrawInfo.aSurface > spModel->aMeshes.size() )
 	{
@@ -1116,7 +1429,7 @@ bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel,
 	// TODO: what about if we don't have an attribute the shader wants???
 	ChVector< Handle > vertexBuffers;
 
-	// TODO: THIS CAN BE DONE WHEN ADDING THE MODEL TO THE MAIN DRAW LIST, AND PUT IN ModelSurfaceDraw_t
+	// TODO: THIS CAN BE DONE WHEN ADDING THE MODEL TO THE MAIN DRAW LIST, AND PUT IN SurfaceDraw_t
 	for ( size_t i = 0; i < spModel->apVertexData->aData.size(); i++ )
 	{
 		VertAttribData_t& data = spModel->apVertexData->aData[ i ];
@@ -1242,48 +1555,47 @@ Frustum_t Graphics_CreateFrustum( const glm::mat4& srViewInfo )
 }
 
 
-ModelBBox_t Graphics_CreateWorldAABB( ModelDraw_t& srModel, ModelBBox_t& srBBox )
+ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )
 {
-	glm::vec3    globalMin{ srModel.aModelMatrix * glm::vec4( srBBox.aMin, 1.f ) };
-	glm::vec3    globalMax{ srModel.aModelMatrix * glm::vec4( srBBox.aMax, 1.f ) };
+	glm::vec4 corners[ 8 ];
 
-	// Calculate AABB
-	ModelBBox_t  aabb( globalMin, globalMax );
+	// Fill array with the corners of the AABB 
+	corners[ 0 ] = { srBBox.aMin.x, srBBox.aMin.y, srBBox.aMin.z, 1.f };
+	corners[ 1 ] = { srBBox.aMin.x, srBBox.aMin.y, srBBox.aMax.z, 1.f };
+	corners[ 2 ] = { srBBox.aMin.x, srBBox.aMax.y, srBBox.aMin.z, 1.f };
+	corners[ 3 ] = { srBBox.aMax.x, srBBox.aMin.y, srBBox.aMin.z, 1.f };
+	corners[ 4 ] = { srBBox.aMin.x, srBBox.aMax.y, srBBox.aMax.z, 1.f };
+	corners[ 5 ] = { srBBox.aMax.x, srBBox.aMin.y, srBBox.aMax.z, 1.f };
+	corners[ 6 ] = { srBBox.aMax.x, srBBox.aMax.y, srBBox.aMin.z, 1.f };
+	corners[ 7 ] = { srBBox.aMax.x, srBBox.aMax.y, srBBox.aMax.z, 1.f };
+
+	glm::vec3 globalMin;
+	glm::vec3 globalMax;
+
+	// Transform all of the corners, and keep track of the greatest and least
+	// values we see on each coordinate axis.
+	for ( int i = 0; i < 8; i++ )
+	{
+		glm::vec3 transformed = srMatrix * corners[ i ];
+
+		if ( i > 0 )
+		{
+			globalMin = glm::min( globalMin, transformed );
+			globalMax = glm::max( globalMax, transformed );
+		}
+		else
+		{
+			globalMin = transformed;
+			globalMax = transformed;
+		}
+	}
+
+	ModelBBox_t aabb( globalMin, globalMax );
 	return aabb;
-
-#if 0
-	//Get global scale thanks to our transform
-	const glm::vec3 globalCenter{ srModel.aModelMatrix * glm::vec4( aabb.center, 1.f ) };
-
-	glm::vec3       matForward, matRight, matUp;
-	Util_GetMatrixDirection( srModel.aModelMatrix, &matForward, &matRight, &matUp );
-
-	// Scaled orientation
-	const glm::vec3 right   = matRight * aabb.extents.x;
-	const glm::vec3 up      = matUp * aabb.extents.y;
-	const glm::vec3 forward = matForward * aabb.extents.z;
-
-	const float     newIi   = std::abs( glm::dot( glm::vec3{ 1.f, 0.f, 0.f }, right ) ) +
-		std::abs( glm::dot( glm::vec3{ 1.f, 0.f, 0.f }, up ) ) +
-		std::abs( glm::dot( glm::vec3{ 1.f, 0.f, 0.f }, forward ) );
-
-	const float newIj = std::abs( glm::dot( glm::vec3{ 0.f, 1.f, 0.f }, right ) ) +
-		std::abs( glm::dot( glm::vec3{ 0.f, 1.f, 0.f }, up ) ) +
-		std::abs( glm::dot( glm::vec3{ 0.f, 1.f, 0.f }, forward ) );
-
-	const float newIk = std::abs( glm::dot( glm::vec3{ 0.f, 0.f, 1.f }, right ) ) +
-		std::abs( glm::dot( glm::vec3{ 0.f, 0.f, 1.f }, up ) ) +
-		std::abs( glm::dot( glm::vec3{ 0.f, 0.f, 1.f }, forward ) );
-
-	// We not need to divise scale because it's based on the half extention of the AABB
-	AABB_t globalAABB( globalCenter, newIi, newIj, newIk );
-
-	return globalAABB;
-#endif
 }
 
 
-bool Graphics_ViewFrustumTest( ModelDraw_t* spModelDraw, int sViewInfoIndex )
+bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewInfoIndex )
 {
 	if ( !spModelDraw )
 		return false;
@@ -1302,7 +1614,7 @@ bool Graphics_ViewFrustumTest( ModelDraw_t* spModelDraw, int sViewInfoIndex )
 }
 
 
-void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelSurfaceDraw_t >& srRenderList )
+void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< SurfaceDraw_t >& srRenderList )
 {
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
@@ -1310,16 +1622,23 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 		return;
 	}
 
-	ModelSurfaceDraw_t* prevRenderable   = nullptr;
-	Model*              prevModel        = nullptr;
+	SurfaceDraw_t* prevRenderable = nullptr;
+	Model*         prevModel      = nullptr;
 
-	VertexFormat        vertexFormat     = Shader_GetVertexFormat( shader );
+	ShaderData_t*  shaderData     = Shader_GetData( shader );
+	if ( !shaderData )
+		return;
+
+	if ( shaderData->aDynamicState & EDynamicState_LineWidth )
+		render->CmdSetLineWidth( cmd, r_line_thickness );
+
+	VertexFormat   vertexFormat   = Shader_GetVertexFormat( shader );
 
 	for ( uint32_t i = 0; i < srRenderList.size(); )
 	{
-		auto&        renderable = srRenderList[ i ];
+		auto& renderable = srRenderList[ i ];
 
-		ModelDraw_t* modelDraw = nullptr;
+		Renderable_t* modelDraw = nullptr;
 		if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
 		{
 			Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
@@ -1374,6 +1693,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 				continue;
 		}
 
+		// NOTE: not needed if the material is the same i think
 		if ( !Shader_PreRenderableDraw( cmd, gCmdIndex, shader, renderable ) )
 			continue;
 
@@ -1383,17 +1703,8 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< ModelS
 }
 
 
-void Graphics_RenderShadowMaps( Handle cmd, Light_t* spLight, const ShadowMap_t& srShadowMap )
+void Graphics_RenderShadowMap( Handle cmd, Light_t* spLight, const ShadowMap_t& srShadowMap )
 {
-	// fun
-	static Handle shadow_map = Graphics_GetShader( "__shadow_map" );
-
-	if ( shadow_map == InvalidHandle )
-	{
-		Log_Error( gLC_ClientGraphics, "No Shadow Map Shader!\n" );
-		return;
-	}
-
 	Rect2D_t rect{};
 	rect.aOffset.x = 0;
 	rect.aOffset.y = 0;
@@ -1416,28 +1727,18 @@ void Graphics_RenderShadowMaps( Handle cmd, Light_t* spLight, const ShadowMap_t&
 
 	// HACK: need to setup a view push and pop system?
 	Shader_ShadowMap_SetViewInfo( srShadowMap.aViewInfoIndex );
-	int oldViewIndex = gViewInfoIndex;
-	gViewInfoIndex = srShadowMap.aViewInfoIndex;
 
 	ViewRenderList_t& viewList = gViewRenderLists[ srShadowMap.aViewInfoIndex ];
 
 	for ( auto& [ shader, renderList ] : viewList.aRenderLists )
 	{
-		ShaderData_t* shaderData = Shader_GetData( shader );
-		if ( !shaderData )
-			continue;
-
-		// TODO: change this so meshes can specify whether they receive and/or cast shadows
-		if ( shaderData->aFlags & EShaderFlags_Lights )
-			Graphics_DrawShaderRenderables( cmd, shadow_map, renderList );
+		Graphics_DrawShaderRenderables( cmd, shader, renderList );
 	}
-
-	gViewInfoIndex = oldViewIndex;
 }
 
 
 // Do Rendering with shader system and user land meshes
-void Graphics_Render( Handle cmd )
+void Graphics_RenderView( Handle cmd, ViewRenderList_t& srViewList )
 {
 	// here we go again
 	static Handle skybox    = Graphics_GetShader( "skybox" );
@@ -1466,10 +1767,7 @@ void Graphics_Render( Handle cmd )
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-	gViewInfoIndex             = 0;
-	ViewRenderList_t& viewList = gViewRenderLists[ 0 ];
-
-	for ( auto& [ shader, renderList ] : viewList.aRenderLists )
+	for ( auto& [ shader, renderList ] : srViewList.aRenderLists )
 	{
 		if ( shader == skybox )
 		{
@@ -1488,228 +1786,23 @@ void Graphics_Render( Handle cmd )
 
 		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-		Graphics_DrawShaderRenderables( cmd, skybox, viewList.aRenderLists[ skybox ] );
+		Graphics_DrawShaderRenderables( cmd, skybox, srViewList.aRenderLists[ skybox ] );
 	}
 }
 
 
-void Graphics_UpdateLightBuffer( Light_t* spLight )
+void Graphics_Render( Handle cmd )
 {
-	Handle buffer = InvalidHandle;
-
-	auto it = gLightBuffers.find( spLight );
-
-	if ( it == gLightBuffers.end() )
+	for ( size_t i = 0; i < gViewRenderLists.size(); i++ )
 	{
-		switch ( spLight->aType )
-		{
-			case ELightType_Directional:
-				buffer = Graphics_AddLightBuffer( gUniformLightDirectional, "Light Directional Buffer", sizeof( UBO_LightDirectional_t ), spLight );
-				gLightInfo.aCountWorld++;
-				break;
-			case ELightType_Point:
-				buffer = Graphics_AddLightBuffer( gUniformLightPoint, "Light Point Buffer", sizeof( UBO_LightPoint_t ), spLight );
-				gLightInfo.aCountPoint++;
-				break;
-			case ELightType_Cone:
-				buffer = Graphics_AddLightBuffer( gUniformLightCone, "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
-				gLightInfo.aCountCone++;
-				break;
-			case ELightType_Capsule:
-				buffer = Graphics_AddLightBuffer( gUniformLightCapsule, "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
-				gLightInfo.aCountCapsule++;
-				break;
-		}
+		// HACK HACK !!!!
+		// don't render views with shader overrides here, the only override is the shadow map shader
+		// and that is rendered in a separate render pass
+		if ( gViewInfo[ i ].aShaderOverride )
+			continue;
 
-		if ( buffer == InvalidHandle )
-		{
-			Log_Warn( gLC_ClientGraphics, "Failed to Create Light Buffer!\n" );
-			return;
-		}
-
-		gLightBuffers[ spLight ] = buffer;
-		gNeedLightInfoUpdate     = true;
-	}
-	else
-	{
-		buffer = it->second;
-	}
-
-	switch ( spLight->aType )
-	{
-		default:
-		{
-			Log_Error( gLC_ClientGraphics, "Unknown Light Type!\n" );
-			return;
-		}
-		case ELightType_Directional:
-		{
-			UBO_LightDirectional_t light;
-			light.aColor.x = spLight->aColor.x;
-			light.aColor.y = spLight->aColor.y;
-			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
-
-			Transform temp{};
-			temp.aPos = spLight->aPos;
-			temp.aAng = spLight->aAng;
-			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
-
-			// glm::mat4 matrix;
-			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
-			// matrix = temp.ToViewMatrixZ();
-			// ToViewMatrix( matrix, spLight->aPos, spLight->aAng );
-
-			// GetDirectionVectors( matrix, light.aDir );
-
-			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
-			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
-			
-			// update shadow map view info
-#if 0
-			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
-
-			ViewportCamera_t view{};
-			view.aFarZ  = r_shadowmap_farz;
-			view.aNearZ = r_shadowmap_nearz;
-			// view.aFOV   = spLight->aOuterFov;
-			view.aFOV   = r_shadowmap_fov_hack;
-
-			Transform transform{};
-			transform.aPos                  = spLight->aPos;
-			// transform.aAng = spLight->aAng;
-
-			transform.aAng.x                = -spLight->aAng.z + 90.f;
-			transform.aAng.y                = -spLight->aAng.y;
-			transform.aAng.z                = spLight->aAng.x;
-
-			// shadowMap.aViewInfo.aProjection = glm::ortho< float >( -10, 10, -10, 10, -10, 20 );
-
-			shadowMap.aViewInfo.aProjection = glm::ortho< float >(
-			  r_shadowmap_othro_left,
-			  r_shadowmap_othro_right,
-			  r_shadowmap_othro_bottom,
-			  r_shadowmap_othro_top,
-			  view.aNearZ,
-			  view.aFarZ );
-
-			// shadowMap.aViewInfo.aView       = view.aViewMat;
-			shadowMap.aViewInfo.aView       = glm::lookAt( -light.aDir, glm::vec3( 0, 0, 0 ), glm::vec3( 0, -1, 0 ) );
-			shadowMap.aViewInfo.aProjView   = shadowMap.aViewInfo.aProjection * shadowMap.aViewInfo.aView;
-			shadowMap.aViewInfo.aNearZ      = view.aNearZ;
-			shadowMap.aViewInfo.aFarZ       = view.aFarZ;
-
-			Handle shadowBuffer             = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
-			render->MemWriteBuffer( shadowBuffer, sizeof( UBO_ViewInfo_t ), &shadowMap.aViewInfo );
-
-			// get shadow map view info
-			light.aViewInfo = shadowMap.aViewInfoIndex;
-			light.aShadow   = render->GetTextureIndex( shadowMap.aTexture );
-#else
-			// get shadow map view info
-			light.aViewInfo = 0;
-			light.aShadow   = -1;
-#endif
-
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			break;
-		}
-		case ELightType_Point:
-		{
-			UBO_LightPoint_t light;
-			light.aColor.x = spLight->aColor.x;
-			light.aColor.y = spLight->aColor.y;
-			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
-
-			light.aPos    = spLight->aPos;
-			light.aRadius = spLight->aRadius;
-
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			break;
-		}
-		case ELightType_Cone:
-		{
-			UBO_LightCone_t light;
-			light.aColor.x = spLight->aColor.x;
-			light.aColor.y = spLight->aColor.y;
-			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
-
-			light.aPos   = spLight->aPos;
-			light.aFov.x = glm::radians( spLight->aInnerFov );
-			light.aFov.y = glm::radians( spLight->aOuterFov );
-
-			Transform temp{};
-			temp.aPos = spLight->aPos;
-			temp.aAng = spLight->aAng;
-			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
-			
-			// update shadow map view info
-			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
-
-#if 1
-			ViewportCamera_t view{};
-			view.aFarZ  = r_shadowmap_farz;
-			view.aNearZ = r_shadowmap_nearz;
-			// view.aFOV   = spLight->aOuterFov;
-			view.aFOV   = r_shadowmap_fov_hack;
-
-			Transform transform{};
-			transform.aPos = spLight->aPos;
-			// transform.aAng = spLight->aAng;
-
-			transform.aAng.x = -spLight->aAng.z + 90.f;
-			transform.aAng.y = -spLight->aAng.y;
-			transform.aAng.z = spLight->aAng.x;
-		
-			view.aViewMat  = transform.ToViewMatrixZ();
-			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
-
-			gViewInfo[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
-			gViewInfo[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
-			gViewInfo[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
-			gViewInfo[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
-			gViewInfo[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
-			gViewInfo[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
-
-			Handle shadowBuffer = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
-			render->MemWriteBuffer( shadowBuffer, sizeof( UBO_ViewInfo_t ), &gViewInfo[ shadowMap.aViewInfoIndex ] );
-#endif
-
-			// get shadow map view info
-			light.aViewInfo        = shadowMap.aViewInfoIndex;
-			light.aShadow          = render->GetTextureIndex( shadowMap.aTexture );
-
-			gViewInfo[ shadowMap.aViewInfoIndex ].aActive = spLight->aShadow && !spLight->aEnabled;
-
-			// Update Light Buffer
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			break;
-		}
-		case ELightType_Capsule:
-		{
-			UBO_LightCapsule_t light;
-			light.aColor.x   = spLight->aColor.x;
-			light.aColor.y   = spLight->aColor.y;
-			light.aColor.z   = spLight->aColor.z;
-			light.aColor.w   = spLight->aEnabled;
-
-			light.aPos       = spLight->aPos;
-			light.aLength    = spLight->aLength;
-			light.aThickness = spLight->aRadius;
-
-			Transform temp{};
-			temp.aPos = spLight->aPos;
-			temp.aAng = spLight->aAng;
-			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
-
-			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
-			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
-
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
-			break;
-		}
+		gViewInfoIndex = i;
+		Graphics_RenderView( cmd, gViewRenderLists[ i ] );
 	}
 }
 
@@ -1757,14 +1850,19 @@ void Graphics_PrepareDrawData()
 
 	// update model AABB's
 	for ( auto& [model, bbox] : gModelAABBUpdate )
-		model->aAABB = Graphics_CreateWorldAABB( *model, bbox );
+		model->aAABB = Graphics_CreateWorldAABB( model->aModelMatrix, bbox );
 
 	gModelAABBUpdate.clear();
+
+	// Destroy lights if needed
+	for ( Light_t* light : gDestroyLights )
+		Graphics_DestroyLightBuffer( light );
 
 	// Update UBO's for lights if needed
 	for ( Light_t* light : gDirtyLights )
 		Graphics_UpdateLightBuffer( light );
 
+	gDestroyLights.clear();
 	gDirtyLights.clear();
 
 	// Update Light Info UBO
@@ -1785,7 +1883,7 @@ void Graphics_PrepareDrawData()
 		}
 	}
 
-	// update view frustums
+	// update view frustums (CHANGE THIS, SHOULD NOT UPDATE EVERY SINGLE ONE PER FRAME  !!!!)
 	if ( !r_vis_lock.GetBool() || gViewInfoFrustums.size() != gViewInfo.size() )
 	{
 		gViewInfoFrustums.resize( gViewInfo.size() );
@@ -1793,7 +1891,9 @@ void Graphics_PrepareDrawData()
 		for ( size_t i = 0; i < gViewInfo.size(); i++ )
 		{
 			Graphics_CreateFrustum( gViewInfoFrustums[ i ], gViewInfo[ i ].aProjView );
-			Graphics_DrawFrustum( gViewInfoFrustums[ i ] );
+
+			if ( r_debug_frustums )
+				Graphics_DrawFrustum( gViewInfoFrustums[ i ] );
 		}
 	}
 
@@ -1816,19 +1916,19 @@ void Graphics_PrepareDrawData()
 
 	if ( !r_vis_lock.GetBool() )
 	{
-		gViewRenderLists.resize( gViewInfoCount );
-
 		for ( ViewRenderList_t& viewList : gViewRenderLists )
 			for ( auto& [ handle, vec ] : viewList.aRenderLists )
 				vec.clear();
 
-		for ( uint32_t i = 0; i < gModelDrawList.size(); )
+		gViewRenderLists.resize( gViewInfoCount );
+
+		for ( uint32_t i = 0; i < gModelDraws.size(); )
 		{
-			ModelDraw_t* modelDraw = nullptr;
-			if ( !gModelDraws.Get( gModelDrawList[ i ], &modelDraw ) )
+			Renderable_t* modelDraw = nullptr;
+			if ( !gModelDraws.Get( gModelDraws.aHandles[ i ], &modelDraw ) )
 			{
 				Log_Warn( gLC_ClientGraphics, "ModelDraw handle is invalid!\n" );
-				gModelDrawList.remove( i );
+				gModelDraws.Remove( gModelDraws.aHandles[ i ] );
 				continue;
 			}
 
@@ -1836,13 +1936,18 @@ void Graphics_PrepareDrawData()
 			if ( !gModels.Get( modelDraw->aModel, &model ) )
 			{
 				Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
-				gModelDrawList.remove( i );
+				gModelDraws.Remove( gModelDraws.aHandles[ i ] );
 				continue;
 			}
 
 			// check if we need this in any views
 			for ( int viewIndex = 0; viewIndex < gViewInfoCount; viewIndex++ )
 			{
+				// HACK: kind of of hack with the shader override check
+				// If we don't want to cast a shadow and are in a shadowmap view, don't add to the view's render list
+				if ( !modelDraw->aCastShadow && gViewInfo[ viewIndex ].aShaderOverride )
+					continue;
+
 				// Is this model visible in this view?
 				if ( !Graphics_ViewFrustumTest( modelDraw, viewIndex ) )
 					continue;
@@ -1860,12 +1965,16 @@ void Graphics_PrepareDrawData()
 						continue;
 					}
 
-					Handle shader = Mat_GetShader( mat );
+					// Handle shader = InvalidHandle;
+					Handle shader = gViewInfo[ viewIndex ].aShaderOverride;
 
-					// check if we need this in any views
-					ModelSurfaceDraw_t& surfDraw = gViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
-					surfDraw.aDrawData           = gModelDrawList[ i ];
-					surfDraw.aSurface            = surf;
+					if ( !shader )
+						shader = Mat_GetShader( mat );
+
+					// add a SurfaceDraw_t to this render list
+					SurfaceDraw_t& surfDraw = gViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
+					surfDraw.aDrawData      = gModelDraws.aHandles[ i ];
+					surfDraw.aSurface       = surf;
 				}
 			}
 
@@ -1877,21 +1986,21 @@ void Graphics_PrepareDrawData()
 	// Update Debug Draw Buffers
 	// TODO: replace this system with instanced drawing
 
-	if ( r_draw_aabb )
+	if ( r_debug_aabb )
 	{
 		ViewRenderList_t& viewList = gViewRenderLists[ 0 ];
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
 		{
-			for ( auto& renderable : modelList )
+			for ( auto& surfaceDraw : modelList )
 			{
 				// hack to not draw this AABB multiple times, need to change this render list system
-				if ( renderable.aSurface == 0 )
+				if ( surfaceDraw.aSurface == 0 )
 				{
 					// Graphics_DrawModelAABB( renderable->apDraw );
 
-					ModelDraw_t* modelDraw = nullptr;
-					if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+					Renderable_t* modelDraw = nullptr;
+					if ( !gModelDraws.Get( surfaceDraw.aDrawData, &modelDraw ) )
 					{
 						Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 						return;
@@ -1965,7 +2074,7 @@ void Graphics_PrepareDrawData()
 
 			for ( auto& renderable : modelList )
 			{
-				ModelDraw_t* modelDraw = nullptr;
+				Renderable_t* modelDraw = nullptr;
 				if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
 				{
 					Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
@@ -2040,7 +2149,7 @@ void Graphics_Present()
 
 		RenderPassBegin_t renderPassBegin{};
 		renderPassBegin.aClear.resize( 1 );
-		renderPassBegin.aClear[ 0 ].aDepth   = 1.f;
+		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
 		renderPassBegin.aClear[ 0 ].aIsDepth = true;
 
 		for ( const auto& [ light, shadowMap ] : gLightShadows )
@@ -2057,9 +2166,9 @@ void Graphics_Present()
 			gCurFramebuffer = renderPassBegin.aFrameBuffer;
 			gViewInfoIndex  = shadowMap.aViewInfoIndex;
 
-			// render->BeginRenderPass( c, renderPassBegin );
-			// Graphics_RenderShadowMaps( c, light, shadowMap );
-			// render->EndRenderPass( c );
+			render->BeginRenderPass( c, renderPassBegin );
+			Graphics_RenderShadowMap( c, light, shadowMap );
+			render->EndRenderPass( c );
 		}
 
 		// ----------------------------------------------------------
@@ -2070,7 +2179,7 @@ void Graphics_Present()
 		renderPassBegin.aClear.resize( 2 );
 		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
 		renderPassBegin.aClear[ 0 ].aIsDepth = false;
-		renderPassBegin.aClear[ 1 ].aDepth   = 1.f;
+		renderPassBegin.aClear[ 1 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
 		renderPassBegin.aClear[ 1 ].aIsDepth = true;
 
 		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
@@ -2134,7 +2243,7 @@ ViewInfo_t& Graphics_GetViewInfo()
 }
 
 
-void Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo )
+void Graphics_DrawModelAABB( Renderable_t* spDrawInfo )
 {
 	if ( !r_debug_draw || !gpDebugLineModel )
 		return;
@@ -2168,7 +2277,7 @@ void Graphics_DrawModelAABB( ModelDraw_t* spDrawInfo )
 }
 
 
-ModelDraw_t* Graphics_AddModelDraw( Handle sModel )
+Renderable_t* Graphics_AddModelDraw( Handle sModel )
 {
 	Model* model = nullptr;
 	if ( !gModels.Get( sModel, &model ) )
@@ -2177,12 +2286,12 @@ ModelDraw_t* Graphics_AddModelDraw( Handle sModel )
 		return nullptr;
 	}
 
-	ModelDraw_t* modelDraw  = nullptr;
+	Renderable_t* modelDraw  = nullptr;
 	Handle       drawHandle = InvalidHandle;
 
 	if ( !( drawHandle = gModelDraws.Create( &modelDraw ) ) )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Failed to create ModelDraw_t\n" );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to create Renderable_t\n" );
 		return nullptr;
 	}
 
@@ -2193,10 +2302,7 @@ ModelDraw_t* Graphics_AddModelDraw( Handle sModel )
 
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
-	modelDraw->aAABB              = Graphics_CreateWorldAABB( *modelDraw, gModelBBox[ modelDraw->aModel ] );
-
-	// Add the handle to the draw list
-	gModelDrawList.emplace_back() = drawHandle;
+	modelDraw->aAABB              = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gModelBBox[ modelDraw->aModel ] );
 
 	// blech
 	gModelDrawHandles[ modelDraw ] = drawHandle;
@@ -2205,7 +2311,7 @@ ModelDraw_t* Graphics_AddModelDraw( Handle sModel )
 }
 
 
-void Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo )
+void Graphics_RemoveModelDraw( Renderable_t* spDrawInfo )
 {
 	if ( !spDrawInfo )
 		return;
@@ -2218,11 +2324,8 @@ void Graphics_RemoveModelDraw( ModelDraw_t* spDrawInfo )
 		return;
 	}
 
-	Handle drawHandle = it->second;
-
 	gModelDrawHandles.erase( spDrawInfo );
-	gModelDrawList.erase( drawHandle );
-	gModelDraws.Remove( drawHandle );
+	gModelDraws.Remove( it->second );
 }
 
 
@@ -2657,11 +2760,8 @@ void Graphics_DestroyLight( Light_t* spLight )
 
 	gNeedLightInfoUpdate = true;
 
-	// Destroy Descriptor Set
+	gDestroyLights.push_back( spLight );
 
-	vec_remove( gLights, spLight );
 	vec_remove_if( gDirtyLights, spLight );
-
-	delete spLight;
 }
 

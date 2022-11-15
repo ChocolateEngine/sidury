@@ -10,7 +10,7 @@ static Handle                                             gModelLightCone     = 
 
 static bool                                               gLightEditorEnabled = true;
 
-static std::unordered_map< Light_t*, ModelDraw_t >        gDrawLights;
+static std::unordered_map< Light_t*, Renderable_t >        gDrawLights;
 
 static Light_t*                                           gpSelectedLight    = nullptr;
 
@@ -32,7 +32,7 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 	if ( gpFlashlight == spLight )
 		return;
 
-	ModelDraw_t& modelDraw = gDrawLights[ spLight ];
+	Renderable_t& modelDraw = gDrawLights[ spLight ];
 
 	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
 		modelDraw.aModel = gModelLightCone;
@@ -205,6 +205,14 @@ void LightEditor_DrawEditor()
 	if ( !gpSelectedLight )
 	{
 		ImGui::End();
+		return;
+	}
+
+	if ( ImGui::Button( "Delete Light" ) )
+	{
+		ImGui::End();
+		Graphics_DestroyLight( gpSelectedLight );
+		gpSelectedLight = nullptr;
 		return;
 	}
 

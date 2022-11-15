@@ -121,7 +121,38 @@ bool MapManager_LoadMap( const std::string &path )
 
 	MapManager_SpawnPlayer();
 
-	gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
+	// rotate the world model
+	glm::mat4 modelMatrix = Util_ToMatrix( nullptr, &gpMap->aMapInfo->ang );
+
+	// gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
+
+	gpMap->aRenderable = new SceneDraw_t;
+
+	SceneDraw_t* sceneDraw = new SceneDraw_t;
+	gpMap->aRenderable->aScene = gpMap->aScene;
+
+	sceneDraw->aDraw.resize( Graphics_GetSceneModelCount( gpMap->aScene ) );
+
+	for ( uint32_t i = 0; i < sceneDraw->aDraw.size(); i++ )
+	{
+		sceneDraw->aDraw[ i ]               = Graphics_AddModelDraw( Graphics_GetSceneModel( gpMap->aScene, i ) );
+		sceneDraw->aDraw[ i ]->aModelMatrix = modelMatrix;
+		sceneDraw->aDraw[ i ]->aAABB        = Graphics_CreateWorldAABB( modelMatrix, sceneDraw->aDraw[ i ]->aAABB );
+	}
+
+	// return sceneDraw;
+	// 
+	// int      heap = _heapchk();
+	// 
+	// uint32_t i = 0;
+	// for ( auto& renderable : gpMap->aRenderable->aDraw )
+	// {
+	// 	renderable->aModelMatrix = modelMatrix;
+	// 	renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
+	// 	i++;
+	// 
+	// 	_heapchk();
+	// }
 
 	return true;
 }
@@ -137,21 +168,17 @@ bool MapManager_LoadWorldModel()
 {
 	if ( !( gpMap->aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
 		return false;
-
-	// rotate the world model
-	glm::mat4 modelMatrix;
-	Util_ToMatrix( modelMatrix, {}, gpMap->aMapInfo->ang );
 	
 	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
 	{
 		Handle       model     = Graphics_GetSceneModel( gpMap->aScene, i );
-		ModelDraw_t* modelDraw = Graphics_AddModelDraw( model );
-
-		if ( modelDraw )
-			continue;
-
-		modelDraw->aModel       = model;
-		modelDraw->aModelMatrix = modelMatrix;
+		// Renderable_t* modelDraw = Graphics_AddModelDraw( model );
+		// 
+		// if ( modelDraw )
+		// 	continue;
+		// 
+		// modelDraw->aModel       = model;
+		// modelDraw->aModelMatrix = modelMatrix;
 
 #if 0
 		PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );

@@ -337,7 +337,7 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			ModelDraw_t* renderable = entities->GetComponent< ModelDraw_t* >( player );
+			Renderable_t* renderable = entities->GetComponent< Renderable_t* >( player );
 
 			auto model = entities->GetComponent< HModel >( player );
 			transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
