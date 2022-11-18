@@ -24,8 +24,6 @@
 #include <algorithm>
 
 
-GameSystem*      game         = nullptr;
-
 BaseGuiSystem*   gui          = nullptr;
 IRender*         render       = nullptr;
 BaseInputSystem* input        = nullptr;
@@ -199,13 +197,7 @@ CON_COMMAND( create_phys_proto )
 }
 
 
-GameSystem::GameSystem()
-{
-	game = this;
-}
-
-
-GameSystem::~GameSystem(  )
+void Game_Shutdown()
 {
 	Skybox_Destroy();
 	Phys_Shutdown();
@@ -261,7 +253,7 @@ void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, U
 #endif
 
 
-bool GameSystem::Init()
+bool Game_Init()
 {
 	Game_RegisterKeys();
 	Game_UpdateProjection();
@@ -361,14 +353,14 @@ extern ConVar velocity_scale;
 CONVAR( r_render, 1 );
 
 
-void GameSystem::Update( float frameTime )
+void Game_Update( float frameTime )
 {
 	input->Update( frameTime );
 
 	ImGui::NewFrame();
 	ImGui_ImplSDL2_NewFrame();
 
-	Game_Update( frameTime );
+	Game_UpdateGame( frameTime );
 
 	LightEditor_Update();
 
@@ -411,7 +403,7 @@ void EntUpdate()
 }
 
 
-void Game_Update( float frameTime )
+void Game_UpdateGame( float frameTime )
 {
 	gFrameTime = frameTime * en_timescale;
 

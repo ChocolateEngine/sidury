@@ -44,18 +44,6 @@ enum class GameState
 };
 
 
-class GameSystem : public BaseSystem
-{
-public:
-	GameSystem();
-	~GameSystem();
-
-	bool Init() override;
-	void Update( float frameTime ) override;
-};
-
-extern GameSystem* game;
-
 void               Game_RegisterKeys();
 
 bool               Game_InMap();
@@ -64,7 +52,11 @@ void               Game_SetPaused( bool paused );
 bool               Game_IsPaused();
 void               Game_CheckPaused();
 
+bool               Game_Init();
+void               Game_Shutdown();
+
 void               Game_Update( float frameTime );
+void               Game_UpdateGame( float frameTime );  // epic name
 
 void               Game_SetupModels( float frameTime );
 void               Game_ResetInputs();

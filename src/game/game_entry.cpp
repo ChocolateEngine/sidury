@@ -14,7 +14,6 @@
 #include <vector>
 #include <functional>
 
-GameSystem *gamesystem = new GameSystem;
 static bool gRunning   = true;
 
 CONVAR( en_max_frametime, 0.1 );
@@ -69,7 +68,12 @@ extern "C"
 
 		Mod_InitSystems();
 
-		gamesystem->Init();
+		if ( !Game_Init() )
+		{
+			Log_Error( "Failed to Start Game!\n" );
+			Game_Shutdown();
+			return;
+		}
 
 		Con_QueueCommandSilent( "exec ongameload", false );
 
@@ -101,7 +105,7 @@ extern "C"
 				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
 				float minFrameTime = 1.0f / maxFps;
 				if ( (minFrameTime - time) > (2.0f/1000.f))
-					SDL_Delay(1);
+					sys_sleep( 1 );
 
 				// framerate is above max
 				if (time < minFrameTime)
@@ -110,7 +114,7 @@ extern "C"
 
 			// ftl::TaskCounter taskCounter( &gTaskScheduler );
 
-			gamesystem->Update( time );
+			Game_Update( time );
 			// Con_Update();
 			
 			// Wait and help to execute unfinished tasks
@@ -120,5 +124,8 @@ extern "C"
 
 			profile_end_frame();
 		}
+
+		Game_Shutdown();
 	}
 }
+
