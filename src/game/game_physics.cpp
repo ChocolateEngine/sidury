@@ -81,8 +81,8 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 	if ( srTriangles.empty() )
 		return InvalidHandle;  // mEmptyBatch;
 
-	Model*      model = new Model;
-	// gMeshes.push_back( mesh );
+	Model*      model  = nullptr;
+	Handle      handle = Graphics_CreateModel( &model );
 
 	Handle      mat   = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
 
@@ -119,7 +119,6 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 	meshBuilder.End();
 
-	Handle handle = Graphics_AddModel( model );
 	gModelDraw[ handle ];
 	return handle;
 }
@@ -132,7 +131,8 @@ Handle Phys_CreateTriangleBatchInd(
 	if ( srVerts.empty() || srInd.empty() )
 		return InvalidHandle;
 
-	Model* model = new Model;
+	Model*      model  = nullptr;
+	Handle      handle = Graphics_CreateModel( &model );
 
 	Handle mat = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
 
@@ -153,7 +153,6 @@ Handle Phys_CreateTriangleBatchInd(
 
 	meshBuilder.End();
 
-	Handle handle = Graphics_AddModel( model );
 	gModelDraw[ handle ];
 	return handle;
 }

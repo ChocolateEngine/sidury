@@ -126,18 +126,16 @@ bool MapManager_LoadMap( const std::string &path )
 
 	// gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
 
-	gpMap->aRenderable = new SceneDraw_t;
-
-	SceneDraw_t* sceneDraw = new SceneDraw_t;
+	gpMap->aRenderable         = new SceneDraw_t;
 	gpMap->aRenderable->aScene = gpMap->aScene;
 
-	sceneDraw->aDraw.resize( Graphics_GetSceneModelCount( gpMap->aScene ) );
+	gpMap->aRenderable->aDraw.resize( Graphics_GetSceneModelCount( gpMap->aScene ) );
 
-	for ( uint32_t i = 0; i < sceneDraw->aDraw.size(); i++ )
+	for ( uint32_t i = 0; i < gpMap->aRenderable->aDraw.size(); i++ )
 	{
-		sceneDraw->aDraw[ i ]               = Graphics_AddModelDraw( Graphics_GetSceneModel( gpMap->aScene, i ) );
-		sceneDraw->aDraw[ i ]->aModelMatrix = modelMatrix;
-		sceneDraw->aDraw[ i ]->aAABB        = Graphics_CreateWorldAABB( modelMatrix, sceneDraw->aDraw[ i ]->aAABB );
+		gpMap->aRenderable->aDraw[ i ]               = Graphics_AddModelDraw( Graphics_GetSceneModel( gpMap->aScene, i ) );
+		gpMap->aRenderable->aDraw[ i ]->aModelMatrix = modelMatrix;
+		gpMap->aRenderable->aDraw[ i ]->aAABB        = Graphics_CreateWorldAABB( modelMatrix, gpMap->aRenderable->aDraw[ i ]->aAABB );
 	}
 
 	// return sceneDraw;

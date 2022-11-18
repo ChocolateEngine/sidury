@@ -14,6 +14,8 @@ struct VertexInputAttribute_t;
 
 enum class GraphicsFmt;
 
+extern IRender* render;
+
 // hack for bad entity system
 struct HModel
 {
@@ -188,19 +190,29 @@ private:
 };
 
 
-struct VertexData_t
+struct VertexData_t : public RefCounted
 {
-	VertexFormat                   aFormat = VertexFormat_None;
-	u32                            aCount  = 0;
+	VertexFormat                 aFormat = VertexFormat_None;
+	u32                          aCount  = 0;
 	ChVector< VertAttribData_t > aData;
 	ChVector< uint32_t >         aIndices;
 };
 
 
-struct ModelBuffers_t
+struct ModelBuffers_t : public RefCounted
 {
 	ChVector< Handle > aVertex;
-	Handle               aIndex = InvalidHandle;
+	Handle             aIndex = InvalidHandle;
+
+	~ModelBuffers_t()
+	{
+		for ( auto& buf : aVertex )
+			if ( buf )
+				render->DestroyBuffer( buf );
+
+		if ( aIndex )
+			render->DestroyBuffer( aIndex );
+	}
 };
 
 
@@ -218,8 +230,8 @@ struct Mesh
 
 struct Model
 {
-	ModelBuffers_t*    apBuffers    = nullptr;
-	VertexData_t*      apVertexData = nullptr;
+	ModelBuffers_t*  apBuffers    = nullptr;
+	VertexData_t*    apVertexData = nullptr;
 
 	ChVector< Mesh > aMeshes;
 };
@@ -436,7 +448,7 @@ struct ShaderData_t
 // Models
 
 Handle             Graphics_LoadModel( const std::string& srPath );
-Handle             Graphics_AddModel( Model* spModel );
+Handle             Graphics_CreateModel( Model** spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
 void               Graphics_UpdateModelAABB( Renderable_t* spDraw );

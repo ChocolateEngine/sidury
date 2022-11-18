@@ -257,11 +257,13 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 		// fastObjGroup& group = obj->groups[objIndex];
 
 		// index_offset += group.index_offset;
-		Model*        model = new Model;
+		Model* model        = nullptr;
+		spScene->aModels.push_back( Graphics_CreateModel( &model ) );
 		model->apBuffers    = modelBuffers;
 		model->apVertexData = vertData;
 
-		spScene->aModels.push_back( Graphics_AddModel( model ) );
+		model->apBuffers->AddRef();
+		model->apVertexData->AddRef();
 
 		char* groupName = nullptr;
 

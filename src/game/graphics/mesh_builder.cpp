@@ -59,7 +59,8 @@ void MeshBuilder::End( bool sCreateBuffers )
 	}
 	else if ( !vertData )
 	{
-		vertData             = new VertexData_t;
+		vertData = new VertexData_t;
+		vertData->AddRef();
 		apMesh->apVertexData = vertData;
 	}
 
@@ -205,6 +206,8 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 	if ( apMesh->apBuffers == nullptr )
 		apMesh->apBuffers = new ModelBuffers_t;
+
+	apMesh->apBuffers->AddRef();
 
 	Graphics_CreateVertexBuffers( apMesh->apBuffers, vertData, apDebugName );
 

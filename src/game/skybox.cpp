@@ -24,8 +24,8 @@ static Handle           gSkyboxShader = InvalidHandle;
 
 bool Skybox_Init()
 {
-	Model* model              = new Model;
-	gSkyboxModel              = Graphics_AddModel( model );
+	Model* model            = nullptr;
+	gSkyboxModel            = Graphics_CreateModel( &model );
 
 	gSkyboxShader           = Graphics_GetShader( "skybox" );
 

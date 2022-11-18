@@ -147,14 +147,14 @@ struct ModelAABBUpdate_t
 	ModelBBox_t  aBBox;
 };
 
-static ResourceList< Model* >                          gModels;
+static ResourceList< Model >                           gModels;
 static std::unordered_map< std::string, Handle >       gModelPaths;
 static std::unordered_map< Handle, ModelBBox_t >       gModelBBox;
 // static std::unordered_map< Handle, AABB_t >      gModelAABB;
 static std::unordered_map< Renderable_t*, ModelBBox_t > gModelAABBUpdate;
 // static std::set< ModelAABBUpdate_t >             gModelAABBUpdate;
 
-static ResourceList< Scene_t* >                  gScenes;
+static ResourceList< Scene_t >                   gScenes;
 static std::unordered_map< std::string, Handle > gScenePaths;
 
 // --------------------------------------------------------------------------------------
@@ -280,23 +280,38 @@ Handle Graphics_LoadModel( const std::string& srPath )
 
 	std::string fileExt = FileSys_GetFileExt( srPath );
 
-	Model* model = new Model;
+	Model* model = nullptr;
 	Handle handle = InvalidHandle;
 
 	// TODO: try to do file header checking
 	if ( fileExt == "obj" )
 	{
-		handle = gModels.Add( model );
+		handle = gModels.Create( &model );
+
+		if ( handle == InvalidHandle )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "LoadModel: Failed to Allocate Model: %s\n", srPath.c_str() );
+			return InvalidHandle;
+		}
+
 		Graphics_LoadObj( srPath, fullPath, model );
 	}
 	else if ( fileExt == "glb" || fileExt == "gltf" )
 	{
-		handle = gModels.Add( model );
+		handle = gModels.Create( &model );
+
+		if ( handle == InvalidHandle )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "LoadModel: Failed to Allocate Model: %s\n", srPath.c_str() );
+			return InvalidHandle;
+		}
+
 		Graphics_LoadGltf( srPath, fullPath, fileExt, model );
 	}
 	else
 	{
 		Log_DevF( gLC_ClientGraphics, 1, "Unknown Model File Extension: %s\n", fileExt.c_str() );
+		return InvalidHandle;
 	}
 
 	//sModel->aRadius = glm::distance( mesh->aMinSize, mesh->aMaxSize ) / 2.0f;
@@ -305,7 +320,6 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	if ( model->aMeshes.empty() )
 	{
 		gModels.Remove( handle );
-		delete model;
 		return InvalidHandle;
 	}
 
@@ -318,9 +332,9 @@ Handle Graphics_LoadModel( const std::string& srPath )
 }
 
 
-Handle Graphics_AddModel( Model* spModel )
+Handle Graphics_CreateModel( Model** spModel )
 {
-	return gModels.Add( spModel );
+	return gModels.Create( spModel );
 }
 
 
@@ -337,21 +351,35 @@ void Graphics_FreeModel( Handle shModel )
 		return;
 	}
 
+	if ( model->apVertexData )
+	{
+		model->apVertexData->Release();
+	}
+
 	if ( model->apBuffers )
 	{
-		for ( auto& buf : model->apBuffers->aVertex )
-				render->DestroyBuffer( buf );
+		model->apBuffers->Release();
+	// 	for ( auto& buf : model->apBuffers->aVertex )
+	// 		render->DestroyBuffer( buf );
+	// 
+	// 	if ( model->apBuffers->aIndex )
+	// 		render->DestroyBuffer( model->apBuffers->aIndex );
+	// 
+	// 	model->apBuffers->aVertex.clear();
+	// 	model->apBuffers->aIndex = InvalidHandle;
+	}
 
-		if ( model->apBuffers->aIndex )
-			render->DestroyBuffer( model->apBuffers->aIndex );
-
-		model->apBuffers->aVertex.clear();
-		model->apBuffers->aIndex = InvalidHandle;
+	for ( auto& [ path, modelHandle ] : gModelPaths )
+	{
+		if ( modelHandle == shModel )
+		{
+			gModelPaths.erase( path );
+			break;
+		}
 	}
 
 	gModels.Remove( shModel );
 	gModelBBox.erase( shModel );
-	delete model;
 }
 
 
@@ -431,19 +459,28 @@ Handle Graphics_LoadScene( const std::string& srPath )
 
 	if ( fullPath.empty() )
 	{
-		Log_DevF( gLC_ClientGraphics, 1, "LoadModel: Failed to Find Scene: %s\n", srPath.c_str() );
+		Log_ErrorF( gLC_ClientGraphics, "LoadScene: Failed to Find Scene: %s\n", srPath.c_str() );
 		return InvalidHandle;
 	}
 
 	std::string fileExt = FileSys_GetFileExt( srPath );
 
-	Scene_t*    scene   = new Scene_t;
+	// Scene_t*    scene   = new Scene_t;
+	Scene_t*    scene   = nullptr;
 	Handle      handle  = InvalidHandle;
 
 	// TODO: try to do file header checking
 	if ( fileExt == "obj" )
 	{
-		handle = gScenes.Add( scene );
+		handle = gScenes.Create( &scene );
+		
+		if ( handle == InvalidHandle )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "LoadScene: Failed to Allocate Scene: %s\n", srPath.c_str() );
+			return InvalidHandle;
+		}
+
+		memset( &scene->aModels, 0, sizeof( scene->aModels ) );
 		Graphics_LoadSceneObj( srPath, fullPath, scene );
 	}
 	else if ( fileExt == "glb" || fileExt == "gltf" )
@@ -462,7 +499,7 @@ Handle Graphics_LoadScene( const std::string& srPath )
 	if ( scene->aModels.empty() )
 	{
 		gScenes.Remove( handle );
-		delete scene;
+		// delete scene;
 		return InvalidHandle;
 	}
 
@@ -495,9 +532,18 @@ void Graphics_FreeScene( Handle sScene )
 	{
 		Graphics_FreeModel( model );
 	}
+	
+	for ( auto& [ path, sceneHandle ] : gScenePaths )
+	{
+		if ( sceneHandle == sScene )
+		{
+			gScenePaths.erase( path );
+			break;
+		}
+	}
 
+	// delete scene;
 	gScenes.Remove( sScene );
-	delete scene;
 }
 
 
@@ -1361,9 +1407,7 @@ void Graphics_NewFrame()
 
 	if ( !gpDebugLineModel )
 	{
-		gpDebugLineModel             = new Model;
-
-		Handle handle                = gModels.Add( gpDebugLineModel );
+		Handle handle                = gModels.Create( &gpDebugLineModel );
 
 		gpDebugLineDraw              = Graphics_AddModelDraw( handle );
 		gpDebugLineDraw->aTestVis    = false;
@@ -1373,6 +1417,9 @@ void Graphics_NewFrame()
 
 		gpDebugLineModel->apVertexData = new VertexData_t;
 		gpDebugLineModel->apBuffers    = new ModelBuffers_t;
+
+		gpDebugLineModel->apVertexData->AddRef();
+		gpDebugLineModel->apBuffers->AddRef();
 
 		// gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
 		gpDebugLineModel->apVertexData->aData.resize( 2, true );
@@ -1769,6 +1816,12 @@ void Graphics_RenderView( Handle cmd, ViewRenderList_t& srViewList )
 
 	for ( auto& [ shader, renderList ] : srViewList.aRenderLists )
 	{
+		if ( shader == InvalidHandle )
+		{
+			Log_Warn( gLC_ClientGraphics, "Invalid Shader Handle (0) in View RenderList\n" );
+			continue;
+		}
+
 		if ( shader == skybox )
 		{
 			hasSkybox = true;
@@ -2020,10 +2073,16 @@ void Graphics_PrepareDrawData()
 		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
 
 		if ( !gpDebugLineModel->apVertexData )
+		{
 			gpDebugLineModel->apVertexData = new VertexData_t;
+			gpDebugLineModel->apVertexData->AddRef();
+		}
 
 		if ( !gpDebugLineModel->apBuffers )
+		{
 			gpDebugLineModel->apBuffers = new ModelBuffers_t;
+			gpDebugLineModel->apBuffers->AddRef();
+		}
 
 		// Is our current buffer size too small? If so, free the old ones
 		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )
@@ -2324,8 +2383,8 @@ void Graphics_RemoveModelDraw( Renderable_t* spDrawInfo )
 		return;
 	}
 
-	gModelDrawHandles.erase( spDrawInfo );
 	gModelDraws.Remove( it->second );
+	gModelDrawHandles.erase( spDrawInfo );
 }
 
 
