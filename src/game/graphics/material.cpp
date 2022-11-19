@@ -84,16 +84,16 @@ struct MaterialData_t
 };
 
 
-static ResourceList< MaterialData_t* >            gMaterials;
-static std::unordered_map< std::string, Handle >  gMaterialPaths;
-// static std::unordered_map< std::string, Handle >  gMaterialNames;
-static std::unordered_map< const char*, Handle >  gMaterialNames;
-static std::unordered_map< Handle, Handle >       gMaterialShaders;
+static ResourceList< MaterialData_t* >                gMaterials;
+static std::unordered_map< std::string, Handle >      gMaterialPaths;
+// static std::unordered_map< std::string, Handle >   gMaterialNames;
+static std::unordered_map< std::string_view, Handle > gMaterialNames;  // TODO: use string hashing for this?
+static std::unordered_map< Handle, Handle >           gMaterialShaders;
 
-static Handle                                     gInvalidMaterial;
-static std::string                                gStrEmpty;
+static Handle                                         gInvalidMaterial;
+static std::string                                    gStrEmpty;
 
-std::set< Handle >                                gDirtyMaterials;
+std::set< Handle >                                    gDirtyMaterials;
 
 
 const char* Mat_GetName( Handle shMat )
@@ -101,7 +101,7 @@ const char* Mat_GetName( Handle shMat )
 	for ( auto& [name, mat] : gMaterialNames )
 	{
 		if ( mat == shMat )
-			return name;
+			return name.data();
 	}
 
 	return nullptr;
