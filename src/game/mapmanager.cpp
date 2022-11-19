@@ -133,9 +133,13 @@ bool MapManager_LoadMap( const std::string &path )
 
 	for ( uint32_t i = 0; i < gpMap->aRenderable->aDraw.size(); i++ )
 	{
-		gpMap->aRenderable->aDraw[ i ]               = Graphics_AddModelDraw( Graphics_GetSceneModel( gpMap->aScene, i ) );
-		gpMap->aRenderable->aDraw[ i ]->aModelMatrix = modelMatrix;
-		gpMap->aRenderable->aDraw[ i ]->aAABB        = Graphics_CreateWorldAABB( modelMatrix, gpMap->aRenderable->aDraw[ i ]->aAABB );
+		gpMap->aRenderable->aDraw[ i ] = Graphics_CreateRenderable( Graphics_GetSceneModel( gpMap->aScene, i ) );
+
+		if ( Renderable_t* renderable = Graphics_GetRenderableData( gpMap->aRenderable->aDraw[ i ] ) )
+		{
+			renderable->aModelMatrix = modelMatrix;
+			renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
+		}
 	}
 
 	// return sceneDraw;
@@ -166,6 +170,8 @@ bool MapManager_LoadWorldModel()
 {
 	if ( !( gpMap->aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
 		return false;
+
+	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 	
 	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
 	{
@@ -178,27 +184,27 @@ bool MapManager_LoadWorldModel()
 		// modelDraw->aModel       = model;
 		// modelDraw->aModelMatrix = modelMatrix;
 
-#if 0
-		PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
-
+#if 1
 		Phys_GetModelInd( model, shapeInfo.aConcaveData );
-	
-		IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
-
-		if ( physShape == nullptr )
-			return false;
-
-		Assert( physShape );
-	
-		PhysicsObjectInfo physInfo;
-		physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
-	
-		IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
-	
-		gpMap->aWorldPhysShapes.push_back( physShape );
-		gpMap->aWorldPhysObjs.push_back( physObj );
 #endif
 	}
+
+#if 1
+	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+
+	if ( physShape == nullptr )
+		return false;
+
+	Assert( physShape );
+
+	PhysicsObjectInfo physInfo;
+	physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
+
+	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
+
+	gpMap->aWorldPhysShapes.push_back( physShape );
+	gpMap->aWorldPhysObjs.push_back( physObj );
+#endif
 
 	return true;
 }

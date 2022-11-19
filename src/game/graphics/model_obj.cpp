@@ -216,7 +216,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 		// fallback if there is no cmt file
 		if ( material == InvalidHandle )
 		{
-			material = Graphics_CreateMaterial( objMat.name, Graphics_GetShader( gDefaultShader ) );
+			material = Graphics_CreateMaterial( matName, Graphics_GetShader( gDefaultShader ) );
 
 			TextureCreateData_t createData{};
 			createData.aUsage  = EImageUsage_Sampled;
@@ -303,8 +303,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 			{
 				// NOTE: mesh->indices holds each face "fastObjIndex" as three
 				// seperate index objects contiguously laid out one after the other
-				// fastObjIndex objIndex = obj->indices[totalIndexOffset + faceVertIndex];
-				fastObjIndex objIndex = obj->indices[ totalIndexOffset + faceVertIndex ];
+				fastObjIndex vertIndex = obj->indices[ totalIndexOffset + faceVertIndex ];
 
 				if ( faceVertIndex >= 3 )
 				{
@@ -318,9 +317,9 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 					meshBuilder.NextVertex();
 				}
 
-				const u32 position_index = objIndex.p * 3;
-				const u32 texcoord_index = objIndex.t * 2;
-				const u32 normal_index   = objIndex.n * 3;
+				const u32 position_index = vertIndex.p * 3;
+				const u32 texcoord_index = vertIndex.t * 2;
+				const u32 normal_index   = vertIndex.n * 3;
 
 				meshBuilder.SetPos(
 				  obj->positions[ position_index ],

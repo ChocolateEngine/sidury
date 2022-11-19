@@ -77,18 +77,19 @@ std::vector< ModelPhysTest* > g_physEnts;
 void CreateProtogen( const std::string& path )
 {
 #if 1
-	Entity proto = entities->CreateEntity();
+	Entity        proto        = entities->CreateEntity();
 
-	Handle       model     = Graphics_LoadModel( path );
-	Renderable_t* modelDraw = Graphics_AddModelDraw( model );
-	entities->AddComponent< Renderable_t* >( proto, modelDraw );
+	Handle        model        = Graphics_LoadModel( path );
 
-	Transform& transform = entities->AddComponent< Transform >( proto );
+	CRenderable_t renderComp   = entities->AddComponent< CRenderable_t >( proto );
+	renderComp.aHandle         = Graphics_CreateRenderable( model );
 
-	auto playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
+	Transform& transform       = entities->AddComponent< Transform >( proto );
 
-	transform.aPos   = playerTransform.aPos;
-	transform.aScale = {vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat()};
+	auto       playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
+
+	transform.aPos             = playerTransform.aPos;
+	transform.aScale           = { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() };
 
 	g_protos.push_back( proto );
 #endif
@@ -115,18 +116,16 @@ void CreateModelEntity( const std::string& path )
 void CreatePhysEntity( const std::string& path )
 {
 #if 1
-	Entity       physEnt   = entities->CreateEntity();
+	Entity        physEnt      = entities->CreateEntity();
 
-	Handle       model     = Graphics_LoadModel( path );
-	Renderable_t* modelDraw = Graphics_AddModelDraw( model );
+	Handle        model        = Graphics_LoadModel( path );
 
-	entities->AddComponent< Renderable_t* >( physEnt, modelDraw );
-
-	Transform& transform = entities->GetComponent< Transform >( gLocalPlayer );
+	CRenderable_t renderComp   = entities->AddComponent< CRenderable_t >( physEnt );
+	renderComp.aHandle         = Graphics_CreateRenderable( model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
 
-	Phys_GetModelVerts( modelDraw->aModel, shapeInfo.aConvexData );
+	Phys_GetModelVerts( model, shapeInfo.aConvexData );
 
 	IPhysicsShape* shape = physenv->CreateShape( shapeInfo );
 
@@ -136,20 +135,22 @@ void CreatePhysEntity( const std::string& path )
 		return;
 	}
 
+	Transform&        transform = entities->GetComponent< Transform >( gLocalPlayer );
+
 	PhysicsObjectInfo physInfo;
-	physInfo.aPos = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
-	physInfo.aAng = transform.aAng;
-	physInfo.aMass = 1.f;
-	physInfo.aMotionType = PhysMotionType::Dynamic;
+	physInfo.aPos         = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
+	physInfo.aAng         = transform.aAng;
+	physInfo.aMass        = 1.f;
+	physInfo.aMotionType  = PhysMotionType::Dynamic;
 	physInfo.aStartActive = true;
 
-	IPhysicsObject* phys = physenv->CreateObject( shape, physInfo );
+	IPhysicsObject* phys  = physenv->CreateObject( shape, physInfo );
 	phys->SetFriction( phys_friction );
 
 	Phys_SetMaxVelocities( phys );
 
-	entities->AddComponent< IPhysicsShape * >( physEnt, shape );
-	entities->AddComponent< IPhysicsObject * >( physEnt, phys );
+	entities->AddComponent< IPhysicsShape* >( physEnt, shape );
+	entities->AddComponent< IPhysicsObject* >( physEnt, phys );
 
 	g_otherEnts.push_back( physEnt );
 #endif
@@ -179,7 +180,7 @@ CON_COMMAND( delete_protos )
 	for ( auto& proto : g_protos )
 	{
 		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
-		Graphics_RemoveModelDraw( entities->GetComponent< Renderable_t* >( proto ) );
+		Graphics_FreeRenderable( entities->GetComponent< CRenderable_t >( proto ).aHandle );
 		entities->DeleteEntity( proto );
 	}
 
@@ -384,20 +385,23 @@ void EntUpdate()
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
-		Renderable_t* model = entities->GetComponent< Renderable_t* >( ent );
+		CRenderable_t& renderComp = entities->GetComponent< CRenderable_t >( ent );
 
-		if ( model->aModel == InvalidHandle )
-			continue;
-
-		// Model *physObjList = &entities->GetComponent< Model >( ent );
-
-		// Transform& transform = entities->GetComponent< Transform >( ent );
-		IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
-
-		if ( phys )
+		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderComp.aHandle ) )
 		{
+			if ( renderable->aModel == InvalidHandle )
+				continue;
+
+			// Model *physObjList = &entities->GetComponent< Model >( ent );
+
+			// Transform& transform = entities->GetComponent< Transform >( ent );
+			IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
+
+			if ( !phys )
+				continue;
+
 			phys->SetFriction( phys_friction );
-			Util_ToMatrix( model->aModelMatrix, phys->GetPos(), phys->GetAng() );
+			Util_ToMatrix( renderable->aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
 	}
 }
@@ -436,7 +440,7 @@ void Game_UpdateGame( float frameTime )
 
 	players->Update( gFrameTime );
 
-	physenv->Simulate( gFrameTime );
+	Phys_Simulate( physenv, gFrameTime );
 
 	EntUpdate();
 
@@ -487,73 +491,6 @@ void Game_CheckPaused()
 	}
 
 	audio->SetPaused( gPaused );
-}
-
-
-// from vkquake
-glm::vec3 Util_VectorToAngles( const glm::vec3& forward )
-{
-	glm::vec3 angles;
-
-	if (forward.x == 0.f && forward.y == 0.f )
-	{
-		// either vertically up or down
-		angles[PITCH] = (forward.z > 0) ? -90 : 90;
-		angles[YAW] = 0;
-		angles[ROLL] = 0;
-	}
-	else
-	{
-		angles[PITCH] = -atan2(forward.z, sqrt( glm::dot(forward, forward) ));
-		angles[YAW] = atan2(forward.y, forward.x);
-		angles[ROLL] = 0;
-
-		angles = glm::degrees( angles );
-	}
-	
-	return angles;
-}
-
-
-glm::vec3 Util_VectorToAngles( const glm::vec3& forward, const glm::vec3& up )
-{
-	glm::vec3 angles;
-
-	if (forward.x == 0 && forward.y == 0)
-	{
-		// either vertically up or down
-		if (forward[2] > 0)
-		{
-			angles[PITCH] = -90;
-			angles[YAW] = glm::degrees( ::atan2(-up[1], -up[0]) );
-		}
-		else
-		{
-			angles[PITCH] = 90;
-			angles[YAW] = glm::degrees( atan2(up[1], up[0]) );
-		}
-		angles[ROLL] = 0;
-	}
-	else
-	{
-		angles[PITCH] = -atan2(forward.z, sqrt( glm::dot(forward, forward) ));
-		angles[YAW] = atan2(forward.y, forward.x);
-
-		float cp = cos(angles[PITCH]), sp = sin(angles[PITCH]);
-		float cy = cos(angles[YAW]), sy = sin(angles[YAW]);
-		glm::vec3 tleft, tup;
-		tleft.x = -sy;
-		tleft.y = cy;
-		tleft.z = 0;
-		tup.x = sp*cy;
-		tup.y = sp*sy;
-		tup.z = cp;
-		angles[ROLL] = -atan2( glm::dot(up, tleft), glm::dot(up, tup) );
-
-		angles = glm::degrees( angles );
-	}
-	
-	return angles;
 }
 
 
@@ -631,7 +568,7 @@ CONVAR( r_proto_line_dist2, 32.f );
 void Game_SetupModels( float frameTime )
 {
 	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
-	auto& camTransform = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+	// auto& camTransform = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
 
 	if ( !gPaused )
 	{
@@ -652,10 +589,15 @@ void Game_SetupModels( float frameTime )
 #if 1
 	for ( auto& proto: g_protos )
 	{
-		Renderable_t* modelDraw      = entities->GetComponent< Renderable_t* >( proto );
-		auto&        protoTransform = entities->GetComponent< Transform >( proto );
+		CRenderable_t& renderComp     = entities->GetComponent< CRenderable_t >( proto );
+		auto&          protoTransform = entities->GetComponent< Transform >( proto );
 
-		bool         matrixChanged  = false;
+		bool           matrixChanged  = false;
+
+		Renderable_t*  renderable     = Graphics_GetRenderableData( renderComp.aHandle );
+
+		if ( renderable == nullptr )
+			continue;
 
 		// TESTING: BROKEN
 		if ( proto_look == 2.f )
@@ -689,7 +631,7 @@ void Game_SetupModels( float frameTime )
 
 			modelMatrix *= glm::toMat4( protoQuat );
 
-			modelDraw->aModelMatrix = modelMatrix;
+			renderable->aModelMatrix = modelMatrix;
 		}
 		else if ( proto_look.GetBool() )
 		{
@@ -721,21 +663,21 @@ void Game_SetupModels( float frameTime )
 			matrixChanged = true;
 
 			glm::vec3 modelUp;
-			Util_GetMatrixDirection( modelDraw->aModelMatrix, nullptr, nullptr, &modelUp );
+			Util_GetMatrixDirection( renderable->aModelMatrix, nullptr, nullptr, &modelUp );
 
 			protoTransform.aPos = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
 		}
 
 		if ( matrixChanged )
 		{
-		 	modelDraw->aModelMatrix = protoTransform.ToMatrix();
-			Graphics_UpdateModelAABB( modelDraw );
+			renderable->aModelMatrix = protoTransform.ToMatrix();
+			Graphics_UpdateRenderableAABB( renderComp.aHandle );
 		}
 
 		// TEMP
 		{
 			glm::vec3 modelForward, modelRight, modelUp;
-			Util_GetMatrixDirection( modelDraw->aModelMatrix, &modelForward, &modelRight, &modelUp );
+			Util_GetMatrixDirection( renderable->aModelMatrix, &modelForward, &modelRight, &modelUp );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
@@ -745,7 +687,7 @@ void Game_SetupModels( float frameTime )
 }
 
 
-void Game_ResetInputs(  )
+void Game_ResetInputs()
 {
 }
 
@@ -767,12 +709,12 @@ CONVAR_CMD( snd_sound_speed, 6000 )
 #endif
 
 
-void Game_UpdateAudio(  )
+void Game_UpdateAudio()
 {
 	if ( gPaused )
 		return;
 
-	auto& transform = entities->GetComponent< Transform >( gLocalPlayer );
+	// auto& transform = entities->GetComponent< Transform >( gLocalPlayer );
 
 	if ( input->KeyJustPressed( SDL_SCANCODE_H ) )
 	{

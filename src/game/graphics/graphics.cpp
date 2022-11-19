@@ -54,8 +54,8 @@ struct ViewRenderList_t
 //   ChVector< SurfaceDraw_t > >
 // 												 gModelDrawList;
 
-static ResourceList< Renderable_t >                gModelDraws;
-static std::unordered_map< Renderable_t*, Handle > gModelDrawHandles;  // really dumb
+static ResourceList< Renderable_t >               gRenderables;
+static std::unordered_map< Handle, ModelBBox_t >  gRenderAABBUpdate;
 
 std::vector< ViewRenderList_t >                   gViewRenderLists;
 
@@ -81,6 +81,9 @@ extern std::set< Handle >                         gDirtyMaterials;
 
 static Handle                                     gSkyboxShader = InvalidHandle;
 
+// --------------------------------------------------------------------------------------
+// Viewports
+
 static glm::mat4                                  gViewProjMat;
 constexpr int                                     MAX_VIEW_INFO_BUFFERS = 32;
 static std::vector< Handle >                      gViewInfoBuffers( MAX_VIEW_INFO_BUFFERS + 1 );
@@ -91,9 +94,12 @@ bool                                              gViewInfoUpdate    = false;
 int                                               gViewInfoCount     = 1;
 int                                               gViewInfoIndex     = 0;
 
+// --------------------------------------------------------------------------------------
+// Debug Drawing
+
 // static MeshBuilder                               gDebugLineBuilder;
-static Model*                                     gpDebugLineModel   = nullptr;
-static Renderable_t*                              gpDebugLineDraw    = nullptr;
+static Handle                                     gDebugLineModel    = InvalidHandle;
+static Handle                                     gDebugLineDraw     = InvalidHandle;
 static Handle                                     gDebugLineMaterial = InvalidHandle;
 static ChVector< glm::vec3 >                      gDebugLineVertPos;
 static ChVector< glm::vec3 >                      gDebugLineVertColor;
@@ -131,7 +137,6 @@ struct ShadowMap_t
 	Handle     aTexture     = InvalidHandle;
 	Handle     aFramebuffer = InvalidHandle;
 	glm::ivec2 aSize{};
-	// ViewInfo_t aViewInfo{};
 	int        aViewInfoIndex = 0;
 };
 
@@ -147,12 +152,9 @@ struct ModelAABBUpdate_t
 	ModelBBox_t  aBBox;
 };
 
-static ResourceList< Model >                           gModels;
-static std::unordered_map< std::string, Handle >       gModelPaths;
-static std::unordered_map< Handle, ModelBBox_t >       gModelBBox;
-// static std::unordered_map< Handle, AABB_t >      gModelAABB;
-static std::unordered_map< Renderable_t*, ModelBBox_t > gModelAABBUpdate;
-// static std::set< ModelAABBUpdate_t >             gModelAABBUpdate;
+static ResourceList< Model >                     gModels;
+static std::unordered_map< std::string, Handle > gModelPaths;
+static std::unordered_map< Handle, ModelBBox_t > gModelBBox;
 
 static ResourceList< Scene_t >                   gScenes;
 static std::unordered_map< std::string, Handle > gScenePaths;
@@ -177,7 +179,7 @@ CONVAR( r_shadowmap_slope, 1.75f );
 
 CONVAR( r_shadowmap_fov_hack, 90.f );
 CONVAR( r_shadowmap_nearz, 1.f );
-CONVAR( r_shadowmap_farz, 10000.f );
+CONVAR( r_shadowmap_farz, 2000.f );
 
 CONVAR( r_shadowmap_othro_left, -1000.f );
 CONVAR( r_shadowmap_othro_right, 1000.f );
@@ -396,9 +398,13 @@ Model* Graphics_GetModelData( Handle shModel )
 }
 
 
-void Graphics_UpdateModelAABB( Renderable_t* spDraw )
+void Graphics_UpdateRenderableAABB( Handle sRenderable )
 {
-	gModelAABBUpdate.emplace( spDraw, gModelBBox[ spDraw->aModel ] );
+	if ( !sRenderable )
+		return;
+
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( sRenderable ) )
+		gRenderAABBUpdate.emplace( sRenderable, gModelBBox[ renderable->aModel ] );
 }
 
 
@@ -483,11 +489,11 @@ Handle Graphics_LoadScene( const std::string& srPath )
 		memset( &scene->aModels, 0, sizeof( scene->aModels ) );
 		Graphics_LoadSceneObj( srPath, fullPath, scene );
 	}
-	else if ( fileExt == "glb" || fileExt == "gltf" )
-	{
-		// handle = gScenes.Add( scene );
-		// Graphics_LoadGltf( srPath, fullPath, fileExt, model );
-	}
+	// else if ( fileExt == "glb" || fileExt == "gltf" )
+	// {
+	// 	// handle = gScenes.Add( scene );
+	// 	// Graphics_LoadGltf( srPath, fullPath, fileExt, model );
+	// }
 	else
 	{
 		Log_DevF( gLC_ClientGraphics, 1, "Unknown Model File Extension: %s\n", fileExt.c_str() );
@@ -565,7 +571,7 @@ SceneDraw_t* Graphics_AddSceneDraw( Handle sScene )
 
 	for ( uint32_t i = 0; i < scene->aModels.size(); i++ )
 	{
-		sceneDraw->aDraw[ i ] = Graphics_AddModelDraw( scene->aModels[ i ] );
+		sceneDraw->aDraw[ i ] = Graphics_CreateRenderable( scene->aModels[ i ] );
 	}
 
 	return sceneDraw;
@@ -586,7 +592,7 @@ void Graphics_RemoveSceneDraw( SceneDraw_t* spScene )
 
 	for ( auto& modelDraw : spScene->aDraw )
 	{
-		Graphics_RemoveModelDraw( modelDraw );
+		Graphics_FreeRenderable( modelDraw );
 	}
 
 	delete spScene;
@@ -1394,39 +1400,77 @@ void Graphics_NewFrame()
 
 	if ( !r_debug_draw )
 	{
-		if ( gpDebugLineModel )
+		if ( gDebugLineModel )
 		{
-			Graphics_RemoveModelDraw( gpDebugLineDraw );
-			Graphics_FreeModel( gpDebugLineDraw->aModel );
-			gpDebugLineModel = nullptr;
-			gpDebugLineDraw  = nullptr;
+			Graphics_FreeModel( gDebugLineModel );
+			gDebugLineModel = InvalidHandle;
+		}
+
+		if ( gDebugLineDraw )
+		{
+			Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+
+			if ( !renderable )
+				return;
+
+			// Graphics_FreeModel( renderable->aModel );
+			Graphics_FreeRenderable( gDebugLineDraw );
+			gDebugLineDraw = InvalidHandle;
 		}
 
 		return;
 	}
 
-	if ( !gpDebugLineModel )
+	if ( !gDebugLineModel )
 	{
-		Handle handle                = gModels.Create( &gpDebugLineModel );
+		Model* model    = nullptr;
+		gDebugLineModel = gModels.Create( &model );
 
-		gpDebugLineDraw              = Graphics_AddModelDraw( handle );
-		gpDebugLineDraw->aTestVis    = false;
-		gpDebugLineDraw->aCastShadow = false;
+		if ( !gDebugLineModel )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create Debug Line Model\n" );
+			return;
+		}
 
-		gpDebugLineModel->aMeshes.resize( 1 );
+		model->aMeshes.resize( 1 );
 
-		gpDebugLineModel->apVertexData = new VertexData_t;
-		gpDebugLineModel->apBuffers    = new ModelBuffers_t;
+		model->apVertexData = new VertexData_t;
+		model->apBuffers    = new ModelBuffers_t;
 
-		gpDebugLineModel->apVertexData->AddRef();
-		gpDebugLineModel->apBuffers->AddRef();
+		model->apVertexData->AddRef();
+		model->apBuffers->AddRef();
 
 		// gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
-		gpDebugLineModel->apVertexData->aData.resize( 2, true );
-		gpDebugLineModel->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
-		gpDebugLineModel->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
+		model->apVertexData->aData.resize( 2, true );
+		model->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
+		model->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
 
-		Model_SetMaterial( handle, 0, gDebugLineMaterial );
+		Model_SetMaterial( gDebugLineModel, 0, gDebugLineMaterial );
+
+		if ( gDebugLineDraw )
+		{
+			if ( Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw ) )
+			{
+				renderable->aModel = gDebugLineDraw;
+			}
+		}
+	}
+
+	if ( !gDebugLineDraw )
+	{
+		gDebugLineDraw = Graphics_CreateRenderable( gDebugLineModel );
+
+		if ( !gDebugLineDraw )
+			return;
+
+		Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+
+		if ( !renderable )
+			return;
+
+		renderable->aTestVis    = false;
+		renderable->aCastShadow = false;
+		renderable->aVisible    = true;
 	}
 }
 
@@ -1444,7 +1488,7 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 		  mesh.aIndexCount,
 		  1,                  // instance count
 		  mesh.aIndexOffset,
-		  mesh.aVertexOffset,
+		  0, // mesh.aVertexOffset,
 		  0 );
 
 	else
@@ -1462,13 +1506,13 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 
 bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel, SurfaceDraw_t& srDrawInfo )
 {
-	if ( srDrawInfo.aSurface > spModel->aMeshes.size() )
-	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: model surface index is out of range!\n" );
-		return false;
-	}
+	// if ( srDrawInfo.aSurface > spModel->aMeshes.size() )
+	// {
+	// 	Log_Error( gLC_ClientGraphics, "Graphics_BindModel: model surface index is out of range!\n" );
+	// 	return false;
+	// }
 
-	Mesh& mesh = spModel->aMeshes[ srDrawInfo.aSurface ];
+	// Mesh& mesh = spModel->aMeshes[ srDrawInfo.aSurface ];
 	
 	// Bind the mesh's vertex and index buffers
 
@@ -1650,6 +1694,9 @@ bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewInfoIndex )
 	if ( gViewInfo.size() <= sViewInfoIndex || !r_vis || !spModelDraw->aTestVis )
 		return true;
 
+	if ( !spModelDraw->aVisible )
+		return false;
+
 	ViewInfo_t& viewInfo = gViewInfo[ sViewInfoIndex ];
 
 	if ( !viewInfo.aActive )
@@ -1686,7 +1733,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< Surfac
 		auto& renderable = srRenderList[ i ];
 
 		Renderable_t* modelDraw = nullptr;
-		if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+		if ( !gRenderables.Get( renderable.aDrawData, &modelDraw ) )
 		{
 			Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 			srRenderList.remove( i );
@@ -1865,6 +1912,100 @@ void Graphics_AddToViewRenderList()
 }
 
 
+static void Graphics_UpdateDebugDraw()
+{
+	if ( r_debug_aabb )
+	{
+		ViewRenderList_t& viewList = gViewRenderLists[ 0 ];
+
+		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
+		{
+			for ( auto& surfaceDraw : modelList )
+			{
+				// hack to not draw this AABB multiple times, need to change this render list system
+				if ( surfaceDraw.aSurface == 0 )
+				{
+					// Graphics_DrawModelAABB( renderable->apDraw );
+
+					Renderable_t* modelDraw = nullptr;
+					if ( !gRenderables.Get( surfaceDraw.aDrawData, &modelDraw ) )
+					{
+						Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+						return;
+					}
+
+					Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+
+					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
+					// Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
+				}
+			}
+		}
+	}
+
+	if ( r_debug_draw && gDebugLineModel && gDebugLineVertPos.size() )
+	{
+		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
+
+		Model* model = nullptr;
+		if ( !gModels.Get( gDebugLineModel, &model ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to get Debug Draw Model!\n" );
+			gDebugLineModel = InvalidHandle;
+			return;
+		}
+
+		if ( !model->apVertexData )
+		{
+			model->apVertexData = new VertexData_t;
+			model->apVertexData->AddRef();
+		}
+
+		if ( !model->apBuffers )
+		{
+			model->apBuffers = new ModelBuffers_t;
+			model->apBuffers->AddRef();
+		}
+
+		// Is our current buffer size too small? If so, free the old ones
+		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )
+		{
+			if ( model->apBuffers && model->apBuffers->aVertex.size() )
+			{
+				render->DestroyBuffer( model->apBuffers->aVertex[ 0 ] );
+				render->DestroyBuffer( model->apBuffers->aVertex[ 1 ] );
+				model->apBuffers->aVertex.clear();
+			}
+
+			gDebugLineBufferSize = gDebugLineVertPos.size();
+		}
+
+		size_t bufferSize = ( 3 * sizeof( float ) ) * gDebugLineVertPos.size();
+
+		// Create new Buffers if needed
+		if ( model->apBuffers->aVertex.empty() )
+		{
+			model->apBuffers->aVertex.resize( 2 );
+			model->apBuffers->aVertex[ 0 ]            = render->CreateBuffer( "DebugLine Position", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
+			model->apBuffers->aVertex[ 1 ] = render->CreateBuffer( "DebugLine Color", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
+		}
+
+		model->apVertexData->aCount = gDebugLineVertPos.size();
+
+		if ( model->aMeshes.empty() )
+			model->aMeshes.resize( 1 );
+
+		model->aMeshes[ 0 ].aIndexCount              = 0;
+		model->aMeshes[ 0 ].aVertexOffset           = 0;
+		model->aMeshes[ 0 ].aVertexCount             = gDebugLineVertPos.size();
+
+		// Update the Buffers
+		render->MemWriteBuffer( model->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
+		render->MemWriteBuffer( model->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+	}
+}
+
+
 void Graphics_PrepareDrawData()
 {
 	// fun
@@ -1901,11 +2042,14 @@ void Graphics_PrepareDrawData()
 
 	gDirtyMaterials.clear();
 
-	// update model AABB's
-	for ( auto& [model, bbox] : gModelAABBUpdate )
-		model->aAABB = Graphics_CreateWorldAABB( model->aModelMatrix, bbox );
+	// update renderable AABB's
+	for ( auto& [ renderHandle, bbox ] : gRenderAABBUpdate )
+	{
+		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+			renderable->aAABB = Graphics_CreateWorldAABB( renderable->aModelMatrix, bbox );
+	}
 
-	gModelAABBUpdate.clear();
+	gRenderAABBUpdate.clear();
 
 	// Destroy lights if needed
 	for ( Light_t* light : gDestroyLights )
@@ -1975,13 +2119,19 @@ void Graphics_PrepareDrawData()
 
 		gViewRenderLists.resize( gViewInfoCount );
 
-		for ( uint32_t i = 0; i < gModelDraws.size(); )
+		for ( uint32_t i = 0; i < gRenderables.size(); )
 		{
 			Renderable_t* modelDraw = nullptr;
-			if ( !gModelDraws.Get( gModelDraws.aHandles[ i ], &modelDraw ) )
+			if ( !gRenderables.Get( gRenderables.aHandles[ i ], &modelDraw ) )
 			{
 				Log_Warn( gLC_ClientGraphics, "ModelDraw handle is invalid!\n" );
-				gModelDraws.Remove( gModelDraws.aHandles[ i ] );
+				gRenderables.Remove( gRenderables.aHandles[ i ] );
+				continue;
+			}
+
+			if ( !modelDraw->aVisible )
+			{
+				i++;
 				continue;
 			}
 
@@ -1989,7 +2139,7 @@ void Graphics_PrepareDrawData()
 			if ( !gModels.Get( modelDraw->aModel, &model ) )
 			{
 				Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
-				gModelDraws.Remove( gModelDraws.aHandles[ i ] );
+				gRenderables.Remove( gRenderables.aHandles[ i ] );
 				continue;
 			}
 
@@ -2026,7 +2176,7 @@ void Graphics_PrepareDrawData()
 
 					// add a SurfaceDraw_t to this render list
 					SurfaceDraw_t& surfDraw = gViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
-					surfDraw.aDrawData      = gModelDraws.aHandles[ i ];
+					surfDraw.aDrawData      = gRenderables.aHandles[ i ];
 					surfDraw.aSurface       = surf;
 				}
 			}
@@ -2039,83 +2189,9 @@ void Graphics_PrepareDrawData()
 	// Update Debug Draw Buffers
 	// TODO: replace this system with instanced drawing
 
-	if ( r_debug_aabb )
+	if ( r_debug_draw )
 	{
-		ViewRenderList_t& viewList = gViewRenderLists[ 0 ];
-
-		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
-		{
-			for ( auto& surfaceDraw : modelList )
-			{
-				// hack to not draw this AABB multiple times, need to change this render list system
-				if ( surfaceDraw.aSurface == 0 )
-				{
-					// Graphics_DrawModelAABB( renderable->apDraw );
-
-					Renderable_t* modelDraw = nullptr;
-					if ( !gModelDraws.Get( surfaceDraw.aDrawData, &modelDraw ) )
-					{
-						Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
-						return;
-					}
-
-					Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
-					
-					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
-					// Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
-				}
-			}
-		}
-	}
-
-	if ( r_debug_draw && gpDebugLineModel && gDebugLineVertPos.size() )
-	{
-		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
-
-		if ( !gpDebugLineModel->apVertexData )
-		{
-			gpDebugLineModel->apVertexData = new VertexData_t;
-			gpDebugLineModel->apVertexData->AddRef();
-		}
-
-		if ( !gpDebugLineModel->apBuffers )
-		{
-			gpDebugLineModel->apBuffers = new ModelBuffers_t;
-			gpDebugLineModel->apBuffers->AddRef();
-		}
-
-		// Is our current buffer size too small? If so, free the old ones
-		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )
-		{
-			if ( gpDebugLineModel->apBuffers && gpDebugLineModel->apBuffers->aVertex.size() )
-			{
-				render->DestroyBuffer( gpDebugLineModel->apBuffers->aVertex[ 0 ] );
-				render->DestroyBuffer( gpDebugLineModel->apBuffers->aVertex[ 1 ] );
-				gpDebugLineModel->apBuffers->aVertex.clear();
-			}
-
-			gDebugLineBufferSize = gDebugLineVertPos.size();
-		}
-
-		size_t bufferSize = ( 3 * sizeof( float ) ) * gDebugLineVertPos.size();
-
-		// Create new Buffers if needed
-		if ( gpDebugLineModel->apBuffers->aVertex.empty() )
-		{
-			gpDebugLineModel->apBuffers->aVertex.resize( 2 );
-			gpDebugLineModel->apBuffers->aVertex[ 0 ] = render->CreateBuffer( "DebugLine Position", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
-			gpDebugLineModel->apBuffers->aVertex[ 1 ] = render->CreateBuffer( "DebugLine Color", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
-		}
-
-		gpDebugLineModel->apVertexData->aCount      = gDebugLineVertPos.size();
-
-		gpDebugLineModel->aMeshes[ 0 ].aIndexCount   = 0;
-		gpDebugLineModel->aMeshes[ 0 ].aVertexOffset = 0;
-		gpDebugLineModel->aMeshes[ 0 ].aVertexCount  = gDebugLineVertPos.size();
-
-		// Update the Buffers
-		render->MemWriteBuffer( gpDebugLineModel->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
-		render->MemWriteBuffer( gpDebugLineModel->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+		Graphics_UpdateDebugDraw();
 	}
 
 	// --------------------------------------------------------------------
@@ -2134,7 +2210,7 @@ void Graphics_PrepareDrawData()
 			for ( auto& renderable : modelList )
 			{
 				Renderable_t* modelDraw = nullptr;
-				if ( !gModelDraws.Get( renderable.aDrawData, &modelDraw ) )
+				if ( !gRenderables.Get( renderable.aDrawData, &modelDraw ) )
 				{
 					Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 					continue;
@@ -2302,95 +2378,64 @@ ViewInfo_t& Graphics_GetViewInfo()
 }
 
 
-void Graphics_DrawModelAABB( Renderable_t* spDrawInfo )
-{
-	if ( !r_debug_draw || !gpDebugLineModel )
-		return;
 
-#if 0
-	AABB_t    globalAABB = Graphics_CreateWorldAABB( *spDrawInfo );
-	glm::vec3 scale  = Util_GetMatrixScale( spDrawInfo->aModelMatrix );
-
-	glm::vec3 minPos{ INT_MAX };
-	glm::vec3 maxPos{ INT_MIN };
-
-	minPos = globalAABB.center + ( -globalAABB.extents.x * scale );
-	minPos = glm::min( minPos, globalAABB.center + ( -globalAABB.extents.y * scale ) );
-	minPos = glm::min( minPos, globalAABB.center + ( -globalAABB.extents.z * scale ) );
-
-	maxPos = globalAABB.center + ( globalAABB.extents.x * scale );
-	maxPos = glm::max( maxPos, globalAABB.center + ( globalAABB.extents.y * scale ) );
-	maxPos = glm::max( maxPos, globalAABB.center + ( globalAABB.extents.z * scale ) );
-
-	Graphics_DrawBBox( minPos, maxPos, glm::vec3( 0.5, 1.0, 1.0 ) );
-#endif
-
-	// glm::vec3    pos    = Util_GetMatrixPosition( spDrawInfo->aModelMatrix );
-	// 
-	// ModelBBox_t& bbox   = gModelBBox[ spDrawInfo->aModel ];
-	// 
-	// minPos = pos + ( bbox.aMin * scale );
-	// maxPos = pos + ( bbox.aMax * scale );
-	// 
-	// Graphics_DrawBBox( minPos, maxPos, glm::vec3( 1.0, 1.0, 0.75 ) );
-}
-
-
-Renderable_t* Graphics_AddModelDraw( Handle sModel )
+Handle Graphics_CreateRenderable( Handle sModel )
 {
 	Model* model = nullptr;
 	if ( !gModels.Get( sModel, &model ) )
 	{
 		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
-		return nullptr;
+		return InvalidHandle;
 	}
 
 	Renderable_t* modelDraw  = nullptr;
-	Handle       drawHandle = InvalidHandle;
+	Handle        drawHandle = InvalidHandle;
 
-	if ( !( drawHandle = gModelDraws.Create( &modelDraw ) ) )
+	if ( !( drawHandle = gRenderables.Create( &modelDraw ) ) )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Failed to create Renderable_t\n" );
-		return nullptr;
+		return InvalidHandle;
 	}
 
-	modelDraw->aModel             = sModel;
-	modelDraw->aModelMatrix       = glm::identity< glm::mat4 >();
-	modelDraw->aTestVis           = true;
-	modelDraw->aCastShadow        = true;
+	modelDraw->aModel              = sModel;
+	modelDraw->aModelMatrix        = glm::identity< glm::mat4 >();
+	modelDraw->aTestVis            = true;
+	modelDraw->aCastShadow         = true;
+	modelDraw->aVisible            = true;
 
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
-	modelDraw->aAABB              = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gModelBBox[ modelDraw->aModel ] );
+	modelDraw->aAABB               = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gModelBBox[ modelDraw->aModel ] );
 
-	// blech
-	gModelDrawHandles[ modelDraw ] = drawHandle;
-
-	return modelDraw;
+	return drawHandle;
 }
 
 
-void Graphics_RemoveModelDraw( Renderable_t* spDrawInfo )
+Renderable_t* Graphics_GetRenderableData( Handle sRenderable )
 {
-	if ( !spDrawInfo )
-		return;
-
-	auto it = gModelDrawHandles.find( spDrawInfo );
-
-	if ( it == gModelDrawHandles.end() )
+	Renderable_t* renderable = nullptr;
+	if ( !gRenderables.Get( sRenderable, &renderable ) )
 	{
-		Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
-		return;
+		Log_Warn( gLC_ClientGraphics, "Failed to find Renderable!\n" );
+		return nullptr;
 	}
 
-	gModelDraws.Remove( it->second );
-	gModelDrawHandles.erase( spDrawInfo );
+	return renderable;
+}
+
+
+void Graphics_FreeRenderable( Handle sRenderable )
+{
+	if ( !sRenderable )
+		return;
+
+	gRenderables.Remove( sRenderable );
 }
 
 
 void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
 {
-	if ( !r_debug_draw || !gpDebugLineModel )
+	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
 	gDebugLineVertPos.push_back( sX );
@@ -2412,7 +2457,7 @@ void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm:
 
 void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )
 {
-	if ( !r_debug_draw || !gpDebugLineModel )
+	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
 	// bottom
@@ -2437,7 +2482,7 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 
 void Graphics_DrawProjView( const glm::mat4& srProjView )
 {
-	if ( !r_debug_draw || !gpDebugLineModel )
+	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
 	glm::mat4 inv = glm::inverse( srProjView );
@@ -2471,7 +2516,7 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 
 void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 {
-	if ( !r_debug_draw || !gpDebugLineModel )
+	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );

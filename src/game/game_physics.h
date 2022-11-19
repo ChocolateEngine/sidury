@@ -13,6 +13,9 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData );
 
 void Phys_Init();
 void Phys_Shutdown();
+
+// Simulate This Physics Environment
+void Phys_Simulate( IPhysicsEnvironment* spPhysEnv, float sFrameTime );
 void Phys_SetMaxVelocities( IPhysicsObject* spPhysObj );
 
 

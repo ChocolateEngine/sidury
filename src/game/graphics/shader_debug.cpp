@@ -38,8 +38,9 @@ static void Shader_Debug_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& sr
 	srGraphics.aColorBlendAttachments.emplace_back( true );
 
 	srGraphics.aPrimTopology = EPrimTopology_Tri;
-	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;
-	srGraphics.aCullMode     = ECullMode_Back;
+	srGraphics.aLineMode     = true;
+	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth;
+	srGraphics.aCullMode     = ECullMode_None;
 }
 
 
@@ -77,7 +78,7 @@ ShaderCreate_t gShaderCreate_Debug = {
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
 	.aFlags           = EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
-	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
+	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth,
 	.aVertexFormat    = VertexFormat_Position,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,

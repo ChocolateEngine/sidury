@@ -32,7 +32,7 @@ static Handle                 gShader_DebugLine = InvalidHandle;
 static Handle                 gMatSolid         = InvalidHandle;
 static Handle                 gMatWire          = InvalidHandle;
 
-static std::unordered_map< Handle, Renderable_t > gModelDraw;
+static std::unordered_map< Handle, Handle >       gPhysRenderables;
 
 // ==============================================================
 
@@ -119,7 +119,7 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 	meshBuilder.End();
 
-	gModelDraw[ handle ];
+	gPhysRenderables[ handle ];
 	return handle;
 }
 
@@ -153,7 +153,7 @@ Handle Phys_CreateTriangleBatchInd(
 
 	meshBuilder.End();
 
-	gModelDraw[ handle ];
+	gPhysRenderables[ handle ];
 	return handle;
 }
 
@@ -170,13 +170,27 @@ void Phys_DrawGeometry(
 {
 	Handle mat = Model_GetMaterial( sGeometry, 0 );
 
-	Mat_SetVar( mat, "color", srColor );
+	// Mat_SetVar( mat, "color", srColor );
+	Mat_SetVar( mat, "color", {1, 0.25, 0, 1} );
 
-	auto& modelDraw = gModelDraw[ sGeometry ];
-	modelDraw.aModel = sGeometry;
-	modelDraw.aModelMatrix = srModelMatrix;
+	Handle renderHandle = gPhysRenderables[ sGeometry ];
 
-	// Graphics_DrawModel( &modelDraw );
+	if ( renderHandle == InvalidHandle )
+	{
+		renderHandle                  = Graphics_CreateRenderable( sGeometry );
+		gPhysRenderables[ sGeometry ] = renderHandle;
+	}
+
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+	{
+		renderable->aTestVis     = false;
+		renderable->aCastShadow  = false;
+		renderable->aVisible     = true;
+		renderable->aModel       = sGeometry;
+		renderable->aModelMatrix = srModelMatrix;
+
+		Graphics_UpdateRenderableAABB( renderHandle );
+	}
 }
 
 
@@ -212,7 +226,7 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 
 		if ( data == nullptr )
 		{
-			Log_Error( "Phys_GetModelInd(): Position Vertex Data not found?\n" );
+			Log_Error( "Phys_GetModelVerts(): Position Vertex Data not found?\n" );
 			return;
 		}
 
@@ -317,19 +331,21 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 	u32    origSize = srData.aVertCount;
 	Model* model    = Graphics_GetModelData( sModel );
 
+	u32    initialIndOffset = 0;
+
 	// TODO: use this for physics materials later on
-	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
 	{
-		// Mesh&  mesh     = model->aMeshes[ s ];
+		Mesh&  mesh     = model->aMeshes[ s ];
 
 		auto&  vertData = model->apVertexData;
 
-		float* data     = nullptr;
+		glm::vec3* data     = nullptr;
 		for ( auto& attrib : vertData->aData )
 		{
 			if ( attrib.aAttrib == VertexAttribute_Position )
 			{
-				data = (float*)attrib.apData;
+				data = static_cast< glm::vec3* >( attrib.apData );
 				break;
 			}
 		}
@@ -340,39 +356,60 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			return;
 		}
 
-		origSize = srData.aVertCount;
+		origSize            = srData.aVertCount;
 
-		if ( srData.apVertices )
-			srData.apVertices = (glm::vec3*)realloc( srData.apVertices, ( origSize + vertData->aCount ) * sizeof( glm::vec3 ) );
-		else
-			srData.apVertices = (glm::vec3*)malloc( ( origSize + vertData->aCount ) * sizeof( glm::vec3 ) );
+		void* vertsTmp = realloc( srData.apVertices, ( origSize + mesh.aVertexCount ) * sizeof( glm::vec3 ) );
 
-		for ( u32 i = 0, j = 0; j < vertData->aCount; i += 3, j++ )
+		if ( !vertsTmp )
 		{
-			// srVerts.emplace_back( data[ i + 0 ], data[ i + 1 ], data[ i + 2 ] );
-
-			srData.apVertices[ origSize + j ].x = data[ i + 0 ];
-			srData.apVertices[ origSize + j ].y = data[ i + 1 ];
-			srData.apVertices[ origSize + j ].z = data[ i + 2 ];
-
-			// srVerts.push_back( what );
+			Log_ErrorF( "Failed to allocate memory for physics vertices: (%zd bytes)\n", ( origSize + mesh.aVertexCount ) * sizeof( glm::vec3 ) );
+			free( srData.apVertices );
+			return;
 		}
 
-		srData.aVertCount += vertData->aCount;
+		srData.apVertices = static_cast< glm::vec3* >( vertsTmp );
+
+		// faster
+		memcpy( &srData.apVertices[ origSize ], &data[ mesh.aVertexOffset ], mesh.aVertexCount * sizeof( glm::vec3 ) );
+
+		srData.aVertCount += mesh.aVertexCount;
 		u32 indSize = srData.aTriCount;
 
-		if ( srData.aTris )
-			srData.aTris = (PhysIndexedTriangle_t*)realloc( srData.aTris, ( indSize + ( vertData->aIndices.size() / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
-		else
-			srData.aTris = (PhysIndexedTriangle_t*)malloc( ( indSize + vertData->aIndices.size() ) * sizeof( PhysIndexedTriangle_t ) );
+		if ( s == 0 )
+		{
+			initialIndOffset = mesh.aVertexOffset;
+		}
 
-		for ( u32 i = 0, j = 0; i < vertData->aIndices.size(); j++ )
+		void* trisTmp = realloc( srData.aTris, ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
+
+		if ( !trisTmp )
+		{
+			Log_ErrorF( "Failed to allocate memory for physics indexed triangles: (%zd bytes)\n",
+			            ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
+
+			free( srData.aTris );
+			return;
+		}
+
+		srData.aTris = static_cast< PhysIndexedTriangle_t* >( trisTmp );
+
+		for ( u32 i = 0, j = 0; i < mesh.aIndexCount; j++ )
 		{
 			// auto& tri     = srConvexData.emplace_back();
 
-			srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + vertData->aIndices[ i++ ];
-			srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + vertData->aIndices[ i++ ];
-			srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + vertData->aIndices[ i++ ];
+			// srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			// srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			// srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
+
+			srData.aTris[ indSize + j ].aPos[ 0 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
+			srData.aTris[ indSize + j ].aPos[ 1 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
+			srData.aTris[ indSize + j ].aPos[ 2 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
+
+			// SANITY CHECK
+			if ( srData.aTris[ indSize + j ].aPos[ 0 ] > srData.aVertCount )
+			{
+				Log_Error( "Physics vert pos index is greater than vert count!!!!\n" );
+			}
 
 			// srInd.emplace_back(
 			//   origSize + ind[ i + 0 ],
@@ -380,7 +417,17 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			//   origSize + ind[ i + 2 ] );
 		}
 
-		srData.aTriCount += vertData->aIndices.size() / 3;
+		srData.aTriCount += mesh.aIndexCount / 3;
+
+		// SANITY CHECK
+
+		for ( u32 i = 0; i < srData.aTriCount; i++ )
+		{
+			if ( srData.aTris[ i ].aPos[ 0 ] > srData.aVertCount )
+			{
+				Log_Error( "Physics vert pos index is greater than vert count!!!!\n" );
+			}
+		}
 	}
 }
 
@@ -406,7 +453,40 @@ void Phys_Init()
 
 void Phys_Shutdown()
 {
+	for ( auto& [ handle, renderable ] : gPhysRenderables )
+	{
+		if ( !renderable )
+			continue;
+
+		Graphics_FreeRenderable( renderable );
+	}
+
+	gPhysRenderables.clear();
+
 	ch_physics->DestroyPhysEnv( physenv );
+}
+
+
+void Phys_Simulate( IPhysicsEnvironment* spPhysEnv, float sFrameTime )
+{
+	if ( !spPhysEnv )
+		return;
+
+	// reset all renderables
+	// TODO: probably quite slow and inefficient, having to skip over chunks of data each loop
+	// just to set visible to false
+	for ( auto& [ handle, renderHandle ] : gPhysRenderables )
+	{
+		if ( !renderHandle )
+			continue;
+
+		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+		{
+			renderable->aVisible = false;
+		}
+	}
+
+	spPhysEnv->Simulate( sFrameTime );
 }
 
 

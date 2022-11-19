@@ -67,8 +67,3 @@ void               Game_HandleSystemEvents();
 void               Game_SetView( const glm::mat4& srViewMat );
 void               Game_UpdateProjection();
 
-// TODO: MOVE THESE TO CORE !!!
-// void               Util_GetDirectionVectors( const glm::vec3& srAngles, glm::vec3* spForward, glm::vec3* spRight = nullptr, glm::vec3* spUp = nullptr );
-extern glm::vec3          Util_VectorToAngles( const glm::vec3& forward );
-glm::vec3          Util_VectorToAngles( const glm::vec3& srForward, const glm::vec3& srUp );
-

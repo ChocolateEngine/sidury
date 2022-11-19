@@ -326,8 +326,6 @@ void PlayerManager::Update( float frameTime )
 		Transform transform  = entities->GetComponent< Transform >( player );
 		CCamera   camera     = entities->GetComponent< CCamera >( player );
 
-		Light_t*  flashlight = entities->GetComponent< Light_t* >( player );
-
 		if ( !Game_IsPaused() )
 		{
 			DoMouseLook( player );
@@ -486,7 +484,7 @@ void CalcZoom( CCamera& camera, Entity player )
 
 void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 {
-	auto& move = GetPlayerMoveData( player );
+	// auto& move = GetPlayerMoveData( player );
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 	auto& dir = GetDirection( player );
@@ -567,7 +565,8 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 {
 	auto& move = entities->GetComponent< CPlayerMoveData >( player );
 
-	SetMoveType( move, PlayerMoveType::Walk );
+	// SetMoveType( move, PlayerMoveType::Walk );
+	SetMoveType( move, PlayerMoveType::NoClip );
 
 	auto& camera = entities->GetComponent< CCamera >( player );
 	camera.aTransform.aPos = {0, 0, cl_view_height.GetFloat()};
@@ -600,7 +599,7 @@ void PlayerMovement::MovePlayer( Entity player )
 	apDir = &entities->GetComponent< CDirection >( player );
 	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
 
-	apPhysObj->SetAllowDebugDraw( phys_dbg_player );
+	apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
 
 	// update velocity
 	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
@@ -706,7 +705,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	if ( !cl_show_player_stats )
 		return;
 
-	auto& move = entities->GetComponent< CPlayerMoveData >( player );
+	// auto& move = entities->GetComponent< CPlayerMoveData >( player );
 	auto& rigidBody = entities->GetComponent< CRigidBody >( player );
 	auto& transform = entities->GetComponent< Transform >( player );
 	auto& camera = entities->GetComponent< CCamera >( player );

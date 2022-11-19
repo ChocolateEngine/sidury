@@ -7,8 +7,8 @@
 #include "util.h"
 
 
-CONVAR( g_skybox, 1 );
-CONVAR( g_skybox_ang_freeze, 0 );
+CONVAR( r_skybox, 1 );
+CONVAR( r_skybox_ang_freeze, 0 );
 
 // wtf
 extern ViewportCamera_t gView;
@@ -17,7 +17,7 @@ constexpr float         SKYBOX_SCALE = 100.0f;
 constexpr glm::vec3     vec3_zero( 0, 0, 0 );
 
 static bool             gSkyboxValid  = false;
-static Renderable_t*    gpSkyboxDraw  = nullptr;
+static Handle           gSkyboxDraw   = InvalidHandle;
 static Handle           gSkyboxModel  = InvalidHandle;
 static Handle           gSkyboxShader = InvalidHandle;
 
@@ -88,25 +88,32 @@ bool Skybox_Init()
 
 void Skybox_Destroy()
 {
-	Graphics_FreeModel( gpSkyboxDraw->aModel );
-	Graphics_RemoveModelDraw( gpSkyboxDraw );
+	if ( !gSkyboxDraw )
+		return;
+
+	Graphics_FreeModel( gSkyboxModel );
+	Graphics_FreeRenderable( gSkyboxDraw );
 }
 
 
 void Skybox_SetAng( const glm::vec3& srAng )
 {
-	if ( !gSkyboxValid || g_skybox_ang_freeze || !gSkyboxModel || !Model_GetMaterial( gSkyboxModel, 0 ) )
+	if ( !gSkyboxValid || r_skybox_ang_freeze || !gSkyboxModel || !Model_GetMaterial( gSkyboxModel, 0 ) )
 		return;
 
-	Util_ToViewMatrixY( gpSkyboxDraw->aModelMatrix, srAng );
-	gpSkyboxDraw->aModelMatrix = gView.aProjMat * gpSkyboxDraw->aModelMatrix;
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( gSkyboxDraw ) )
+	{
+		Util_ToViewMatrixY( renderable->aModelMatrix, srAng );
+		renderable->aModelMatrix = gView.aProjMat * renderable->aModelMatrix;
+		renderable->aVisible     = r_skybox.GetBool();
+	}
 }
 
 
 void Skybox_SetMaterial( const std::string& srPath )
 {
-	Graphics_RemoveModelDraw( gpSkyboxDraw );
-	gpSkyboxDraw   = nullptr;
+	Graphics_FreeRenderable( gSkyboxDraw );
+	gSkyboxDraw    = InvalidHandle;
 	gSkyboxValid   = false;
 
 	Handle prevMat = Model_GetMaterial( gSkyboxModel, 0 );
@@ -132,17 +139,20 @@ void Skybox_SetMaterial( const std::string& srPath )
 		return;
 	}
 
-	gpSkyboxDraw = Graphics_AddModelDraw( gSkyboxModel );
+	gSkyboxDraw = Graphics_CreateRenderable( gSkyboxModel );
 
-	if ( !gpSkyboxDraw )
+	if ( !gSkyboxDraw )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create skybox model draw!\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to create skybox renderable!\n" );
 		return;
 	}
 
-	gpSkyboxDraw->aCastShadow = false;
-	gpSkyboxDraw->aTestVis    = false;
-	gSkyboxValid              = true;
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( gSkyboxDraw ) )
+	{
+		renderable->aCastShadow = false;
+		renderable->aTestVis    = false;
+		gSkyboxValid            = true;
+	}
 
 	Mat_SetVar( mat, "ang", vec3_zero );
 }

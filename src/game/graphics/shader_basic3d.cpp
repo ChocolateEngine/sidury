@@ -73,15 +73,15 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	// IDEA: since materials shouldn't be updated very often,
 	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
 
-	Handle buffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
+	Handle newBuffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
 
-	if ( buffer == InvalidHandle )
+	if ( newBuffer == InvalidHandle )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to Create Material Uniform Buffer\n" );
 		return false;
 	}
 
-	gMaterialBuffers[ sMat ] = { buffer, 0 };
+	gMaterialBuffers[ sMat ] = { newBuffer, 0 };
 
 	// update the material descriptor sets
 	UpdateVariableDescSet_t update{};

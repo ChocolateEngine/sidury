@@ -254,6 +254,7 @@ struct Renderable_t
 	ModelBBox_t aAABB;
 	bool        aTestVis;
 	bool        aCastShadow;
+	bool        aVisible;
 };
 
 
@@ -273,9 +274,8 @@ struct Scene_t
 
 struct SceneDraw_t
 {
-	Handle                   aScene;
-	// ChVector< Renderable_t* > aDraw;
-	std::vector< Renderable_t* > aDraw;
+	Handle                aScene;
+	std::vector< Handle > aDraw;
 };
 
 
@@ -451,7 +451,6 @@ Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_CreateModel( Model** spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
-void               Graphics_UpdateModelAABB( Renderable_t* spDraw );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
@@ -598,11 +597,10 @@ void               Graphics_PushViewInfo( const ViewInfo_t& srViewInfo );
 void               Graphics_PopViewInfo();
 ViewInfo_t&        Graphics_GetViewInfo();
 
-// TODO: add a "RegisterModelDraw" here or whatever, and use Handles for that
-// that way, if you free it without removing it from the draw list, it doesn't cause a crash
-// and it can throw a warning and remove it itself
-Renderable_t*      Graphics_AddModelDraw( Handle sModel );
-void               Graphics_RemoveModelDraw( Renderable_t* spDrawInfo );
+Handle             Graphics_CreateRenderable( Handle sModel );
+Renderable_t*      Graphics_GetRenderableData( Handle sRenderable );
+void               Graphics_FreeRenderable( Handle sRenderable );
+void               Graphics_UpdateRenderableAABB( Handle sRenderable );
 
 ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox );
 
@@ -613,7 +611,6 @@ void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, 
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
-void               Graphics_DrawModelAABB( Renderable_t* spDrawInfo );
 
 // ---------------------------------------------------------------------------------------
 // Other

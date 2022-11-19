@@ -333,14 +333,6 @@ private:
 extern EntityManager* entities;
 
 
-// uh how will this work when networked? lol
-static EntityManager& GetEntityManager()
-{
-	static EntityManager entityManager;
-	return entityManager;
-}
-
-
 // ==========================================
 // Convienence Macros
 
@@ -379,10 +371,15 @@ struct CCamera: public CDirection
 };
 
 
-class CSound
+struct CSound
 {
-public:
 	Handle aStream = InvalidHandle;
+};
+
+
+struct CRenderable_t
+{
+	Handle aHandle;
 };
 
 

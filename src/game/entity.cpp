@@ -25,8 +25,7 @@ int EntityManager::Init()
 	// uhhhhh
 	RegisterComponent< Handle >();
 	RegisterComponent< HModel >();
-	RegisterComponent< Renderable_t >();
-	RegisterComponent< Renderable_t* >();
+	RegisterComponent< CRenderable_t >();
 
 	RegisterComponent< Light_t* >();
 
