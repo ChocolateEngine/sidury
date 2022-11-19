@@ -183,7 +183,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 		size_t              origSize = ind.size();
 
 		mesh.aIndexOffset            = origSize;
-		mesh.aVertexOffset           = 0;
+		// mesh.aVertexOffset           = 0;
 		mesh.aIndexCount             = surf.aIndices.size();
 
 		ind.resize( ind.size() + surf.aIndices.size() );
