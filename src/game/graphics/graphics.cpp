@@ -485,6 +485,7 @@ Handle Graphics_LoadScene( const std::string& srPath )
 	else
 	{
 		Log_DevF( gLC_ClientGraphics, 1, "Unknown Model File Extension: %s\n", fileExt.c_str() );
+		return InvalidHandle;
 	}
 
 	//sModel->aRadius = glm::distance( mesh->aMinSize, mesh->aMaxSize ) / 2.0f;
