@@ -20,13 +20,18 @@
 #include <cmath>
 
 
-CONVAR( in_forward, 0 );
-CONVAR( in_side, 0 );
-CONVAR( in_duck, 0 );
-CONVAR( in_sprint, 0 );
-CONVAR( in_jump, 0 );
 
-extern ConVarRef en_timescale;
+
+CONVAR( in_forward, 0, CVARF_INPUT );
+CONVAR( in_back, 0, CVARF_INPUT );
+CONVAR( in_left, 0, CVARF_INPUT );
+CONVAR( in_right, 0, CVARF_INPUT );
+
+CONVAR( in_duck, 0, CVARF_INPUT );
+CONVAR( in_sprint, 0, CVARF_INPUT );
+CONVAR( in_jump, 0, CVARF_INPUT );
+CONVAR( in_zoom, 0, CVARF_INPUT );
+CONVAR( in_flashlight, 0, CVARF_INPUT );
 
 CONVAR( sv_sprint_mult, 2.4 );
 //CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
@@ -74,7 +79,7 @@ CONVAR( cl_show_player_stats, 0 );
 
 CONVAR( phys_dbg_player, 0 );
 
-CONVAR( r_fov, 106.f );
+CONVAR( r_fov, 106.f, CVARF_ARCHIVE );
 CONVAR( r_nearz, 1.f );
 CONVAR( r_farz, 10000.f );
 
@@ -117,10 +122,39 @@ CON_COMMAND( respawn )
 	players->Respawn( gLocalPlayer );
 }
 
+
 CON_COMMAND( reset_velocity )
 {
 	auto& rigidBody = entities->GetComponent< CRigidBody >( gLocalPlayer );
 	rigidBody.aVel = {0, 0, 0};
+}
+
+
+// HACK: should set this properly
+static PlayerMoveType gHostMoveType;
+
+
+static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
+{
+	// auto& move = entities->GetComponent< CPlayerMoveData >( sPlayer );
+	// SetMoveType( move, sMoveType );
+
+	if ( gHostMoveType == sMoveType )
+		gHostMoveType = PlayerMoveType::Walk;
+	else
+		gHostMoveType = sMoveType;
+}
+
+
+CONCMD( noclip )
+{
+	CmdSetPlayerMoveType( gLocalPlayer, PlayerMoveType::NoClip );
+}
+
+
+CONCMD( fly )
+{
+	CmdSetPlayerMoveType( gLocalPlayer, PlayerMoveType::Fly );
 }
 
 
@@ -290,7 +324,8 @@ void Player_UpdateFlashlight( Entity player )
 		flashlight->aPos += offset * camera.aUp;
 	};
 
-	if ( input->KeyJustPressed( SDL_SCANCODE_F ) )
+	// Is the flashlight key Just Pressed?
+	if ( in_flashlight == IN_CVAR_JUST_PRESSED )
 	{
 		flashlight->aEnabled = !flashlight->aEnabled;
 
@@ -371,8 +406,7 @@ void PlayerManager::DoMouseLook( Entity player )
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
 
-	// const glm::vec2 mouse = in_sensitivity.GetFloat() * glm::vec2(input->GetMouseDelta());
-	const glm::vec2 mouse = gameinput.GetMouseDelta();
+	const glm::vec2 mouse = Input_GetMouseDelta();
 
 	// transform.aAng[PITCH] = -mouse.y;
 	camera.aTransform.aAng[PITCH] += mouse.y * m_pitch;
@@ -434,28 +468,33 @@ void CalcZoom( CCamera& camera, Entity player )
 
 	float lerpTarget = 0.f;
 
-	if ( KEY_PRESSED( SDL_SCANCODE_Z ) )
+	// HACK HACK
+	static bool wasZoomedIn = false;
+
+	if ( in_zoom.GetBool() )
 	{
-		if ( KEY_JUST_PRESSED( SDL_SCANCODE_Z ) )
+		if ( !wasZoomedIn )
 		{
 			zoom.aZoomChangeFov = camera.aFov;
-			
+
 			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom.aZoomDuration = Lerp_GetDurationIn( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
-			zoom.aZoomTime = 0.f;
+			zoom.aZoomDuration  = Lerp_GetDurationIn( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
+			zoom.aZoomTime      = 0.f;
+			wasZoomedIn         = true;
 		}
 
 		lerpTarget = cl_zoom_fov;
 	}
 	else
 	{
-		if ( KEY_JUST_RELEASED( SDL_SCANCODE_Z ) )
+		if ( wasZoomedIn )
 		{
 			zoom.aZoomChangeFov = camera.aFov;
 
 			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom.aZoomDuration = Lerp_GetDuration( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
-			zoom.aZoomTime = 0.f;
+			zoom.aZoomDuration  = Lerp_GetDuration( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
+			zoom.aZoomTime      = 0.f;
+			wasZoomedIn         = false;
 		}
 
 		lerpTarget = zoom.aOrigFov;
@@ -476,7 +515,7 @@ void CalcZoom( CCamera& camera, Entity player )
 
 	// scale mouse delta
 	float fovScale = (zoom.aNewFov / zoom.aOrigFov);
-	gameinput.SetMouseDeltaScale( {fovScale, fovScale} );
+	Input_SetMouseDeltaScale( {fovScale, fovScale} );
 
 	camera.aFov = zoom.aNewFov;
 }
@@ -646,13 +685,14 @@ float PlayerMovement::GetViewHeight(  )
 }
 
 
-void PlayerMovement::DetermineMoveType(  )
+void PlayerMovement::DetermineMoveType()
 {
-	if ( KEY_JUST_PRESSED(SDL_SCANCODE_V) )
-		SetMoveType( *apMove, apMove->aMoveType == PlayerMoveType::NoClip ? PlayerMoveType::Walk : PlayerMoveType::NoClip );
-
-	if ( KEY_JUST_PRESSED(SDL_SCANCODE_B) )
-		SetMoveType( *apMove, apMove->aMoveType == PlayerMoveType::Fly ? PlayerMoveType::Walk : PlayerMoveType::Fly );
+	// TODO: MULTIPLAYER
+	if ( gHostMoveType != apMove->aMoveType )
+	{
+		apMove->aMoveType = gHostMoveType;
+		SetMoveType( *apMove, gHostMoveType );
+	}
 }
 
 
@@ -770,19 +810,18 @@ void PlayerMovement::UpdateInputs(  )
 	const float sideSpeed = side_speed * moveScale;
 	apMove->aMaxSpeed = max_speed * moveScale;
 
-	if ( KEY_PRESSED(SDL_SCANCODE_W) || in_forward.GetBool() )  apRigidBody->aAccel[W_FORWARD] = forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_S) || in_forward == -1.f )    apRigidBody->aAccel[W_FORWARD] += -forwardSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_A) || in_side == -1.f )       apRigidBody->aAccel[W_RIGHT] = -sideSpeed;
-	if ( KEY_PRESSED(SDL_SCANCODE_D) || in_side.GetBool() )     apRigidBody->aAccel[W_RIGHT] += sideSpeed;
+	if ( in_forward.GetBool() )  apRigidBody->aAccel[W_FORWARD] = forwardSpeed;
+	if ( in_back.GetBool() )     apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
+	if ( in_left.GetBool() )     apRigidBody->aAccel[W_RIGHT] = -sideSpeed;
+	if ( in_right.GetBool() )    apRigidBody->aAccel[W_RIGHT] += sideSpeed;
 
 	// kind of a hack
 	// this feels really stupid
 	static bool wasJumpButtonPressed = false;
-	bool jump = KEY_PRESSED(SDL_SCANCODE_SPACE) || in_jump;
 
 	if ( CalcOnGround() )
 	{
-		if ( jump && !wasJumpButtonPressed )
+		if ( in_jump && !wasJumpButtonPressed )
 		{
 			apRigidBody->aVel[W_UP] = jump_force;
 			wasJumpButtonPressed = true;
@@ -1297,7 +1336,7 @@ void PlayerMovement::DoViewBob()
 }
 
 
-CONVAR( cl_tilt, 1 );
+CONVAR( cl_tilt, 1, CVARF_ARCHIVE );
 CONVAR( cl_tilt_speed, 0.1 );
 CONVAR( cl_tilt_threshold, 200 );
 

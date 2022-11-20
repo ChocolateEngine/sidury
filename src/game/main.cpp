@@ -52,9 +52,9 @@ CONVAR( dbg_global_axis_size, 15 );
 
 CONVAR( vrcmdl_scale, 40 );
 
-extern ConVar en_timescale;
+extern ConVar host_timescale;
 
-extern ConVar velocity_scale;
+CONVAR( in_proto_spam, 0, CVARF_INPUT );
 
 
 struct ModelPhysTest
@@ -275,7 +275,9 @@ void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, U
 
 bool Game_Init()
 {
-	Game_RegisterKeys();
+	// Startup the Game Input System
+	Input_Init();
+
 	Game_UpdateProjection();
 
 	if ( !Graphics_Init() )
@@ -316,37 +318,6 @@ bool Game_Init()
 }
 
 
-void Game_RegisterKeys()
-{
-	input->RegisterKey( SDL_SCANCODE_W );
-	input->RegisterKey( SDL_SCANCODE_S );
-	input->RegisterKey( SDL_SCANCODE_A );
-	input->RegisterKey( SDL_SCANCODE_D );
-
-	input->RegisterKey( SDL_SCANCODE_LCTRL );
-	input->RegisterKey( SDL_SCANCODE_LSHIFT );
-	input->RegisterKey( SDL_SCANCODE_SPACE );
-	
-	input->RegisterKey( SDL_SCANCODE_V ); // noclip
-	input->RegisterKey( SDL_SCANCODE_B ); // flight
-
-	input->RegisterKey( SDL_SCANCODE_Z );  // zoom button
-
-	// Debugging Keys
-
-	input->RegisterKey( SDL_SCANCODE_G ); // play a test sound at current position in world
-	input->RegisterKey( SDL_SCANCODE_H ); // stop all test sounds
-
-	input->RegisterKey( SDL_SCANCODE_E ); // create protogen
-	input->RegisterKey( SDL_SCANCODE_R ); // create protogen hold down key
-
-	input->RegisterKey( SDL_SCANCODE_T ); // create a point light
-	input->RegisterKey( SDL_SCANCODE_Y ); // create a cone light
-
-	gameinput.Init();
-}
-
-
 void CenterMouseOnScreen()
 {
 	int w, h;
@@ -367,7 +338,6 @@ Model* g_streamModel = nullptr;
 
 
 ConVar snd_cube_scale("snd_cube_scale", "0.05");
-extern ConVar velocity_scale;
 
 
 CONVAR( r_render, 1 );
@@ -428,12 +398,12 @@ void EntUpdate()
 
 void Game_UpdateGame( float frameTime )
 {
-	gFrameTime = frameTime * en_timescale;
+	gFrameTime = frameTime * host_timescale;
 
 	Graphics_NewFrame();
 	Game_HandleSystemEvents();
 
-	gameinput.Update();
+	Input_Update();
 
 	Game_CheckPaused();
 
@@ -591,7 +561,7 @@ void Game_SetupModels( float frameTime )
 
 	if ( !gPaused )
 	{
-		if ( input->KeyJustPressed( SDL_SCANCODE_E ) || input->KeyPressed( SDL_SCANCODE_R ) )
+		if ( in_proto_spam.GetBool() )
 		{
 			CreateProtogen( DEFAULT_PROTOGEN_PATH );
 		}
@@ -728,63 +698,65 @@ CONVAR_CMD( snd_sound_speed, 6000 )
 #endif
 
 
+CONCMD( snd_test )
+{
+	Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion_mono.ogg" ) );
+
+	/*if ( audio->IsValid( stream ) )
+	{
+		audio->FreeSound( stream );
+	}*/
+	// test sound
+	//else if ( stream = audio->LoadSound("sound/rain2.ogg") )
+	if ( stream )
+	//else if ( stream = audio->LoadSound("sound/endymion_mono.ogg") )
+	//else if ( stream = audio->LoadSound("sound/endymion2.wav") )
+	//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )
+	//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )
+	{
+		audio->SetVolume( stream, snd_test_vol );
+
+#if AUDIO_OPENAL
+		audio->AddEffect( stream, AudioEffect_Loop );  // on by default
+#endif
+
+		// play it where the player currently is
+		// audio->AddEffect( stream, AudioEffect_World );
+		// audio->SetEffectData( stream, Audio_World_Pos, transform.aPos );
+
+		audio->PlaySound( stream );
+
+		/*if ( g_streamModel == nullptr )
+		{
+			g_streamModel = graphics->LoadModel( "materials/models/cube.obj" );
+			//aModels.push_back( g_streamModel );
+		}
+
+		g_streamModel->SetPos( transform.aPos );*/
+	}
+}
+
+
+CONCMD( snd_test_clear )
+{
+	for ( Handle stream : streams )
+	{
+		if ( audio->IsValid( stream ) )
+		{
+			audio->FreeSound( stream );
+		}
+	}
+
+	streams.clear();
+}
+
+
 void Game_UpdateAudio()
 {
 	if ( gPaused )
 		return;
 
 	// auto& transform = entities->GetComponent< Transform >( gLocalPlayer );
-
-	if ( input->KeyJustPressed( SDL_SCANCODE_H ) )
-	{
-		for ( Handle stream: streams )
-		{
-			if ( audio->IsValid( stream ) )
-			{
-				audio->FreeSound( stream );
-			}
-		}
-
-		streams.clear();
-	}
-
-	if ( input->KeyJustPressed( SDL_SCANCODE_G ) )
-	{
-		Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion_mono.ogg" ) );
-
-		/*if ( audio->IsValid( stream ) )
-		{
-			audio->FreeSound( stream );
-		}*/
-		// test sound
-		//else if ( stream = audio->LoadSound("sound/rain2.ogg") )  
-		if ( stream )  
-		//else if ( stream = audio->LoadSound("sound/endymion_mono.ogg") )  
-		//else if ( stream = audio->LoadSound("sound/endymion2.wav") )  
-		//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )  
-		//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )  
-		{
-			audio->SetVolume( stream, snd_test_vol );
-
-#if AUDIO_OPENAL
-			audio->AddEffect( stream, AudioEffect_Loop );  // on by default
-#endif
-
-			// play it where the player currently is
-			// audio->AddEffect( stream, AudioEffect_World );
-			// audio->SetEffectData( stream, Audio_World_Pos, transform.aPos );
-
-			audio->PlaySound( stream );
-
-			/*if ( g_streamModel == nullptr )
-			{
-				g_streamModel = graphics->LoadModel( "materials/models/cube.obj" );
-				//aModels.push_back( g_streamModel );
-			}
-
-			g_streamModel->SetPos( transform.aPos );*/
-		}
-	}
 
 	for ( Handle stream: streams )
 	{

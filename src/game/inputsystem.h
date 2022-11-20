@@ -3,9 +3,11 @@
 #include <SDL2/SDL_scancode.h>
 #include <string>
 
-using ButtonInput_t = size_t;
+extern ConVarFlag_t CVARF_INPUT;
 
-enum ButtonInputs_ : ButtonInput_t
+using ButtonInput_t = int;
+
+enum : ButtonInput_t
 {
 	In_None = 0,
 
@@ -26,48 +28,32 @@ enum ButtonInputs_ : ButtonInput_t
 };
 
 
+constexpr float      IN_CVAR_JUST_RELEASED = -1.f;
+constexpr float      IN_CVAR_RELEASED      = 0.f;
+constexpr float      IN_CVAR_PRESSED       = 1.f;
+constexpr float      IN_CVAR_JUST_PRESSED  = 2.f;
 
-// only handles mouse input right now
-// also make component based maybe in-case of a controller, 
-// we don't need any mouse sens or key input calculations here
-// maybe a list of IGameInputDevice?
-class GameInput
-{
-public:
 
-	void                Init();
-	void                Update();
+void                 Input_Init();
+void                 Input_Update();
 
-	void                CalcMouseDelta();
-	glm::vec2           GetMouseDelta();
+void                 Input_CalcMouseDelta();
+glm::vec2            Input_GetMouseDelta();
 
-	// could use some stack system to determine who gets to control the mouse scale maybe
-	void                SetMouseDeltaScale( const glm::vec2& scale );
-	const glm::vec2&    GetMouseDeltaScale();
+// could use some stack system to determine who gets to control the mouse scale maybe
+void                 Input_SetMouseDeltaScale( const glm::vec2& scale );
+const glm::vec2&     Input_GetMouseDeltaScale();
 
-	// Button Handling
-	ButtonInput_t       RegisterButton();
+// Button Handling
+ButtonInput_t        Input_RegisterButton();
+ButtonInput_t        Input_GetButtonStates();
 
-	void BindKey( SDL_Scancode key, const std::string& cmd );
+void                 Input_BindKey( SDL_Scancode key, const std::string& cmd );
 
-	//bool KeyPressed( ButtonInput_t key );
-	//bool KeyReleased( ButtonInput_t key );
-	//bool KeyJustPressed( ButtonInput_t key );
-	//bool KeyJustReleased( ButtonInput_t key );
-
-	glm::vec2 aMouseDelta{};
-	glm::vec2 aMouseDeltaScale{1.f, 1.f};
-
-	std::vector< ButtonInput_t > aButtonInputs;
-
-	ButtonInput_t aButtons;
-
-	std::unordered_map< SDL_Scancode, std::string > aKeyBinds;
-};
-
-extern GameInput gameinput;
-
-GameInput& GetGameInput();
+//bool Input_KeyPressed( ButtonInput_t key );
+//bool Input_KeyReleased( ButtonInput_t key );
+//bool Input_KeyJustPressed( ButtonInput_t key );
+//bool Input_KeyJustReleased( ButtonInput_t key );
 
 
 extern ButtonInput_t IN_FORWARD;

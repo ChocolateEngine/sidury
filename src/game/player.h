@@ -26,9 +26,10 @@ typedef unsigned char PlayerFlags;
 enum class PlayerMoveType
 {
 	Walk,
-	Water,
 	NoClip,
 	Fly,
+	// Water,
+	Count
 };
 
 

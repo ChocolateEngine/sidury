@@ -44,8 +44,6 @@ enum class GameState
 };
 
 
-void               Game_RegisterKeys();
-
 bool               Game_InMap();
 
 void               Game_SetPaused( bool paused );

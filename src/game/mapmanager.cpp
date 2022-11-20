@@ -21,7 +21,6 @@ LOG_REGISTER_CHANNEL( Map, LogColor::DarkGreen );
 
 SiduryMap*    gpMap      = nullptr;
 
-extern ConVar velocity_scale;
 extern Entity gLocalPlayer;
 
 

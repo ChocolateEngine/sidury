@@ -1,100 +1,393 @@
 #include "inputsystem.h"
 #include "iinput.h"
+#include "main.h"
 
 extern BaseInputSystem* input;
 
-GameInput gameinput;
+LOG_REGISTER_CHANNEL2( GameInput, LogColor::Default );
 
-GameInput& GetGameInput()
-{
-	return gameinput;
-}
+NEW_CVAR_FLAG( CVARF_INPUT );
 
-#define REGISTER_BUTTON( name ) ButtonInput_t name = GetGameInput().RegisterButton()
+#define REGISTER_BUTTON( name ) ButtonInput_t name = Input_RegisterButton()
 
 REGISTER_BUTTON( IN_FORWARD );
 REGISTER_BUTTON( IN_BACK );
 
 
-CONVAR( m_pitch, 0.022 );
-CONVAR( m_yaw, 0.022 );
+CONVAR( m_pitch, 0.022, CVARF_ARCHIVE );
+CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
 CONVAR( m_sensitivity, 0.3, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
-extern ConVar in_forward;
+
+static glm::vec2                                       gMouseDelta{};
+static glm::vec2                                       gMouseDeltaScale{ 1.f, 1.f };
+static std::vector< ButtonInput_t >                    gButtonInputs;
+static ButtonInput_t                                   gButtons;
+static std::unordered_map< SDL_Scancode, std::string > gKeyBinds;
+static std::unordered_map< SDL_Scancode, std::string > gKeyBindToggle;
+
+static std::vector< ConVar* >                          gInputCvars;
+static std::unordered_map< SDL_Scancode, ConVar* >     gInputCvarKeys;
 
 
-void GameInput::Init()
+CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 {
-	CalcMouseDelta();
+	LogGroup group = Log_GroupBegin( gLC_GameInput );
+
+	Log_Group( group, "SDL2 Scancodes:\n\n" );
+	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
+	{
+		const char* name = SDL_GetScancodeName( (SDL_Scancode)i );
+
+		if ( strlen( name ) == 0 )
+			continue;
+
+		Log_GroupF( group, "%d: %s\n", i, name );
+	}
+
+	Log_GroupEnd( group );
 }
 
 
-void GameInput::Update()
+static void bind_dropdown_keys(
+  const std::vector< std::string >& args,  // arguments currently typed in by the user
+  std::vector< std::string >&       results )    // results to populate the dropdown list with
+{
+	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
+	{
+		const char* name = SDL_GetScancodeName( (SDL_Scancode)i );
+
+		if ( strlen( name ) == 0 )
+			continue;
+
+		if ( args.size() > 1 )
+		{
+			// Check if they are both equal
+#ifdef _WIN32
+			if ( _strnicmp( name, args[ 0 ].c_str(), strlen( name ) ) != 0 )
+				continue;
+#else
+			if ( strncasecmp( name, args[ 0 ].c_str(), strlen( name ) ) != 0 )
+				continue;
+#endif
+		}
+		else if ( args.size() )
+		{
+			// Check if this string is inside this other string
+			char* find = strcasestr( name, args[ 0 ].c_str() );
+
+			if ( !find )
+				continue;
+		}
+
+		std::string& result = results.emplace_back();
+		result += "\"";
+		result += name;
+		result += "\"";
+	}
+}
+
+static void bind_dropdown(
+  const std::vector< std::string >& args,  // arguments currently typed in by the user
+  std::vector< std::string >&       results )    // results to populate the dropdown list with
+{
+	bind_dropdown_keys( args, results );
+
+	if ( results.size() > 1 )
+		return;
+
+	// must be an invalid scancode
+	if ( results.empty() )
+	{
+		results.push_back( "INVALID SCANCODE" );
+		return;
+	}
+
+	std::string key = results[ 0 ] + " ";
+	results.clear();
+
+	// Build this spaced out command
+	std::string command;
+	for ( size_t i = 1; i < args.size(); i++ )
+	{
+		command += args[ i ];
+		if ( i + 1 < args.size() )
+			command += " ";
+	}
+
+	// Search Through ConVars
+	std::vector< std::string > searchResults;
+	Con_BuildAutoCompleteList( command, searchResults );
+
+	for ( auto& cvar : searchResults )
+	{
+		results.push_back( key + cvar );
+	}
+}
+
+
+static void PrintBinding( const char* spKey, const char* spCmd )
+{
+	Log_MsgF( gLC_GameInput, "Binding: \"%s\" \"%s\"\n", spKey, spCmd );
+}
+
+
+static void PrintBinding( SDL_Scancode sScancode, const char* spKey )
+{
+	// Find the command for this key and print it
+	auto it = gKeyBinds.find( sScancode );
+	if ( it == gKeyBinds.end() )
+	{
+		Log_MsgF( gLC_GameInput, "Binding: \"%s\" :\n", spKey );
+	}
+	else
+	{
+		PrintBinding( spKey, it->second.c_str() );
+	}
+}
+
+
+CONCMD_DROP_VA( bind, bind_dropdown, 0, "Bind a key to a command" )
+{
+	if ( args.empty() )
+		return;
+
+	SDL_Scancode scancode = SDL_GetScancodeFromName( args[ 0 ].c_str() );
+
+	if ( scancode == SDL_SCANCODE_UNKNOWN )
+	{
+		Log_ErrorF( gLC_GameInput, "Unknown Key: %s\n", args[ 0 ].c_str() );
+		return;
+	}
+
+	if ( args.size() < 2 )
+	{
+		PrintBinding( scancode, args[ 0 ].c_str() );
+		return;
+	}
+
+	if ( args.size() == 2 )
+	{
+		Input_BindKey( scancode, args[ 1 ] );
+		return;
+	}
+
+	// Build this spaced out command
+	std::string command;
+	for ( size_t i = 1; i < args.size(); i++ )
+	{
+		command += args[ i ];
+		if ( i + 1 < args.size() )
+			command += " ";
+	}
+
+	Input_BindKey( scancode, command );
+}
+
+
+CONCMD_DROP_VA( unbind, bind_dropdown_keys, 0, "UnBind a key" )
+{
+	if ( args.empty() )
+		return;
+
+	SDL_Scancode scancode = SDL_GetScancodeFromName( args[ 0 ].c_str() );
+
+	if ( scancode == SDL_SCANCODE_UNKNOWN )
+	{
+		Log_ErrorF( gLC_GameInput, "Unknown Key: \"%s\"\n", args[ 0 ].c_str() );
+		return;
+	}
+
+	auto it = gKeyBinds.find( scancode );
+	if ( it == gKeyBinds.end() )
+	{
+		Log_MsgF( gLC_GameInput, "Key is already unbound: \"%s\"\n", args[ 0 ].c_str() );
+		return;
+	}
+
+	gInputCvarKeys.erase( scancode );
+	gKeyBinds.erase( it );
+
+	Log_DevF( gLC_GameInput, 1, "Unbound Key: \"%s\"\n", args[ 0 ].c_str() );
+}
+
+
+CONCMD_VA( bind_dump, "Dump all keys bound to a command" )
+{
+	for ( auto& [ scancode, command ] : gKeyBinds )
+	{
+		PrintBinding( SDL_GetScancodeName( scancode ), command.c_str() );
+	}
+}
+
+
+CONVAR( in_show_scancodes, 0 );
+
+
+static void CmdBindArchive( std::string& srOutput )
+{
+	srOutput += "// Bindings\n\n";
+
+	for ( auto& [ scancode, command ] : gKeyBinds )
+	{
+		// get ugly'd on - Agent Agrimar
+		srOutput += "bind \"";
+		srOutput += SDL_GetScancodeName( scancode );
+		srOutput += "\" \"";
+		srOutput += command;
+		srOutput += "\"\n";
+	}
+}
+
+
+void Input_Init()
+{
+	Input_CalcMouseDelta();
+
+	Con_AddArchiveCallback( CmdBindArchive );
+
+	// Find all Convars with the CVARF_INPUT flag on it
+	ConVarBase* current = ConVarBase::spConVarBases;
+
+	while ( current )
+	{
+		if ( typeid( *current ) != typeid( ConVar ) )
+		{
+			current = current->apNext;
+			continue;
+		}
+
+		ConVar* cvar = static_cast< ConVar* >( current );
+
+		if ( cvar->aFlags & CVARF_INPUT )
+			gInputCvars.push_back( cvar );
+
+		current = current->apNext;
+	}
+}
+
+
+void Input_Update()
 {
 	// update mouse inputs
-	aMouseDelta = {};
-	CalcMouseDelta();
+	gMouseDelta = {};
+	Input_CalcMouseDelta();
 
-	// update button binds and run the commands they are bound to
+	// Don't run inputs when the game is paused
+	if ( !Game_IsPaused() )
+	{
+		// Update button binds and run the commands they are bound to
+		for ( auto& [ scancode, command ] : gKeyBinds )
+		{
+			if ( input->KeyJustPressed( scancode ) )
+				Con_RunCommand( command );
+		}
+	}
+
+	// Update Input ConVar States
+	for ( auto& [ scancode, cvar ] : gInputCvarKeys )
+	{
+		if ( input->KeyJustPressed( scancode ) )
+		{
+			cvar->SetValue( IN_CVAR_JUST_PRESSED );
+		}
+		else if ( input->KeyPressed( scancode ) && cvar->aValueFloat == IN_CVAR_JUST_PRESSED )
+		{
+			cvar->SetValue( IN_CVAR_PRESSED );
+		}
+		else if ( input->KeyJustReleased( scancode ) )
+		{
+			cvar->SetValue( IN_CVAR_JUST_RELEASED );
+		}
+		else if ( input->KeyReleased( scancode ) && cvar->aValueFloat == IN_CVAR_JUST_RELEASED )
+		{
+			cvar->SetValue( IN_CVAR_RELEASED );
+		}
+	}
 	
 	// and for updating button states, do something like this
-	aButtons = 0;
+	// gButtons = 0;
 
-	if ( in_forward == 1.f )
-		aButtons |= IN_FORWARD;
-
-	else if ( in_forward == -1.f )
-		aButtons |= IN_BACK;
-
+	// if ( in_forward == 1.f )
+	// 	gButtons |= IN_FORWARD;
+	// 
+	// else if ( in_forward == -1.f )
+	// 	gButtons |= IN_BACK;
 }
 
 
-void GameInput::CalcMouseDelta()
+void Input_CalcMouseDelta()
 {
 	const glm::ivec2& baseDelta = input->GetMouseDelta();
 
-	aMouseDelta.x = baseDelta.x * m_sensitivity;
-	aMouseDelta.y = baseDelta.y * m_sensitivity;
+	gMouseDelta.x = baseDelta.x * m_sensitivity;
+	gMouseDelta.y = baseDelta.y * m_sensitivity;
 }
 
 
-glm::vec2 GameInput::GetMouseDelta()
+glm::vec2 Input_GetMouseDelta()
 {
-	return aMouseDelta * aMouseDeltaScale;
+	return gMouseDelta * gMouseDeltaScale;
 }
 
 
-void GameInput::SetMouseDeltaScale( const glm::vec2& scale )
+void Input_SetMouseDeltaScale( const glm::vec2& scale )
 {
-	aMouseDeltaScale = scale;
-}
-
-const glm::vec2& GameInput::GetMouseDeltaScale()
-{
-	return aMouseDeltaScale;
+	gMouseDeltaScale = scale;
 }
 
 
-ButtonInput_t GameInput::RegisterButton()
+const glm::vec2& Input_GetMouseDeltaScale()
 {
-	ButtonInput_t newBitShift = (1 << aButtonInputs.size());
-	aButtonInputs.push_back( newBitShift );
+	return gMouseDeltaScale;
+}
+
+
+ButtonInput_t Input_RegisterButton()
+{
+	ButtonInput_t newBitShift = (1 << gButtonInputs.size());
+	gButtonInputs.push_back( newBitShift );
 	return newBitShift;
 }
 
 
-void GameInput::BindKey( SDL_Scancode key, const std::string& cmd )
+ButtonInput_t Input_GetButtonStates()
 {
-	auto it = aKeyBinds.find( key );
-	if ( it == aKeyBinds.end() )
+	return gButtons;
+}
+
+
+void Input_BindKey( SDL_Scancode key, const std::string& cmd )
+{
+	input->RegisterKey( key );
+
+	auto it = gKeyBinds.find( key );
+	if ( it == gKeyBinds.end() )
 	{
 		// bind it
-		aKeyBinds[key] = cmd;
+		gKeyBinds[key] = cmd;
 	}
 	else
 	{
 		// update this bind (does this work?)
 		it->second = cmd;
+	}
+
+	Log_DevF( gLC_GameInput, 1, "Bound Key: \"%s\" \"%s\"\n", SDL_GetScancodeName( key ), cmd.c_str() );
+
+	// Add the first convar here to the input list
+	std::string name;
+	std::vector< std::string > args;
+	Con_ParseCommandLine( cmd, name, args );
+
+	ConVar* cvar = Con_GetConVar( name );
+
+	if ( !cvar )
+		return;
+
+	if ( cvar->aFlags & CVARF_INPUT )
+	{
+		gInputCvarKeys[ key ] = cvar;
 	}
 }
 

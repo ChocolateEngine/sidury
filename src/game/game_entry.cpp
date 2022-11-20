@@ -16,9 +16,9 @@
 
 static bool gRunning   = true;
 
-CONVAR( en_max_frametime, 0.1 );
-CONVAR( en_timescale, 1 );
-CONVAR( en_fps_max, 300 );
+CONVAR( host_max_frametime, 0.1 );
+CONVAR( host_timescale, 1 );
+CONVAR( host_fps_max, 300 );
 
 
 CONCMD( exit )
@@ -96,11 +96,11 @@ extern "C"
 			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	
 			// don't let the time go too crazy, usually happens when in a breakpoint
-			time = glm::min( time, en_max_frametime.GetFloat() );
+			time = glm::min( time, host_max_frametime.GetFloat() );
 
-			if ( en_fps_max.GetFloat() > 0.f )
+			if ( host_fps_max.GetFloat() > 0.f )
 			{
-				float maxFps = glm::clamp( en_fps_max.GetFloat(), 10.f, 5000.f );
+				float maxFps = glm::clamp( host_fps_max.GetFloat(), 10.f, 5000.f );
 
 				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
 				float minFrameTime = 1.0f / maxFps;
