@@ -81,7 +81,7 @@ void CreateProtogen( const std::string& path )
 
 	Handle        model        = Graphics_LoadModel( path );
 
-	CRenderable_t renderComp   = entities->AddComponent< CRenderable_t >( proto );
+	CRenderable_t& renderComp  = entities->AddComponent< CRenderable_t >( proto );
 	renderComp.aHandle         = Graphics_CreateRenderable( model );
 
 	Transform& transform       = entities->AddComponent< Transform >( proto );
@@ -120,7 +120,7 @@ void CreatePhysEntity( const std::string& path )
 
 	Handle        model        = Graphics_LoadModel( path );
 
-	CRenderable_t renderComp   = entities->AddComponent< CRenderable_t >( physEnt );
+	CRenderable_t& renderComp  = entities->AddComponent< CRenderable_t >( physEnt );
 	renderComp.aHandle         = Graphics_CreateRenderable( model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
@@ -169,7 +169,26 @@ CON_COMMAND( create_gltf_proto )
 	CreateProtogen( "materials/models/protogen_wip_25d/protogen_25d.glb" );
 }
 
-CON_COMMAND( create_look_entity )
+static void model_dropdown(
+  const std::vector< std::string >& args,  // arguments currently typed in by the user
+  std::vector< std::string >&       results )    // results to populate the dropdown list with
+{
+	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
+	{
+		if ( file.ends_with( ".." ) )
+			continue;
+
+		if ( args.size() && !file.starts_with( args[ 0 ] ) )
+			continue;
+
+		// make sure it's a format we can open
+		if ( file.ends_with( ".obj" ) || file.ends_with( ".glb" ) || file.ends_with( ".gltf" ) )
+			results.push_back( file );
+	}
+}
+
+
+CONCMD_DROP( create_look_entity, model_dropdown )
 {
 	if ( args.size() )
 		CreateProtogen( args[ 0 ] );
@@ -239,7 +258,7 @@ void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, U
 	{
 		case WM_PAINT:
 		{
-			Log_Msg( "WM_PAINT\n" );
+			// Log_Msg( "WM_PAINT\n" );
 			break;
 		}
 
