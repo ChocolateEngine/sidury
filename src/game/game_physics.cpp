@@ -119,6 +119,8 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 	meshBuilder.End();
 
+	Graphics_CalcModelBBox( handle );
+
 	gPhysRenderables[ handle ];
 	return handle;
 }
@@ -152,6 +154,8 @@ Handle Phys_CreateTriangleBatchInd(
 	}
 
 	meshBuilder.End();
+
+	Graphics_CalcModelBBox( handle );
 
 	gPhysRenderables[ handle ];
 	return handle;

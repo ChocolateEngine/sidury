@@ -5,14 +5,6 @@
 
 extern IRender*                                         render;
 
-// temp shader
-static Handle                                           gTempShader       = InvalidHandle;
-static Handle                                           gSkyboxShader     = InvalidHandle;
-static Handle                                           gUIShader         = InvalidHandle;
-static Handle                                           gShadowShader     = InvalidHandle;
-static Handle                                           gDbgShader        = InvalidHandle;
-static Handle                                           gDbgLineShader    = InvalidHandle;
-
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
 static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point
@@ -29,10 +21,7 @@ extern UniformBufferArray_t                             gUniformSampler;
 extern UniformBufferArray_t                             gUniformViewInfo;
 extern UniformBufferArray_t                             gUniformMaterialBasic3D;
 extern UniformBufferArray_t                             gUniformLightInfo;
-extern UniformBufferArray_t                             gUniformLightDirectional;
-extern UniformBufferArray_t                             gUniformLightPoint;
-extern UniformBufferArray_t                             gUniformLightCone;
-extern UniformBufferArray_t                             gUniformLightCapsule;
+extern UniformBufferArray_t                             gUniformLights[ ELightType_Count ];
 
 static std::unordered_map< SurfaceDraw_t*, void* > gShaderPushData;
 
@@ -106,10 +95,9 @@ void Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFla
 	if ( sFlags & EShaderFlags_Lights )
 	{
 		srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightDirectional.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightPoint.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightCone.aLayout );
-		srPipeline.aLayouts.push_back( gUniformLightCapsule.aLayout );
+
+		for ( int i = 0; i < ELightType_Count; i++ )
+			srPipeline.aLayouts.push_back( gUniformLights[ i ].aLayout );
 	}
 
 	// if ( sFlags & EShaderFlags_MaterialUniform )
@@ -354,17 +342,11 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 		for ( const auto& set : gUniformLightInfo.aSets )
 			descSets.push_back( set );
 
-		for ( const auto& set : gUniformLightDirectional.aSets )
-			descSets.push_back( set );
-
-		for ( const auto& set : gUniformLightPoint.aSets )
-			descSets.push_back( set );
-		
-		for ( const auto& set : gUniformLightCone.aSets )
-			descSets.push_back( set );
-		
-		for ( const auto& set : gUniformLightCapsule.aSets )
-			descSets.push_back( set );
+		for ( int i = 0; i < ELightType_Count; i++ )
+		{
+			for ( const auto& set : gUniformLights[ i ].aSets )
+				descSets.push_back( set );
+		}
 	}
 
 	if ( shaderData->aFlags & EShaderFlags_MaterialUniform )

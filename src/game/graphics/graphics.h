@@ -79,11 +79,11 @@ enum : EShaderFlags
 {
 	EShaderFlags_None             = 0,
 	EShaderFlags_Sampler          = ( 1 << 0 ),  // Shader Uses Texture Sampler Array
-	EShaderFlags_ViewInfo         = ( 1 << 1 ),  // Shader Uses View Info UBO
+	EShaderFlags_ViewInfo         = ( 1 << 1 ),  // Shader Uses View Info UBO's
 	EShaderFlags_VertexAttributes = ( 1 << 2 ),  // Shader Uses Vertex Attributes
-	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader makes of a Push Constant
-	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Makes use of Material Uniform Buffers
-	EShaderFlags_Lights           = ( 1 << 5 ),  // Shader Makes use of Lights
+	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader Uses a Push Constant
+	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Uses Material Uniform Buffers
+	EShaderFlags_Lights           = ( 1 << 5 ),  // Shader Uses Light UBO's
 };
 
 
@@ -93,6 +93,18 @@ enum ELightType // : char
 	ELightType_Point,
 	ELightType_Cone,
 	ELightType_Capsule,
+	ELightType_Count,
+};
+
+
+using ERenderableFlags = unsigned char;
+enum : ERenderableFlags
+{
+	ERenderableFlags_None       = 0,
+	ERenderableFlags_Visible    = ( 1 << 0 ),
+	ERenderableFlags_TestVis    = ( 1 << 1 ),
+	ERenderableFlags_CastShadow = ( 1 << 2 ),
+	// ERenderableFlags_RecieveShadow = ( 1 << 3 ),
 };
 
 
@@ -451,6 +463,7 @@ Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_CreateModel( Model** spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
+void               Graphics_CalcModelBBox( Handle sModel );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
@@ -512,12 +525,6 @@ void               Graphics_FreeMaterial( Handle sMaterial );
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 // NAME: materials/dev/grid01
 Handle             Graphics_FindMaterial( const char* spName );
-
-// Is This Material an Error Material?
-bool               Graphics_IsErrorMaterial( Handle sMaterial );
-
-// Get a fallback error material
-Handle             Graphics_GetErrorMaterial( Handle shShader );
 
 // Get the total amount of materials created
 size_t             Graphics_GetMaterialCount();
@@ -601,6 +608,7 @@ Handle             Graphics_CreateRenderable( Handle sModel );
 Renderable_t*      Graphics_GetRenderableData( Handle sRenderable );
 void               Graphics_FreeRenderable( Handle sRenderable );
 void               Graphics_UpdateRenderableAABB( Handle sRenderable );
+void               Graphics_ConsolidateRenderables();
 
 ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox );
 
@@ -613,7 +621,7 @@ void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
 
 // ---------------------------------------------------------------------------------------
-// Other
+// Vertex Format/Attributes
 
 GraphicsFmt        Graphics_GetVertexAttributeFormat( VertexAttribute attrib );
 size_t             Graphics_GetVertexAttributeTypeSize( VertexAttribute attrib );

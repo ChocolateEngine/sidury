@@ -109,11 +109,7 @@ static size_t                                     gDebugLineBufferSize = 0;
 // Lighting
 
 UniformBufferArray_t                              gUniformLightInfo;
-
-UniformBufferArray_t                              gUniformLightDirectional;
-UniformBufferArray_t                              gUniformLightPoint;
-UniformBufferArray_t                              gUniformLightCone;
-UniformBufferArray_t                              gUniformLightCapsule;
+UniformBufferArray_t                              gUniformLights[ ELightType_Count ];
 
 std::unordered_map< Light_t*, Handle >            gLightBuffers;
 
@@ -203,16 +199,18 @@ CONCMD( r_reload_textures )
 }
 
 
-void Graphics_CalcModelBBox( Handle sModel, Model* spModel )
+void Graphics_CalcModelBBox( Handle sModel )
 {
-	if ( !spModel )
+	Model* model = Graphics_GetModelData( sModel );
+
+	if ( !model )
 		return;
 
 	ModelBBox_t bbox{};
 	bbox.aMax = { INT_MIN, INT_MIN, INT_MIN };
 	bbox.aMin = { INT_MAX, INT_MAX, INT_MAX };
 
-	auto*      vertData = spModel->apVertexData;
+	auto*      vertData = model->apVertexData;
 	glm::vec3* data     = nullptr;
 
 	for ( auto& attrib : vertData->aData )
@@ -242,7 +240,7 @@ void Graphics_CalcModelBBox( Handle sModel, Model* spModel )
 		bbox.aMax.z = glm::max( bbox.aMax.z, vertex.z );
 	};
 
-	for ( Mesh& mesh : spModel->aMeshes )
+	for ( Mesh& mesh : model->aMeshes )
 	{
 		if ( vertData->aIndices.size() )
 		{
@@ -326,7 +324,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	}
 
 	// calculate a bounding box
-	Graphics_CalcModelBBox( handle, model );
+	Graphics_CalcModelBBox( handle );
 
 	gModelPaths[ srPath ]     = handle;
 
@@ -395,16 +393,6 @@ Model* Graphics_GetModelData( Handle shModel )
 	}
 
 	return model;
-}
-
-
-void Graphics_UpdateRenderableAABB( Handle sRenderable )
-{
-	if ( !sRenderable )
-		return;
-
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( sRenderable ) )
-		gRenderAABBUpdate.emplace( sRenderable, gModelBBox[ renderable->aModel ] );
 }
 
 
@@ -512,8 +500,7 @@ Handle Graphics_LoadScene( const std::string& srPath )
 	// Calculate Bounding Boxes for Models
 	for ( const auto& modelHandle : scene->aModels )
 	{
-		Model* model = Graphics_GetModelData( modelHandle );
-		Graphics_CalcModelBBox( modelHandle, model );
+		Graphics_CalcModelBBox( modelHandle );
 	}
 
 	gScenePaths[ srPath ] = handle;
@@ -852,7 +839,7 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 }
 
 
-Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBufferName, size_t sBufferSize, Light_t* spLight )
+Handle Graphics_AddLightBuffer( const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
 	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
 
@@ -868,8 +855,8 @@ Handle Graphics_AddLightBuffer( UniformBufferArray_t& srBuffer, const char* spBu
 	UpdateVariableDescSet_t update{};
 	update.aType = EDescriptorType_UniformBuffer;
 
-	for ( size_t i = 0; i < srBuffer.aSets.size(); i++ )
-		update.aDescSets.push_back( srBuffer.aSets[ i ] );
+	for ( size_t i = 0; i < gUniformLights[ spLight->aType ].aSets.size(); i++ )
+		update.aDescSets.push_back( gUniformLights[ spLight->aType ].aSets[ i ] );
 
 	for ( const auto& [ light, bufferHandle ] : gLightBuffers )
 	{
@@ -910,7 +897,13 @@ void Graphics_DestroyLightBuffer( Light_t* spLight )
 	UpdateVariableDescSet_t update{};
 	update.aType = EDescriptorType_UniformBuffer;
 
-	UniformBufferArray_t* buffer = nullptr;
+	if ( spLight->aType < 0 || spLight->aType > ELightType_Count )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Unknown Light Buffer: %d\n", spLight->aType );
+		return;
+	}
+
+	UniformBufferArray_t* buffer = &gUniformLights[ spLight->aType ];
 	switch ( spLight->aType )
 	{
 		default:
@@ -918,19 +911,15 @@ void Graphics_DestroyLightBuffer( Light_t* spLight )
 			Log_ErrorF( gLC_ClientGraphics, "Unknown Light Buffer: %d\n", spLight->aType );
 			return;
 		case ELightType_Directional:
-			buffer = &gUniformLightDirectional;
 			gLightInfo.aCountWorld--;
 			break;
 		case ELightType_Point:
-			buffer = &gUniformLightPoint;
 			gLightInfo.aCountPoint--;
 			break;
 		case ELightType_Cone:
-			buffer = &gUniformLightCone;
 			gLightInfo.aCountCone--;
 			break;
 		case ELightType_Capsule:
-			buffer = &gUniformLightCapsule;
 			gLightInfo.aCountCapsule--;
 			break;
 	}
@@ -962,19 +951,19 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		switch ( spLight->aType )
 		{
 			case ELightType_Directional:
-				buffer = Graphics_AddLightBuffer( gUniformLightDirectional, "Light Directional Buffer", sizeof( UBO_LightDirectional_t ), spLight );
+				buffer = Graphics_AddLightBuffer( "Light Directional Buffer", sizeof( UBO_LightDirectional_t ), spLight );
 				gLightInfo.aCountWorld++;
 				break;
 			case ELightType_Point:
-				buffer = Graphics_AddLightBuffer( gUniformLightPoint, "Light Point Buffer", sizeof( UBO_LightPoint_t ), spLight );
+				buffer = Graphics_AddLightBuffer( "Light Point Buffer", sizeof( UBO_LightPoint_t ), spLight );
 				gLightInfo.aCountPoint++;
 				break;
 			case ELightType_Cone:
-				buffer = Graphics_AddLightBuffer( gUniformLightCone, "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
+				buffer = Graphics_AddLightBuffer( "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
 				gLightInfo.aCountCone++;
 				break;
 			case ELightType_Capsule:
-				buffer = Graphics_AddLightBuffer( gUniformLightCapsule, "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
+				buffer = Graphics_AddLightBuffer( "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
 				gLightInfo.aCountCapsule++;
 				break;
 		}
@@ -1219,21 +1208,23 @@ bool Graphics_CreateDescriptorSets()
 	if ( !Graphics_CreateVariableUniformLayout( gUniformLightInfo, "Light Info Layout", "Light Info Set", 1 ) )
 		return false;
 
-	gUniformLightDirectional.aSets.resize( 1 );
-	if ( !Graphics_CreateVariableUniformLayout( gUniformLightDirectional, "Light Directional Layout", "Light Directional Set", MAX_LIGHTS ) )
+	for ( int i = 0; i < ELightType_Count; i++ )
+		gUniformLights[ i ].aSets.resize( 1 );
+
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Directional ], "Light Directional Layout", "Light Directional Set", MAX_LIGHTS ) )
 		return false;
 
-	gUniformLightPoint.aSets.resize( 1 );
-	if ( !Graphics_CreateVariableUniformLayout( gUniformLightPoint, "Light Point Layout", "Light Point Set", MAX_LIGHTS ) )
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Point ], "Light Point Layout", "Light Point Set", MAX_LIGHTS ) )
 		return false;
 
-	gUniformLightCone.aSets.resize( 1 );
-	if ( !Graphics_CreateVariableUniformLayout( gUniformLightCone, "Light Cone Layout", "Light Cone Set", MAX_LIGHTS ) )
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Cone ], "Light Cone Layout", "Light Cone Set", MAX_LIGHTS ) )
 		return false;
 
-	gUniformLightCapsule.aSets.resize( 1 );
-	if ( !Graphics_CreateVariableUniformLayout( gUniformLightCapsule, "Light Capsule Layout", "Light Capsule Set", MAX_LIGHTS ) )
+	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Capsule ], "Light Capsule Layout", "Light Capsule Set", MAX_LIGHTS ) )
 		return false;
+
+	// ------------------------------------------------------
+	// Create Shadow Map Layout
 
 	gUniformShadows.aSets.resize( 1 );
 	if ( !Graphics_CreateVariableUniformLayout( gUniformShadows, "Shadow Map Layout", "Shadow Map Set", MAX_LIGHTS ) )
@@ -2046,7 +2037,16 @@ void Graphics_PrepareDrawData()
 	for ( auto& [ renderHandle, bbox ] : gRenderAABBUpdate )
 	{
 		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+		{
+			if ( glm::length( bbox.aMin ) == 0 && glm::length( bbox.aMax ) == 0 )
+			{
+				Log_Warn( gLC_ClientGraphics, "Model Bounding Box not calculated, length of min and max is 0\n" );
+				Graphics_CalcModelBBox( renderable->aModel );
+				bbox = gModelBBox[ renderable->aModel ];
+			}
+
 			renderable->aAABB = Graphics_CreateWorldAABB( renderable->aModelMatrix, bbox );
+		}
 	}
 
 	gRenderAABBUpdate.clear();
@@ -2433,6 +2433,26 @@ void Graphics_FreeRenderable( Handle sRenderable )
 }
 
 
+void Graphics_UpdateRenderableAABB( Handle sRenderable )
+{
+	if ( !sRenderable )
+		return;
+
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( sRenderable ) )
+		gRenderAABBUpdate.emplace( sRenderable, gModelBBox[ renderable->aModel ] );
+}
+
+
+void Graphics_ConsolidateRenderables()
+{
+	gRenderables.Consolidate();
+}
+
+
+// ---------------------------------------------------------------------------------------
+// Debug Rendering
+
+
 void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
 {
 	if ( !r_debug_draw || !gDebugLineModel )
@@ -2534,6 +2554,10 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 	Graphics_DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 7 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( srFrustum.aPoints[ 2 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
 }
+
+
+// ---------------------------------------------------------------------------------------
+// Vertex Format/Attributes
 
 
 GraphicsFmt Graphics_GetVertexAttributeFormat( VertexAttribute attrib )

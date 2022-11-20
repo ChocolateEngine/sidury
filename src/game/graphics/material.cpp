@@ -86,7 +86,6 @@ struct MaterialData_t
 
 static ResourceList< MaterialData_t* >                gMaterials;
 static std::unordered_map< std::string, Handle >      gMaterialPaths;
-// static std::unordered_map< std::string, Handle >   gMaterialNames;
 static std::unordered_map< std::string_view, Handle > gMaterialNames;  // TODO: use string hashing for this?
 static std::unordered_map< Handle, Handle >           gMaterialShaders;
 
@@ -435,7 +434,7 @@ Handle Graphics_LoadMaterial( const std::string& srPath )
 	auto nameIt = gMaterialNames.find( srPath.c_str() );
 	if ( nameIt != gMaterialNames.end() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Material Already Loaded: \"%s\"", srPath.c_str() );
+		Log_WarnF( gLC_ClientGraphics, "Material Already Loaded: \"%s\"\n", srPath.c_str() );
 		return nameIt->second;
 	}
 
@@ -512,20 +511,6 @@ Handle Graphics_FindMaterial( const char* spName )
 		return nameIt->second;
 
 	return InvalidHandle;
-}
-
-
-// Is This Material an Error Material?
-bool Graphics_IsErrorMaterial( Handle sMaterial )
-{
-	return sMaterial == gInvalidMaterial;
-}
-
-
-// Get a fallback error material
-Handle Graphics_GetErrorMaterial( Handle shShader )
-{
-	return gInvalidMaterial;
 }
 
 
