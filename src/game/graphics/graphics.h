@@ -16,6 +16,8 @@ enum class GraphicsFmt;
 
 extern IRender* render;
 
+constexpr int   MAX_VIEW_INFO_BUFFERS = 32;
+
 // hack for bad entity system
 struct HModel
 {
@@ -400,6 +402,14 @@ struct ViewInfo_t
 
 	// HACK: if this is set, it overrides the shader used for all renderables in this view
 	Handle     aShaderOverride = InvalidHandle;
+};
+
+struct ShadowMap_t
+{
+	Handle     aTexture     = InvalidHandle;
+	Handle     aFramebuffer = InvalidHandle;
+	glm::ivec2 aSize{};
+	int        aViewInfoIndex = 0;
 };
 
 extern std::vector< ViewInfo_t > gViewInfo;

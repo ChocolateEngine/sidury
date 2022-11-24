@@ -216,6 +216,11 @@ CON_COMMAND( create_phys_proto )
 	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
 }
 
+CON_COMMAND( pause )
+{
+	gui->ShowConsole();
+}
+
 
 void Game_Shutdown()
 {
@@ -776,6 +781,15 @@ void Game_HandleSystemEvents()
 	{
 		switch (e.type)
 		{
+			// TODO: remove this and use pause concmd, can't at the moment as binds are only parsed when game is active, hmm
+			case SDL_KEYDOWN:
+			{
+				if ( e.key.keysym.sym == SDLK_BACKQUOTE || e.key.keysym.sym == SDLK_ESCAPE )
+					gui->ShowConsole();
+			
+				break;
+			}
+
 			case SDL_WINDOWEVENT:
 			{
 				switch (e.window.event)

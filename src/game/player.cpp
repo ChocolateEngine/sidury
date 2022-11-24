@@ -20,8 +20,6 @@
 #include <cmath>
 
 
-
-
 CONVAR( in_forward, 0, CVARF_INPUT );
 CONVAR( in_back, 0, CVARF_INPUT );
 CONVAR( in_left, 0, CVARF_INPUT );
@@ -319,7 +317,7 @@ void Player_UpdateFlashlight( Entity player )
 
 		flashlight->aPos = transform.aPos + camera.aTransform.aPos;
 
-		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat());
+		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat() );
 
 		flashlight->aPos += offset * camera.aUp;
 	};
@@ -837,9 +835,10 @@ void PlayerMovement::UpdateInputs(  )
 
 class PlayerCollisionCheck : public PhysCollisionCollector
 {
-public:
-	explicit PlayerCollisionCheck( const glm::vec3& srGravity, CPlayerMoveData* moveData ) :
+  public:
+	explicit PlayerCollisionCheck( const glm::vec3& srGravity, const glm::vec3& srVelocity, CPlayerMoveData* moveData ) :
 		aGravity( srGravity ),
+		aVelocity( srVelocity ),
 		apMove( moveData )
 	{
 		apMove->apGroundObj = nullptr;
@@ -863,10 +862,16 @@ public:
 		}
 	}
 
+	glm::vec3 GetDirection() override
+	{
+		return aVelocity;
+	}
+
 	CPlayerMoveData*        apMove;
 
 private:
 	glm::vec3               aGravity;
+	glm::vec3               aVelocity;
 	float                   aBestDot = 0.f;
 };
 
@@ -889,7 +894,7 @@ void PlayerMovement::UpdatePosition( Entity player )
 
 	if ( apMove->aMoveType != PlayerMoveType::NoClip )
 	{
-		PlayerCollisionCheck playerCollide( physenv->GetGravity(), apMove );
+		PlayerCollisionCheck playerCollide( physenv->GetGravity(), apRigidBody->aVel, apMove );
 		apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
 	}
 
@@ -1169,6 +1174,40 @@ void PlayerMovement::FlyMove()
 CONVAR( cl_land_sound_threshold, 0.1 );
 
 
+class PlayerStairsCheck : public PhysCollisionCollector
+{
+  public:
+	explicit PlayerStairsCheck( const glm::vec3& srDir )
+	{
+		aDir = glm::normalize( srDir );
+	}
+
+	void AddResult( const PhysCollisionResult& srPhysResult ) override
+	{
+		glm::vec3 normal = -glm::normalize( srPhysResult.aPenetrationAxis );
+
+		float     dot    = glm::dot( normal, aDir );
+		if ( dot < aBestDot )  // Find the hit that is most opposite to the gravity
+		{
+			aBestResult = srPhysResult;
+			aNormal     = normal;
+			aBestDot    = dot;
+		}
+	}
+	
+	glm::vec3 GetDirection() override
+	{
+		return aDir;
+	}
+
+	PhysCollisionResult aBestResult;
+	glm::vec3           aNormal;
+
+	glm::vec3           aDir;
+	float               aBestDot = 0.f;
+};
+
+
 void PlayerMovement::WalkMove()
 {
 	glm::vec3 wishvel = apDir->aForward*apRigidBody->aAccel.x + apDir->aRight*apRigidBody->aAccel[W_RIGHT];
@@ -1197,7 +1236,20 @@ void PlayerMovement::WalkMove()
 	// uhhh
 	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
 	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
-	
+
+	// -------------------------------------------------
+	// Try checking for stairs
+
+	// PlayerStairsCheck playerStairsForward( { apRigidBody->aVel.x, apRigidBody->aVel.y, 0 } );
+	// apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerStairsForward );
+
+	// if ( playerStairsForward.aBestResult.apPhysObj2 )
+	// {
+	// 	Log_Msg( "FOUND STAIRS\n" );
+	// }
+
+	// -------------------------------------------------
+
 	StopStepSound();
 
 	if ( IsOnGround() && !onGround )

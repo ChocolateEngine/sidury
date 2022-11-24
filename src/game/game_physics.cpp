@@ -17,8 +17,8 @@ CONVAR_CMD( phys_gravity, -800 )
 	physenv->SetGravityZ( phys_gravity );
 }
 
+extern ConVar r_debug_draw;
 
-CONVAR( phys_dbg, 0 );
 
 // constexpr glm::vec3 vec3_default( 255, 255, 255 );
 // constexpr glm::vec4 vec4_default( 255, 255, 255, 255 );
@@ -172,6 +172,9 @@ void Phys_DrawGeometry(
   bool             sCastShadow,
   bool             sWireframe )
 {
+	if ( !r_debug_draw )
+		return;
+
 	Handle mat = Model_GetMaterial( sGeometry, 0 );
 
 	// Mat_SetVar( mat, "color", srColor );
@@ -204,6 +207,8 @@ void Phys_DrawText(
   const glm::vec3&   srColor,
   float              sHeight )
 {
+	if ( !r_debug_draw )
+		return;
 }
 
 
@@ -335,8 +340,6 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 	u32    origSize = srData.aVertCount;
 	Model* model    = Graphics_GetModelData( sModel );
 
-	u32    initialIndOffset = 0;
-
 	// TODO: use this for physics materials later on
 	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
 	{
@@ -360,8 +363,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			return;
 		}
 
-		origSize            = srData.aVertCount;
-
+		origSize       = srData.aVertCount;
 		void* vertsTmp = realloc( srData.apVertices, ( origSize + mesh.aVertexCount ) * sizeof( glm::vec3 ) );
 
 		if ( !vertsTmp )
@@ -379,11 +381,6 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		srData.aVertCount += mesh.aVertexCount;
 		u32 indSize = srData.aTriCount;
 
-		if ( s == 0 )
-		{
-			initialIndOffset = mesh.aVertexOffset;
-		}
-
 		void* trisTmp = realloc( srData.aTris, ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
 
 		if ( !trisTmp )
@@ -399,39 +396,12 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 
 		for ( u32 i = 0, j = 0; i < mesh.aIndexCount; j++ )
 		{
-			// auto& tri     = srConvexData.emplace_back();
-
-			// srData.aTris[ indSize + j ].aPos[ 0 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
-			// srData.aTris[ indSize + j ].aPos[ 1 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
-			// srData.aTris[ indSize + j ].aPos[ 2 ] = origSize + vertData->aIndices[ mesh.aIndexOffset + i++ ];
-
-			srData.aTris[ indSize + j ].aPos[ 0 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
-			srData.aTris[ indSize + j ].aPos[ 1 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
-			srData.aTris[ indSize + j ].aPos[ 2 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ] - initialIndOffset;
-
-			// SANITY CHECK
-			if ( srData.aTris[ indSize + j ].aPos[ 0 ] > srData.aVertCount )
-			{
-				Log_Error( "Physics vert pos index is greater than vert count!!!!\n" );
-			}
-
-			// srInd.emplace_back(
-			//   origSize + ind[ i + 0 ],
-			//   origSize + ind[ i + 1 ],
-			//   origSize + ind[ i + 2 ] );
+			srData.aTris[ indSize + j ].aPos[ 0 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			srData.aTris[ indSize + j ].aPos[ 1 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			srData.aTris[ indSize + j ].aPos[ 2 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
 		}
 
 		srData.aTriCount += mesh.aIndexCount / 3;
-
-		// SANITY CHECK
-
-		for ( u32 i = 0; i < srData.aTriCount; i++ )
-		{
-			if ( srData.aTris[ i ].aPos[ 0 ] > srData.aVertCount )
-			{
-				Log_Error( "Physics vert pos index is greater than vert count!!!!\n" );
-			}
-		}
 	}
 }
 

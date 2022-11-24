@@ -220,8 +220,51 @@ CONCMD_VA( bind_dump, "Dump all keys bound to a command" )
 	}
 }
 
+CONCMD_VA( unbindall, "Unbind all keys" )
+{
+	// verify you want to do this
+	if ( args.empty() || args[ 0 ] != "YES" )
+	{
+		Log_Msg( "If you really mean to unbind ALL your keys, type \"unbindall YES\"\n" );
+		return;
+	}
+
+	gKeyBinds.clear();
+	gKeyBindToggle.clear();
+}
+
 
 CONVAR( in_show_scancodes, 0 );
+
+
+static const char* gDefaultBinds[] = {
+	"bind \"W\" \"in_forward 1\"",
+	"bind \"S\" \"in_back 1\"",
+	"bind \"A\" \"in_left 1\"",
+	"bind \"D\" \"in_right 1\"",
+	"bind \"Space\" \"in_jump 1\"",
+	"bind \"B\" \"fly\"",
+	"bind \"V\" \"noclip\"",
+	"bind \"Z\" \"in_zoom 1\"",
+	"bind \"Left Ctrl\" \"in_duck 1\"",
+	"bind \"Left Shift\" \"in_sprint 1\"",
+	"bind \"F\" \"in_flashlight 1\"",
+	"bind \"R\" \"create_proto\"",
+	"bind \"T\" \"in_proto_spam 1\"",
+	// "bind \"Escape\" \"pause\"",
+};
+
+constexpr size_t gDefaultBindSize = ARR_SIZE( gDefaultBinds );
+
+
+CONCMD_VA( bind_reset_all, "Reset All Binds" )
+{
+	gKeyBinds.clear();
+	gKeyBindToggle.clear();
+
+	for ( int i = 0; i < gDefaultBindSize; i++ )
+		Con_RunCommand( gDefaultBinds[ i ] );
+}
 
 
 static void CmdBindArchive( std::string& srOutput )
@@ -263,6 +306,11 @@ void Input_Init()
 			gInputCvars.push_back( cvar );
 
 		current = current->apNext;
+	}
+
+	if ( Args_Find( "-reset" ) )
+	{
+		bind_reset_all( {} );
 	}
 }
 
