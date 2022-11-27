@@ -299,6 +299,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 			meshBuilder.SetCurrentSurface( index );
 			meshBuilder.SetMaterial( materials[ faceMat ] );
 
+			bool needNormalCalc = false;
 			for ( u32 faceVertIndex = 0; faceVertIndex < faceVertCount; faceVertIndex++ )
 			{
 				// NOTE: mesh->indices holds each face "fastObjIndex" as three
@@ -326,16 +327,55 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 				  obj->positions[ position_index + 1 ],
 				  obj->positions[ position_index + 2 ] );
 
-				meshBuilder.SetNormal(
-				  obj->normals[ normal_index ],
-				  obj->normals[ normal_index + 1 ],
-				  obj->normals[ normal_index + 2 ] );
+				// Check to see if normal index is within valid bounds
+				if ( normal_index + 0 < obj->normal_count * 3 )
+				{
+					meshBuilder.SetNormal(
+					  obj->normals[ normal_index ],
+					  obj->normals[ normal_index + 1 ],
+					  obj->normals[ normal_index + 2 ] );
+				}
+				else
+				{
+					needNormalCalc |= true;
+
+					// TEMP: set to positions to keep them unique
+					// need to have index buffer calculation be at the end
+					meshBuilder.SetNormal(
+					  obj->positions[ position_index ],
+					  obj->positions[ position_index + 1 ],
+					  obj->positions[ position_index + 2 ] );
+				}
 
 				meshBuilder.SetTexCoord(
 				  obj->texcoords[ texcoord_index ],
 				  1.0f - obj->texcoords[ texcoord_index + 1 ] );
 
 				meshBuilder.NextVertex();
+			}
+
+			if ( needNormalCalc )
+			{
+				u32       ind[ 3 ];
+				glm::vec3 pos[ 3 ];
+
+				ind[ 0 ] = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 3 ];
+				ind[ 1 ] = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 2 ];
+				ind[ 2 ] = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 1 ];
+
+				pos[ 0 ] = meshBuilder.apSurf->aVertices[ ind[ 0 ] ].pos;
+				pos[ 1 ] = meshBuilder.apSurf->aVertices[ ind[ 1 ] ].pos;
+				pos[ 2 ] = meshBuilder.apSurf->aVertices[ ind[ 2 ] ].pos;
+
+				// Calcluate a New Face normal for the vertices
+				glm::vec3 normal = glm::normalize( glm::cross( ( pos[ 1 ] - pos[ 0 ] ), ( pos[ 2 ] - pos[ 0 ] ) ) );
+
+				// TODO: we could remove junk faces here, like single line ones
+
+				// set the new face normal for all verts
+				meshBuilder.apSurf->aVertices[ ind[ 0 ] ].normal = normal;
+				meshBuilder.apSurf->aVertices[ ind[ 1 ] ].normal = normal;
+				meshBuilder.apSurf->aVertices[ ind[ 2 ] ].normal = normal;
 			}
 
 			// indexOffset += faceVertCount;
