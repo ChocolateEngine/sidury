@@ -22,11 +22,15 @@ file(
 	${CH_PUBLIC}/*.cpp
 	${CH_PUBLIC}/*.h
 	${CH_PUBLIC}/core/*.h
+)
+
+set(
+	THIRDPARTY_FILES
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.cpp
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} )
+add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 
 target_link_libraries(
 	SiduryClient
@@ -57,4 +61,22 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 target_precompile_headers( SiduryClient PRIVATE "${CH_PUBLIC}/core/core.h" )
+
+source_group(
+	TREE ${CMAKE_CURRENT_LIST_DIR}
+	PREFIX "Source Files"
+	FILES ${SRC_FILES}
+)
+
+source_group(
+	TREE ${CH_PUBLIC}
+	PREFIX "Public"
+	FILES ${PUBLIC_FILES}
+)
+
+source_group(
+	TREE ${CH_THIRDPARTY}
+	PREFIX "Thirdparty"
+	FILES ${THIRDPARTY_FILES}
+)
 
