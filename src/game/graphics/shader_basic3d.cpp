@@ -145,12 +145,12 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 		return;
 	}
 
-	render->MemWriteBuffer( gStagingBuffer, sizeof( Basic3D_Material ), mat );
+	render->BufferWrite( gStagingBuffer, sizeof( Basic3D_Material ), mat );
 
 	// write new material data to the buffer
 	Handle buffer = gMaterialBuffers[ sMat ].aBuffer;
 	// render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
-	render->MemCopyBuffer( gStagingBuffer, buffer, sizeof( Basic3D_Material ) );
+	render->BufferCopy( gStagingBuffer, buffer, sizeof( Basic3D_Material ) );
 }
 
 

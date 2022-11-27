@@ -22,9 +22,12 @@ extern ResourceList< Model >           gModels;
 
 // --------------------------------------------------------------------------------------
 
-CONVAR( r_debug_draw, 1 );
-CONVAR( r_debug_aabb, 1 );
+CONVAR( r_debug_draw, 0 );
+CONVAR( r_debug_aabb, 0 );
 CONVAR( r_debug_frustums, 0 );
+CONVAR( r_debug_normals, 0 );
+CONVAR( r_debug_normals_len, 8 );
+CONVAR( r_debug_normals_len_face, 8 );
 
 // --------------------------------------------------------------------------------------
 
@@ -125,9 +128,12 @@ void Graphics_UpdateDebugDraw()
 	if ( !r_debug_draw )
 		return;
 
-	if ( r_debug_aabb )
+	if ( r_debug_aabb || r_debug_normals )
 	{
-		ViewRenderList_t& viewList = gViewRenderLists[ 0 ];
+		ViewRenderList_t& viewList   = gViewRenderLists[ 0 ];
+
+		glm::mat4         lastMatrix = glm::mat4( 1.f );
+		glm::mat4         invMatrix  = glm::mat4( 1.f );
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
 		{
@@ -146,7 +152,20 @@ void Graphics_UpdateDebugDraw()
 						return;
 					}
 
-					Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+					if ( r_debug_aabb )
+						Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+
+					if ( r_debug_normals )
+					{
+						// slight hack
+						if ( lastMatrix != modelDraw->aModelMatrix )
+						{
+							lastMatrix = modelDraw->aModelMatrix;
+							invMatrix  = glm::inverse( modelDraw->aModelMatrix );
+						}
+
+						Graphics_DrawNormals( modelDraw->aModel, invMatrix );
+					}
 
 					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
 					// Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
@@ -155,8 +174,14 @@ void Graphics_UpdateDebugDraw()
 		}
 	}
 
+	Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+
+	if ( !renderable )
+		return;
+
 	if ( gDebugLineModel && gDebugLineVertPos.size() )
 	{
+		renderable->aVisible = true;
 		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
 
 		Model* model = nullptr;
@@ -212,8 +237,12 @@ void Graphics_UpdateDebugDraw()
 		model->aMeshes[ 0 ].aVertexCount  = gDebugLineVertPos.size();
 
 		// Update the Buffers
-		render->MemWriteBuffer( model->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
-		render->MemWriteBuffer( model->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+		render->BufferWrite( model->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
+		render->BufferWrite( model->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+	}
+	else
+	{
+		renderable->aVisible = false;
 	}
 }
 
@@ -322,5 +351,104 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 	Graphics_DrawLine( srFrustum.aPoints[ 1 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 7 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( srFrustum.aPoints[ 2 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
+}
+
+
+void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
+{
+	if ( !r_debug_draw || !gDebugLineModel || !r_debug_normals )
+		return;
+
+	Model*    model = Graphics_GetModelData( sModel );
+
+	// TODO: use this for physics materials later on
+	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
+	{
+		Mesh&      mesh     = model->aMeshes[ s ];
+
+		auto&      vertData = model->apVertexData;
+
+		glm::vec3* pos      = nullptr;
+		glm::vec3* normals  = nullptr;
+
+		for ( auto& attrib : vertData->aData )
+		{
+			if ( attrib.aAttrib == VertexAttribute_Position )
+			{
+				pos = static_cast< glm::vec3* >( attrib.apData );
+			}
+			if ( attrib.aAttrib == VertexAttribute_Normal )
+			{
+				normals = static_cast< glm::vec3* >( attrib.apData );
+			}
+
+			if ( pos && normals )
+				break;
+		}
+
+		if ( pos == nullptr || normals == nullptr )
+		{
+			// Log_Error( "Graphics_DrawNormals(): Position Vertex Data not found?\n" );
+			return;
+		}
+
+		u32 j = 0;
+		for ( u32 i = 0; i < mesh.aIndexCount; )
+		{
+			u32       idx[ 3 ];
+			glm::vec3 v[ 3 ];
+			glm::vec3 n[ 3 ];
+
+			idx[ 0 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			idx[ 1 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			idx[ 2 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+
+			v[ 0 ]   = pos[ idx[ 0 ] ];
+			v[ 1 ]   = pos[ idx[ 1 ] ];
+			v[ 2 ]   = pos[ idx[ 2 ] ];
+
+			n[ 0 ]   = normals[ idx[ 0 ] ];
+			n[ 1 ]   = normals[ idx[ 1 ] ];
+			n[ 2 ]   = normals[ idx[ 2 ] ];
+
+			// Calculate face normal
+			glm::vec3 normal = glm::cross( ( v[ 1 ] - v[ 0 ] ), ( v[ 2 ] - v[ 0 ] ) );
+			float     len    = glm::length( normal );
+
+			// Make sure we don't have any 0 lengths, that will crash the physics engine
+			if ( len == 0.f )
+			{
+				// Log_Warn( "Graphics_DrawNormals(): Face Normal of 0?\n" );
+				continue;
+			}
+
+			// Draw Vertex Normals
+			for ( int vi = 0; vi < 3; vi++ )
+			{
+				glm::vec4 v4( v[ vi ], 1 );
+				glm::vec4 n4( n[ vi ], 1 );
+
+				glm::vec3   posX    = v4 * srMatrix;
+				glm::vec3   normMat = n4 * srMatrix;
+
+				// glm::vec3 forward;
+				// Util_GetDirectionVectors( )
+
+				glm::vec3 posY = posX + ( normMat * r_debug_normals_len.GetFloat() );
+
+				// protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() )
+
+				Graphics_DrawLine( posX, posY, {0.9, 0.1, 0.1} );
+			}
+
+			// Draw Face Normal
+			// glm::vec4 normal4( normal, 1 );
+			// glm::vec3 posX = normal4 * srMatrix;
+			// glm::vec3 posY = posX * r_debug_normals_len_face.GetFloat();
+			// 
+			// Graphics_DrawLine( posX, posY, normal );
+			j++;
+		}
+	}
 }
 

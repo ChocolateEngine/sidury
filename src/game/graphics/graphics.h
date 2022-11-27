@@ -629,6 +629,7 @@ void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, 
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
+void               Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix );
 
 // ---------------------------------------------------------------------------------------
 // Vertex Format/Attributes

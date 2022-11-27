@@ -417,7 +417,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aShadow   = -1;
 #endif
 
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			render->BufferWrite( buffer, sizeof( light ), &light );
 			break;
 		}
 		case ELightType_Point:
@@ -431,7 +431,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aPos     = spLight->aPos;
 			light.aRadius  = spLight->aRadius;
 
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			render->BufferWrite( buffer, sizeof( light ), &light );
 			break;
 		}
 		case ELightType_Cone:
@@ -478,7 +478,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			gViewInfo[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
 
 			Handle shadowBuffer                               = gViewInfoBuffers[ shadowMap.aViewInfoIndex ];
-			render->MemWriteBuffer( shadowBuffer, sizeof( UBO_ViewInfo_t ), &gViewInfo[ shadowMap.aViewInfoIndex ] );
+			render->BufferWrite( shadowBuffer, sizeof( UBO_ViewInfo_t ), &gViewInfo[ shadowMap.aViewInfoIndex ] );
 
 			// get shadow map view info
 			light.aViewInfo                               = shadowMap.aViewInfoIndex;
@@ -488,7 +488,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 #endif
 
 			// Update Light Buffer
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			render->BufferWrite( buffer, sizeof( light ), &light );
 			break;
 		}
 		case ELightType_Capsule:
@@ -511,7 +511,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
 
-			render->MemWriteBuffer( buffer, sizeof( light ), &light );
+			render->BufferWrite( buffer, sizeof( light ), &light );
 			break;
 		}
 	}
@@ -567,8 +567,8 @@ void Graphics_PrepareLights()
 	if ( gNeedLightInfoUpdate )
 	{
 		gNeedLightInfoUpdate = false;
-		render->MemWriteBuffer( gLightInfoStagingBuffer, sizeof( LightInfo_t ), &gLightInfo );
-		render->MemCopyBuffer( gLightInfoStagingBuffer, gLightInfoBuffer, sizeof( LightInfo_t ) );
+		render->BufferWrite( gLightInfoStagingBuffer, sizeof( LightInfo_t ), &gLightInfo );
+		render->BufferCopy( gLightInfoStagingBuffer, gLightInfoBuffer, sizeof( LightInfo_t ) );
 	}
 }
 

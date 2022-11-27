@@ -1244,7 +1244,7 @@ void Graphics_PrepareDrawData()
 		// for ( size_t i = 0; i < gViewInfoBuffers.size(); i++ )
 		for ( size_t i = 0; i < 1; i++ )
 		{
-			render->MemWriteBuffer( gViewInfoBuffers[ i ], sizeof( UBO_ViewInfo_t ), &gViewInfo[ i ] );
+			render->BufferWrite( gViewInfoBuffers[ i ], sizeof( UBO_ViewInfo_t ), &gViewInfo[ i ] );
 		}
 	}
 
@@ -1704,12 +1704,12 @@ static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBuffe
 	Handle stagingBuffer = render->CreateBuffer( "Staging Model Buffer", sBufferSize, sUsage | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	// Copy Data to Buffer
-	render->MemWriteBuffer( stagingBuffer, sBufferSize, spData );
+	render->BufferWrite( stagingBuffer, sBufferSize, spData );
 
 	Handle deviceBuffer = render->CreateBuffer( spName, sBufferSize, sUsage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	// Copy Local Buffer data to Device
-	render->MemCopyBuffer( stagingBuffer, deviceBuffer, sBufferSize );
+	render->BufferCopy( stagingBuffer, deviceBuffer, sBufferSize );
 
 	render->DestroyBuffer( stagingBuffer );
 
