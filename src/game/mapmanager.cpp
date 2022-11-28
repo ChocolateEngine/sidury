@@ -17,7 +17,7 @@ Loads Sidury Map Files (smf)
 #include "speedykeyv/KeyValue.h"
 
 
-LOG_REGISTER_CHANNEL( Map, LogColor::DarkGreen );
+LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
 
 SiduryMap*    gpMap      = nullptr;
 
@@ -47,7 +47,7 @@ CONCMD_DROP( map, map_dropdown )
 {
 	if ( args.size() == 0 )
 	{
-		Log_Warn( gMapChannel, "No Map Path/Name specified!\n" );
+		Log_Warn( gLC_Map, "No Map Path/Name specified!\n" );
 		return;
 	}
 
@@ -96,9 +96,11 @@ bool MapManager_LoadMap( const std::string &path )
 
 	if ( absPath == "" )
 	{
-		Log_WarnF( gMapChannel, "Map does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"", path.c_str() );
 		return false;
 	}
+
+	Log_DevF( gLC_Map, 1, "Loading Map: %s\n", path.c_str() );
 
 	MapInfo* mapInfo = MapManager_ParseMapInfo( absPath + "/mapInfo.smf" );
 
@@ -228,7 +230,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 {
 	if ( !FileSys_Exists( path ) )
 	{
-		Log_WarnF( gMapChannel, "Map Info does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gLC_Map, "Map Info does not exist: \"%s\"", path.c_str() );
 		return nullptr;
 	}
 
@@ -236,7 +238,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 	if ( rawData.empty() )
 	{
-		Log_WarnF( gMapChannel, "Failed to read file: %s\n", path.c_str() );
+		Log_WarnF( gLC_Map, "Failed to read file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -248,7 +250,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 	if ( err != KeyValueErrorCode::NO_ERROR )
 	{
-		Log_WarnF( gMapChannel, "Failed to parse file: %s\n", path.c_str() );
+		Log_WarnF( gLC_Map, "Failed to parse file: %s\n", path.c_str() );
 		return nullptr;
 	}
 
@@ -264,7 +266,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 	{
 		if ( kv->hasChildren )
 		{
-			Log_MsgF( gMapChannel, "Skipping extra children in kv file: %s", path.c_str() );
+			Log_MsgF( gLC_Map, "Skipping extra children in kv file: %s", path.c_str() );
 			kv = kv->next;
 			continue;
 		}
@@ -274,7 +276,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 			mapInfo->version = ToLong( kv->value.string, 0 );
 			if ( mapInfo->version != MAP_VERSION )
 			{
-				Log_ErrorF( gMapChannel, "Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
+				Log_ErrorF( gLC_Map, "Invalid Version: %ud - Expected Version %ud\n", mapInfo->version, MAP_VERSION );
 				delete mapInfo;
 				return nullptr;
 			}
@@ -291,7 +293,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 			if ( mapInfo->modelPath == "" )
 			{
-				Log_WarnF( gMapChannel, "Empty Model Path for map \"%s\"\n", path.c_str() );
+				Log_WarnF( gLC_Map, "Empty Model Path for map \"%s\"\n", path.c_str() );
 				delete mapInfo;
 				return nullptr;
 			}
