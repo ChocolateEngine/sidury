@@ -381,27 +381,68 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 		srData.aVertCount += mesh.aVertexCount;
 		u32 indSize = srData.aTriCount;
 
-		void* trisTmp = realloc( srData.aTris, ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
-
-		if ( !trisTmp )
 		{
-			Log_ErrorF( "Failed to allocate memory for physics indexed triangles: (%zd bytes)\n",
-			            ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
+			void* trisTmp = realloc( srData.aTris, ( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
 
-			free( srData.aTris );
-			return;
+			if ( !trisTmp )
+			{
+				Log_ErrorF( "Failed to allocate memory for physics indexed triangles: (%zd bytes)\n",
+							( indSize + ( mesh.aIndexCount / 3 ) ) * sizeof( PhysIndexedTriangle_t ) );
+
+				free( srData.aTris );
+				return;
+			}
+
+			srData.aTris = static_cast< PhysIndexedTriangle_t* >( trisTmp );
 		}
 
-		srData.aTris = static_cast< PhysIndexedTriangle_t* >( trisTmp );
-
-		for ( u32 i = 0, j = 0; i < mesh.aIndexCount; j++ )
+		u32 j = 0;
+		for ( u32 i = 0; i < mesh.aIndexCount; )
 		{
-			srData.aTris[ indSize + j ].aPos[ 0 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
-			srData.aTris[ indSize + j ].aPos[ 1 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
-			srData.aTris[ indSize + j ].aPos[ 2 ] = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			u32       idx0   = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			u32       idx1   = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+			u32       idx2   = vertData->aIndices[ mesh.aIndexOffset + i++ ];
+
+			// Check Triangle Normal
+			glm::vec3 v0     = srData.apVertices[ idx0 ];
+			glm::vec3 v1     = srData.apVertices[ idx1 ];
+			glm::vec3 v2     = srData.apVertices[ idx2 ];
+
+			// Calculate triangle normal
+			glm::vec3 normal = glm::cross( ( v1 - v0 ), ( v2 - v0 ) );
+			float     len    = glm::length( normal );
+
+			// Make sure we don't have any 0 lengths, that will crash the physics engine
+			if ( len == 0.f )
+			{
+				Log_Warn( "Normal of 0?" );
+				continue;
+			}
+
+			srData.aTris[ indSize + j ].aPos[ 0 ] = idx0;
+			srData.aTris[ indSize + j ].aPos[ 1 ] = idx1;
+			srData.aTris[ indSize + j ].aPos[ 2 ] = idx2;
+			j++;
 		}
 
-		srData.aTriCount += mesh.aIndexCount / 3;
+		srData.aTriCount += j;
+
+		// consolidate the memory just in case
+		if ( j != mesh.aIndexCount / 3 )
+		{
+			void* trisTmp = realloc( srData.aTris, ( indSize + j ) * sizeof( PhysIndexedTriangle_t ) );
+
+			if ( !trisTmp )
+			{
+				Log_ErrorF( "Failed to allocate memory for physics indexed triangles: (%zd bytes)\n",
+				            ( indSize + j ) * sizeof( PhysIndexedTriangle_t ) );
+
+				free( srData.aTris );
+				return;
+			}
+
+			srData.aTris = static_cast< PhysIndexedTriangle_t* >( trisTmp );
+		}
 	}
 }
 
@@ -409,7 +450,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 void Phys_Init()
 {
 	Phys_DebugInit();
-
+	
 	gPhysDebugFuncs.apDrawLine          = Phys_DrawLine;
 	gPhysDebugFuncs.apDrawTriangle      = Phys_DrawTriangle;
 	gPhysDebugFuncs.apCreateTriBatch    = Phys_CreateTriangleBatch;
