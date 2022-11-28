@@ -29,7 +29,7 @@ IRender*         render       = nullptr;
 BaseInputSystem* input        = nullptr;
 BaseAudioSystem* audio        = nullptr;
 
-static bool      gPaused      = false;
+static bool      gPaused      = true;
 float            gFrameTime   = 0.f;
 double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
