@@ -30,6 +30,9 @@ static std::vector< ConVar* >                          gInputCvars;
 static std::unordered_map< SDL_Scancode, ConVar* >     gInputCvarKeys;
 
 
+static bool                                            gResetBindings = Args_Register( "Reset All Keybindings", "-reset-binds" );
+
+
 CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 {
 	LogGroup group = Log_GroupBegin( gLC_GameInput );
@@ -308,7 +311,7 @@ void Input_Init()
 		current = current->apNext;
 	}
 
-	if ( Args_Find( "-reset" ) )
+	if ( gResetBindings )
 	{
 		bind_reset_all( {} );
 	}
