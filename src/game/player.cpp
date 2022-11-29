@@ -304,6 +304,8 @@ void PlayerManager::Respawn( Entity player )
 
 void Player_UpdateFlashlight( Entity player )
 {
+	PROF_SCOPE();
+
 	Transform& transform       = entities->GetComponent< Transform >( player );
 	CCamera&   camera          = entities->GetComponent< CCamera >( player );
 	Light_t*   flashlight      = entities->GetComponent< Light_t* >( player );
@@ -353,11 +355,12 @@ void Player_UpdateFlashlight( Entity player )
 
 void PlayerManager::Update( float frameTime )
 {
+	PROF_SCOPE();
+
 	for ( Entity player: aPlayerList )
 	{
 		auto&     playerInfo = entities->GetComponent< CPlayerInfo >( player );
-		Transform transform  = entities->GetComponent< Transform >( player );
-		CCamera   camera     = entities->GetComponent< CCamera >( player );
+		// CCamera   camera     = entities->GetComponent< CCamera >( player );
 
 		if ( !Game_IsPaused() )
 		{
@@ -368,13 +371,15 @@ void PlayerManager::Update( float frameTime )
 
 		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
 		{
-			Renderable_t* renderable = entities->GetComponent< Renderable_t* >( player );
-
-			auto model = entities->GetComponent< HModel >( player );
-			transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
-
-			renderable->aModelMatrix = transform.ToMatrix();
-			renderable->aModel = model.handle;
+			// CRenderable_t* renderable = entities->GetComponent< CRenderable_t* >( player );
+			// 
+			// auto          model      = entities->GetComponent< HModel >( player );
+			// Transform     transform  = entities->GetComponent< Transform >( player );
+			// 
+			// transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
+			// 
+			// renderable->aModelMatrix = transform.ToMatrix();
+			// renderable->aModel = model.handle;
 
 			// Graphics_DrawModel( renderable );
 		}
@@ -521,6 +526,8 @@ void CalcZoom( CCamera& camera, Entity player )
 
 void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 {
+	PROF_SCOPE();
+
 	// auto& move = GetPlayerMoveData( player );
 	auto& transform = GetTransform( player );
 	auto& camera = GetCamera( player );
@@ -676,10 +683,7 @@ void PlayerMovement::MovePlayer( Entity player )
 
 float PlayerMovement::GetViewHeight(  )
 {
-	if ( KEY_PRESSED(SDL_SCANCODE_LCTRL) || in_duck )
-		return cl_view_height_duck;
-
-	return cl_view_height;
+	return in_duck ? cl_view_height_duck : cl_view_height;
 }
 
 
@@ -808,10 +812,10 @@ void PlayerMovement::UpdateInputs(  )
 	const float sideSpeed = side_speed * moveScale;
 	apMove->aMaxSpeed = max_speed * moveScale;
 
-	if ( in_forward.GetBool() )  apRigidBody->aAccel[W_FORWARD] = forwardSpeed;
-	if ( in_back.GetBool() )     apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
-	if ( in_left.GetBool() )     apRigidBody->aAccel[W_RIGHT] = -sideSpeed;
-	if ( in_right.GetBool() )    apRigidBody->aAccel[W_RIGHT] += sideSpeed;
+	if ( in_forward.GetBool() ) apRigidBody->aAccel[ W_FORWARD ] = forwardSpeed;
+	if ( in_back.GetBool() )    apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
+	if ( in_left.GetBool() )    apRigidBody->aAccel[ W_RIGHT ] = -sideSpeed;
+	if ( in_right.GetBool() )   apRigidBody->aAccel[ W_RIGHT ] += sideSpeed;
 
 	// kind of a hack
 	// this feels really stupid
