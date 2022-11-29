@@ -11,36 +11,43 @@ extern IRender* render;
 
 struct MaterialVar
 {
-	MaterialVar( const ChString &name, EMatVar type ):
-		aName( name ), aType( type )
+	MaterialVar( const std::string_view name, EMatVar type ) :
+		apName( name.data() ), aNameLen( name.size() ), aType( type )
 	{}
 
-	MaterialVar( const ChString& name, Handle data ) :
+	MaterialVar( const std::string_view name, Handle data ) :
 		MaterialVar( name, EMatVar_Texture )
 	{ aDataTexture = data; }
 
-	MaterialVar( const ChString& name, float data ) :
+	MaterialVar( const std::string_view name, float data ) :
 		MaterialVar( name, EMatVar_Float )
 	{ aDataFloat = data; }
 
-	MaterialVar( const ChString& name, int data ) :
+	MaterialVar( const std::string_view name, int data ) :
 		MaterialVar( name, EMatVar_Int )
 	{ aDataInt = data; }
 
-	MaterialVar( const ChString& name, const glm::vec2& data ) :
+	MaterialVar( const std::string_view name, const glm::vec2& data ) :
 		MaterialVar( name, EMatVar_Vec2 )
 	{ aDataVec2 = data; }
 
-	MaterialVar( const ChString& name, const glm::vec3& data ) :
+	MaterialVar( const std::string_view name, const glm::vec3& data ) :
 		MaterialVar( name, EMatVar_Vec3 )
 	{ aDataVec3 = data; }
 
-	MaterialVar( const ChString& name, const glm::vec4& data ) :
+	MaterialVar( const std::string_view name, const glm::vec4& data ) :
 		MaterialVar( name, EMatVar_Vec4 )
 	{ aDataVec4 = data; }
 
-	ChString aName;
-	EMatVar  aType;
+	~MaterialVar()
+	{
+		if ( apName )
+			delete[] apName;
+	}
+
+	const char* apName;
+	u32         aNameLen;
+	EMatVar     aType;
 	
 	// TODO: can this be smaller somehow? this takes up 16 bytes due to the vec4
 	// which will only be used very, very rarely!!
@@ -190,7 +197,10 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 
 	for ( MaterialVar& var : data->aVars )
 	{
-		if ( var.aName == name )
+		if ( name.size() != var.aNameLen )
+			continue;
+
+		if ( var.apName == name )
 		{
 			var.SetVar( value );
 			return;
@@ -199,7 +209,13 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 
 	// data->aVars.emplace_back( name, value );
 	MaterialVar& var = data->aVars.emplace_back( true );
-	var.aName = name.data();
+
+	var.aNameLen     = name.size();
+	char* varName    = new char[ name.size() + 1 ];
+	strncpy( varName, name.data(), name.size() );
+	varName[ name.size() ] = '\0';
+	var.apName             = varName;
+
 	var.SetVar( value );
 }
 
@@ -229,10 +245,11 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 
 	for ( MaterialVar& var : data->aVars )
 	{
-		if ( var.aName == name )
-		{
+		if ( name.size() != var.aNameLen )
+			continue;
+
+		if ( var.apName == name )
 			return &var;
-		}
 	}
 
 	return nullptr;
