@@ -14,6 +14,10 @@
 #include <vector>
 #include <functional>
 
+#if CH_USE_MIMALLOC
+  #include "mimalloc-new-delete.h"
+#endif
+
 static bool gRunning   = true;
 
 CONVAR( host_max_frametime, 0.1 );
@@ -30,6 +34,16 @@ CONCMD( quit )
 {
 	gRunning = false;
 }
+
+#if CH_USE_MIMALLOC
+CONCMD( mimalloc_print )
+{
+	// TODO: have this output to the logging system
+	mi_collect( true );
+	mi_stats_merge();
+	mi_stats_print( nullptr );
+}
+#endif
 
 
 static bool             gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
@@ -58,6 +72,10 @@ extern "C"
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
+
+#if CH_USE_MIMALLOC
+		Log_DevF( 1, "Using mimalloc version %d\n", mi_version() );
+#endif
 
 		// Needs to be done before Renderer is loaded
 		ImGui::CreateContext();
@@ -124,7 +142,7 @@ extern "C"
 			// gTaskScheduler.WaitForCounter( &taskCounter );
 
 			startTime = currentTime;
-
+			
 			profile_end_frame();
 		}
 

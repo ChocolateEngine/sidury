@@ -2,7 +2,7 @@ message( "Current Project: Sidury Launcher" )
 
 set(
 	SRC_FILES
-	gameloader.c
+	gameloader.cpp
 )
 
 add_executable( SiduryLauncher ${SRC_FILES} )

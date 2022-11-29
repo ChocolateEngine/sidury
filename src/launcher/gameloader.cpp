@@ -1,6 +1,10 @@
 #include "core/platform.h"
 #include <stdio.h>
 
+#if CH_USE_MIMALLOC
+  #include "mimalloc-new-delete.h"
+#endif
+
 #include <SDL2/SDL_loadso.h>
 
 Module core = 0;
@@ -31,6 +35,16 @@ int load_object( Module* mod, const char* path )
 
 
 #define GAME_PATH "sidury"
+
+#if CH_USE_MIMALLOC
+// ensure mimalloc is loaded
+struct ForceMiMalloc_t
+{
+	ForceMiMalloc_t() { mi_version(); }
+};
+
+static ForceMiMalloc_t forceMiMalloc;
+#endif
 
 
 int main( int argc, char *argv[] )

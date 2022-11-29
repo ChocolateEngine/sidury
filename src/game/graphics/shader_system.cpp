@@ -335,8 +335,10 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	if ( !render->CmdBindPipeline( sCmd, sShader ) )
 		return false;
 
-	std::vector< Handle > descSets;
+	ChVector< Handle > descSets;
+	descSets.reserve( 8 );
 
+	// TODO: bind a single uniform variable so the shader can do a bounds check on this
 	if ( shaderData->aFlags & EShaderFlags_Sampler )
 		descSets.push_back( gUniformSampler.aSets[ sIndex ] );
 
@@ -368,7 +370,7 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	{
 		EPipelineBindPoint bindPoint = Shader_GetPipelineBindPoint( sShader );
 
-		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), static_cast< u32 >( descSets.size() ) );
+		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), descSets.size() );
 	}
 
 	return true;
