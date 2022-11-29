@@ -117,10 +117,11 @@ void LightEditor_DrawEditor()
 	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
 	auto& camTransform    = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
 
-	if ( ImGui::Button( "Create World Light" ) )
+	if ( ImGui::Button( "Create Directional Light" ) )
 	{
 		Light_t* light = Graphics_CreateLight( ELightType_Directional );
 
+		Log_Dev( 1, "Created Directional Light\n" );
 		// gLightsWorld
 	}
 
@@ -135,6 +136,8 @@ void LightEditor_DrawEditor()
 			light->aColor       = { 1, 1, 1 };
 			light->aRadius      = 500;
 		}
+
+		Log_Dev( 1, "Created Point Light\n" );
 	}
 
 	if ( ImGui::Button( "Create Cone Light" ) )
@@ -154,6 +157,8 @@ void LightEditor_DrawEditor()
 			light->aInnerFov = 0.f;  // FOV
 			light->aOuterFov = 45.f;  // FOV
 		}
+
+		Log_Dev( 1, "Created Cone Light\n" );
 	}
 
 	// Show list of lights
