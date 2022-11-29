@@ -350,10 +350,15 @@ CONVAR( r_render, 1 );
 
 void Game_Update( float frameTime )
 {
+	PROF_SCOPE();
+
 	input->Update( frameTime );
 
-	ImGui::NewFrame();
-	ImGui_ImplSDL2_NewFrame();
+	{
+		PROF_SCOPE_NAMED( "Imgui New Frame" );
+		ImGui::NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+	}
 
 	Game_UpdateGame( frameTime );
 
@@ -367,6 +372,7 @@ void Game_Update( float frameTime )
 	}
 	else
 	{
+		PROF_SCOPE_NAMED( "Imgui End Frame" );
 		ImGui::EndFrame();
 	}
 
@@ -376,6 +382,8 @@ void Game_Update( float frameTime )
 
 void EntUpdate()
 {
+	PROF_SCOPE();
+
 	// blech
 	for ( auto &ent : g_otherEnts )
 	{
@@ -403,6 +411,8 @@ void EntUpdate()
 
 void Game_UpdateGame( float frameTime )
 {
+	PROF_SCOPE();
+
 	gFrameTime = frameTime * host_timescale;
 
 	Graphics_NewFrame();
@@ -561,6 +571,8 @@ CONVAR( r_proto_line_dist2, 32.f );
 // will be used in the future for when updating bones and stuff
 void Game_SetupModels( float frameTime )
 {
+	PROF_SCOPE();
+
 	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
 	// auto& camTransform = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
 
@@ -775,6 +787,8 @@ void Game_UpdateAudio()
 
 void Game_HandleSystemEvents()
 {
+	PROF_SCOPE();
+
 	static std::vector< SDL_Event >* events = input->GetEvents();
 
 	for ( auto& e: *events )
@@ -822,6 +836,8 @@ void Game_HandleSystemEvents()
 
 void Game_SetView( const glm::mat4& srViewMat )
 {
+	PROF_SCOPE();
+
 	int width = 0, height = 0;
 	render->GetSurfaceSize( width, height );
 
@@ -845,6 +861,8 @@ void Game_SetView( const glm::mat4& srViewMat )
 
 void Game_UpdateProjection()
 {
+	PROF_SCOPE();
+
 	int width = 0, height = 0;
 	render->GetSurfaceSize( width, height );
 	gView.ComputeProjection( width, height );

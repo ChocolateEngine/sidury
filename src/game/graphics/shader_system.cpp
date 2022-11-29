@@ -282,6 +282,8 @@ void Graphics_ShaderDestroy()
 
 EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 {
+	PROF_SCOPE();
+
 	auto it = gShaderBindPoint.find( sShader );
 	if ( it != gShaderBindPoint.end() )
 		return it->second;
@@ -293,6 +295,8 @@ EPipelineBindPoint Shader_GetPipelineBindPoint( Handle sShader )
 
 ShaderData_t* Shader_GetData( Handle sShader )
 {
+	PROF_SCOPE();
+
 	auto it = gShaderData.find( sShader );
 	if ( it != gShaderData.end() )
 		return &it->second;
@@ -322,6 +326,8 @@ Handle* Shader_GetMaterialUniform( Handle sShader )
 
 bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 {
+	PROF_SCOPE();
+
 	ShaderData_t* shaderData = Shader_GetData( sShader );
 	if ( !shaderData )
 		return false;
@@ -371,6 +377,8 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 
 void Shader_ResetPushData()
 {
+	PROF_SCOPE();
+
 	// this is where data oriented would be better, but the way i did it was slow
 	for ( auto& [ shader, data ] : gShaderData )
 	{
@@ -389,6 +397,8 @@ void Shader_ResetPushData()
 
 bool Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
 {
+	PROF_SCOPE();
+
 	if ( !spShaderData )
 		return false;
 
@@ -406,6 +416,8 @@ bool Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* sp
 
 bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable )
 {
+	PROF_SCOPE();
+
 	ShaderData_t* shaderData = Shader_GetData( sShader );
 	if ( !shaderData )
 		return false;
@@ -427,6 +439,8 @@ bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceD
 
 VertexFormat Shader_GetVertexFormat( Handle sShader )
 {
+	PROF_SCOPE();
+
 	auto it = gShaderVertFormat.find( sShader );
 
 	if ( it == gShaderVertFormat.end() )

@@ -281,6 +281,8 @@ void LightEditor_DrawLightModels()
 
 void LightEditor_Update()
 {
+	PROF_SCOPE();
+
 	gpFlashlight = entities->GetComponent< Light_t* >( gLocalPlayer );
 
 	LightEditor_DrawLightModels();

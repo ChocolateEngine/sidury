@@ -44,6 +44,8 @@ void MeshBuilder::Start( Model* spMesh, const char* spDebugName )
 
 void MeshBuilder::End( bool sCreateBuffers )
 {
+	PROF_SCOPE();
+
 	if ( apMesh->aMeshes.size() )
 	{
 		Log_WarnF( gLC_ClientGraphics, "Meshes already created for Model: \"%s\"\n", apDebugName ? apDebugName : "internal" );
@@ -255,6 +257,8 @@ uint32_t MeshBuilder::GetVertexCount() const
 
 void MeshBuilder::NextVertex()
 {
+	PROF_SCOPE();
+
 	Assert( aSurfaces.size() );
 	Assert( apSurf );
 

@@ -218,6 +218,8 @@ void Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& value )  
 
 MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 {
+	PROF_SCOPE();
+
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
 	{

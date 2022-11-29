@@ -190,6 +190,8 @@ void Graphics_CalcModelBBox( Handle sModel )
 
 Handle Graphics_LoadModel( const std::string& srPath )
 {
+	PROF_SCOPE();
+
 	// Have we loaded this model already?
 	auto it = gModelPaths.find( srPath );
 
@@ -256,7 +258,9 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	// calculate a bounding box
 	Graphics_CalcModelBBox( handle );
 
-	gModelPaths[ srPath ]     = handle;
+	gModelPaths[ srPath ] = handle;
+
+	_heapchk();
 
 	return handle;
 }
@@ -801,12 +805,16 @@ void Graphics_Shutdown()
 
 void Graphics_Reset()
 {
+	PROF_SCOPE();
+
 	render->Reset();
 }
 
 
 void Graphics_NewFrame()
 {
+	PROF_SCOPE();
+
 	render->NewFrame();
 
 	Graphics_DebugDrawNewFrame();
@@ -816,6 +824,8 @@ void Graphics_NewFrame()
 // TODO: experiment with instanced drawing
 void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 {
+	PROF_SCOPE();
+
 	Mesh& mesh = spModel->aMeshes[ sSurface ];
 
 	// TODO: figure out a way to use vertex and index offsets with this vertex format stuff
@@ -844,6 +854,8 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 
 bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	// Bind the mesh's vertex and index buffers
 
 	// Get Vertex Buffers the shader wants
@@ -883,6 +895,8 @@ bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel,
 // https://iquilezles.org/articles/frustumcorrect/
 bool Frustum_t::IsBoxVisible( const glm::vec3& sMin, const glm::vec3& sMax ) const
 {
+	PROF_SCOPE();
+
 	// Check Box Outside/Inside of Frustum
 	for ( int i = 0; i < EFrustum_Count; i++ )
 	{
@@ -929,6 +943,8 @@ bool Frustum_t::IsBoxVisible( const glm::vec3& sMin, const glm::vec3& sMax ) con
 
 void Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )
 {
+	PROF_SCOPE();
+
 	glm::mat4 m                          = glm::transpose( srViewMat );
 	glm::mat4 inv                        = glm::inverse( srViewMat );
 
@@ -960,6 +976,8 @@ Frustum_t Graphics_CreateFrustum( const glm::mat4& srViewInfo )
 
 ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )
 {
+	PROF_SCOPE();
+
 	glm::vec4 corners[ 8 ];
 
 	// Fill array with the corners of the AABB 
@@ -1000,6 +1018,8 @@ ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& sr
 
 bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewInfoIndex )
 {
+	PROF_SCOPE();
+
 	if ( !spModelDraw )
 		return false;
 
@@ -1022,6 +1042,8 @@ bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewInfoIndex )
 
 void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< SurfaceDraw_t >& srRenderList )
 {
+	PROF_SCOPE();
+
 	if ( !Shader_Bind( cmd, gCmdIndex, shader ) )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", Graphics_GetShaderName( shader ) );
@@ -1112,6 +1134,8 @@ void Graphics_DrawShaderRenderables( Handle cmd, Handle shader, ChVector< Surfac
 // Do Rendering with shader system and user land meshes
 void Graphics_RenderView( Handle cmd, ViewRenderList_t& srViewList )
 {
+	PROF_SCOPE();
+
 	// here we go again
 	static Handle skybox    = Graphics_GetShader( "skybox" );
 
@@ -1171,6 +1195,8 @@ void Graphics_RenderView( Handle cmd, ViewRenderList_t& srViewList )
 
 void Graphics_Render( Handle cmd )
 {
+	PROF_SCOPE();
+
 	for ( size_t i = 0; i < gViewRenderLists.size(); i++ )
 	{
 		// HACK HACK !!!!
@@ -1191,6 +1217,8 @@ void Graphics_AddToViewRenderList()
 
 void Graphics_PrepareDrawData()
 {
+	PROF_SCOPE();
+
 	// fun
 	static Handle        shadow_map       = Graphics_GetShader( "__shadow_map" );
 	static ShaderData_t* shadowShaderData = Shader_GetData( shadow_map );
@@ -1201,7 +1229,10 @@ void Graphics_PrepareDrawData()
 	ImGui::Text( "Verts Drawn: %zd", gVertsDrawn );
 	ImGui::Text( "Debug Line Verts: %zd", gDebugLineVertPos.size() );
 
-	ImGui::Render();
+	{
+		PROF_SCOPE_NAMED( "Imgui Render" );
+		ImGui::Render();
+	}
 
 	gModelDrawCalls = 0;
 	gVertsDrawn     = 0;
@@ -1271,6 +1302,8 @@ void Graphics_PrepareDrawData()
 
 	if ( !r_vis_lock.GetBool() )
 	{
+		PROF_SCOPE_NAMED( "Prepare View Render Lists" );
+
 		for ( ViewRenderList_t& viewList : gViewRenderLists )
 			for ( auto& [ handle, vec ] : viewList.aRenderLists )
 				vec.clear();
@@ -1304,6 +1337,8 @@ void Graphics_PrepareDrawData()
 			// check if we need this in any views
 			for ( int viewIndex = 0; viewIndex < gViewInfoCount; viewIndex++ )
 			{
+				PROF_SCOPE_NAMED( "Viewport Testing" );
+
 				// HACK: kind of of hack with the shader override check
 				// If we don't want to cast a shadow and are in a shadowmap view, don't add to the view's render list
 				if ( !modelDraw->aCastShadow && gViewInfo[ viewIndex ].aShaderOverride )
@@ -1353,6 +1388,8 @@ void Graphics_PrepareDrawData()
 
 	for ( int viewIndex = 0; viewIndex < gViewInfoCount; viewIndex++ )
 	{
+		PROF_SCOPE_NAMED( "Update Shader Draw Data" );
+
 		ViewRenderList_t& viewList = gViewRenderLists[ viewIndex ];
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
@@ -1385,6 +1422,8 @@ void Graphics_PrepareDrawData()
 
 void Graphics_Present()
 {
+	PROF_SCOPE();
+
 	// render->LockGraphicsMutex();
 	render->WaitForQueues();
 	render->ResetCommandPool();
@@ -1395,6 +1434,8 @@ void Graphics_Present()
 	// command buffer, and record the commands.
 	for ( gCmdIndex = 0; gCmdIndex < gCommandBuffers.size(); gCmdIndex++ )
 	{
+		PROF_SCOPE_NAMED( "Primary Command Buffer" );
+
 		auto c = gCommandBuffers[ gCmdIndex ];
 
 		render->BeginCommandBuffer( c );

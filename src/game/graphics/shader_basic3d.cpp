@@ -108,6 +108,8 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 // TODO: this doesn't handle shaders being changed on materials, or materials being freed
 void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 {
+	PROF_SCOPE();
+
 	if ( sMat == 0 )
 		return;
 
@@ -206,6 +208,8 @@ static void Shader_Basic3D_ResetPushData()
 
 static void Shader_Basic3D_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	Basic3D_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix  = spModelDraw->aModelMatrix;
 
@@ -233,6 +237,8 @@ static void Shader_Basic3D_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw
 
 static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	Basic3D_Push& push = gPushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ), &push );
 }

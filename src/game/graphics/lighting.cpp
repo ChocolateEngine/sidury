@@ -552,6 +552,8 @@ void Graphics_DestroyLight( Light_t* spLight )
 
 void Graphics_PrepareLights()
 {
+	PROF_SCOPE();
+
 	// Destroy lights if needed
 	for ( Light_t* light : gDestroyLights )
 		Graphics_DestroyLightBuffer( light );
@@ -575,6 +577,8 @@ void Graphics_PrepareLights()
 
 bool Graphics_IsUsingShadowMaps()
 {
+	PROF_SCOPE();
+
 	bool usingShadow = false;
 	for ( const auto& [ light, shadowMap ] : gLightShadows )
 	{
@@ -591,6 +595,8 @@ bool Graphics_IsUsingShadowMaps()
 
 void Graphics_RenderShadowMap( Handle cmd, Light_t* spLight, const ShadowMap_t& srShadowMap )
 {
+	PROF_SCOPE();
+
 	Rect2D_t rect{};
 	rect.aOffset.x = 0;
 	rect.aOffset.y = 0;
@@ -625,6 +631,8 @@ void Graphics_RenderShadowMap( Handle cmd, Light_t* spLight, const ShadowMap_t& 
 
 void Graphics_DrawShadowMaps( Handle cmd )
 {
+	PROF_SCOPE();
+
 	RenderPassBegin_t renderPassBegin{};
 	renderPassBegin.aClear.resize( 1 );
 	renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 1.f };

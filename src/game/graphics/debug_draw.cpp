@@ -41,6 +41,8 @@ bool Graphics_DebugDrawInit()
 
 void Graphics_DebugDrawNewFrame()
 {
+	PROF_SCOPE();
+
 	gDebugLineVertPos.clear();
 	gDebugLineVertColor.clear();
 
@@ -125,6 +127,8 @@ void Graphics_DebugDrawNewFrame()
 // TODO: replace this system with instanced drawing
 void Graphics_UpdateDebugDraw()
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw )
 		return;
 
@@ -253,6 +257,8 @@ void Graphics_UpdateDebugDraw()
 
 void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
@@ -275,6 +281,8 @@ void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm:
 
 void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
@@ -300,6 +308,8 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 
 void Graphics_DrawProjView( const glm::mat4& srProjView )
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
@@ -334,6 +344,8 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 
 void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw || !gDebugLineModel || !r_debug_frustums )
 		return;
 
@@ -356,6 +368,8 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 
 void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 {
+	PROF_SCOPE();
+
 	if ( !r_debug_draw || !gDebugLineModel || !r_debug_normals )
 		return;
 

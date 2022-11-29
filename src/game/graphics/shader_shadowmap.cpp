@@ -51,6 +51,8 @@ static void Shader_ShadowMap_ResetPushData()
 
 static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = spModelDraw->aModelMatrix;
 	push.aViewInfo       = gShadowViewInfoIndex;
@@ -87,6 +89,8 @@ static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDr
 
 static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	ShadowMap_Push& push = gPushData.at( &srDrawInfo );
 	push.aViewInfo       = gShadowViewInfoIndex;
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ), &push );

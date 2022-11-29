@@ -43,6 +43,8 @@ static void Shader_Skybox_ResetPushData()
 
 static void Shader_Skybox_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	Skybox_Push& push = gSkyboxPushData[ &srDrawInfo ];
 	push.aModelMatrix = spModelDraw->aModelMatrix;
 
@@ -53,6 +55,8 @@ static void Shader_Skybox_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_
 
 static void Shader_Skybox_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
+	PROF_SCOPE();
+
 	Skybox_Push& push = gSkyboxPushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ), &push );
 }

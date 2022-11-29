@@ -35,6 +35,8 @@ static std::string MatVar_Emissive = "emissive";
 
 void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Model* spModel )
 {
+	PROF_SCOPE();
+
 	fastObjMesh* obj = fast_obj_read( srPath.c_str() );
 
 	if ( obj == nullptr )
@@ -173,6 +175,8 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 
 void Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath, Model* spModel )
 {
+	PROF_SCOPE();
+
 	auto startTime = std::chrono::high_resolution_clock::now();
 	float time      = 0.f;
 
@@ -187,6 +191,8 @@ void Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath,
 
 void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& srPath, Scene_t* spScene )
 {
+	PROF_SCOPE();
+
 	fastObjMesh* obj = fast_obj_read( srPath.c_str() );
 
 	if ( obj == nullptr )
