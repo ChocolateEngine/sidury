@@ -375,6 +375,9 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 
 		srData.apVertices = static_cast< glm::vec3* >( vertsTmp );
 
+		// Zero the new memory
+		memset( &srData.apVertices[ origSize ], 0, mesh.aVertexCount * sizeof( glm::vec3 ) );
+
 		// faster
 		memcpy( &srData.apVertices[ origSize ], &data[ mesh.aVertexOffset ], mesh.aVertexCount * sizeof( glm::vec3 ) );
 
@@ -394,6 +397,9 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			}
 
 			srData.aTris = static_cast< PhysIndexedTriangle_t* >( trisTmp );
+
+			// Zero the new memory
+			memset( &srData.aTris[ indSize ], 0, ( mesh.aIndexCount / 3 ) * sizeof( PhysIndexedTriangle_t ) );
 		}
 
 		u32 j = 0;
@@ -415,7 +421,7 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 			// Make sure we don't have any 0 lengths, that will crash the physics engine
 			if ( len == 0.f )
 			{
-				Log_Warn( "Normal of 0?" );
+				Log_Warn( "Normal of 0?\n" );
 				continue;
 			}
 
@@ -484,6 +490,7 @@ void Phys_Shutdown()
 
 void Phys_Simulate( IPhysicsEnvironment* spPhysEnv, float sFrameTime )
 {
+	PROF_SCOPE();
 	if ( !spPhysEnv )
 		return;
 
