@@ -256,7 +256,7 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 				std::string texName = texture->image->uri;
 				Handle handle = InvalidHandle;
 
-				if ( FileSys_IsRelative( texName ) )
+				if ( FileSys_IsRelative( texName.data() ) )
 					render->LoadTexture( handle, baseDir2 + "/" + texName, createData );
 				else
 					render->LoadTexture( handle, texName, createData );
