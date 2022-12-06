@@ -293,22 +293,17 @@ void Input_Init()
 	Con_AddArchiveCallback( CmdBindArchive );
 
 	// Find all Convars with the CVARF_INPUT flag on it
-	ConVarBase* current = ConVarBase::spConVarBases;
-
-	while ( current )
+	for ( uint32_t i = 0; i < Con_GetConVarCount(); i++ )
 	{
+		ConVarBase* current = Con_GetConVar( i );
+
 		if ( typeid( *current ) != typeid( ConVar ) )
-		{
-			current = current->apNext;
 			continue;
-		}
 
 		ConVar* cvar = static_cast< ConVar* >( current );
 
 		if ( cvar->aFlags & CVARF_INPUT )
 			gInputCvars.push_back( cvar );
-
-		current = current->apNext;
 	}
 
 	if ( gResetBindings )
