@@ -90,6 +90,8 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 	meshBuilder.Start( model, "_phys_triangle_batch" );
 	meshBuilder.SetMaterial( mat );
 
+	meshBuilder.PreallocateVertices( srTriangles.size() * 3 );
+
 	// convert vertices
 	// vert.resize( inTriangleCount * 3 );
 	for ( int i = 0; i < srTriangles.size(); i++ )
@@ -141,6 +143,8 @@ Handle Phys_CreateTriangleBatchInd(
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "__phys_model" );
 	meshBuilder.SetMaterial( mat );
+
+	meshBuilder.PreallocateVertices( srInd.size() );
 
 	// convert vertices
 	for ( size_t i = 0; i < srInd.size(); i++ )

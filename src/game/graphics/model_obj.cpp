@@ -122,6 +122,7 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 			u32& faceMat = obj->face_materials[group.face_offset + faceIndex];
 
 			meshBuilder.SetCurrentSurface( faceMat );
+			meshBuilder.AllocateVertices( faceVertCount == 3 ? 3 : 6 );
 
 			for ( u32 faceVertIndex = 0; faceVertIndex < faceVertCount; faceVertIndex++ )
 			{
@@ -304,6 +305,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 			meshBuilder.SetSurfaceCount( mats.size() );
 			meshBuilder.SetCurrentSurface( index );
 			meshBuilder.SetMaterial( materials[ faceMat ] );
+			meshBuilder.AllocateVertices( faceVertCount == 3 ? 3 : 6 );
 
 			bool needNormalCalc = false;
 			for ( u32 faceVertIndex = 0; faceVertIndex < faceVertCount; faceVertIndex++ )

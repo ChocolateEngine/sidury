@@ -368,8 +368,8 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			float* normals   = (float*)GetBufferData( normalBuffer );
 			float* texCoords = (float*)GetBufferData( texBuffer );
 			float* colors    = (float*)GetBufferData( colorBuffer );
-			float* joints    = (float*)GetBufferData( jointsBuffer );
-			float* weights   = (float*)GetBufferData( weightsBuffer );
+			// float* joints    = (float*)GetBufferData( jointsBuffer );
+			// float* weights   = (float*)GetBufferData( weightsBuffer );
 
 
 			// uh, small problem, we have a variable amount of morph targets on the mesh
@@ -403,8 +403,11 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			float* morphPos = 0;
 			
 			// just use the first one for now
-			if ( morphTargets.size() )
-				morphPos = (float*)GetBufferData( morphTargets[3] );  // LongVisor on protogen
+			// if ( morphTargets.size() )
+			// 	morphPos = (float*)GetBufferData( morphTargets[3] );  // LongVisor on protogen
+
+			if ( vertexBuffer )
+				meshBuilder.PreallocateVertices( vertexBuffer->count );
 			
 			if ( prim.indices )
 			{

@@ -255,6 +255,34 @@ uint32_t MeshBuilder::GetVertexCount() const
 // Building Functions
 
 
+void MeshBuilder::PreallocateVertices( uint32_t sCount )
+{
+	Assert( aSurfaces.size() );
+	Assert( apSurf );
+
+	if ( !apSurf )
+		return;
+
+	apSurf->aVertices.reserve( sCount );
+	apSurf->aIndices.reserve( sCount );
+	aSurfacesInd[ aSurf ].reserve( sCount );
+}
+
+
+void MeshBuilder::AllocateVertices( uint32_t sCount )
+{
+	Assert( aSurfaces.size() );
+	Assert( apSurf );
+
+	if ( !apSurf )
+		return;
+
+	apSurf->aVertices.reserve( apSurf->aVertices.size() + sCount );
+	apSurf->aIndices.reserve( apSurf->aIndices.size() + sCount );
+	aSurfacesInd[ aSurf ].reserve( aSurfacesInd[ aSurf ].size() + sCount );
+}
+
+
 void MeshBuilder::NextVertex()
 {
 	PROF_SCOPE();

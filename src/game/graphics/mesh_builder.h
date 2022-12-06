@@ -152,6 +152,9 @@ struct MeshBuilder
 
 	// ------------------------------------------------------------------------
 	// Building Functions
+	
+	void                     PreallocateVertices( uint32_t sCount );
+	void                     AllocateVertices( uint32_t sCount );  // adds onto the existing size
 
 	void                     NextVertex();
 
