@@ -260,8 +260,6 @@ Handle Graphics_LoadModel( const std::string& srPath )
 
 	gModelPaths[ srPath ] = handle;
 
-	_heapchk();
-
 	return handle;
 }
 
