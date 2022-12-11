@@ -788,7 +788,7 @@ bool Graphics_Init()
 
 	// TEMP: make a world light
 	gpWorldLight = Graphics_CreateLight( ELightType_Directional );
-	gpWorldLight->aColor = { 1.0, 1.0, 1.0 };
+	gpWorldLight->aColor = { 1.0, 1.0, 1.0, 1.0 };
 	// gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
 
 	return render->InitImGui( gRenderPassGraphics );

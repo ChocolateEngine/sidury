@@ -69,6 +69,7 @@ enum : EMatVar
 	EMatVar_Texture,
 	EMatVar_Float,
 	EMatVar_Int,
+	EMatVar_Bool,
 	EMatVar_Vec2,
 	EMatVar_Vec3,
 	EMatVar_Vec4,
@@ -242,6 +243,11 @@ struct Mesh
 };
 
 
+// TODO: here's an idea, store a handle to ModelBuffers_t and VertexData_t
+// internally, we will store a "handle count" or "instance count" or something idk
+// and then every time a model or scene is loaded, just up that internal ref count
+// and lower it when a model or scene is freed
+// they will never free themselves, only the system managing it will free it
 struct Model
 {
 	ModelBuffers_t*  apBuffers    = nullptr;
@@ -361,7 +367,7 @@ struct UBO_LightCapsule_t
 struct Light_t
 {
 	ELightType aType = ELightType_Directional;
-	glm::vec3  aColor{};
+	glm::vec4  aColor{};
 	glm::vec3  aPos{};
 	glm::vec3  aAng{};
 	float      aInnerFov = 45.f;
@@ -555,6 +561,7 @@ VertexFormat       Mat_GetVertexFormat( Handle mat );
 void               Mat_SetVar( Handle mat, const std::string& name, Handle texture );
 void               Mat_SetVar( Handle mat, const std::string& name, float data );
 void               Mat_SetVar( Handle mat, const std::string& name, int data );
+void               Mat_SetVar( Handle mat, const std::string& name, bool data );
 void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& data );
 void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& data );
 void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& data );
@@ -563,6 +570,7 @@ int                Mat_GetTextureIndex( Handle mat, std::string_view name, Handl
 Handle             Mat_GetTexture( Handle mat, std::string_view name, Handle fallback = InvalidHandle );
 float              Mat_GetFloat( Handle mat, std::string_view name, float fallback = 0.f );
 int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 );
+bool               Mat_GetBool( Handle mat, std::string_view name, bool fallback = false );
 const glm::vec2&   Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback = {} );
 const glm::vec3&   Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback = {} );
 const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback = {} );
@@ -582,6 +590,12 @@ bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sSh
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
 ShaderData_t*      Shader_GetData( Handle sShader );
+
+// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
+// bool               Shader_IsMaterialTransparent( Handle sMat );
+
+// Used to get all material vars the shader can use, and throw warnings on unknown material vars
+// void               Shader_GetMaterialVars( Handle sShader );
 
 // ---------------------------------------------------------------------------------------
 // Buffers

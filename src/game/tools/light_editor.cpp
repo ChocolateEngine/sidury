@@ -5,25 +5,99 @@
 #include "imgui/imgui.h"
 
 
-static Handle                                             gModelLightPoint    = InvalidHandle;
-static Handle                                             gModelLightCone     = InvalidHandle;
+static Handle                                 gModelLightPoint    = InvalidHandle;
+static Handle                                 gModelLightCone     = InvalidHandle;
 
-static bool                                               gLightEditorEnabled = true;
+static bool                                   gLightEditorEnabled = true;
 
-static std::unordered_map< Light_t*, Renderable_t >        gDrawLights;
+static std::unordered_map< Light_t*, Handle > gDrawLights;
 
-static Light_t*                                           gpSelectedLight    = nullptr;
+static Light_t*                               gpSelectedLight = nullptr;
 
-extern Handle                                             gLocalPlayer;
+extern Handle                                 gLocalPlayer;
 
-extern std::vector< Light_t* >                            gLights;
+extern std::vector< Light_t* >                gLights;
 
-static Light_t*                                           gpFlashlight = nullptr;
+static Light_t*                               gpFlashlight = nullptr;
 
 
 CONVAR( r_light_line, 1 );
 CONVAR( r_light_line_dist, 64.f );
 CONVAR( r_light_line_dist2, 48.f );
+
+
+static Handle LightEditor_CreateRenderable( Light_t* spLight )
+{
+	// HACK
+	if ( gpFlashlight == spLight )
+		return InvalidHandle;
+
+	auto it = gDrawLights.find( spLight );
+
+	if ( it == gDrawLights.end() )
+	{
+		// create a new renderable
+		Handle model = gModelLightPoint;
+		if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
+			model = gModelLightCone;
+
+		Handle renderHandle = Graphics_CreateRenderable( model );
+
+		if ( !renderHandle )
+		{
+			Log_Error( "Failed to create Renderable for light\n" );
+			return InvalidHandle;
+		}
+		
+		gDrawLights[ spLight ] = renderHandle;
+		return renderHandle;
+	}
+
+	return it->second;
+}
+
+
+static void LightEditor_DestroyRenderable( Light_t* spLight )
+{
+	// HACK
+	if ( gpFlashlight == spLight )
+		return;
+
+	auto it = gDrawLights.find( spLight );
+
+	if ( it != gDrawLights.end() )
+	{
+		// destroy this renderable
+		Graphics_FreeRenderable( it->second );
+		gDrawLights.erase( it );
+	}
+}
+
+
+static void LightEditor_CreateRenderables()
+{
+	gDrawLights.reserve( gLights.size() );
+	for ( const auto& light : gLights )
+	{
+		LightEditor_CreateRenderable( light );
+	}
+}
+
+
+static void LightEditor_DestroyRenderables()
+{
+	for ( const auto& [light, renderable] : gDrawLights )
+	{
+		// HACK
+		if ( gpFlashlight == light )
+			continue;
+
+		// destroy this renderable
+		Graphics_FreeRenderable( renderable );
+	}
+
+	gDrawLights.clear();
+}
 
 
 void LightEditor_UpdateLightDraw( Light_t* spLight )
@@ -32,27 +106,33 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 	if ( gpFlashlight == spLight )
 		return;
 
-	Renderable_t& modelDraw = gDrawLights[ spLight ];
+	Handle renderHandle = LightEditor_CreateRenderable( spLight );
 
-	if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
-		modelDraw.aModel = gModelLightCone;
-	else
-		modelDraw.aModel = gModelLightPoint;
+	if ( !renderHandle )
+	{
+		Log_Error( "Failed to get Renderable for light\n" );
+		return;
+	}
 
-	// Dumb
-	Transform transform{};
-	transform.aPos = spLight->aPos;
-	transform.aAng = spLight->aAng;
+	Renderable_t* renderable = Graphics_GetRenderableData( renderHandle );
+	
+	if ( !renderable )
+	{
+		Log_Error( "Renderable data for light is nullptr\n" );
+		return;
+	}
+
+	Graphics_UpdateRenderableAABB( renderHandle );
+
+	renderable->aCastShadow = false;
 
 	if ( spLight->aType == ELightType_Directional )
-	{
-		transform.aScale       = { 2.f, 2.f, 2.f };
-		modelDraw.aModelMatrix = transform.ToMatrix();
-	}
+		Util_ToMatrix( renderable->aModelMatrix, spLight->aPos, spLight->aAng, { 2.f, 2.f, 2.f } );
 	else
-	{
-		modelDraw.aModelMatrix = transform.ToMatrix( false );
-	}
+		Util_ToMatrix( renderable->aModelMatrix, spLight->aPos, spLight->aAng );
+
+	if ( spLight == gpSelectedLight )
+	 	Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
 	
 	// glm::vec3 modelForward, modelRight, modelUp;
 	// Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
@@ -60,11 +140,11 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelRight * r_light_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
 	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelUp * r_light_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
 
-	if ( r_light_line )
+	if ( r_light_line && spLight->aType != ELightType_Point )
 	{
 		glm::vec3 forward;
-		Util_GetDirectionVectors( spLight->aAng, &forward );
-		Graphics_DrawLine( spLight->aPos, spLight->aPos + ( forward * r_light_line_dist.GetFloat() ), { spLight->aColor.x, spLight->aColor.y, spLight->aColor.z } );
+		Util_GetMatrixDirection( renderable->aModelMatrix, nullptr, nullptr, &forward );
+		Graphics_DrawLine( spLight->aPos, spLight->aPos + ( -forward * r_light_line_dist.GetFloat() ), { spLight->aColor.x, spLight->aColor.y, spLight->aColor.z } );
 	}
 }
 
@@ -77,18 +157,33 @@ void LightEditor_UpdateAllLightDraws()
 }
 
 
+CONVAR_CMD( tool_light_editor_draw_lights, 1 )
+{
+	if ( !gLightEditorEnabled )
+		return;
+
+	if ( tool_light_editor_draw_lights.GetBool() )
+		LightEditor_CreateRenderables();
+	else
+		LightEditor_DestroyRenderables();
+}
+
+
 CONCMD( tool_light_editor )
 {
 	gLightEditorEnabled = !gLightEditorEnabled;
 
 	if ( !gLightEditorEnabled )
+	{
+		LightEditor_DestroyRenderables();
 		return;
+	}
+
+	if ( tool_light_editor_draw_lights.GetBool() )
+		LightEditor_CreateRenderables();
 
 	// LightEditor_UpdateAllLightDraws();
 }
-
-
-CONVAR( tool_light_editor_draw_lights, 1 );
 
 
 void LightEditor_Init()
@@ -133,7 +228,7 @@ void LightEditor_DrawEditor()
 		{
 			light->aPos         = playerTransform.aPos + camTransform.aPos;
 			// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
-			light->aColor       = { 1, 1, 1 };
+			light->aColor       = { 1, 1, 1, 1 };
 			light->aRadius      = 500;
 		}
 
@@ -147,7 +242,7 @@ void LightEditor_DrawEditor()
 		if ( light != nullptr )
 		{
 			light->aPos    = playerTransform.aPos + camTransform.aPos;
-			light->aColor  = { 10, 10, 10 };
+			light->aColor  = { 1, 1, 1, 10 };
 
 			// weird stuff to get the angle of the light correct from the player's view matrix stuff
 			light->aAng.x =  camTransform.aAng.z;
@@ -168,6 +263,11 @@ void LightEditor_DrawEditor()
 
 	ImVec2 itemSize = ImGui::GetItemRectSize();
 	itemSize.y *= gLights.size();
+
+	const ImGuiStyle& style = ImGui::GetStyle();
+
+	itemSize.x += ( style.FramePadding.x + style.ItemInnerSpacing.x ) * 2;
+	itemSize.y += ( style.FramePadding.y + style.ItemInnerSpacing.y ) * 2;
 
 	if ( ImGui::BeginChild( "Lights", itemSize, true ) )
 	{
@@ -198,7 +298,7 @@ void LightEditor_DrawEditor()
 
 			if ( ImGui::Selectable( name, gpSelectedLight == gLights[ i ] ) )
 			{
-				gpSelectedLight    = gLights[ i ];
+				gpSelectedLight = gLights[ i ];
 			}
 
 			ImGui::PopID();
@@ -216,12 +316,13 @@ void LightEditor_DrawEditor()
 	if ( ImGui::Button( "Delete Light" ) )
 	{
 		ImGui::End();
+		LightEditor_DestroyRenderable( gpSelectedLight );
 		Graphics_DestroyLight( gpSelectedLight );
 		gpSelectedLight = nullptr;
 		return;
 	}
 
-	if ( !ImGui::BeginChild( "Light Properties" ) )
+	if ( !ImGui::BeginChild( "Light Properties", {}, true ) )
 	{
 		ImGui::EndChild();
 		ImGui::End();
@@ -230,8 +331,8 @@ void LightEditor_DrawEditor()
 
 	bool updateLight = false;
 
-	// updateLight |= ImGui::ColorEdit3( "Color", &gpSelectedLight->aColor.x );
-	updateLight |= ImGui::InputFloat3( "Color", &gpSelectedLight->aColor.x );
+	updateLight |= ImGui::ColorEdit4( "Color", &gpSelectedLight->aColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
+	// updateLight |= ImGui::InputFloat4( "Color", &gpSelectedLight->aColor.x );
 
 	if ( gpSelectedLight->aType == ELightType_Directional )
 	{
@@ -241,14 +342,14 @@ void LightEditor_DrawEditor()
 	}
 	else if ( gpSelectedLight->aType == ELightType_Point )
 	{
-		updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
+		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &gpSelectedLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
+		// updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
 		updateLight |= ImGui::SliderFloat( "Radius", &gpSelectedLight->aRadius, 0, 1000 );
 	}
 	else if ( gpSelectedLight->aType == ELightType_Cone )
 	{
-		// updateLight |= ImGui::ColorEdit3( "Color", &gpSelectedLight->aColor.x );
-
-		updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
+		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &gpSelectedLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
+		// updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
 
 		updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
 		updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
@@ -275,12 +376,6 @@ void LightEditor_DrawLightModels()
 		return;
 
 	LightEditor_UpdateAllLightDraws();
-
-	for ( auto& [ light, draw ] : gDrawLights )
-	{
-		// if ( gpFlashlight != light )
-		// 	Graphics_DrawModel( &draw );
-	}
 }
 
 

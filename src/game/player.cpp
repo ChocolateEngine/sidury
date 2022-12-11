@@ -223,7 +223,8 @@ Entity PlayerManager::Create()
 	Light_t* flashlight = Graphics_CreateLight( ELightType_Cone );
 	flashlight->aInnerFov = 0.f ;
 	flashlight->aOuterFov = 45.f;
-	flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+	flashlight->aColor    = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
 	entities->AddComponent< Light_t* >( player, flashlight );
 
@@ -341,7 +342,8 @@ void Player_UpdateFlashlight( Entity player )
 
 	if ( flashlight->aEnabled )
 	{
-		flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+		// flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
+		flashlight->aColor = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
 		if ( !r_flashlight_lock.GetBool() )
 		{

@@ -56,6 +56,7 @@ struct MaterialVar
 		Handle    aDataTexture;
 		float     aDataFloat;
 		int       aDataInt;
+		bool      aDataBool;
 		glm::vec2 aDataVec2;
 		glm::vec3 aDataVec3;
 		glm::vec4 aDataVec4;
@@ -71,6 +72,7 @@ struct MaterialVar
 	inline void             SetVar( Handle val )                          { aType = EMatVar_Texture; aDataTexture = val; }
 	inline void             SetVar( float val )                           { aType = EMatVar_Float; aDataFloat = val; }
 	inline void             SetVar( int val )                             { aType = EMatVar_Int; aDataInt = val; }
+	inline void             SetVar( bool val )                            { aType = EMatVar_Bool; aDataBool = val; }
 	inline void             SetVar( const glm::vec2 &val )                { aType = EMatVar_Vec2; aDataVec2 = val; }
 	inline void             SetVar( const glm::vec3 &val )                { aType = EMatVar_Vec3; aDataVec3 = val; }
 	inline void             SetVar( const glm::vec4 &val )                { aType = EMatVar_Vec4; aDataVec4 = val; }
@@ -78,6 +80,7 @@ struct MaterialVar
 	inline Handle           GetTexture( Handle fallback = InvalidHandle ) { return ( aType == EMatVar_Texture ) ? aDataTexture : fallback; }
 	inline const float&     GetFloat( float fallback = 0.f )              { return ( aType == EMatVar_Float ) ? aDataFloat : fallback; }
 	inline const int&       GetInt( int fallback = 0 )                    { return ( aType == EMatVar_Int ) ? aDataInt : fallback; }
+	inline bool             GetBool( bool fallback = false )              { return ( aType == EMatVar_Bool ) ? aDataBool : fallback; }
 	inline const glm::vec2& GetVec2( const glm::vec2 &fallback )          { return ( aType == EMatVar_Vec2 ) ? aDataVec2 : fallback; }
 	inline const glm::vec3& GetVec3( const glm::vec3 &fallback )          { return ( aType == EMatVar_Vec3 ) ? aDataVec3 : fallback; }
 	inline const glm::vec4& GetVec4( const glm::vec4 &fallback )          { return ( aType == EMatVar_Vec4 ) ? aDataVec4 : fallback; }
@@ -227,6 +230,7 @@ void Mat_SetVar( Handle mat, const std::string& name, Handle value )
 
 void Mat_SetVar( Handle mat, const std::string& name, float value )              { Mat_SetVarInternal( mat, name, value ); }
 void Mat_SetVar( Handle mat, const std::string& name, int value )                { Mat_SetVarInternal( mat, name, value ); }
+void Mat_SetVar( Handle mat, const std::string& name, bool value )               { Mat_SetVarInternal( mat, name, value ); }
 void Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& value )   { Mat_SetVarInternal( mat, name, value ); }
 void Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& value )   { Mat_SetVarInternal( mat, name, value ); }
 void Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& value )   { Mat_SetVarInternal( mat, name, value ); }
@@ -281,6 +285,13 @@ int Mat_GetInt( Handle mat, std::string_view name, int fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetInt( fallback ) : fallback;
+}
+
+
+bool Mat_GetBool( Handle mat, std::string_view name, bool fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, name );
+	return var ? var->GetBool( fallback ) : fallback;
 }
 
 
@@ -418,8 +429,14 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				// integer is here is an int64_t
 				if ( cur.aInt > INT_MAX )
 				{
-					Log_WarnF( gLC_ClientGraphics, "Overflowed Int Value for key \"%s\", clamping to INT_MAX - \"%s\"\n", cur.apName , srPath.c_str() );
+					Log_WarnF( gLC_ClientGraphics, "Overflowed Int Value for key \"%s\", clamping to INT_MAX - \"%s\"\n", cur.apName, srPath.c_str() );
 					Mat_SetVar( handle, cur.apName, INT_MAX );
+					break;
+				}
+				else if ( cur.aInt < INT_MIN )
+				{
+					Log_WarnF( gLC_ClientGraphics, "Underflowed Int Value for key \"%s\", clamping to INT_MIN - \"%s\"\n", cur.apName, srPath.c_str() );
+					Mat_SetVar( handle, cur.apName, INT_MIN );
 					break;
 				}
 
@@ -431,6 +448,18 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 			case EJsonType_Double:
 			{
 				Mat_SetVar( handle, cur.apName, static_cast< float >( cur.aDouble ) );
+				break;
+			}
+
+			case EJsonType_True:
+			{
+				Mat_SetVar( handle, cur.apName, true );
+				break;
+			}
+
+			case EJsonType_False:
+			{
+				Mat_SetVar( handle, cur.apName, false );
 				break;
 			}
 

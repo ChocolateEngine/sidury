@@ -35,12 +35,14 @@ struct Basic3D_Push
 
 struct Basic3D_Material
 {
-	int   diffuse       = 0;
+	int   albedo        = 0;
 	int   ao            = 0;
 	int   emissive      = 0;
 
 	float aoPower       = 1.f;
 	float emissivePower = 1.f;
+
+	bool  aAlphaTest    = false;
 };
 
 
@@ -131,12 +133,14 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 		mat = &gMaterialData[ sMat ];
 	}
 
-	mat->diffuse       = Mat_GetTextureIndex( sMat, "diffuse" );
+	mat->albedo        = Mat_GetTextureIndex( sMat, "diffuse" );
 	mat->ao            = Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
 	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
 
 	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
-	mat->emissivePower   = Mat_GetFloat( sMat, "emissivePower", 0.f );
+	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
+
+	mat->aAlphaTest    = Mat_GetBool( sMat, "alphaTest" );
 
 	if ( !gStagingBuffer )
 		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
@@ -174,6 +178,15 @@ static void Shader_Basic3D_Destroy()
 {
 	render->FreeTexture( gFallbackAO );
 	render->FreeTexture( gFallbackEmissive );
+	
+	if ( gStagingBuffer )
+		render->DestroyBuffer( gStagingBuffer );
+
+	for ( auto& [ buffer, material ] : gMaterialData )
+		render->DestroyBuffer( buffer );
+
+	gStagingBuffer = InvalidHandle;
+	gMaterialData.clear();
 
 	Graphics_SetAllMaterialsDirty();
 }

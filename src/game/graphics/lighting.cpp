@@ -354,7 +354,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
+			light.aColor.w = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
 			Transform temp{};
 			temp.aPos = spLight->aPos;
@@ -426,7 +426,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
+			light.aColor.w = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
 			light.aPos     = spLight->aPos;
 			light.aRadius  = spLight->aRadius;
@@ -440,7 +440,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x = spLight->aColor.x;
 			light.aColor.y = spLight->aColor.y;
 			light.aColor.z = spLight->aColor.z;
-			light.aColor.w = spLight->aEnabled;
+			light.aColor.w = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
 			light.aPos     = spLight->aPos;
 			light.aFov.x   = glm::radians( spLight->aInnerFov );
@@ -497,7 +497,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.x   = spLight->aColor.x;
 			light.aColor.y   = spLight->aColor.y;
 			light.aColor.z   = spLight->aColor.z;
-			light.aColor.w   = spLight->aEnabled;
+			light.aColor.w   = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
 			light.aPos       = spLight->aPos;
 			light.aLength    = spLight->aLength;
