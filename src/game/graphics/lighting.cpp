@@ -161,6 +161,8 @@ void Graphics_AddShadowMap( Light_t* spLight )
 	// createData.aSamplerAddress = ESamplerAddressMode_ClampToEdge;
 	createData.aSamplerAddress = ESamplerAddressMode_ClampToBorder;
 
+	createData.aDepthCompare   = true;
+
 	shadowMap.aTexture         = render->CreateTexture( texCreate, createData );
 
 	// Create Framebuffer
