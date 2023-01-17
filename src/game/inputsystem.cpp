@@ -77,7 +77,7 @@ static void bind_dropdown_keys(
 		else if ( args.size() )
 		{
 			// Check if this string is inside this other string
-			char* find = strcasestr( name, args[ 0 ].c_str() );
+			const char* find = strcasestr( name, args[ 0 ].c_str() );
 
 			if ( !find )
 				continue;
