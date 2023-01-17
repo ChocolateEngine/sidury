@@ -132,13 +132,9 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 		Util_ToMatrix( renderable->aModelMatrix, spLight->aPos, spLight->aAng );
 
 	if ( spLight == gpSelectedLight )
-	 	Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
-	
-	// glm::vec3 modelForward, modelRight, modelUp;
-	// Util_GetMatrixDirection( modelDraw.aModelMatrix, &modelForward, &modelRight, &modelUp );
-	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelForward * r_light_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
-	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelRight * r_light_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
-	// Graphics_DrawLine( spLight->aPos, spLight->aPos + ( modelUp * r_light_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
+	{
+		Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+	}
 
 	if ( r_light_line && spLight->aType != ELightType_Point )
 	{
@@ -332,7 +328,6 @@ void LightEditor_DrawEditor()
 	bool updateLight = false;
 
 	updateLight |= ImGui::ColorEdit4( "Color", &gpSelectedLight->aColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
-	// updateLight |= ImGui::InputFloat4( "Color", &gpSelectedLight->aColor.x );
 
 	if ( gpSelectedLight->aType == ELightType_Directional )
 	{
@@ -343,13 +338,11 @@ void LightEditor_DrawEditor()
 	else if ( gpSelectedLight->aType == ELightType_Point )
 	{
 		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &gpSelectedLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
-		// updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
 		updateLight |= ImGui::SliderFloat( "Radius", &gpSelectedLight->aRadius, 0, 1000 );
 	}
 	else if ( gpSelectedLight->aType == ELightType_Cone )
 	{
 		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &gpSelectedLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
-		// updateLight |= ImGui::InputFloat3( "Position", &gpSelectedLight->aPos.x );
 
 		updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
 		updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
