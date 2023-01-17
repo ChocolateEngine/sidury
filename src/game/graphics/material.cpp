@@ -7,6 +7,10 @@
 
 #include <set>
 
+#if __unix__
+#include <limits.h>
+#endif /* __unix__  */
+
 extern IRender* render;
 
 struct MaterialVar

@@ -866,7 +866,7 @@ class PlayerCollisionCheck : public PhysCollisionCollector
 		}
 	}
 
-	glm::vec3 GetDirection() override
+	glm::vec3 GetDirection()
 	{
 		return aVelocity;
 	}
@@ -1199,7 +1199,7 @@ class PlayerStairsCheck : public PhysCollisionCollector
 		}
 	}
 	
-	glm::vec3 GetDirection() override
+	glm::vec3 GetDirection()
 	{
 		return aDir;
 	}
