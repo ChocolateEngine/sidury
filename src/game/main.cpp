@@ -7,6 +7,7 @@
 #include "render/irender.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl.h"
+#include "imgui/ImGuizmo.h"
 
 #include "util.h"
 #include "game_physics.h"
@@ -21,6 +22,7 @@
 #include "tools/light_editor.h"
 
 #include <SDL_system.h>
+#include <SDL_hints.h>
 
 #include <algorithm>
 
@@ -412,6 +414,59 @@ void EntUpdate()
 }
 
 
+static ImVec2 ImVec2Mul( ImVec2 vec, float sScale )
+{
+	vec.x *= sScale;
+	vec.y *= sScale;
+	return vec;
+}
+
+
+static ImVec2 ImVec2MulMin( ImVec2 vec, float sScale, float sMin = 1.f )
+{
+	vec.x *= sScale;
+	vec.y *= sScale;
+
+	vec.x = glm::max( sMin, vec.x );
+	vec.y = glm::max( sMin, vec.y );
+
+	return vec;
+}
+
+
+static void ScaleImGui( float sScale )
+{
+	static ImGuiStyle baseStyle = ImGui::GetStyle();
+
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	style.ChildRounding             = baseStyle.ChildRounding * sScale;
+	style.WindowRounding            = baseStyle.WindowRounding * sScale;
+	style.PopupRounding             = baseStyle.PopupRounding * sScale;
+	style.FrameRounding             = baseStyle.FrameRounding * sScale;
+	style.IndentSpacing             = baseStyle.IndentSpacing * sScale;
+	style.ColumnsMinSpacing         = baseStyle.ColumnsMinSpacing * sScale;
+	style.ScrollbarSize             = baseStyle.ScrollbarSize * sScale;
+	style.ScrollbarRounding         = baseStyle.ScrollbarRounding * sScale;
+	style.GrabMinSize               = baseStyle.GrabMinSize * sScale;
+	style.GrabRounding              = baseStyle.GrabRounding * sScale;
+	style.LogSliderDeadzone         = baseStyle.LogSliderDeadzone * sScale;
+	style.TabRounding               = baseStyle.TabRounding * sScale;
+	style.MouseCursorScale          = baseStyle.MouseCursorScale * sScale;
+	style.TabMinWidthForCloseButton = ( baseStyle.TabMinWidthForCloseButton != FLT_MAX ) ? ( baseStyle.TabMinWidthForCloseButton * sScale ) : FLT_MAX;
+
+	style.WindowPadding             = ImVec2Mul( baseStyle.WindowPadding, sScale );
+	style.WindowMinSize             = ImVec2MulMin( baseStyle.WindowMinSize, sScale );
+	style.FramePadding              = ImVec2Mul( baseStyle.FramePadding, sScale );
+	style.ItemSpacing               = ImVec2Mul( baseStyle.ItemSpacing, sScale );
+	style.ItemInnerSpacing          = ImVec2Mul( baseStyle.ItemInnerSpacing, sScale );
+	style.CellPadding               = ImVec2Mul( baseStyle.CellPadding, sScale );
+	style.TouchExtraPadding         = ImVec2Mul( baseStyle.TouchExtraPadding, sScale );
+	style.DisplayWindowPadding      = ImVec2Mul( baseStyle.DisplayWindowPadding, sScale );
+	style.DisplaySafeAreaPadding    = ImVec2Mul( baseStyle.DisplaySafeAreaPadding, sScale );
+}
+
+
 void Game_UpdateGame( float frameTime )
 {
 	PROF_SCOPE();
@@ -419,6 +474,10 @@ void Game_UpdateGame( float frameTime )
 	gFrameTime = frameTime * host_timescale;
 
 	Graphics_NewFrame();
+
+	ImGuizmo::BeginFrame();
+	ImGuizmo::SetDrawlist();
+
 	Game_HandleSystemEvents();
 
 	Input_Update();
@@ -436,6 +495,38 @@ void Game_UpdateGame( float frameTime )
 	gCurTime += gFrameTime;
 
 	MapManager_Update();
+
+#if 0
+	// what
+	if ( ImGui::Begin( "What" ) )
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+
+		static float imguiScale = 1.f;
+
+		if ( ImGui::SliderFloat( "Scale", &imguiScale, 0.25f, 4.f, "%.4f", 1.f ) )
+		{
+			ScaleImGui( imguiScale );
+		}
+
+		// if ( ImGui::Button( "x 2.0" ) )
+		// {
+		// 	ScaleImGui( 2.0f );
+		// }
+		// 
+		// else if ( ImGui::Button( "x 0.1" ) )
+		// {
+		// 	ScaleImGui( 1.1f );
+		// }
+		// 
+		// else if ( ImGui::Button( "x 0.9" ) )
+		// {
+		// 	ScaleImGui( 0.9f );
+		// }
+	}
+
+	ImGui::End();
+#endif
 
 	// WORLD GLOBAL AXIS
 	// if ( dbg_global_axis )
@@ -593,6 +684,16 @@ void Game_SetupModels( float frameTime )
 	// ?????
 	float protoScale = vrcmdl_scale;
 
+	// funny temp
+	struct ProtoTurn_t
+	{
+		double aNextTime;
+		float  aLastRand;
+		float  aRand;
+	};
+
+	static std::unordered_map< Entity, ProtoTurn_t > protoTurnMap;
+
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
 #if 1
@@ -607,6 +708,8 @@ void Game_SetupModels( float frameTime )
 
 		if ( renderable == nullptr )
 			continue;
+
+		// glm::length( renderable->aModelMatrix ) == 0.f
 
 		// TESTING: BROKEN
 		if ( proto_look == 2.f )
@@ -642,7 +745,7 @@ void Game_SetupModels( float frameTime )
 
 			renderable->aModelMatrix = modelMatrix;
 		}
-		else if ( proto_look.GetBool() )
+		else if ( proto_look.GetBool() && !gPaused )
 		{
 			matrixChanged = true;
 
@@ -671,10 +774,25 @@ void Game_SetupModels( float frameTime )
 		{
 			matrixChanged = true;
 
-			glm::vec3 modelUp;
-			Util_GetMatrixDirection( renderable->aModelMatrix, nullptr, nullptr, &modelUp );
+			glm::vec3 modelUp, modelRight, modelForward;
+			Util_GetMatrixDirection( renderable->aModelMatrix, &modelForward, &modelRight, &modelUp );
 
-			protoTransform.aPos = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
+			ProtoTurn_t& protoTurn = protoTurnMap[ proto ];
+
+			if ( protoTurn.aNextTime <= gCurTime )
+			{
+				protoTurn.aNextTime = gCurTime + ( rand() / ( RAND_MAX / 8.f ) );
+				protoTurn.aLastRand = protoTurn.aRand;
+				// protoTurn.aRand     = ( rand() / ( RAND_MAX / 40.0f ) ) - 20.f;
+				protoTurn.aRand     = ( rand() / ( RAND_MAX / 360.0f ) ) - 180.f;
+			}
+
+			float randTurn         = std::lerp( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
+
+			protoTransform.aPos    = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
+
+			// protoTransform.aAng    = protoTransform.aAng + ( modelForward * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
+			protoTransform.aAng    = protoTransform.aAng + ( modelRight * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
 		}
 
 		if ( matrixChanged )
@@ -811,6 +929,19 @@ void Game_HandleSystemEvents()
 			{
 				switch (e.window.event)
 				{
+					case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+					{
+						// static float prevDPI = 96.f;
+						// 
+						// float dpi, hdpi, vdpi;
+						// int test = SDL_GetDisplayDPI( e.window.data1, &dpi, &hdpi, &vdpi );
+						// 
+						// ImGuiStyle& style = ImGui::GetStyle();
+						// style.ScaleAllSizes( dpi / prevDPI );
+						// 
+						// prevDPI = dpi;
+					}
+
 					case SDL_WINDOWEVENT_SIZE_CHANGED:
 					{
 						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
