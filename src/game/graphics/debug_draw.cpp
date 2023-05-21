@@ -136,7 +136,7 @@ void Graphics_UpdateDebugDraw()
 	{
 		ViewRenderList_t& viewList   = gViewRenderLists[ 0 ];
 
-		glm::mat4         lastMatrix = glm::mat4( 1.f );
+		glm::mat4         lastMatrix = glm::mat4( 0.f );
 		glm::mat4         invMatrix  = glm::mat4( 1.f );
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
@@ -262,6 +262,9 @@ void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
+	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 2 );
+	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 2 );
+
 	gDebugLineVertPos.push_back( sX );
 	gDebugLineVertPos.push_back( sY );
 
@@ -285,6 +288,9 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
+
+	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
+	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
 
 	// bottom
 	Graphics_DrawLine( sMin, glm::vec3( sMax.x, sMin.y, sMin.z ), sColor );
@@ -325,6 +331,9 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 		v[ i ].z     = ff.z / ff.w;
 	}
 
+	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
+	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
+
 	Graphics_DrawLine( v[ 0 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( v[ 0 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( v[ 3 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
@@ -348,6 +357,9 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 
 	if ( !r_debug_draw || !gDebugLineModel || !r_debug_frustums )
 		return;
+
+	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
+	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
 
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
@@ -406,6 +418,9 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 			return;
 		}
 
+		gDebugLineVertPos.reserve( gDebugLineVertPos.size() + ( mesh.aIndexCount * 3 ) );
+		gDebugLineVertColor.reserve( gDebugLineVertColor.size() + ( mesh.aIndexCount * 3 ) );
+
 		u32 j = 0;
 		for ( u32 i = 0; i < mesh.aIndexCount; )
 		{
@@ -429,7 +444,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 			glm::vec3 normal = glm::cross( ( v[ 1 ] - v[ 0 ] ), ( v[ 2 ] - v[ 0 ] ) );
 			float     len    = glm::length( normal );
 
-			// Make sure we don't have any 0 lengths, that will crash the physics engine
+			// Make sure we don't have any 0 lengths
 			if ( len == 0.f )
 			{
 				// Log_Warn( "Graphics_DrawNormals(): Face Normal of 0?\n" );
