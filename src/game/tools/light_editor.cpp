@@ -8,7 +8,7 @@
 static Handle                                 gModelLightPoint    = InvalidHandle;
 static Handle                                 gModelLightCone     = InvalidHandle;
 
-static bool                                   gLightEditorEnabled = true;
+static bool                                   gLightEditorEnabled = false;
 
 static std::unordered_map< Light_t*, Handle > gDrawLights;
 
