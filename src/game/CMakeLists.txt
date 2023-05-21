@@ -12,10 +12,25 @@ set(
 	SRC_FILES
 	${SRC_FILES_GLOB}
 	
+	# networking
+	network/net_main.cpp
+	network/net_main.h
+	
 	# tools
 	tools/light_editor.cpp
 	tools/light_editor.h
 )
+
+if( WIN32 )
+	set(
+		SRC_FILES
+		${SRC_FILES_GLOB}
+		
+		# networking
+		network/net_windows.cpp
+		network/net_windows.h
+	)
+endif()
 
 file(
 	GLOB_RECURSE PUBLIC_FILES CONFIGURE_DEPENDS
@@ -38,6 +53,17 @@ target_link_libraries(
 	Core
 	ImGui
 )
+
+if( WIN32 )
+	target_link_libraries(
+		SiduryClient
+		PRIVATE
+		# Networking
+		wsock32
+		ws2_32
+		Iphlpapi
+	)
+endif()
 
 add_dependencies( SiduryClient "Core" "ImGui" )
 

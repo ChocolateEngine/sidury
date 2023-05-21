@@ -16,6 +16,7 @@
 #include "mapmanager.h"
 #include "inputsystem.h"
 #include "skybox.h"
+#include "network/net_main.h"
 
 #include "tools/light_editor.h"
 
@@ -226,6 +227,7 @@ void Game_Shutdown()
 {
 	Skybox_Destroy();
 	Phys_Shutdown();
+	Net_Shutdown();
 
 	//if ( aLocalPlayer )
 	//	delete aLocalPlayer;
@@ -301,6 +303,7 @@ bool Game_Init()
 	Phys_Init();
 	LightEditor_Init();
 	Skybox_Init();
+	Net_Init();
 
 	entities = new EntityManager;
 	entities->Init();
