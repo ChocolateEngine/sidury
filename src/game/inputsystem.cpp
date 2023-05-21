@@ -16,7 +16,7 @@ REGISTER_BUTTON( IN_BACK );
 
 CONVAR( m_pitch, 0.022, CVARF_ARCHIVE );
 CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
-CONVAR( m_sensitivity, 0.3, CVARF_ARCHIVE, "Mouse Sensitivity" );
+CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 
 static glm::vec2                                       gMouseDelta{};
