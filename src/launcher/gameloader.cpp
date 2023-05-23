@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
 	void ( *core_exit )() = 0;
 
-	if ( load_object( &core, "bin/core" EXT_DLL ) == -1 )
+	if ( load_object( &core, "bin/ch_core" EXT_DLL ) == -1 )
 		return -1;
 	if ( load_object( &imgui, "bin/imgui" EXT_DLL ) == -1 )
 		return -1;

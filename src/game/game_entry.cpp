@@ -58,10 +58,10 @@ extern Ch_IPhysics*     ch_physics;
 
 static AppModules_t gAppModules[] = 
 {
-	{ (void**)&input,      "input",       IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (void**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
 	{ (void**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_VER },
 	{ (void**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
-	{ (void**)&audio,      "aduio",       IADUIO_NAME, IADUIO_HASH },
+	{ (void**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_HASH },
 	{ (void**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
 };
 
