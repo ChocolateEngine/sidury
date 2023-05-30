@@ -2,7 +2,7 @@
 #include "iinput.h"
 #include "main.h"
 
-extern BaseInputSystem* input;
+extern IInputSystem* input;
 
 LOG_REGISTER_CHANNEL2( GameInput, LogColor::Default );
 

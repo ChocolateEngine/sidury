@@ -49,11 +49,11 @@ CONCMD( mimalloc_print )
 static bool             gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
 
 
-extern BaseGuiSystem*   gui;
-extern IRender*         render;
-extern BaseInputSystem* input;
-extern BaseAudioSystem* audio;
-extern Ch_IPhysics*     ch_physics;
+extern IGuiSystem*   gui;
+extern IRender*      render;
+extern IInputSystem* input;
+extern IAudioSystem* audio;
+extern Ch_IPhysics*  ch_physics;
 
 
 static AppModules_t gAppModules[] = 

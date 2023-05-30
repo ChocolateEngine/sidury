@@ -21,15 +21,15 @@ const glm::vec3 vec3_up(0, 0, 1);
 #include "game_physics.h"
 #include "entity.h"
 
-class BaseGuiSystem;
+class IGuiSystem;
 class IRender;
-class BaseInputSystem;
-class BaseAudioSystem;
+class IInputSystem;
+class IAudioSystem;
 
-extern BaseGuiSystem*   gui;
+extern IGuiSystem*      gui;
 extern IRender*         render;
-extern BaseInputSystem* input;
-extern BaseAudioSystem* audio;
+extern IInputSystem*    input;
+extern IAudioSystem*    audio;
 
 extern ViewportCamera_t gView;
 extern float            gFrameTime;

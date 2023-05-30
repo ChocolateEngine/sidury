@@ -19,8 +19,8 @@ LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::Green )
 // --------------------------------------------------------------------------------------
 // Interfaces
 
-extern BaseGuiSystem*        gui;
-extern IRender*              render;
+extern IGuiSystem* gui;
+extern IRender*    render;
 
 // --------------------------------------------------------------------------------------
 

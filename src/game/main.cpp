@@ -27,10 +27,10 @@
 #include <algorithm>
 
 
-BaseGuiSystem*   gui          = nullptr;
+IGuiSystem*      gui          = nullptr;
 IRender*         render       = nullptr;
-BaseInputSystem* input        = nullptr;
-BaseAudioSystem* audio        = nullptr;
+IInputSystem*    input        = nullptr;
+IAudioSystem*    audio        = nullptr;
 
 static bool      gPaused      = true;
 float            gFrameTime   = 0.f;
