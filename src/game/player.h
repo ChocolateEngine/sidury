@@ -75,6 +75,7 @@ struct CPlayerMoveData
 	IPhysicsObject*         apGroundObj = nullptr;
 	glm::vec3               aGroundPosition{};
 	glm::vec3               aGroundNormal{};
+	glm::vec3               aGroundVelocity{};
 	// Handle                  aGroundMaterial;
 };
 
