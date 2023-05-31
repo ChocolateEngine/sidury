@@ -3,6 +3,8 @@
 #include "inputsystem.h"
 #include "graphics/graphics.h"
 
+#include "imgui/imgui.h"
+
 // ---------------------------------------------------------------------------
 // This file is dedicated for random stuff and experiments with the game
 // and will be quite messy
@@ -12,8 +14,12 @@
 
 CONVAR( vrcmdl_scale, 40 );
 CONVAR( in_proto_spam, 0, CVARF_INPUT );
+CONVAR( proto_look, 1 );
+CONVAR( proto_follow, 0 );
+CONVAR( proto_follow_speed, 400 );
 
 extern ConVar                 phys_friction;
+extern ConVar                 cl_view_height;
 
 extern Entity                 gLocalPlayer;
 
@@ -190,6 +196,57 @@ void TEST_Shutdown()
 }
 
 
+static ImVec2 ImVec2Mul( ImVec2 vec, float sScale )
+{
+	vec.x *= sScale;
+	vec.y *= sScale;
+	return vec;
+}
+
+static ImVec2 ImVec2MulMin( ImVec2 vec, float sScale, float sMin = 1.f )
+{
+	vec.x *= sScale;
+	vec.y *= sScale;
+
+	vec.x = glm::max( sMin, vec.x );
+	vec.y = glm::max( sMin, vec.y );
+
+	return vec;
+}
+
+static void ScaleImGui( float sScale )
+{
+	static ImGuiStyle baseStyle     = ImGui::GetStyle();
+
+	ImGuiStyle&       style         = ImGui::GetStyle();
+
+	style.ChildRounding             = baseStyle.ChildRounding * sScale;
+	style.WindowRounding            = baseStyle.WindowRounding * sScale;
+	style.PopupRounding             = baseStyle.PopupRounding * sScale;
+	style.FrameRounding             = baseStyle.FrameRounding * sScale;
+	style.IndentSpacing             = baseStyle.IndentSpacing * sScale;
+	style.ColumnsMinSpacing         = baseStyle.ColumnsMinSpacing * sScale;
+	style.ScrollbarSize             = baseStyle.ScrollbarSize * sScale;
+	style.ScrollbarRounding         = baseStyle.ScrollbarRounding * sScale;
+	style.GrabMinSize               = baseStyle.GrabMinSize * sScale;
+	style.GrabRounding              = baseStyle.GrabRounding * sScale;
+	style.LogSliderDeadzone         = baseStyle.LogSliderDeadzone * sScale;
+	style.TabRounding               = baseStyle.TabRounding * sScale;
+	style.MouseCursorScale          = baseStyle.MouseCursorScale * sScale;
+	style.TabMinWidthForCloseButton = ( baseStyle.TabMinWidthForCloseButton != FLT_MAX ) ? ( baseStyle.TabMinWidthForCloseButton * sScale ) : FLT_MAX;
+
+	style.WindowPadding             = ImVec2Mul( baseStyle.WindowPadding, sScale );
+	style.WindowMinSize             = ImVec2MulMin( baseStyle.WindowMinSize, sScale );
+	style.FramePadding              = ImVec2Mul( baseStyle.FramePadding, sScale );
+	style.ItemSpacing               = ImVec2Mul( baseStyle.ItemSpacing, sScale );
+	style.ItemInnerSpacing          = ImVec2Mul( baseStyle.ItemInnerSpacing, sScale );
+	style.CellPadding               = ImVec2Mul( baseStyle.CellPadding, sScale );
+	style.TouchExtraPadding         = ImVec2Mul( baseStyle.TouchExtraPadding, sScale );
+	style.DisplayWindowPadding      = ImVec2Mul( baseStyle.DisplayWindowPadding, sScale );
+	style.DisplaySafeAreaPadding    = ImVec2Mul( baseStyle.DisplaySafeAreaPadding, sScale );
+}
+
+
 void TEST_EntUpdate()
 {
 	PROF_SCOPE();
@@ -216,14 +273,25 @@ void TEST_EntUpdate()
 			Util_ToMatrix( renderable->aModelMatrix, phys->GetPos(), phys->GetAng() );
 		}
 	}
+
+#if 0
+	// what
+	if ( ImGui::Begin( "What" ) )
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+
+		static float imguiScale = 1.f;
+
+		if ( ImGui::SliderFloat( "Scale", &imguiScale, 0.25f, 4.f, "%.4f", 1.f ) )
+		{
+			ScaleImGui( imguiScale );
+		}
+	}
+
+	ImGui::End();
+#endif
 }
 
-
-extern ConVar cl_view_height;
-
-CONVAR( proto_look, 1 );
-CONVAR( proto_follow, 0 );
-CONVAR( proto_follow_speed, 400 );
 
 #if 0
 void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
@@ -511,4 +579,5 @@ void TEST_UpdateAudio()
 		}
 	}
 }
+
 

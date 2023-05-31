@@ -18,6 +18,7 @@
   #include "mimalloc-new-delete.h"
 #endif
 
+static bool gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
 static bool gRunning   = true;
 
 CONVAR( host_max_frametime, 0.1 );
@@ -44,9 +45,6 @@ CONCMD( mimalloc_print )
 	mi_stats_print( nullptr );
 }
 #endif
-
-
-static bool             gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
 
 
 extern IGuiSystem*   gui;
@@ -135,8 +133,13 @@ extern "C"
 
 			// ftl::TaskCounter taskCounter( &gTaskScheduler );
 
+			input->Update( time );
+
+			// may change from input update running the quit command
+			if ( !gRunning )
+				break;
+
 			Game_Update( time );
-			// Con_Update();
 			
 			// Wait and help to execute unfinished tasks
 			// gTaskScheduler.WaitForCounter( &taskCounter );

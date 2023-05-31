@@ -20,6 +20,9 @@
 #include "testing.h"
 #include "network/net_main.h"
 
+#include "cl_main.h"
+#include "sv_main.h"
+
 #include "tools/light_editor.h"
 
 #include <SDL_system.h>
@@ -40,14 +43,14 @@ double           gCurTime     = 0.0;  // i could make this a size_t, and then ju
 Entity           gLocalPlayer = ENT_INVALID;
 ViewportCamera_t gView{};
 
-extern ConVar r_nearz, r_farz, r_fov;
+extern bool      gRunning;
+extern ConVar    r_nearz, r_farz, r_fov;
+extern ConVar    host_timescale;
 
 CONVAR( phys_friction, 10 );
 CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 CONVAR( r_render, 1 );
-
-extern ConVar host_timescale;
 
 
 CON_COMMAND( pause )
@@ -60,6 +63,9 @@ void Game_Shutdown()
 {
 	TEST_Shutdown();
 
+	CL_Shutdown();
+	SV_Shutdown();
+
 	LightEditor_Shutdown();
 	Skybox_Destroy();
 	Phys_Shutdown();
@@ -67,28 +73,28 @@ void Game_Shutdown()
 }
 
 
-#ifdef _WIN32
-  #define WM_PAINT 0x000F
-
-void Game_WindowMessageHook( void* userdata, void* hWnd, unsigned int message, Uint64 wParam, Sint64 lParam )
+void WindowResizeCallback()
 {
-	switch ( message )
-	{
-		case WM_PAINT:
-		{
-			// Log_Msg( "WM_PAINT\n" );
-			break;
-		}
+	PROF_SCOPE_NAMED( "WindowResizeCallback" );
 
-		default:
-		{
-			// static size_t i = 0;
-			// Log_MsgF( "erm %zd\n", i++ );
-			break;
-		}
+	ImGui::NewFrame();
+	ImGui_ImplSDL2_NewFrame();
+	Graphics_NewFrame();
+
+	Game_UpdateProjection();
+
+	Graphics_Reset();
+
+	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
+	{
+		gui->Update( 0.f );
+		Graphics_Present();
+	}
+	else
+	{
+		ImGui::EndFrame();
 	}
 }
-#endif
 
 
 bool Game_Init()
@@ -101,9 +107,7 @@ bool Game_Init()
 	if ( !Graphics_Init() )
 		return false;
 
-#ifdef _WIN32
-	SDL_SetWindowsMessageHook( Game_WindowMessageHook, nullptr );
-#endif
+	Sys_SetResizeCallback( WindowResizeCallback );
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 
@@ -112,9 +116,32 @@ bool Game_Init()
 #endif
 
 	Phys_Init();
-	LightEditor_Init();
-	Skybox_Init();
-	Net_Init();
+	LightEditor_Init(); // TODO: when tools are made, move this there
+
+	// a bit odd this being here
+	if ( !Skybox_Init() )
+	{
+		Log_Error( "Failed to create skybox\n" );
+		return false;
+	}
+
+	if ( !Net_Init() )
+	{
+		Log_Error( "Failed to init networking\n" );
+		return false;
+	}
+
+	if ( !SV_Init() )
+	{
+		Log_Error( "Failed to init server\n" );
+		return false;
+	}
+
+	if ( !CL_Init() )
+	{
+		Log_Error( "Failed to init client\n" );
+		return false;
+	}
 
 	entities = new EntityManager;
 	entities->Init();
@@ -135,25 +162,10 @@ bool Game_Init()
 }
 
 
-void CenterMouseOnScreen()
-{
-	int w, h;
-	SDL_GetWindowSize( render->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
-}
-
-
-bool Game_InMap()
-{
-	return MapManager_HasMap();
-}
-
 
 void Game_Update( float frameTime )
 {
 	PROF_SCOPE();
-
-	input->Update( frameTime );
 
 	{
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
@@ -161,7 +173,17 @@ void Game_Update( float frameTime )
 		ImGui_ImplSDL2_NewFrame();
 	}
 
+	Graphics_NewFrame();
+
 	Game_UpdateGame( frameTime );
+
+	// WORLD GLOBAL AXIS
+	// if ( dbg_global_axis )
+	// {
+	// 	graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size.GetFloat(), 0, 0}, {1, 0, 0});
+	// 	graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size.GetFloat(), 0}, {0, 1, 0} );
+	// 	graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
+	// }
 
 	LightEditor_Update();
 
@@ -181,56 +203,17 @@ void Game_Update( float frameTime )
 }
 
 
-static ImVec2 ImVec2Mul( ImVec2 vec, float sScale )
+void CenterMouseOnScreen()
 {
-	vec.x *= sScale;
-	vec.y *= sScale;
-	return vec;
+	int w, h;
+	SDL_GetWindowSize( render->GetWindow(), &w, &h );
+	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
 }
 
 
-static ImVec2 ImVec2MulMin( ImVec2 vec, float sScale, float sMin = 1.f )
+bool Game_InMap()
 {
-	vec.x *= sScale;
-	vec.y *= sScale;
-
-	vec.x = glm::max( sMin, vec.x );
-	vec.y = glm::max( sMin, vec.y );
-
-	return vec;
-}
-
-
-static void ScaleImGui( float sScale )
-{
-	static ImGuiStyle baseStyle = ImGui::GetStyle();
-
-	ImGuiStyle& style = ImGui::GetStyle();
-
-	style.ChildRounding             = baseStyle.ChildRounding * sScale;
-	style.WindowRounding            = baseStyle.WindowRounding * sScale;
-	style.PopupRounding             = baseStyle.PopupRounding * sScale;
-	style.FrameRounding             = baseStyle.FrameRounding * sScale;
-	style.IndentSpacing             = baseStyle.IndentSpacing * sScale;
-	style.ColumnsMinSpacing         = baseStyle.ColumnsMinSpacing * sScale;
-	style.ScrollbarSize             = baseStyle.ScrollbarSize * sScale;
-	style.ScrollbarRounding         = baseStyle.ScrollbarRounding * sScale;
-	style.GrabMinSize               = baseStyle.GrabMinSize * sScale;
-	style.GrabRounding              = baseStyle.GrabRounding * sScale;
-	style.LogSliderDeadzone         = baseStyle.LogSliderDeadzone * sScale;
-	style.TabRounding               = baseStyle.TabRounding * sScale;
-	style.MouseCursorScale          = baseStyle.MouseCursorScale * sScale;
-	style.TabMinWidthForCloseButton = ( baseStyle.TabMinWidthForCloseButton != FLT_MAX ) ? ( baseStyle.TabMinWidthForCloseButton * sScale ) : FLT_MAX;
-
-	style.WindowPadding             = ImVec2Mul( baseStyle.WindowPadding, sScale );
-	style.WindowMinSize             = ImVec2MulMin( baseStyle.WindowMinSize, sScale );
-	style.FramePadding              = ImVec2Mul( baseStyle.FramePadding, sScale );
-	style.ItemSpacing               = ImVec2Mul( baseStyle.ItemSpacing, sScale );
-	style.ItemInnerSpacing          = ImVec2Mul( baseStyle.ItemInnerSpacing, sScale );
-	style.CellPadding               = ImVec2Mul( baseStyle.CellPadding, sScale );
-	style.TouchExtraPadding         = ImVec2Mul( baseStyle.TouchExtraPadding, sScale );
-	style.DisplayWindowPadding      = ImVec2Mul( baseStyle.DisplayWindowPadding, sScale );
-	style.DisplaySafeAreaPadding    = ImVec2Mul( baseStyle.DisplaySafeAreaPadding, sScale );
+	return MapManager_HasMap();
 }
 
 
@@ -239,8 +222,6 @@ void Game_UpdateGame( float frameTime )
 	PROF_SCOPE();
 
 	gFrameTime = frameTime * host_timescale;
-
-	Graphics_NewFrame();
 
 	ImGuizmo::BeginFrame();
 	ImGuizmo::SetDrawlist();
@@ -262,46 +243,6 @@ void Game_UpdateGame( float frameTime )
 	gCurTime += gFrameTime;
 
 	MapManager_Update();
-
-#if 0
-	// what
-	if ( ImGui::Begin( "What" ) )
-	{
-		ImGuiStyle& style = ImGui::GetStyle();
-
-		static float imguiScale = 1.f;
-
-		if ( ImGui::SliderFloat( "Scale", &imguiScale, 0.25f, 4.f, "%.4f", 1.f ) )
-		{
-			ScaleImGui( imguiScale );
-		}
-
-		// if ( ImGui::Button( "x 2.0" ) )
-		// {
-		// 	ScaleImGui( 2.0f );
-		// }
-		// 
-		// else if ( ImGui::Button( "x 0.1" ) )
-		// {
-		// 	ScaleImGui( 1.1f );
-		// }
-		// 
-		// else if ( ImGui::Button( "x 0.9" ) )
-		// {
-		// 	ScaleImGui( 0.9f );
-		// }
-	}
-
-	ImGui::End();
-#endif
-
-	// WORLD GLOBAL AXIS
-	// if ( dbg_global_axis )
-	// {
-	// 	graphics->DrawLine( {0, 0, 0}, {dbg_global_axis_size.GetFloat(), 0, 0}, {1, 0, 0});
-	// 	graphics->DrawLine( {0, 0, 0}, {0, dbg_global_axis_size.GetFloat(), 0}, {0, 1, 0} );
-	// 	graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
-	// }
 
 	players->Update( gFrameTime );
 
