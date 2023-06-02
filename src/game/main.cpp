@@ -118,19 +118,13 @@ bool Game_Init()
 	Phys_Init();
 	LightEditor_Init(); // TODO: when tools are made, move this there
 
-	// a bit odd this being here
-	if ( !Skybox_Init() )
-	{
-		Log_Error( "Failed to create skybox\n" );
-		return false;
-	}
-
 	if ( !Net_Init() )
 	{
 		Log_Error( "Failed to init networking\n" );
 		return false;
 	}
 
+	// TODO: is this actually even needed if we are only connecting to other servers?
 	if ( !SV_Init() )
 	{
 		Log_Error( "Failed to init server\n" );
@@ -162,7 +156,6 @@ bool Game_Init()
 }
 
 
-
 void Game_Update( float frameTime )
 {
 	PROF_SCOPE();
@@ -171,6 +164,9 @@ void Game_Update( float frameTime )
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
 		ImGui::NewFrame();
 		ImGui_ImplSDL2_NewFrame();
+
+		ImGuizmo::BeginFrame();
+		ImGuizmo::SetDrawlist();
 	}
 
 	Graphics_NewFrame();
@@ -223,12 +219,13 @@ void Game_UpdateGame( float frameTime )
 
 	gFrameTime = frameTime * host_timescale;
 
-	ImGuizmo::BeginFrame();
-	ImGuizmo::SetDrawlist();
-
 	Game_HandleSystemEvents();
 
 	Input_Update();
+
+	// when do i call these lol
+	CL_Update( frameTime );
+	SV_Update( frameTime );
 
 	Game_CheckPaused();
 
@@ -298,7 +295,6 @@ void Game_CheckPaused()
 
 	audio->SetPaused( gPaused );
 }
-
 
 
 // will be used in the future for when updating bones and stuff
@@ -431,5 +427,4 @@ void Game_UpdateProjection()
 	io.DisplaySize.x = width;
 	io.DisplaySize.y = height;
 }
-
 

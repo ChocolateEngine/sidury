@@ -28,6 +28,8 @@ constexpr int      CH_NET_BUF_LEN  = 1000;
 
 static ChVector< Socket_t > gSockets;
 
+// Socket to listen for connections on
+static Socket_t             gListenSocket = CH_INVALID_SOCKET;
 
 inline SOCKET Net_ToSysSocket( Socket_t sSocket )
 {
@@ -39,6 +41,7 @@ inline Socket_t Net_ToSocket( SOCKET sSocket )
 	return reinterpret_cast< Socket_t >( sSocket );
 }
 
+//=============================================================================
 
 const char* Net_ErrorString()
 {
@@ -235,19 +238,6 @@ bool Net_Init()
 
 	gNetInit = true;
 
-	// temp
-	if ( !Net_OpenServer() )
-	{
-		Log_Error( gLC_Network, "Failed to Open Test Server\n" );
-		return false;
-	}
-
-	if ( !Net_ConnectToServer() )
-	{
-		Log_Error( gLC_Network, "Failed to Connect To Test Server\n" );
-		return false;
-	}
-
 	return true;
 }
 
@@ -262,7 +252,49 @@ void Net_Shutdown()
 }
 
 
-void Net_NetadrToSockadr( const NetAddr_t* spNetAddr, struct sockaddr* spSockAddr )
+NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
+{
+	NetAddr_t netAddr;
+
+	if ( sString == "127.0.0.1" )
+	{
+		netAddr.aType = ENetType_Loopback;
+		netAddr.aPort = 27016;
+		netAddr.aIPV4[ 0 ] = 127;
+		netAddr.aIPV4[ 1 ] = 0;
+		netAddr.aIPV4[ 2 ] = 0;
+		netAddr.aIPV4[ 3 ] = 1;
+
+		return netAddr;
+	}
+	
+	Log_Warn( gLC_Network, "FINISH Net_GetNetAddrFromString !!!!!\n" );
+	return netAddr;
+}
+
+
+#if 0
+int Net_GetAddrFromName( char* name, ch_sockaddr* addr )
+{
+	struct hostent* hostentry;
+
+	if ( name[ 0 ] >= '0' && name[ 0 ] <= '9' )
+		return PartialIPAddress( name, addr );
+
+	hostentry = pgethostbyname( name );
+	if ( !hostentry )
+		return -1;
+
+	addr->sa_family                                = AF_INET;
+	( (struct sockaddr_in*)addr )->sin_port        = htons( (unsigned short)net_hostport );
+	( (struct sockaddr_in*)addr )->sin_addr.s_addr = *(int*)hostentry->h_addr_list[ 0 ];
+
+	return 0;
+}
+#endif
+
+
+void Net_NetadrToSockaddr( const NetAddr_t* spNetAddr, struct sockaddr* spSockAddr )
 {
 	memset( spSockAddr, 0, sizeof( *spSockAddr ) );
 
@@ -282,10 +314,49 @@ void Net_NetadrToSockadr( const NetAddr_t* spNetAddr, struct sockaddr* spSockAdd
 }
 
 
+// from quake
+char* Net_AddrToString( ch_sockaddr& addr )
+{
+	static char buffer[ 22 ];
+	int         haddr = ntohl( ( (struct sockaddr_in*)&addr )->sin_addr.s_addr );
+
+	sprintf( buffer, "%d.%d.%d.%d:%d", ( haddr >> 24 ) & 0xff, ( haddr >> 16 ) & 0xff, ( haddr >> 8 ) & 0xff, haddr & 0xff, ntohs( ( (struct sockaddr_in*)&addr )->sin_port ) );
+	return buffer;
+}
+
+
+void Net_GetSocketAddr( Socket_t sSocket, ch_sockaddr& srAddr )
+{
+	int          addrLen = sizeof( srAddr );
+	int          ret     = getsockname( (SOCKET)sSocket, (sockaddr*)&srAddr, &addrLen );
+
+	unsigned int a       = ( (sockaddr_in*)&srAddr )->sin_addr.s_addr;
+
+	if ( a == 0 || a == inet_addr( "127.0.0.1" ) )
+	{
+		// ( (struct sockaddr_in*)addr )->sin_addr.s_addr = myAddr;
+	}
+
+	return;
+}
+
+
+int Net_GetSocketPort( ch_sockaddr& srAddr )
+{
+	return ntohs( ( (sockaddr_in*)&srAddr )->sin_port );
+}
+
+
+void Net_SetSocketPort( ch_sockaddr& srAddr, unsigned short sPort )
+{
+	( (sockaddr_in*)&srAddr )->sin_port = htons( sPort );
+}
+
+
 Socket_t Net_OpenSocket( const char* spPort )
 {
-	if ( !spPort )
-		return CH_INVALID_SOCKET;
+	// if ( !spPort )
+	// 	return CH_INVALID_SOCKET;
 
 	struct addrinfo* result = NULL;
 	struct addrinfo  hints;
@@ -328,27 +399,44 @@ Socket_t Net_OpenSocket( const char* spPort )
 	}
 
 	// Make this socket broadcast capable
-	int i = 1;
-	if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )
+	// HACK FOR CLIENT
+	if ( strcmp( spPort, "0" ) != 0 )
 	{
-		Log_ErrorF( gLC_Network, "Failed to set socket option SO_BROADCAST: %s\n", Net_ErrorString() );
-		return CH_INVALID_SOCKET;
+		int i = 1;
+		if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )
+		{
+			Log_ErrorF( gLC_Network, "Failed to set socket option SO_BROADCAST: %s\n", Net_ErrorString() );
+			return CH_INVALID_SOCKET;
+		}
 	}
 
 	iResult = bind( newSocket, result->ai_addr, (int)result->ai_addrlen );
 	if ( iResult == SOCKET_ERROR )
 	{
-		Log_ErrorF( gLC_Network, "Failed to bind socket: %s\n", Net_ErrorString() );
+		Log_ErrorF( gLC_Network, "Failed to bind socket to address \"%s\": %s\n", Net_AddrToString( (ch_sockaddr&)result->ai_addr ), Net_ErrorString() );
 		freeaddrinfo( result );
 		closesocket( newSocket );
 		return CH_INVALID_SOCKET;
 	}
 
-	Log_DevF( gLC_Network, 1, "Opened Socket on Port \"%s\"\n", gTestServerPort );
+	Log_DevF( gLC_Network, 1, "Opened Socket on Port \"%s\"\n", spPort );
 
 	freeaddrinfo( result );
 
 	return Net_ToSocket( newSocket );
+}
+
+
+void Net_CloseSocket( Socket_t sSocket )
+{
+	if ( !sSocket )
+		return;
+
+	int ret = closesocket( (SOCKET)sSocket );
+	if ( ret != 0 )
+	{
+		Log_ErrorF( gLC_Network, "Failed to close socket: %s\n", Net_ErrorString() );
+	}
 }
 
 
@@ -371,18 +459,92 @@ void Net_SendPacket( const NetAddr_t& srTo, const void* spData, int sSize )
 }
 
 
+void Net_Listen()
+{
+	// int ret = listen( (SOCKET)gListenSocket, )
+}
+
+
+Socket_t Net_CheckNewConnections()
+{
+	char buf[ 4096 ];
+
+	if ( gListenSocket == CH_INVALID_SOCKET )
+		return CH_INVALID_SOCKET;
+
+	if ( recvfrom( (SOCKET)gListenSocket, buf, sizeof( buf ), MSG_PEEK, NULL, NULL ) != SOCKET_ERROR )
+	{
+		return gListenSocket;
+	}
+
+	return CH_INVALID_SOCKET;
+}
+
+
+// Read Incoming Data from a Socket
+int Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFrom )
+{
+	int addrlen = sizeof( ch_sockaddr );
+
+	int ret = recvfrom( (SOCKET)sSocket, spData, sLen, 0, (struct sockaddr*)spFrom, &addrlen );
+
+	if ( ret == -1 )
+	{
+		int errno_ = WSAGetLastError();
+
+		Log_ErrorF( gLC_Network, "Failed to read from socket: %s\n", Net_ErrorString() );
+
+		if ( errno_ == WSAEWOULDBLOCK || errno_ == WSAECONNREFUSED )
+			return 0;
+	}
+
+	return ret;
+}
+
+
+// Write Data to a Socket
+int Net_Write( Socket_t sSocket, const char* spData, int sLen, ch_sockaddr* spAddr )
+{
+	int ret = sendto( (SOCKET)sSocket, spData, sLen, 0, (struct sockaddr*)spAddr, sizeof( ch_sockaddr ) );
+
+	if ( ret == -1 )
+	{
+		Log_ErrorF( gLC_Network, "Failed to write to socket: %s\n", Net_ErrorString() );
+		if ( WSAGetLastError() == WSAEWOULDBLOCK )
+			return 0;
+	}
+
+	return ret;
+}
+
+
+int Net_MakeSocketBroadcastCapable( Socket_t sSocket )
+{
+	int i = 1;
+
+	// make this socket broadcast capable
+	int ret = setsockopt( (SOCKET)sSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) );
+
+	if ( ret < 0 )
+	{
+		Log_ErrorF( gLC_Network, "Failed to set socket option SO_BROADCAST: %s\n", Net_ErrorString() );
+		return -1;
+	}
+
+	// net_broadcastsocket = socket;
+
+	return 0;
+}
+
+
 // ---------------------------------------------------------------------------
-
-
-static Socket_t gSrv_ListenSocket = CH_INVALID_SOCKET;
-static Socket_t gSrv_ClientSocket = CH_INVALID_SOCKET;
 
 
 // open a loopback server
 bool Net_OpenServer()
 {
-	gSrv_ListenSocket = Net_OpenSocket( gTestServerPort );
-	return gSrv_ListenSocket != CH_INVALID_SOCKET;
+	gListenSocket = Net_OpenSocket( gTestServerPort );
+	return gListenSocket != CH_INVALID_SOCKET;
 
 #if 0
 	iResult = listen( gSrv_ListenSocket, SOMAXCONN );
@@ -477,7 +639,19 @@ bool Net_ConnectToServer()
 	int         iResult;
 	int         recvbuflen = CH_NET_BUF_LEN;
 
+	// connect();
+
 	return true;
+}
+
+
+int Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr )
+{
+	int ret = connect( (SOCKET)sSocket, (const sockaddr*)&srAddr, sizeof( ch_sockaddr ) );
+
+	// check error
+
+	return ret;
 }
 
 

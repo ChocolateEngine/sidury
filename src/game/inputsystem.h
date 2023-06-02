@@ -9,22 +9,16 @@ using ButtonInput_t = int;
 
 enum : ButtonInput_t
 {
-	In_None = 0,
+	In_None    = 0,
 
-	In_Forward = (1 << 1),
-	In_Back = (1 << 2),
-	In_Right = (1 << 3),
-	In_Left = (1 << 4),
+	In_Forward = ( 1 << 1 ),
+	In_Back    = ( 1 << 2 ),
+	In_Right   = ( 1 << 3 ),
+	In_Left    = ( 1 << 4 ),
 
-	In_Sprint = (1 << 5),
-	//In_Walk = 32, // maybe?
-	In_Duck = (1 << 6),
-	In_Zoom = (1 << 7),
-
-	// hmm, idk, this would work here though
-	In_Noclip = (1 << 8),
-
-
+	In_Sprint  = ( 1 << 5 ),
+	In_Duck    = ( 1 << 6 ),
+	In_Zoom    = ( 1 << 7 ),
 };
 
 

@@ -88,17 +88,23 @@ bool Skybox_Init()
 
 void Skybox_Destroy()
 {
-	if ( !gSkyboxDraw )
-		return;
+	if ( gSkyboxModel )
+		Graphics_FreeModel( gSkyboxModel );
 
-	Graphics_FreeModel( gSkyboxModel );
-	Graphics_FreeRenderable( gSkyboxDraw );
+	if ( gSkyboxDraw )
+		Graphics_FreeRenderable( gSkyboxDraw );
+
+	gSkyboxModel = InvalidHandle;
+	gSkyboxDraw  = InvalidHandle;
 }
 
 
 void Skybox_SetAng( const glm::vec3& srAng )
 {
-	if ( !gSkyboxValid || r_skybox_ang_freeze || !gSkyboxModel || !Model_GetMaterial( gSkyboxModel, 0 ) )
+	if ( !gSkyboxModel && !Skybox_Init() )
+		return;
+
+	if ( !gSkyboxValid || r_skybox_ang_freeze || !Model_GetMaterial( gSkyboxModel, 0 ) )
 		return;
 
 	if ( Renderable_t* renderable = Graphics_GetRenderableData( gSkyboxDraw ) )
@@ -112,6 +118,12 @@ void Skybox_SetAng( const glm::vec3& srAng )
 
 void Skybox_SetMaterial( const std::string& srPath )
 {
+	if ( !gSkyboxModel && !Skybox_Init() )
+	{
+		Log_Error( "Failed to create skybox model\n" );
+		return;
+	}
+
 	Graphics_FreeRenderable( gSkyboxDraw );
 	gSkyboxDraw    = InvalidHandle;
 	gSkyboxValid   = false;

@@ -16,6 +16,10 @@ set(
 	network/net_main.cpp
 	network/net_main.h
 	
+	# capnproto
+	capnproto/sidury.capnp.c++
+	capnproto/sidury.capnp.h
+	
 	# tools
 	tools/light_editor.cpp
 	tools/light_editor.h
@@ -43,6 +47,16 @@ set(
 	THIRDPARTY_FILES
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.cpp
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
+)
+
+include_directories( "${CH_THIRDPARTY}/capnproto/c++/src" )
+
+link_directories( "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug" )
+
+link_libraries(
+	${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug/capnp.lib
+	${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug/capnpc.lib
+	${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug/kj.lib
 )
 
 add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )

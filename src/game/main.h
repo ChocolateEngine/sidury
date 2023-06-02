@@ -35,6 +35,8 @@ extern ViewportCamera_t gView;
 extern float            gFrameTime;
 extern double           gCurTime;
 
+constexpr int           CH_MAX_USERNAME_LEN = 256;
+
 enum class GameState
 {
 	Menu,
@@ -44,24 +46,29 @@ enum class GameState
 };
 
 
-bool               Game_InMap();
+bool         Game_InMap();
 
-void               Game_SetPaused( bool paused );
-bool               Game_IsPaused();
-void               Game_CheckPaused();
+void         Game_SetPaused( bool paused );
+bool         Game_IsPaused();
+void         Game_CheckPaused();
 
-bool               Game_Init();
-void               Game_Shutdown();
+bool         Game_Init();
+void         Game_Shutdown();
 
-void               Game_Update( float frameTime );
-void               Game_UpdateGame( float frameTime );  // epic name
+void         Game_Update( float frameTime );
+void         Game_UpdateGame( float frameTime );  // epic name
 
-void               Game_SetupModels( float frameTime );
-void               Game_ResetInputs();
-void               Game_UpdateAudio();
+void         Game_SetupModels( float frameTime );
+void         Game_ResetInputs();
+void         Game_UpdateAudio();
 
-void               Game_HandleSystemEvents();
+void         Game_HandleSystemEvents();
 
-void               Game_SetView( const glm::mat4& srViewMat );
-void               Game_UpdateProjection();
+void         Game_SetView( const glm::mat4& srViewMat );
+void         Game_UpdateProjection();
+
+inline float Game_GetCurTime()
+{
+	return gCurTime;
+}
 

@@ -2,6 +2,7 @@
 
 constexpr unsigned int MAP_VERSION = 1;
 
+struct SceneDraw_t;
 
 // matches the names in the keyvalues file
 struct MapInfo
@@ -33,18 +34,19 @@ struct SiduryMap
 };
 
 
-bool      MapManager_LoadMap( const std::string& path );
-void      MapManager_CloseMap();
-bool      MapManager_HasMap();
+bool             MapManager_FindMap( const std::string& path );
+bool             MapManager_LoadMap( const std::string& path );
+void             MapManager_CloseMap();
+bool             MapManager_HasMap();
+std::string_view MapManager_GetMapName();
 
-void      MapManager_Update();
+void             MapManager_Update();
 
-MapInfo*  MapManager_ParseMapInfo( const std::string& path );
-bool      MapManager_LoadWorldModel();
+MapInfo*         MapManager_ParseMapInfo( const std::string& path );
+bool             MapManager_LoadWorldModel();
 // void            MapManager_ParseEntities( const std::string &path );
-void      MapManager_SpawnPlayer();
+void             MapManager_SpawnPlayer();
 
-glm::vec3 MapManager_GetSpawnPos();
-glm::vec3 MapManager_GetSpawnAng();
-
+glm::vec3        MapManager_GetSpawnPos();
+glm::vec3        MapManager_GetSpawnAng();
 

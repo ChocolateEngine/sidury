@@ -773,7 +773,7 @@ void PlayerMovement::SetPos( const glm::vec3& origin )
 	apTransform->aPos = origin;
 }
 
-const glm::vec3& PlayerMovement::GetPos(  ) const
+const glm::vec3& PlayerMovement::GetPos() const
 {
 	return apTransform->aPos;
 }
@@ -783,13 +783,13 @@ void PlayerMovement::SetAng( const glm::vec3& angles )
 	apTransform->aAng = angles;
 }
 
-const glm::vec3& PlayerMovement::GetAng(  ) const
+const glm::vec3& PlayerMovement::GetAng() const
 {
 	return apTransform->aAng;
 }
 
 
-void PlayerMovement::UpdateInputs(  )
+void PlayerMovement::UpdateInputs()
 {
 	apRigidBody->aAccel = {0, 0, 0};
 
@@ -798,13 +798,13 @@ void PlayerMovement::UpdateInputs(  )
 	apMove->aPrevPlayerFlags = apMove->aPlayerFlags;
 	apMove->aPlayerFlags = PlyNone;
 
-	if ( KEY_PRESSED(SDL_SCANCODE_LCTRL) || in_duck )
+	if ( in_duck )
 	{
 		apMove->aPlayerFlags |= PlyInDuck;
 		moveScale = sv_duck_mult;
 	}
 
-	else if ( KEY_PRESSED(SDL_SCANCODE_LSHIFT) || in_sprint )
+	else if ( in_sprint )
 	{
 		apMove->aPlayerFlags |= PlyInSprint;
 		moveScale = sv_sprint_mult;

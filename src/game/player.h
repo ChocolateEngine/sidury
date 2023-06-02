@@ -75,7 +75,7 @@ struct CPlayerMoveData
 	IPhysicsObject*         apGroundObj = nullptr;
 	glm::vec3               aGroundPosition{};
 	glm::vec3               aGroundNormal{};
-	glm::vec3               aGroundVelocity{};
+	// glm::vec3               aGroundVelocity{};
 	// Handle                  aGroundMaterial;
 };
 
@@ -188,11 +188,11 @@ class PlayerMovement : public System
 class PlayerManager: public System
 {
 public:
-	PlayerManager(  );
-	~PlayerManager(  );
+	PlayerManager();
+	~PlayerManager();
 
-	void                    Init(  );
-	Entity                  Create(  );
+	void                    Init();
+	Entity                  Create();
 	void                    Spawn( Entity player );
 	void                    Respawn( Entity player );
 	void                    Update( float frameTime );  // ??
@@ -206,6 +206,27 @@ public:
 };
 
 
+// class CL_PlayerManager: public System
+// {
+// public:
+// 	CL_PlayerManager();
+// 	~CL_PlayerManager();
+// 
+// 	void                    Init();
+// 	Entity                  Create();
+// 	void                    Spawn( Entity player );
+// 	void                    Respawn( Entity player );
+// 	void                    Update( float frameTime );  // ??
+// 
+// 	void                    UpdateView( CPlayerInfo& info, Entity player );
+// 	void                    DoMouseLook( Entity player );
+// 
+// 	std::vector< Entity > aPlayerList;
+// 	
+// 	PlayerMovement* apMove = nullptr;
+// };
+
+
 // convinence
 inline auto& GetPlayerMoveData( Entity ent )	    { return entities->GetComponent< CPlayerMoveData >( ent ); }
 inline auto& GetPlayerZoom( Entity ent )            { return entities->GetComponent< CPlayerZoom >( ent ); }
@@ -217,4 +238,6 @@ inline auto& GetRigidBody( Entity ent )             { return entities->GetCompon
 
 
 extern PlayerManager* players;
+// extern CL_PlayerManager* cl_players;
+// extern PlayerManager*    sv_players;
 

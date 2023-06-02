@@ -87,6 +87,17 @@ void MapManager_CloseMap()
 }
 
 
+bool MapManager_FindMap( const std::string& path )
+{
+	std::string absPath = FileSys_FindDir( "maps/" + path );
+
+	if ( absPath == "" )
+		return false;
+
+	return true;
+}
+
+
 bool MapManager_LoadMap( const std::string &path )
 {
 	if ( gpMap )
@@ -164,6 +175,15 @@ bool MapManager_LoadMap( const std::string &path )
 bool MapManager_HasMap()
 {
 	return gpMap != nullptr;
+}
+
+
+std::string_view MapManager_GetMapName()
+{
+	if ( !gpMap )
+		return "";
+
+	return gpMap->aMapInfo->mapName;
 }
 
 
