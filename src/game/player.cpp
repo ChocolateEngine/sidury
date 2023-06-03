@@ -9,6 +9,9 @@
 #include "render/irender.h"
 #include "graphics/graphics.h"
 
+#include "cl_main.h"
+#include "sv_main.h"
+#include "game_shared.h"
 #include "mapmanager.h"
 
 #include "imgui/imgui.h"
@@ -19,17 +22,6 @@
 #include <algorithm>
 #include <cmath>
 
-
-CONVAR( in_forward, 0, CVARF_INPUT );
-CONVAR( in_back, 0, CVARF_INPUT );
-CONVAR( in_left, 0, CVARF_INPUT );
-CONVAR( in_right, 0, CVARF_INPUT );
-
-CONVAR( in_duck, 0, CVARF_INPUT );
-CONVAR( in_sprint, 0, CVARF_INPUT );
-CONVAR( in_jump, 0, CVARF_INPUT );
-CONVAR( in_zoom, 0, CVARF_INPUT );
-CONVAR( in_flashlight, 0, CVARF_INPUT );
 
 CONVAR( sv_sprint_mult, 2.4 );
 //CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
@@ -117,14 +109,41 @@ constexpr float PLAYER_MASS = 200.f;
 
 CON_COMMAND( respawn )
 {
-	players->Respawn( gLocalPlayer );
+	if ( Game_ProcessingClient() )
+	{
+		// forward to server
+		return;
+	}
+
+	if ( Game_GetCommandSource() == ECommandSource_Server )
+	{
+	}
+
+	Entity player = SV_GetCommandClientEntity();
+
+	players->Respawn( player );
 }
 
 
 CON_COMMAND( reset_velocity )
 {
-	auto& rigidBody = entities->GetComponent< CRigidBody >( gLocalPlayer );
-	rigidBody.aVel = {0, 0, 0};
+	if ( Game_ProcessingClient() )
+	{
+		// forward to server
+		return;
+	}
+
+	if ( Game_GetCommandSource() == ECommandSource_Server )
+	{
+	}
+
+	Entity player   = SV_GetCommandClientEntity();
+	auto rigidBody = GetRigidBody( player );
+
+	if ( !rigidBody )
+		return;
+
+	rigidBody->aVel = {0, 0, 0};
 }
 
 
@@ -134,7 +153,7 @@ static PlayerMoveType gHostMoveType;
 
 static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 {
-	// auto& move = entities->GetComponent< CPlayerMoveData >( sPlayer );
+	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( sPlayer );
 	// SetMoveType( move, sMoveType );
 
 	if ( gHostMoveType == sMoveType )
@@ -176,6 +195,10 @@ float vec3_norm(glm::vec3& v)
 	return length;
 }
 
+
+// TODO: MOVE ME !!!!!
+
+
 // ============================================================
 
 
@@ -194,46 +217,62 @@ PlayerManager::~PlayerManager()
 }
 
 
-void PlayerManager::Init(  )
+void PlayerManager::RegisterComponents()
 {
-	entities->RegisterComponent<CPlayerMoveData>();
-	entities->RegisterComponent<CPlayerInfo>();
-	entities->RegisterComponent<CPlayerZoom>();
-	entities->RegisterComponent<Model*>();
-	entities->RegisterComponent<Model>();
-	//entities->RegisterComponent<PhysicsObject*>();
+	CH_REGISTER_COMPONENT( CPlayerInfo, player_info );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, Entity, aEnt, ent );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );
 
-	apMove = entities->RegisterSystem<PlayerMovement>();
+	CH_REGISTER_COMPONENT( CPlayerZoom, player_zoom );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
+
+	// what the fuck
+	CH_REGISTER_COMPONENT( Model, model );
+	CH_REGISTER_COMPONENT( Renderable_t, renderable );
+
+	// GetEntitySystem()->RegisterComponent< Model* >();
+	// GetEntitySystem()->RegisterComponent< Model >();
+	//GetEntitySystem()->RegisterComponent<PhysicsObject*>();
 }
 
 
-Entity PlayerManager::Create()
+void PlayerManager::Init()
 {
-	// Add Components
-	Entity player = entities->CreateEntity();
+	// apMove = GetEntitySystem()->RegisterSystem<PlayerMovement>();
+	apMove = new PlayerMovement;
+}
 
-	entities->AddComponent< CPlayerMoveData >( player );
-	entities->AddComponent< CPlayerInfo >( player );
-	entities->AddComponent< CRigidBody >( player );
-	Transform& transform = entities->AddComponent< Transform >( player );
-	entities->AddComponent< CCamera >( player );
-	entities->AddComponent< CDirection >( player );
-	entities->AddComponent< CPlayerZoom >( player );
 
-	Light_t* flashlight = Graphics_CreateLight( ELightType_Cone );
+void PlayerManager::Create( Entity player )
+{
+	// Add Components to entity
+	GetEntitySystem()->AddComponent( player, "playerMoveData" );
+	GetEntitySystem()->AddComponent( player, "playerInfo" );
+	GetEntitySystem()->AddComponent( player, "playerZoom" );
+
+	GetEntitySystem()->AddComponent( player, "rigidBody" );
+	GetEntitySystem()->AddComponent( player, "camera" );
+	GetEntitySystem()->AddComponent( player, "direction" );
+
+	Transform* transform  = (Transform*)GetEntitySystem()->AddComponent( player, "transform" );
+
+	Light_t*   flashlight = Graphics_CreateLight( player, ELightType_Cone );
 	flashlight->aInnerFov = 0.f ;
 	flashlight->aOuterFov = 45.f;
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 	flashlight->aColor    = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
-	entities->AddComponent< Light_t* >( player, flashlight );
-
 	//Model* model = new Model;
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
-	//entities->AddComponent( player, model );
+	//GetEntitySystem()->AddComponent( player, model );
 
 	// Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
-	// entities->AddComponent< Model* >( player, model );
+	// GetEntitySystem()->AddComponent< Model* >( player, model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Cylinder );
 	shapeInfo.aBounds = glm::vec3(72, 16, 1);
@@ -244,8 +283,8 @@ Entity PlayerManager::Create()
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aMotionType = PhysMotionType::Dynamic;
-	physInfo.aPos = transform.aPos;
-	physInfo.aAng = transform.aAng;
+	physInfo.aPos = transform->aPos;
+	physInfo.aAng = transform->aAng;
 
 	physInfo.aCustomMass = true;
 	physInfo.aMass = PLAYER_MASS;
@@ -268,8 +307,6 @@ Entity PlayerManager::Create()
 	apPhysObj->SetAng( {90, 0, 0} );
 
 	aPlayerList.push_back( player );
-
-	return player;
 }
 
 
@@ -283,19 +320,24 @@ void PlayerManager::Spawn( Entity player )
 
 void PlayerManager::Respawn( Entity player )
 {
-	auto& rigidBody    = GetRigidBody( player );
-	auto& transform    = GetTransform( player );
-	auto& camTransform = GetCamera( player ).aTransform;
-	auto& zoom         = GetPlayerZoom( player );
+	auto rigidBody    = GetRigidBody( player );
+	auto transform    = GetTransform( player );
+	auto camera       = GetCamera( player );
+	auto zoom         = GetPlayerZoom( player );
 
-	transform.aPos     = MapManager_GetSpawnPos();
-	transform.aAng     = { 0, MapManager_GetSpawnAng().y, 0 };
-	camTransform.aAng  = MapManager_GetSpawnAng();
-	rigidBody.aVel     = { 0, 0, 0 };
-	rigidBody.aAccel   = { 0, 0, 0 };
+	Assert( rigidBody );
+	Assert( transform );
+	Assert( camera );
+	Assert( zoom );
 
-	zoom.aOrigFov      = r_fov;
-	zoom.aNewFov       = r_fov;
+	transform->aPos         = MapManager_GetSpawnPos();
+	transform->aAng         = { 0, MapManager_GetSpawnAng().y, 0 };
+	camera->aTransform.aAng = MapManager_GetSpawnAng();
+	rigidBody->aVel         = { 0, 0, 0 };
+	rigidBody->aAccel       = { 0, 0, 0 };
+
+	zoom->aOrigFov          = r_fov;
+	zoom->aNewFov           = r_fov;
 
 	apPhysObj->SetLinearVelocity( { 0, 0, 0 } );
 
@@ -303,30 +345,34 @@ void PlayerManager::Respawn( Entity player )
 }
 
 
-void Player_UpdateFlashlight( Entity player )
+void Player_UpdateFlashlight( Entity player, UserCmd_t* spUserCmd )
 {
 	PROF_SCOPE();
 
-	Transform& transform       = entities->GetComponent< Transform >( player );
-	CCamera&   camera          = entities->GetComponent< CCamera >( player );
-	Light_t*   flashlight      = entities->GetComponent< Light_t* >( player );
+	Transform* transform  = GetTransform( player );
+	CCamera*   camera     = GetCamera( player );
+	Light_t*   flashlight = static_cast< Light_t* >( GetEntitySystem()->GetComponent( player, "light" ) );
 
-	auto      UpdateTransform = [ & ]()
+	Assert( transform );
+	Assert( camera );
+	Assert( flashlight );
+
+	auto UpdateTransform = [ & ]()
 	{
 		// weird stuff to get the angle of the light correct
-		flashlight->aAng.x = camera.aTransform.aAng.z;
-		flashlight->aAng.y = -camera.aTransform.aAng.y;
-		flashlight->aAng.z = -camera.aTransform.aAng.x + 90.f;
+		flashlight->aAng.x = camera->aTransform.aAng.z;
+		flashlight->aAng.y = -camera->aTransform.aAng.y;
+		flashlight->aAng.z = -camera->aTransform.aAng.x + 90.f;
 
-		flashlight->aPos = transform.aPos + camera.aTransform.aPos;
+		flashlight->aPos = transform->aPos + camera->aTransform.aPos;
 
 		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat() );
 
-		flashlight->aPos += offset * camera.aUp;
+		flashlight->aPos += offset * camera->aUp;
 	};
 
 	// Is the flashlight key Just Pressed?
-	if ( in_flashlight == IN_CVAR_JUST_PRESSED )
+	if ( spUserCmd->aFlashlight )
 	{
 		flashlight->aEnabled = !flashlight->aEnabled;
 
@@ -361,22 +407,30 @@ void PlayerManager::Update( float frameTime )
 
 	for ( Entity player: aPlayerList )
 	{
-		auto&     playerInfo = entities->GetComponent< CPlayerInfo >( player );
-		// CCamera   camera     = entities->GetComponent< CCamera >( player );
+		SV_Client_t* client = SV_GetClientFromEntity( player );
+		if ( !client )
+			continue;
+
+		UserCmd_t& userCmd    = client->aUserCmd;
+
+		auto playerInfo = GetPlayerInfo( player );
+		// auto camera     = GetCamera( player );
+
+		Assert( playerInfo );
 
 		if ( !Game_IsPaused() )
 		{
 			DoMouseLook( player );
-			apMove->MovePlayer( player );
-			Player_UpdateFlashlight( player );
+			apMove->MovePlayer( player, &userCmd );
+			Player_UpdateFlashlight( player, &userCmd );
 		}
 
-		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo.aIsLocalPlayer )
+		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo->aIsLocalPlayer )
 		{
-			// CRenderable_t* renderable = entities->GetComponent< CRenderable_t* >( player );
+			// CRenderable_t* renderable = GetEntitySystem()->GetComponent< CRenderable_t* >( player );
 			// 
-			// auto          model      = entities->GetComponent< HModel >( player );
-			// Transform     transform  = entities->GetComponent< Transform >( player );
+			// auto          model      = GetEntitySystem()->GetComponent< HModel >( player );
+			// Transform     transform  = GetEntitySystem()->GetComponent< Transform >( player );
 			// 
 			// transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
 			// 
@@ -408,17 +462,17 @@ inline void ClampAngles( Transform& transform, CCamera& camera )
 
 void PlayerManager::DoMouseLook( Entity player )
 {
-	auto& transform = GetTransform( player );
-	auto& camera = GetCamera( player );
+	auto transform = GetTransform( player );
+	auto camera = GetCamera( player );
 
 	const glm::vec2 mouse = Input_GetMouseDelta();
 
 	// transform.aAng[PITCH] = -mouse.y;
-	camera.aTransform.aAng[PITCH] += mouse.y * m_pitch;
-	camera.aTransform.aAng[YAW] += mouse.x * m_yaw;
-	transform.aAng[YAW] += mouse.x * m_yaw;
+	camera->aTransform.aAng[PITCH] += mouse.y * m_pitch;
+	camera->aTransform.aAng[YAW] += mouse.x * m_yaw;
+	transform->aAng[YAW] += mouse.x * m_yaw;
 
-	ClampAngles( transform, camera );
+	ClampAngles( *transform, *camera );
 }
 
 
@@ -455,19 +509,22 @@ float Math_EaseOutQuart( float x )
 }
 
 
-void CalcZoom( CCamera& camera, Entity player )
+void CalcZoom( CCamera* camera, Entity player )
 {
-	auto& zoom = GetPlayerZoom( player );
+	auto zoom = GetPlayerZoom( player );
 
-	if ( zoom.aOrigFov != r_fov )
+	Assert( zoom );
+
+#if 0
+	if ( zoom->aOrigFov != r_fov )
 	{
-		zoom.aZoomTime = 0.f;  // idk lol
-		zoom.aOrigFov = r_fov;
+		zoom->aZoomTime = 0.f;  // idk lol
+		zoom->aOrigFov = r_fov;
 	}
 
 	if ( Game_IsPaused() )
 	{
-		camera.aFov = zoom.aNewFov;
+		camera->aFov = zoom->aNewFov;
 		return;
 	}
 
@@ -476,15 +533,15 @@ void CalcZoom( CCamera& camera, Entity player )
 	// HACK HACK
 	static bool wasZoomedIn = false;
 
-	if ( in_zoom.GetBool() )
+	if ( in_zoom->GetBool() )
 	{
 		if ( !wasZoomedIn )
 		{
-			zoom.aZoomChangeFov = camera.aFov;
+			zoom->aZoomChangeFov = camera->aFov;
 
 			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom.aZoomDuration  = Lerp_GetDurationIn( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
-			zoom.aZoomTime      = 0.f;
+			zoom->aZoomDuration  = Lerp_GetDurationIn( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
+			zoom->aZoomTime      = 0.f;
 			wasZoomedIn         = true;
 		}
 
@@ -494,59 +551,66 @@ void CalcZoom( CCamera& camera, Entity player )
 	{
 		if ( wasZoomedIn )
 		{
-			zoom.aZoomChangeFov = camera.aFov;
+			zoom->aZoomChangeFov = camera->aFov;
 
 			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom.aZoomDuration  = Lerp_GetDuration( cl_zoom_fov, zoom.aOrigFov, camera.aFov, cl_zoom_duration );
-			zoom.aZoomTime      = 0.f;
+			zoom->aZoomDuration  = Lerp_GetDuration( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
+			zoom->aZoomTime      = 0.f;
 			wasZoomedIn         = false;
 		}
 
-		lerpTarget = zoom.aOrigFov;
+		lerpTarget = zoom->aOrigFov;
 	}
 
-	zoom.aZoomTime += gFrameTime;
+	zoom->aZoomTime += gFrameTime;
 
-	if ( zoom.aZoomDuration >= zoom.aZoomTime )
+	if ( zoom->aZoomDuration >= zoom->aZoomTime )
 	{
-		float time = (zoom.aZoomTime / zoom.aZoomDuration);
+		float time = (zoom->aZoomTime / zoom->aZoomDuration);
 
 		// smooth cosine lerp
 		// float timeCurve = (( cos((zoomLerp * M_PI) - M_PI) ) + 1) * 0.5;
 		float timeCurve = Math_EaseOutQuart( time );
 
-		zoom.aNewFov = std::lerp( zoom.aZoomChangeFov, lerpTarget, timeCurve );
+		zoom->aNewFov = std::lerp( zoom->aZoomChangeFov, lerpTarget, timeCurve );
 	}
 
 	// scale mouse delta
-	float fovScale = (zoom.aNewFov / zoom.aOrigFov);
+	float fovScale = (zoom->aNewFov / zoom->aOrigFov);
 	Input_SetMouseDeltaScale( {fovScale, fovScale} );
 
-	camera.aFov = zoom.aNewFov;
+	camera->aFov = zoom->aNewFov;
+#else
+	// disable zooming until networking is working
+	camera->aFov  = r_fov;
+	zoom->aNewFov = r_fov;
+#endif
 }
 
 
-void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
+void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 {
 	PROF_SCOPE();
 
 	// auto& move = GetPlayerMoveData( player );
-	auto& transform = GetTransform( player );
-	auto& camera = GetCamera( player );
-	auto& dir = GetDirection( player );
-	auto& rigidBody = GetRigidBody( player );
+	auto transform = GetTransform( player );
+	auto camera    = GetCamera( player );
+	auto dir       = GetComp_Direction( player );
+	auto rigidBody = GetRigidBody( player );
 
-	ClampAngles( transform, camera );
+	Assert( transform );
 
-	Util_GetViewMatrixZDirection( transform.ToViewMatrixZ(), dir.aForward, dir.aRight, dir.aUp );
+	ClampAngles( *transform, *camera );
+
+	Util_GetViewMatrixZDirection( transform->ToViewMatrixZ(), dir->aForward, dir->aRight, dir->aUp );
 
 	// MOVE ME ELSEWHERE IDK, MAYBE WHEN AN HEV SUIT COMPONENT IS MADE
 	CalcZoom( camera, player );
 
 	/* Copy the player transformation, and apply the view offsets to it. */
-	Transform transformView = transform;
-	transformView.aPos += camera.aTransform.aPos;
-	transformView.aAng = camera.aTransform.aAng;
+	Transform transformView = *transform;
+	transformView.aPos += camera->aTransform.aPos;
+	transformView.aAng = camera->aTransform.aAng;
 	//Transform transformView = transform;
 	//transformView.aAng += move.aViewAngOffset;
 
@@ -558,7 +622,7 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
 
-		if ( info.aIsLocalPlayer )
+		if ( info->aIsLocalPlayer )
 		{
 			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
 		}
@@ -567,11 +631,11 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		gViewInfo[ 0 ].aViewPos = thirdPerson.aPos;
 		Game_SetView( viewMat );
-		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
 	}
 	else
 	{
-		if ( info.aIsLocalPlayer )
+		if ( info->aIsLocalPlayer )
 		{
 			// wtf broken??
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
@@ -581,24 +645,24 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 		gViewInfo[ 0 ].aViewPos = transformView.aPos;
 		Game_SetView( viewMat );
-		Util_GetViewMatrixZDirection( viewMat, camera.aForward, camera.aRight, camera.aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
 	}
 
-	if ( info.aIsLocalPlayer )
+	if ( info->aIsLocalPlayer )
 	{
 		// scale the nearz and farz
 		gView.aFarZ  = r_farz;
 		gView.aNearZ = r_nearz;
-		gView.aFOV   = camera.aFov;
+		gView.aFOV   = camera->aFov;
 		Game_UpdateProjection();
 
 		// i feel like there's gonna be a lot more here in the future...
 		Skybox_SetAng( transformView.aAng );
-		audio->SetListenerTransform( transformView.aPos, transform.aAng );
+		audio->SetListenerTransform( transformView.aPos, transform->aAng );
 
 #if AUDIO_OPENAL
 		audio->SetListenerVelocity( rigidBody.aVel );
-		audio->SetListenerOrient( camera.aForward, camera.aUp );
+		audio->SetListenerOrient( camera->aForward, camera->aUp );
 #endif
 	}
 }
@@ -609,41 +673,49 @@ void PlayerManager::UpdateView( CPlayerInfo& info, Entity player )
 
 void PlayerMovement::OnPlayerSpawn( Entity player )
 {
-	auto& move = entities->GetComponent< CPlayerMoveData >( player );
+	auto move   = GetPlayerMoveData( player );
+	auto camera = GetCamera(player );
 
-	// SetMoveType( move, PlayerMoveType::Walk );
-	SetMoveType( move, PlayerMoveType::NoClip );
+	Assert( move );
+	Assert( camera );
 
-	auto& camera = entities->GetComponent< CCamera >( player );
-	camera.aTransform.aPos = {0, 0, cl_view_height.GetFloat()};
+	// SetMoveType( *move, PlayerMoveType::Walk );
+	SetMoveType( *move, PlayerMoveType::NoClip );
+
+	camera->aTransform.aPos = {0, 0, cl_view_height.GetFloat()};
 }
 
 
 void PlayerMovement::OnPlayerRespawn( Entity player )
 {
-	auto& move = entities->GetComponent< CPlayerMoveData >( player );
+	auto move      = GetPlayerMoveData( player );
+	auto transform = GetTransform( player );
 
-	Transform transform = entities->GetComponent< Transform >( player );
-	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
-	transform.aPos.z += phys_player_offset;
+	Assert( move );
+	Assert( transform );
 
-	apPhysObj->SetPos( transform.aPos );
+	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
+	transform->aPos.z += phys_player_offset;
+
+	apPhysObj->SetPos( transform->aPos );
 
 	// Init Smooth Duck
-	move.aTargetViewHeight = GetViewHeight();
-	move.aOutViewHeight = GetViewHeight();
+	move->aTargetViewHeight = GetViewHeight();
+	move->aOutViewHeight    = GetViewHeight();
 }
 
 
-void PlayerMovement::MovePlayer( Entity player )
+void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 {
-	aPlayer = player;
-	apMove = &entities->GetComponent< CPlayerMoveData >( player );
-	apRigidBody = &entities->GetComponent< CRigidBody >( player );
-	apTransform = &entities->GetComponent< Transform >( player );
-	apCamera = &entities->GetComponent< CCamera >( player );
-	apDir = &entities->GetComponent< CDirection >( player );
-	//apPhysObj = entities->GetComponent< PhysicsObject* >( player );
+	aPlayer     = player;
+	apUserCmd   = spUserCmd;
+
+	apMove      = GetPlayerMoveData( player );
+	apRigidBody = GetRigidBody( player );
+	apTransform = GetTransform( player );
+	apCamera    = GetCamera( player );
+	apDir       = static_cast< CDirection* >( GetEntitySystem()->GetComponent( player, "direction" ) );
+	//apPhysObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
 
 	apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
 
@@ -673,7 +745,7 @@ void PlayerMovement::MovePlayer( Entity player )
 #if 0
 	if ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() )
 	{
-		auto model = entities->GetComponent< Model* >( player );
+		auto model = GetEntitySystem()->GetComponent< Model* >( player );
 
 		model->aTransform.aAng[ROLL] += 90;
 		model->aTransform.aAng[YAW] *= -1;
@@ -685,7 +757,7 @@ void PlayerMovement::MovePlayer( Entity player )
 
 float PlayerMovement::GetViewHeight(  )
 {
-	return in_duck ? cl_view_height_duck : cl_view_height;
+	return ( apUserCmd->aButtons & EBtnInput_Duck ) ? cl_view_height_duck : cl_view_height;
 }
 
 
@@ -749,20 +821,25 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	if ( !cl_show_player_stats )
 		return;
 
-	// auto& move = entities->GetComponent< CPlayerMoveData >( player );
-	auto& rigidBody = entities->GetComponent< CRigidBody >( player );
-	auto& transform = entities->GetComponent< Transform >( player );
-	auto& camera = entities->GetComponent< CCamera >( player );
-	auto& camTransform = camera.aTransform;
+	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( player );
+	auto rigidBody = GetRigidBody( player );
+	auto transform = GetTransform( player );
+	auto camera    = GetCamera( player );
 
-	float speed = glm::length( glm::vec2(rigidBody.aVel.x, rigidBody.aVel.y) );
+	Assert( rigidBody );
+	Assert( transform );
+	Assert( camera );
 
-	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform.aPos).c_str() );
-	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform.aAng).c_str() );
-	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody.aVel).c_str() );
+	auto  camTransform = camera->aTransform;
+
+	float speed        = glm::length( glm::vec2( rigidBody->aVel.x, rigidBody->aVel.y ) );
+
+	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform->aPos).c_str() );
+	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform->aAng).c_str() );
+	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody->aVel).c_str() );
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
-	gui->DebugMessage( "Camera FOV:    %.4f", camera.aFov );
+	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov );
 	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.aPos).c_str() );
 	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.aAng).c_str() );
 }
@@ -798,13 +875,13 @@ void PlayerMovement::UpdateInputs()
 	apMove->aPrevPlayerFlags = apMove->aPlayerFlags;
 	apMove->aPlayerFlags = PlyNone;
 
-	if ( in_duck )
+	if ( apUserCmd->aButtons & EBtnInput_Duck )
 	{
 		apMove->aPlayerFlags |= PlyInDuck;
 		moveScale = sv_duck_mult;
 	}
 
-	else if ( in_sprint )
+	else if ( apUserCmd->aButtons & EBtnInput_Sprint )
 	{
 		apMove->aPlayerFlags |= PlyInSprint;
 		moveScale = sv_sprint_mult;
@@ -814,27 +891,28 @@ void PlayerMovement::UpdateInputs()
 	const float sideSpeed = side_speed * moveScale;
 	apMove->aMaxSpeed = max_speed * moveScale;
 
-	if ( in_forward.GetBool() ) apRigidBody->aAccel[ W_FORWARD ] = forwardSpeed;
-	if ( in_back.GetBool() )    apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
-	if ( in_left.GetBool() )    apRigidBody->aAccel[ W_RIGHT ] = -sideSpeed;
-	if ( in_right.GetBool() )   apRigidBody->aAccel[ W_RIGHT ] += sideSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Forward ) apRigidBody->aAccel[ W_FORWARD ] = forwardSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Back )    apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Left )    apRigidBody->aAccel[ W_RIGHT ] = -sideSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Right )   apRigidBody->aAccel[ W_RIGHT ] += sideSpeed;
 
 	// kind of a hack
 	// this feels really stupid
-	static bool wasJumpButtonPressed = false;
+	// static bool wasJumpButtonPressed = false;
 
 	if ( CalcOnGround() )
 	{
-		if ( in_jump && !wasJumpButtonPressed )
+		// if ( apUserCmd->aButtons & EBtnInput_Jump && !wasJumpButtonPressed )
+		if ( apUserCmd->aButtons & EBtnInput_Jump )
 		{
 			apRigidBody->aVel[W_UP] = jump_force;
-			wasJumpButtonPressed = true;
+			// wasJumpButtonPressed = true;
 			// Log_Msg( "New Velocity After Jumping: %s", Vec2Str( apRigidBody->aVel ).c_str() );
 		}
 	}
 	else
 	{
-		wasJumpButtonPressed = false;
+		// wasJumpButtonPressed = false;
 	}
 }
 
@@ -887,10 +965,15 @@ CONVAR( phys_player_max_sep_dist, 1 );
 // Post Physics Simulation Update
 void PlayerMovement::UpdatePosition( Entity player )
 {
-	apMove = &entities->GetComponent< CPlayerMoveData >( player );
-	apTransform = &entities->GetComponent< Transform >( player );
-	apRigidBody = &entities->GetComponent< CRigidBody >( player );
-	//auto& physObj = entities->GetComponent< PhysicsObject* >( player );
+	apMove      = GetPlayerMoveData( player );
+	apTransform = GetTransform( player );
+	apRigidBody = GetRigidBody( player );
+
+	Assert( apMove );
+	Assert( apTransform );
+	Assert( apRigidBody );
+
+	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
 
 	//if ( aMoveType == MoveType::Fly )
 		//aTransform = apPhysObj->GetWorldTransform();

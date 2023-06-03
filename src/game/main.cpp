@@ -40,7 +40,7 @@ static bool      gPaused      = true;
 float            gFrameTime   = 0.f;
 double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
-Entity           gLocalPlayer = ENT_INVALID;
+Entity           gLocalPlayer = CH_ENT_INVALID;
 ViewportCamera_t gView{};
 
 extern bool      gRunning;
@@ -118,6 +118,10 @@ bool Game_Init()
 	Phys_Init();
 	LightEditor_Init(); // TODO: when tools are made, move this there
 
+	// Init Entity Component Registry
+	Ent_RegisterBaseComponents();
+	PlayerManager::RegisterComponents();
+
 	if ( !Net_Init() )
 	{
 		Log_Error( "Failed to init networking\n" );
@@ -137,19 +141,23 @@ bool Game_Init()
 		return false;
 	}
 
+#if 0
 	entities = new EntityManager;
-	entities->Init();
+	GetEntitySystem()->Init();
 
-	players = entities->RegisterSystem<PlayerManager>();
+	players = GetEntitySystem()->RegisterSystem<PlayerManager>();
 	players->Init();
 
 	gLocalPlayer = players->Create();
 
 	// mark this as the local player
-	auto& playerInfo = entities->GetComponent< CPlayerInfo >( gLocalPlayer );
+	auto& playerInfo = GetEntitySystem()->GetComponent< CPlayerInfo >( gLocalPlayer );
 	playerInfo.aIsLocalPlayer = true;
 
 	players->Spawn( gLocalPlayer );
+#endif
+
+	players = new PlayerManager;
 
 	Log_Msg( "Game Loaded!\n" );
 	return true;
@@ -223,9 +231,11 @@ void Game_UpdateGame( float frameTime )
 
 	Input_Update();
 
+	if ( gServerData.aActive )
+		SV_Update( frameTime );
+
 	// when do i call these lol
 	CL_Update( frameTime );
-	SV_Update( frameTime );
 
 	Game_CheckPaused();
 

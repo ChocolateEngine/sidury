@@ -7,18 +7,19 @@ extern ConVarFlag_t CVARF_INPUT;
 
 using ButtonInput_t = int;
 
-enum : ButtonInput_t
+enum EBtnInput
 {
-	In_None    = 0,
+	EBtnInput_None    = 0,
 
-	In_Forward = ( 1 << 1 ),
-	In_Back    = ( 1 << 2 ),
-	In_Right   = ( 1 << 3 ),
-	In_Left    = ( 1 << 4 ),
+	EBtnInput_Forward = ( 1 << 1 ),
+	EBtnInput_Back    = ( 1 << 2 ),
+	EBtnInput_Right   = ( 1 << 3 ),
+	EBtnInput_Left    = ( 1 << 4 ),
 
-	In_Sprint  = ( 1 << 5 ),
-	In_Duck    = ( 1 << 6 ),
-	In_Zoom    = ( 1 << 7 ),
+	EBtnInput_Sprint  = ( 1 << 5 ),
+	EBtnInput_Duck    = ( 1 << 6 ),
+	EBtnInput_Jump    = ( 1 << 7 ),
+	EBtnInput_Zoom    = ( 1 << 8 ),
 };
 
 

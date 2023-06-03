@@ -8,6 +8,7 @@ Loads Sidury Map Files (smf)
 #include "core/console.h"
 #include "util.h"
 #include "main.h"
+#include "game_shared.h"
 #include "player.h"
 #include "skybox.h"
 #include "graphics/graphics.h"
@@ -52,6 +53,11 @@ CONCMD_DROP( map, map_dropdown )
 	}
 
 	MapManager_LoadMap( args[0] );
+
+	if ( Game_GetCommandSource() == ECommandSource_Client )
+	{
+		Con_RunCommandArgs( "connect", { "localhost" } );
+	}
 }
 
 
@@ -98,6 +104,9 @@ bool MapManager_FindMap( const std::string& path )
 }
 
 
+static Entity gMapEntity = CH_ENT_INVALID;
+
+
 bool MapManager_LoadMap( const std::string &path )
 {
 	if ( gpMap )
@@ -130,6 +139,9 @@ bool MapManager_LoadMap( const std::string &path )
 	}
 
 	// ParseEntities( absPath + "/entities.smf" );
+
+	// the map should always be entity index 0
+	gMapEntity = GetEntitySystem()->CreateEntity();
 
 	MapManager_SpawnPlayer();
 
@@ -343,7 +355,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 void MapManager_SpawnPlayer()
 {
-	players->Respawn( gLocalPlayer );
+	// players->Respawn( gLocalPlayer );
 }
 
 

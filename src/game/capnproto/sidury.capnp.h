@@ -16,7 +16,9 @@ CAPNP_BEGIN_HEADER
 namespace capnp {
 namespace schemas {
 
+CAPNP_DECLARE_SCHEMA(a3f644954f616311);
 CAPNP_DECLARE_SCHEMA(db96b20698895089);
+CAPNP_DECLARE_SCHEMA(bed97c2c982935b8);
 CAPNP_DECLARE_SCHEMA(ffb0c0aaac42d441);
 enum class EPlayerMoveType_ffb0c0aaac42d441: uint16_t {
   WALK,
@@ -28,15 +30,63 @@ CAPNP_DECLARE_SCHEMA(a5501e058754ad06);
 CAPNP_DECLARE_SCHEMA(ca1f635170315467);
 CAPNP_DECLARE_SCHEMA(b83fc6b03806aa47);
 CAPNP_DECLARE_SCHEMA(d2195344bb147ee5);
-CAPNP_DECLARE_SCHEMA(f014b6c1b8e189bf);
+CAPNP_DECLARE_SCHEMA(d38eab74e58db8fe);
+CAPNP_DECLARE_SCHEMA(b2b416fea7fa7962);
+enum class EMsgSrcClient_b2b416fea7fa7962: uint16_t {
+  DISCONNECT,
+  CLIENT_INFO,
+  CON_VAR,
+  USER_CMD,
+};
+CAPNP_DECLARE_ENUM(EMsgSrcClient, b2b416fea7fa7962);
+CAPNP_DECLARE_SCHEMA(f2aacb5dd4f91298);
+CAPNP_DECLARE_SCHEMA(ea451e6b28d0dc02);
+enum class EMsgSrcServer_ea451e6b28d0dc02: uint16_t {
+  DISCONNECT,
+  SERVER_INFO,
+  CON_VAR,
+  ENTITY_LIST,
+};
+CAPNP_DECLARE_ENUM(EMsgSrcServer, ea451e6b28d0dc02);
+CAPNP_DECLARE_SCHEMA(ee117230db68b1d9);
+CAPNP_DECLARE_SCHEMA(b1a6624d4ef3636d);
+CAPNP_DECLARE_SCHEMA(fa1f12e74ca2b119);
+CAPNP_DECLARE_SCHEMA(a48992305167c2fe);
+enum class EState_a48992305167c2fe: uint16_t {
+  NONE,
+  CREATED,
+  DESTROYED,
+};
+CAPNP_DECLARE_ENUM(EState, a48992305167c2fe);
+CAPNP_DECLARE_SCHEMA(e7322c7bf1113918);
+CAPNP_DECLARE_SCHEMA(b33008f4d574b2a3);
 CAPNP_DECLARE_SCHEMA(9a1eafaa73282c37);
 CAPNP_DECLARE_SCHEMA(b55f01615a1dee6c);
+CAPNP_DECLARE_SCHEMA(86e9cd9a652d4532);
+CAPNP_DECLARE_SCHEMA(a48eaffd3c607de5);
+CAPNP_DECLARE_SCHEMA(87183ad1670e2bbc);
 CAPNP_DECLARE_SCHEMA(a1a4c4fabcd5b477);
+CAPNP_DECLARE_SCHEMA(bb66ad8408c8ace8);
 CAPNP_DECLARE_SCHEMA(adc97680de0560d0);
 
 }  // namespace schemas
 }  // namespace capnp
 
+
+struct Vec2 {
+  Vec2() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(a3f644954f616311, 1, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
 
 struct Vec3 {
   Vec3() = delete;
@@ -47,6 +97,21 @@ struct Vec3 {
 
   struct _capnpPrivate {
     CAPNP_DECLARE_STRUCT_HEADER(db96b20698895089, 2, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct Vec4 {
+  Vec4() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(bed97c2c982935b8, 2, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -78,7 +143,7 @@ struct NetMsgServerInfo {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(ca1f635170315467, 1, 3)
+    CAPNP_DECLARE_STRUCT_HEADER(ca1f635170315467, 2, 3)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -115,15 +180,112 @@ struct NetMsgDisconnect {
   };
 };
 
-struct NetEntity {
-  NetEntity() = delete;
+struct NetMsgConVar {
+  NetMsgConVar() = delete;
 
   class Reader;
   class Builder;
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(f014b6c1b8e189bf, 1, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(d38eab74e58db8fe, 0, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+typedef ::capnp::schemas::EMsgSrcClient_b2b416fea7fa7962 EMsgSrcClient;
+
+struct MsgSrcClient {
+  MsgSrcClient() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(f2aacb5dd4f91298, 1, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+typedef ::capnp::schemas::EMsgSrcServer_ea451e6b28d0dc02 EMsgSrcServer;
+
+struct MsgSrcServer {
+  MsgSrcServer() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(ee117230db68b1d9, 1, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetMsgEntity {
+  NetMsgEntity() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(b1a6624d4ef3636d, 1, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetMsgEntityUpdate {
+  NetMsgEntityUpdate() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+  typedef ::capnp::schemas::EState_a48992305167c2fe EState;
+
+  struct Component;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(fa1f12e74ca2b119, 1, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetMsgEntityUpdate::Component {
+  Component() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(e7322c7bf1113918, 1, 2)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetMsgEntityUpdates {
+  NetMsgEntityUpdates() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(b33008f4d574b2a3, 0, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -160,6 +322,51 @@ struct NetCompTransformSmall {
   };
 };
 
+struct NetCompRigidBody {
+  NetCompRigidBody() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(86e9cd9a652d4532, 0, 2)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetCompDirection {
+  NetCompDirection() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(a48eaffd3c607de5, 0, 3)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetCompGravity {
+  NetCompGravity() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(87183ad1670e2bbc, 0, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
 struct NetCompCamera {
   NetCompCamera() = delete;
 
@@ -168,7 +375,22 @@ struct NetCompCamera {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(a1a4c4fabcd5b477, 1, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(a1a4c4fabcd5b477, 1, 2)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetCompModelPath {
+  NetCompModelPath() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(bb66ad8408c8ace8, 0, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -183,7 +405,7 @@ struct NetCompPlayerMoveData {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(adc97680de0560d0, 5, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(adc97680de0560d0, 4, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -191,6 +413,87 @@ struct NetCompPlayerMoveData {
 };
 
 // =======================================================================================
+
+class Vec2::Reader {
+public:
+  typedef Vec2 Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline float getX() const;
+
+  inline float getY() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class Vec2::Builder {
+public:
+  typedef Vec2 Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline float getX();
+  inline void setX(float value);
+
+  inline float getY();
+  inline void setY(float value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class Vec2::Pipeline {
+public:
+  typedef Vec2 Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
 
 class Vec3::Reader {
 public:
@@ -278,6 +581,97 @@ private:
 };
 #endif  // !CAPNP_LITE
 
+class Vec4::Reader {
+public:
+  typedef Vec4 Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline float getX() const;
+
+  inline float getY() const;
+
+  inline float getZ() const;
+
+  inline float getW() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class Vec4::Builder {
+public:
+  typedef Vec4 Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline float getX();
+  inline void setX(float value);
+
+  inline float getY();
+  inline void setY(float value);
+
+  inline float getZ();
+  inline void setZ(float value);
+
+  inline float getW();
+  inline void setW(float value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class Vec4::Pipeline {
+public:
+  typedef Vec4 Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
 class NetMsgUserCmd::Reader {
 public:
   typedef NetMsgUserCmd Reads;
@@ -300,7 +694,9 @@ public:
 
   inline  ::int32_t getButtons() const;
 
-  inline bool getNoclip() const;
+  inline  ::EPlayerMoveType getMoveType() const;
+
+  inline bool getFlashlight() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -340,8 +736,11 @@ public:
   inline  ::int32_t getButtons();
   inline void setButtons( ::int32_t value);
 
-  inline bool getNoclip();
-  inline void setNoclip(bool value);
+  inline  ::EPlayerMoveType getMoveType();
+  inline void setMoveType( ::EPlayerMoveType value);
+
+  inline bool getFlashlight();
+  inline void setFlashlight(bool value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -402,6 +801,8 @@ public:
   inline bool hasMapHash() const;
   inline  ::capnp::Text::Reader getMapHash() const;
 
+  inline  ::uint32_t getPlayerEntityId() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -459,6 +860,9 @@ public:
   inline  ::capnp::Text::Builder initMapHash(unsigned int size);
   inline void adoptMapHash(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownMapHash();
+
+  inline  ::uint32_t getPlayerEntityId();
+  inline void setPlayerEntityId( ::uint32_t value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -648,9 +1052,262 @@ private:
 };
 #endif  // !CAPNP_LITE
 
-class NetEntity::Reader {
+class NetMsgConVar::Reader {
 public:
-  typedef NetEntity Reads;
+  typedef NetMsgConVar Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasCommand() const;
+  inline  ::capnp::Text::Reader getCommand() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgConVar::Builder {
+public:
+  typedef NetMsgConVar Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasCommand();
+  inline  ::capnp::Text::Builder getCommand();
+  inline void setCommand( ::capnp::Text::Reader value);
+  inline  ::capnp::Text::Builder initCommand(unsigned int size);
+  inline void adoptCommand(::capnp::Orphan< ::capnp::Text>&& value);
+  inline ::capnp::Orphan< ::capnp::Text> disownCommand();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgConVar::Pipeline {
+public:
+  typedef NetMsgConVar Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class MsgSrcClient::Reader {
+public:
+  typedef MsgSrcClient Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::EMsgSrcClient getType() const;
+
+  inline bool hasData() const;
+  inline  ::capnp::Data::Reader getData() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class MsgSrcClient::Builder {
+public:
+  typedef MsgSrcClient Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::EMsgSrcClient getType();
+  inline void setType( ::EMsgSrcClient value);
+
+  inline bool hasData();
+  inline  ::capnp::Data::Builder getData();
+  inline void setData( ::capnp::Data::Reader value);
+  inline  ::capnp::Data::Builder initData(unsigned int size);
+  inline void adoptData(::capnp::Orphan< ::capnp::Data>&& value);
+  inline ::capnp::Orphan< ::capnp::Data> disownData();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class MsgSrcClient::Pipeline {
+public:
+  typedef MsgSrcClient Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class MsgSrcServer::Reader {
+public:
+  typedef MsgSrcServer Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::EMsgSrcServer getType() const;
+
+  inline bool hasData() const;
+  inline  ::capnp::Data::Reader getData() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class MsgSrcServer::Builder {
+public:
+  typedef MsgSrcServer Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::EMsgSrcServer getType();
+  inline void setType( ::EMsgSrcServer value);
+
+  inline bool hasData();
+  inline  ::capnp::Data::Builder getData();
+  inline void setData( ::capnp::Data::Reader value);
+  inline  ::capnp::Data::Builder initData(unsigned int size);
+  inline void adoptData(::capnp::Orphan< ::capnp::Data>&& value);
+  inline ::capnp::Orphan< ::capnp::Data> disownData();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class MsgSrcServer::Pipeline {
+public:
+  typedef MsgSrcServer Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetMsgEntity::Reader {
+public:
+  typedef NetMsgEntity Reads;
 
   Reader() = default;
   inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
@@ -679,9 +1336,9 @@ private:
   friend class ::capnp::Orphanage;
 };
 
-class NetEntity::Builder {
+class NetMsgEntity::Builder {
 public:
-  typedef NetEntity Builds;
+  typedef NetMsgEntity Builds;
 
   Builder() = delete;  // Deleted to discourage incorrect usage.
                        // You can explicitly initialize to nullptr instead.
@@ -708,9 +1365,277 @@ private:
 };
 
 #if !CAPNP_LITE
-class NetEntity::Pipeline {
+class NetMsgEntity::Pipeline {
 public:
-  typedef NetEntity Pipelines;
+  typedef NetMsgEntity Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetMsgEntityUpdate::Reader {
+public:
+  typedef NetMsgEntityUpdate Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint32_t getId() const;
+
+  inline  ::NetMsgEntityUpdate::EState getState() const;
+
+  inline bool hasComponents() const;
+  inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader getComponents() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgEntityUpdate::Builder {
+public:
+  typedef NetMsgEntityUpdate Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint32_t getId();
+  inline void setId( ::uint32_t value);
+
+  inline  ::NetMsgEntityUpdate::EState getState();
+  inline void setState( ::NetMsgEntityUpdate::EState value);
+
+  inline bool hasComponents();
+  inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder getComponents();
+  inline void setComponents( ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader value);
+  inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder initComponents(unsigned int size);
+  inline void adoptComponents(::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>&& value);
+  inline ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>> disownComponents();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgEntityUpdate::Pipeline {
+public:
+  typedef NetMsgEntityUpdate Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetMsgEntityUpdate::Component::Reader {
+public:
+  typedef Component Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasName() const;
+  inline  ::capnp::Text::Reader getName() const;
+
+  inline  ::NetMsgEntityUpdate::EState getState() const;
+
+  inline bool hasData() const;
+  inline  ::capnp::Data::Reader getData() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgEntityUpdate::Component::Builder {
+public:
+  typedef Component Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasName();
+  inline  ::capnp::Text::Builder getName();
+  inline void setName( ::capnp::Text::Reader value);
+  inline  ::capnp::Text::Builder initName(unsigned int size);
+  inline void adoptName(::capnp::Orphan< ::capnp::Text>&& value);
+  inline ::capnp::Orphan< ::capnp::Text> disownName();
+
+  inline  ::NetMsgEntityUpdate::EState getState();
+  inline void setState( ::NetMsgEntityUpdate::EState value);
+
+  inline bool hasData();
+  inline  ::capnp::Data::Builder getData();
+  inline void setData( ::capnp::Data::Reader value);
+  inline  ::capnp::Data::Builder initData(unsigned int size);
+  inline void adoptData(::capnp::Orphan< ::capnp::Data>&& value);
+  inline ::capnp::Orphan< ::capnp::Data> disownData();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgEntityUpdate::Component::Pipeline {
+public:
+  typedef Component Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetMsgEntityUpdates::Reader {
+public:
+  typedef NetMsgEntityUpdates Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasUpdateList() const;
+  inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Reader getUpdateList() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgEntityUpdates::Builder {
+public:
+  typedef NetMsgEntityUpdates Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasUpdateList();
+  inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Builder getUpdateList();
+  inline void setUpdateList( ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Reader value);
+  inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Builder initUpdateList(unsigned int size);
+  inline void adoptUpdateList(::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>&& value);
+  inline ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>> disownUpdateList();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgEntityUpdates::Pipeline {
+public:
+  typedef NetMsgEntityUpdates Pipelines;
 
   inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
   inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
@@ -921,6 +1846,285 @@ private:
 };
 #endif  // !CAPNP_LITE
 
+class NetCompRigidBody::Reader {
+public:
+  typedef NetCompRigidBody Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasVel() const;
+  inline  ::Vec3::Reader getVel() const;
+
+  inline bool hasAccel() const;
+  inline  ::Vec3::Reader getAccel() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompRigidBody::Builder {
+public:
+  typedef NetCompRigidBody Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasVel();
+  inline  ::Vec3::Builder getVel();
+  inline void setVel( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initVel();
+  inline void adoptVel(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownVel();
+
+  inline bool hasAccel();
+  inline  ::Vec3::Builder getAccel();
+  inline void setAccel( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initAccel();
+  inline void adoptAccel(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownAccel();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompRigidBody::Pipeline {
+public:
+  typedef NetCompRigidBody Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+  inline  ::Vec3::Pipeline getVel();
+  inline  ::Vec3::Pipeline getAccel();
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetCompDirection::Reader {
+public:
+  typedef NetCompDirection Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasForward() const;
+  inline  ::Vec3::Reader getForward() const;
+
+  inline bool hasUp() const;
+  inline  ::Vec3::Reader getUp() const;
+
+  inline bool hasRight() const;
+  inline  ::Vec3::Reader getRight() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompDirection::Builder {
+public:
+  typedef NetCompDirection Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasForward();
+  inline  ::Vec3::Builder getForward();
+  inline void setForward( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initForward();
+  inline void adoptForward(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownForward();
+
+  inline bool hasUp();
+  inline  ::Vec3::Builder getUp();
+  inline void setUp( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initUp();
+  inline void adoptUp(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownUp();
+
+  inline bool hasRight();
+  inline  ::Vec3::Builder getRight();
+  inline void setRight( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initRight();
+  inline void adoptRight(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownRight();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompDirection::Pipeline {
+public:
+  typedef NetCompDirection Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+  inline  ::Vec3::Pipeline getForward();
+  inline  ::Vec3::Pipeline getUp();
+  inline  ::Vec3::Pipeline getRight();
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetCompGravity::Reader {
+public:
+  typedef NetCompGravity Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasForce() const;
+  inline  ::Vec3::Reader getForce() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompGravity::Builder {
+public:
+  typedef NetCompGravity Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasForce();
+  inline  ::Vec3::Builder getForce();
+  inline void setForce( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initForce();
+  inline void adoptForce(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownForce();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompGravity::Pipeline {
+public:
+  typedef NetCompGravity Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+  inline  ::Vec3::Pipeline getForce();
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
 class NetCompCamera::Reader {
 public:
   typedef NetCompCamera Reads;
@@ -937,6 +2141,9 @@ public:
     return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
   }
 #endif  // !CAPNP_LITE
+
+  inline bool hasDirection() const;
+  inline  ::NetCompDirection::Reader getDirection() const;
 
   inline bool hasTransform() const;
   inline  ::NetCompTransformSmall::Reader getTransform() const;
@@ -971,6 +2178,13 @@ public:
   inline ::kj::StringTree toString() const { return asReader().toString(); }
 #endif  // !CAPNP_LITE
 
+  inline bool hasDirection();
+  inline  ::NetCompDirection::Builder getDirection();
+  inline void setDirection( ::NetCompDirection::Reader value);
+  inline  ::NetCompDirection::Builder initDirection();
+  inline void adoptDirection(::capnp::Orphan< ::NetCompDirection>&& value);
+  inline ::capnp::Orphan< ::NetCompDirection> disownDirection();
+
   inline bool hasTransform();
   inline  ::NetCompTransformSmall::Builder getTransform();
   inline void setTransform( ::NetCompTransformSmall::Reader value);
@@ -999,7 +2213,89 @@ public:
   inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
       : _typeless(kj::mv(typeless)) {}
 
+  inline  ::NetCompDirection::Pipeline getDirection();
   inline  ::NetCompTransformSmall::Pipeline getTransform();
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetCompModelPath::Reader {
+public:
+  typedef NetCompModelPath Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool hasPath() const;
+  inline  ::capnp::Text::Reader getPath() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompModelPath::Builder {
+public:
+  typedef NetCompModelPath Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool hasPath();
+  inline  ::capnp::Text::Builder getPath();
+  inline void setPath( ::capnp::Text::Reader value);
+  inline  ::capnp::Text::Builder initPath(unsigned int size);
+  inline void adoptPath(::capnp::Orphan< ::capnp::Text>&& value);
+  inline ::capnp::Orphan< ::capnp::Text> disownPath();
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompModelPath::Pipeline {
+public:
+  typedef NetCompModelPath Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
 private:
   ::capnp::AnyPointer::Pipeline _typeless;
   friend class ::capnp::PipelineHook;
@@ -1027,9 +2323,9 @@ public:
 
   inline  ::EPlayerMoveType getMoveType() const;
 
-  inline  ::int32_t getPlayerFlags() const;
+  inline  ::uint8_t getPlayerFlags() const;
 
-  inline  ::int32_t getPrevPlayerFlags() const;
+  inline  ::uint8_t getPrevPlayerFlags() const;
 
   inline float getMaxSpeed() const;
 
@@ -1074,11 +2370,11 @@ public:
   inline  ::EPlayerMoveType getMoveType();
   inline void setMoveType( ::EPlayerMoveType value);
 
-  inline  ::int32_t getPlayerFlags();
-  inline void setPlayerFlags( ::int32_t value);
+  inline  ::uint8_t getPlayerFlags();
+  inline void setPlayerFlags( ::uint8_t value);
 
-  inline  ::int32_t getPrevPlayerFlags();
-  inline void setPrevPlayerFlags( ::int32_t value);
+  inline  ::uint8_t getPrevPlayerFlags();
+  inline void setPrevPlayerFlags( ::uint8_t value);
 
   inline float getMaxSpeed();
   inline void setMaxSpeed(float value);
@@ -1126,6 +2422,34 @@ private:
 
 // =======================================================================================
 
+inline float Vec2::Reader::getX() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec2::Builder::getX() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void Vec2::Builder::setX(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline float Vec2::Reader::getY() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec2::Builder::getY() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void Vec2::Builder::setY(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
 inline float Vec3::Reader::getX() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
@@ -1166,6 +2490,62 @@ inline float Vec3::Builder::getZ() {
 inline void Vec3::Builder::setZ(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline float Vec4::Reader::getX() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec4::Builder::getX() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void Vec4::Builder::setX(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline float Vec4::Reader::getY() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec4::Builder::getY() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void Vec4::Builder::setY(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
+inline float Vec4::Reader::getZ() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec4::Builder::getZ() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void Vec4::Builder::setZ(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline float Vec4::Reader::getW() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+
+inline float Vec4::Builder::getW() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+inline void Vec4::Builder::setW(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgUserCmd::Reader::hasAngles() const {
@@ -1221,18 +2601,32 @@ inline void NetMsgUserCmd::Builder::setButtons( ::int32_t value) {
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline bool NetMsgUserCmd::Reader::getNoclip() const {
-  return _reader.getDataField<bool>(
-      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
+inline  ::EPlayerMoveType NetMsgUserCmd::Reader::getMoveType() const {
+  return _reader.getDataField< ::EPlayerMoveType>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
 
-inline bool NetMsgUserCmd::Builder::getNoclip() {
-  return _builder.getDataField<bool>(
-      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
+inline  ::EPlayerMoveType NetMsgUserCmd::Builder::getMoveType() {
+  return _builder.getDataField< ::EPlayerMoveType>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
-inline void NetMsgUserCmd::Builder::setNoclip(bool value) {
+inline void NetMsgUserCmd::Builder::setMoveType( ::EPlayerMoveType value) {
+  _builder.setDataField< ::EPlayerMoveType>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetMsgUserCmd::Reader::getFlashlight() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<48>() * ::capnp::ELEMENTS);
+}
+
+inline bool NetMsgUserCmd::Builder::getFlashlight() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<48>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgUserCmd::Builder::setFlashlight(bool value) {
   _builder.setDataField<bool>(
-      ::capnp::bounded<32>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<48>() * ::capnp::ELEMENTS, value);
 }
 
 inline  ::int32_t NetMsgServerInfo::Reader::getNewPort() const {
@@ -1379,6 +2773,20 @@ inline ::capnp::Orphan< ::capnp::Text> NetMsgServerInfo::Builder::disownMapHash(
       ::capnp::bounded<2>() * ::capnp::POINTERS));
 }
 
+inline  ::uint32_t NetMsgServerInfo::Reader::getPlayerEntityId() const {
+  return _reader.getDataField< ::uint32_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint32_t NetMsgServerInfo::Builder::getPlayerEntityId() {
+  return _builder.getDataField< ::uint32_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgServerInfo::Builder::setPlayerEntityId( ::uint32_t value) {
+  _builder.setDataField< ::uint32_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
 inline bool NetMsgClientInfo::Reader::hasName() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -1447,18 +2855,326 @@ inline ::capnp::Orphan< ::capnp::Text> NetMsgDisconnect::Builder::disownReason()
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 
-inline  ::uint32_t NetEntity::Reader::getId() const {
+inline bool NetMsgConVar::Reader::hasCommand() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetMsgConVar::Builder::hasCommand() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Text::Reader NetMsgConVar::Reader::getCommand() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Text::Builder NetMsgConVar::Builder::getCommand() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetMsgConVar::Builder::setCommand( ::capnp::Text::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Text::Builder NetMsgConVar::Builder::initCommand(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void NetMsgConVar::Builder::adoptCommand(
+    ::capnp::Orphan< ::capnp::Text>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Text> NetMsgConVar::Builder::disownCommand() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::EMsgSrcClient MsgSrcClient::Reader::getType() const {
+  return _reader.getDataField< ::EMsgSrcClient>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::EMsgSrcClient MsgSrcClient::Builder::getType() {
+  return _builder.getDataField< ::EMsgSrcClient>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void MsgSrcClient::Builder::setType( ::EMsgSrcClient value) {
+  _builder.setDataField< ::EMsgSrcClient>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool MsgSrcClient::Reader::hasData() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool MsgSrcClient::Builder::hasData() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Data::Reader MsgSrcClient::Reader::getData() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Data::Builder MsgSrcClient::Builder::getData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void MsgSrcClient::Builder::setData( ::capnp::Data::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Data::Builder MsgSrcClient::Builder::initData(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void MsgSrcClient::Builder::adoptData(
+    ::capnp::Orphan< ::capnp::Data>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Data> MsgSrcClient::Builder::disownData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::EMsgSrcServer MsgSrcServer::Reader::getType() const {
+  return _reader.getDataField< ::EMsgSrcServer>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::EMsgSrcServer MsgSrcServer::Builder::getType() {
+  return _builder.getDataField< ::EMsgSrcServer>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void MsgSrcServer::Builder::setType( ::EMsgSrcServer value) {
+  _builder.setDataField< ::EMsgSrcServer>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool MsgSrcServer::Reader::hasData() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool MsgSrcServer::Builder::hasData() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Data::Reader MsgSrcServer::Reader::getData() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Data::Builder MsgSrcServer::Builder::getData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void MsgSrcServer::Builder::setData( ::capnp::Data::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Data::Builder MsgSrcServer::Builder::initData(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void MsgSrcServer::Builder::adoptData(
+    ::capnp::Orphan< ::capnp::Data>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Data> MsgSrcServer::Builder::disownData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::uint32_t NetMsgEntity::Reader::getId() const {
   return _reader.getDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
 
-inline  ::uint32_t NetEntity::Builder::getId() {
+inline  ::uint32_t NetMsgEntity::Builder::getId() {
   return _builder.getDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
-inline void NetEntity::Builder::setId( ::uint32_t value) {
+inline void NetMsgEntity::Builder::setId( ::uint32_t value) {
   _builder.setDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint32_t NetMsgEntityUpdate::Reader::getId() const {
+  return _reader.getDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint32_t NetMsgEntityUpdate::Builder::getId() {
+  return _builder.getDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgEntityUpdate::Builder::setId( ::uint32_t value) {
+  _builder.setDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Reader::getState() const {
+  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Builder::getState() {
+  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgEntityUpdate::Builder::setState( ::NetMsgEntityUpdate::EState value) {
+  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetMsgEntityUpdate::Reader::hasComponents() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetMsgEntityUpdate::Builder::hasComponents() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader NetMsgEntityUpdate::Reader::getComponents() const {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder NetMsgEntityUpdate::Builder::getComponents() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetMsgEntityUpdate::Builder::setComponents( ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder NetMsgEntityUpdate::Builder::initComponents(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void NetMsgEntityUpdate::Builder::adoptComponents(
+    ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>> NetMsgEntityUpdate::Builder::disownComponents() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetMsgEntityUpdate::Component::Reader::hasName() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetMsgEntityUpdate::Component::Builder::hasName() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Text::Reader NetMsgEntityUpdate::Component::Reader::getName() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Text::Builder NetMsgEntityUpdate::Component::Builder::getName() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetMsgEntityUpdate::Component::Builder::setName( ::capnp::Text::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Text::Builder NetMsgEntityUpdate::Component::Builder::initName(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void NetMsgEntityUpdate::Component::Builder::adoptName(
+    ::capnp::Orphan< ::capnp::Text>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Text> NetMsgEntityUpdate::Component::Builder::disownName() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Component::Reader::getState() const {
+  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Component::Builder::getState() {
+  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgEntityUpdate::Component::Builder::setState( ::NetMsgEntityUpdate::EState value) {
+  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetMsgEntityUpdate::Component::Reader::hasData() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetMsgEntityUpdate::Component::Builder::hasData() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Data::Reader NetMsgEntityUpdate::Component::Reader::getData() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::getData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline void NetMsgEntityUpdate::Component::Builder::setData( ::capnp::Data::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::initData(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::init(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), size);
+}
+inline void NetMsgEntityUpdate::Component::Builder::adoptData(
+    ::capnp::Orphan< ::capnp::Data>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Data>::adopt(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Data> NetMsgEntityUpdate::Component::Builder::disownData() {
+  return ::capnp::_::PointerHelpers< ::capnp::Data>::disown(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline bool NetMsgEntityUpdates::Reader::hasUpdateList() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetMsgEntityUpdates::Builder::hasUpdateList() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Reader NetMsgEntityUpdates::Reader::getUpdateList() const {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Builder NetMsgEntityUpdates::Builder::getUpdateList() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetMsgEntityUpdates::Builder::setUpdateList( ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>::Builder NetMsgEntityUpdates::Builder::initUpdateList(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void NetMsgEntityUpdates::Builder::adoptUpdateList(
+    ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>> NetMsgEntityUpdates::Builder::disownUpdateList() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::NetMsgEntityUpdate,  ::capnp::Kind::STRUCT>>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 
 inline bool NetCompTransform::Reader::hasPos() const {
@@ -1656,43 +3372,316 @@ inline ::capnp::Orphan< ::Vec3> NetCompTransformSmall::Builder::disownAng() {
       ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
 
-inline bool NetCompCamera::Reader::hasTransform() const {
+inline bool NetCompRigidBody::Reader::hasVel() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
 }
-inline bool NetCompCamera::Builder::hasTransform() {
+inline bool NetCompRigidBody::Builder::hasVel() {
   return !_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
 }
-inline  ::NetCompTransformSmall::Reader NetCompCamera::Reader::getTransform() const {
-  return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::get(_reader.getPointerField(
+inline  ::Vec3::Reader NetCompRigidBody::Reader::getVel() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
-inline  ::NetCompTransformSmall::Builder NetCompCamera::Builder::getTransform() {
-  return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::get(_builder.getPointerField(
+inline  ::Vec3::Builder NetCompRigidBody::Builder::getVel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 #if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompRigidBody::Pipeline::getVel() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(0));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompRigidBody::Builder::setVel( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompRigidBody::Builder::initVel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompRigidBody::Builder::adoptVel(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompRigidBody::Builder::disownVel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompRigidBody::Reader::hasAccel() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompRigidBody::Builder::hasAccel() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompRigidBody::Reader::getAccel() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompRigidBody::Builder::getAccel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompRigidBody::Pipeline::getAccel() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(1));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompRigidBody::Builder::setAccel( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompRigidBody::Builder::initAccel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline void NetCompRigidBody::Builder::adoptAccel(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompRigidBody::Builder::disownAccel() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompDirection::Reader::hasForward() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompDirection::Builder::hasForward() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompDirection::Reader::getForward() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::getForward() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompDirection::Pipeline::getForward() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(0));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompDirection::Builder::setForward( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::initForward() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompDirection::Builder::adoptForward(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompDirection::Builder::disownForward() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompDirection::Reader::hasUp() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompDirection::Builder::hasUp() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompDirection::Reader::getUp() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::getUp() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompDirection::Pipeline::getUp() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(1));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompDirection::Builder::setUp( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::initUp() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline void NetCompDirection::Builder::adoptUp(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompDirection::Builder::disownUp() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompDirection::Reader::hasRight() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompDirection::Builder::hasRight() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompDirection::Reader::getRight() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::getRight() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompDirection::Pipeline::getRight() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(2));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompDirection::Builder::setRight( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompDirection::Builder::initRight() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline void NetCompDirection::Builder::adoptRight(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompDirection::Builder::disownRight() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompGravity::Reader::hasForce() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompGravity::Builder::hasForce() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompGravity::Reader::getForce() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompGravity::Builder::getForce() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompGravity::Pipeline::getForce() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(0));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompGravity::Builder::setForce( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompGravity::Builder::initForce() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompGravity::Builder::adoptForce(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompGravity::Builder::disownForce() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompCamera::Reader::hasDirection() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompCamera::Builder::hasDirection() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::NetCompDirection::Reader NetCompCamera::Reader::getDirection() const {
+  return ::capnp::_::PointerHelpers< ::NetCompDirection>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::NetCompDirection::Builder NetCompCamera::Builder::getDirection() {
+  return ::capnp::_::PointerHelpers< ::NetCompDirection>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::NetCompDirection::Pipeline NetCompCamera::Pipeline::getDirection() {
+  return  ::NetCompDirection::Pipeline(_typeless.getPointerField(0));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompCamera::Builder::setDirection( ::NetCompDirection::Reader value) {
+  ::capnp::_::PointerHelpers< ::NetCompDirection>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::NetCompDirection::Builder NetCompCamera::Builder::initDirection() {
+  return ::capnp::_::PointerHelpers< ::NetCompDirection>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompCamera::Builder::adoptDirection(
+    ::capnp::Orphan< ::NetCompDirection>&& value) {
+  ::capnp::_::PointerHelpers< ::NetCompDirection>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::NetCompDirection> NetCompCamera::Builder::disownDirection() {
+  return ::capnp::_::PointerHelpers< ::NetCompDirection>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompCamera::Reader::hasTransform() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompCamera::Builder::hasTransform() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::NetCompTransformSmall::Reader NetCompCamera::Reader::getTransform() const {
+  return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::NetCompTransformSmall::Builder NetCompCamera::Builder::getTransform() {
+  return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
 inline  ::NetCompTransformSmall::Pipeline NetCompCamera::Pipeline::getTransform() {
-  return  ::NetCompTransformSmall::Pipeline(_typeless.getPointerField(0));
+  return  ::NetCompTransformSmall::Pipeline(_typeless.getPointerField(1));
 }
 #endif  // !CAPNP_LITE
 inline void NetCompCamera::Builder::setTransform( ::NetCompTransformSmall::Reader value) {
   ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::set(_builder.getPointerField(
-      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
 }
 inline  ::NetCompTransformSmall::Builder NetCompCamera::Builder::initTransform() {
   return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::init(_builder.getPointerField(
-      ::capnp::bounded<0>() * ::capnp::POINTERS));
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
 inline void NetCompCamera::Builder::adoptTransform(
     ::capnp::Orphan< ::NetCompTransformSmall>&& value) {
   ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::adopt(_builder.getPointerField(
-      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
 }
 inline ::capnp::Orphan< ::NetCompTransformSmall> NetCompCamera::Builder::disownTransform() {
   return ::capnp::_::PointerHelpers< ::NetCompTransformSmall>::disown(_builder.getPointerField(
-      ::capnp::bounded<0>() * ::capnp::POINTERS));
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
 
 inline float NetCompCamera::Reader::getFov() const {
@@ -1709,6 +3698,40 @@ inline void NetCompCamera::Builder::setFov(float value) {
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
+inline bool NetCompModelPath::Reader::hasPath() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompModelPath::Builder::hasPath() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Text::Reader NetCompModelPath::Reader::getPath() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Text::Builder NetCompModelPath::Builder::getPath() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompModelPath::Builder::setPath( ::capnp::Text::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Text::Builder NetCompModelPath::Builder::initPath(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), size);
+}
+inline void NetCompModelPath::Builder::adoptPath(
+    ::capnp::Orphan< ::capnp::Text>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Text> NetCompModelPath::Builder::disownPath() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
 inline  ::EPlayerMoveType NetCompPlayerMoveData::Reader::getMoveType() const {
   return _reader.getDataField< ::EPlayerMoveType>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
@@ -1723,116 +3746,116 @@ inline void NetCompPlayerMoveData::Builder::setMoveType( ::EPlayerMoveType value
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::int32_t NetCompPlayerMoveData::Reader::getPlayerFlags() const {
-  return _reader.getDataField< ::int32_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
-}
-
-inline  ::int32_t NetCompPlayerMoveData::Builder::getPlayerFlags() {
-  return _builder.getDataField< ::int32_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
-}
-inline void NetCompPlayerMoveData::Builder::setPlayerFlags( ::int32_t value) {
-  _builder.setDataField< ::int32_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
-}
-
-inline  ::int32_t NetCompPlayerMoveData::Reader::getPrevPlayerFlags() const {
-  return _reader.getDataField< ::int32_t>(
+inline  ::uint8_t NetCompPlayerMoveData::Reader::getPlayerFlags() const {
+  return _reader.getDataField< ::uint8_t>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
 
-inline  ::int32_t NetCompPlayerMoveData::Builder::getPrevPlayerFlags() {
-  return _builder.getDataField< ::int32_t>(
+inline  ::uint8_t NetCompPlayerMoveData::Builder::getPlayerFlags() {
+  return _builder.getDataField< ::uint8_t>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setPrevPlayerFlags( ::int32_t value) {
-  _builder.setDataField< ::int32_t>(
+inline void NetCompPlayerMoveData::Builder::setPlayerFlags( ::uint8_t value) {
+  _builder.setDataField< ::uint8_t>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint8_t NetCompPlayerMoveData::Reader::getPrevPlayerFlags() const {
+  return _reader.getDataField< ::uint8_t>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint8_t NetCompPlayerMoveData::Builder::getPrevPlayerFlags() {
+  return _builder.getDataField< ::uint8_t>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setPrevPlayerFlags( ::uint8_t value) {
+  _builder.setDataField< ::uint8_t>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getMaxSpeed() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getMaxSpeed() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setMaxSpeed(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getPrevViewHeight() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getPrevViewHeight() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setPrevViewHeight(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getTargetViewHeight() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getTargetViewHeight() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setTargetViewHeight(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getOutViewHeight() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getOutViewHeight() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setOutViewHeight(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<6>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getDuckDuration() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getDuckDuration() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setDuckDuration(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<7>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
 }
 
 inline float NetCompPlayerMoveData::Reader::getDuckTime() const {
   return _reader.getDataField<float>(
-      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
 }
 
 inline float NetCompPlayerMoveData::Builder::getDuckTime() {
   return _builder.getDataField<float>(
-      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
 }
 inline void NetCompPlayerMoveData::Builder::setDuckTime(float value) {
   _builder.setDataField<float>(
-      ::capnp::bounded<8>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS, value);
 }
 
 

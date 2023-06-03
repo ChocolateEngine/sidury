@@ -256,7 +256,7 @@ NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
 {
 	NetAddr_t netAddr;
 
-	if ( sString == "127.0.0.1" )
+	if ( sString == "127.0.0.1" || sString == "localhost" )
 	{
 		netAddr.aType = ENetType_Loopback;
 		netAddr.aPort = 27016;
@@ -650,6 +650,10 @@ int Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr )
 	int ret = connect( (SOCKET)sSocket, (const sockaddr*)&srAddr, sizeof( ch_sockaddr ) );
 
 	// check error
+	if ( ret != 0 )
+	{
+		Log_ErrorF( gLC_Network, "Failed to connect: %s\n", Net_ErrorString() );
+	}
 
 	return ret;
 }

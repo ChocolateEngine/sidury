@@ -199,14 +199,15 @@ void LightEditor_Shutdown()
 
 void LightEditor_DrawEditor()
 {
+#if 0  // bring back once networking is working
 	if ( !ImGui::Begin( "Light Editor" ) )
 	{
 		ImGui::End();
 		return;
 	}
 
-	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
-	auto& camTransform    = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+	auto& playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
+	auto& camTransform    = GetEntitySystem()->GetComponent< CCamera >( gLocalPlayer ).aTransform;
 
 	if ( ImGui::Button( "Create Directional Light" ) )
 	{
@@ -360,6 +361,7 @@ void LightEditor_DrawEditor()
 
 	ImGui::EndChild();
 	ImGui::End();
+#endif
 }
 
 
@@ -374,9 +376,10 @@ void LightEditor_DrawLightModels()
 
 void LightEditor_Update()
 {
+#if 0
 	PROF_SCOPE();
 
-	gpFlashlight = entities->GetComponent< Light_t* >( gLocalPlayer );
+	gpFlashlight = GetEntitySystem()->GetComponent< Light_t* >( gLocalPlayer );
 
 	LightEditor_DrawLightModels();
 
@@ -387,5 +390,6 @@ void LightEditor_Update()
 		return;
 
 	LightEditor_DrawEditor();
+#endif
 }
 

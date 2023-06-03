@@ -3,6 +3,9 @@
 #include "inputsystem.h"
 #include "graphics/graphics.h"
 
+#include "cl_main.h"
+#include "sv_main.h"
+
 #include "imgui/imgui.h"
 
 // ---------------------------------------------------------------------------
@@ -11,6 +14,14 @@
 
 // #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
 #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_25d.glb"
+
+CONCMD( servertest )
+{
+	// start loopback server
+
+	// connect to the loopback server
+	CL_Connect( "127.0.0.1" );
+}
 
 CONVAR( vrcmdl_scale, 40 );
 CONVAR( in_proto_spam, 0, CVARF_INPUT );
@@ -48,17 +59,17 @@ struct ProtoLookData_t
 
 void CreateProtogen( const std::string& path )
 {
-#if 1
-	Entity         proto       = entities->CreateEntity();
+#if 0
+	Entity         proto       = GetEntitySystem()->CreateEntity();
 
 	Handle         model       = Graphics_LoadModel( path );
 
-	CRenderable_t& renderComp  = entities->AddComponent< CRenderable_t >( proto );
+	CRenderable_t& renderComp  = GetEntitySystem()->AddComponent< CRenderable_t >( proto );
 	renderComp.aHandle         = Graphics_CreateRenderable( model );
 
-	Transform& transform       = entities->AddComponent< Transform >( proto );
+	Transform& transform       = GetEntitySystem()->AddComponent< Transform >( proto );
 
-	auto       playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
+	auto       playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
 
 	transform.aPos             = playerTransform.aPos;
 	transform.aScale           = { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() };
@@ -70,13 +81,13 @@ void CreateProtogen( const std::string& path )
 void CreateModelEntity( const std::string& path )
 {
 #if 0
-	Entity physEnt = entities->CreateEntity();
+	Entity physEnt = GetEntitySystem()->CreateEntity();
 
 	Model* model   = Graphics_LoadModel( path );
-	entities->AddComponent< Model* >( physEnt, model );
-	Transform& transform = entities->AddComponent< Transform >( physEnt );
+	GetEntitySystem()->AddComponent< Model* >( physEnt, model );
+	Transform& transform = GetEntitySystem()->AddComponent< Transform >( physEnt );
 
-	Transform& playerTransform = entities->GetComponent< Transform >( game->aLocalPlayer );
+	Transform& playerTransform = GetEntitySystem()->GetComponent< Transform >( game->aLocalPlayer );
 	transform = playerTransform;
 
 	g_staticEnts.push_back( physEnt );
@@ -85,12 +96,12 @@ void CreateModelEntity( const std::string& path )
 
 void CreatePhysEntity( const std::string& path )
 {
-#if 1
-	Entity         physEnt    = entities->CreateEntity();
+#if 0
+	Entity         physEnt    = GetEntitySystem()->CreateEntity();
 
 	Handle         model      = Graphics_LoadModel( path );
 
-	CRenderable_t& renderComp = entities->AddComponent< CRenderable_t >( physEnt );
+	CRenderable_t& renderComp = GetEntitySystem()->AddComponent< CRenderable_t >( physEnt );
 	renderComp.aHandle        = Graphics_CreateRenderable( model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
@@ -105,7 +116,7 @@ void CreatePhysEntity( const std::string& path )
 		return;
 	}
 
-	Transform&        transform = entities->GetComponent< Transform >( gLocalPlayer );
+	Transform&        transform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aPos         = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
@@ -119,8 +130,8 @@ void CreatePhysEntity( const std::string& path )
 
 	Phys_SetMaxVelocities( phys );
 
-	entities->AddComponent< IPhysicsShape* >( physEnt, shape );
-	entities->AddComponent< IPhysicsObject* >( physEnt, phys );
+	GetEntitySystem()->AddComponent< IPhysicsShape* >( physEnt, shape );
+	GetEntitySystem()->AddComponent< IPhysicsObject* >( physEnt, phys );
 
 	g_otherEnts.push_back( physEnt );
 #endif
@@ -165,9 +176,9 @@ CON_COMMAND( delete_protos )
 {
 	for ( auto& proto : g_protos )
 	{
-		// Graphics_FreeModel( entities->GetComponent< Model* >( proto ) );
-		Graphics_FreeRenderable( entities->GetComponent< CRenderable_t >( proto ).aHandle );
-		entities->DeleteEntity( proto );
+		// Graphics_FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
+		// Graphics_FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
+		// GetEntitySystem()->DeleteEntity( proto );
 	}
 
 	g_protos.clear();
@@ -249,22 +260,23 @@ static void ScaleImGui( float sScale )
 
 void TEST_EntUpdate()
 {
+#if 0
 	PROF_SCOPE();
 
 	// blech
 	for ( auto& ent : g_otherEnts )
 	{
-		CRenderable_t& renderComp = entities->GetComponent< CRenderable_t >( ent );
+		CRenderable_t& renderComp = GetEntitySystem()->GetComponent< CRenderable_t >( ent );
 
 		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderComp.aHandle ) )
 		{
 			if ( renderable->aModel == InvalidHandle )
 				continue;
 
-			// Model *physObjList = &entities->GetComponent< Model >( ent );
+			// Model *physObjList = &GetEntitySystem()->GetComponent< Model >( ent );
 
-			// Transform& transform = entities->GetComponent< Transform >( ent );
-			IPhysicsObject* phys = entities->GetComponent< IPhysicsObject* >( ent );
+			// Transform& transform = GetEntitySystem()->GetComponent< Transform >( ent );
+			IPhysicsObject* phys = GetEntitySystem()->GetComponent< IPhysicsObject* >( ent );
 
 			if ( !phys )
 				continue;
@@ -290,6 +302,7 @@ void TEST_EntUpdate()
 
 	ImGui::End();
 #endif
+#endif
 }
 
 
@@ -304,8 +317,8 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 	// also could thread this as a test
 	for ( auto& proto : lookData->aProtos )
 	{
-		DefaultRenderable* renderable = (DefaultRenderable*)entities->GetComponent< RenderableHandle_t >( proto );
-		auto& protoTransform = entities->GetComponent< Transform >( proto );
+		DefaultRenderable* renderable = (DefaultRenderable*)GetEntitySystem()->GetComponent< RenderableHandle_t >( proto );
+		auto& protoTransform = GetEntitySystem()->GetComponent< Transform >( proto );
 
 		bool matrixChanged = false;
 
@@ -352,10 +365,11 @@ CONVAR( r_proto_line_dist2, 32.f );
 // will be used in the future for when updating bones and stuff
 void TEST_UpdateProtos( float frameTime )
 {
+#if 0
 	PROF_SCOPE();
 
-	auto& playerTransform = entities->GetComponent< Transform >( gLocalPlayer );
-	// auto& camTransform = entities->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+	auto& playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
+	// auto& camTransform = GetEntitySystem()->GetComponent< CCamera >( gLocalPlayer ).aTransform;
 
 	if ( !Game_IsPaused() )
 	{
@@ -385,8 +399,8 @@ void TEST_UpdateProtos( float frameTime )
 	// also could thread this as a test
 	for ( auto& proto : g_protos )
 	{
-		CRenderable_t& renderComp     = entities->GetComponent< CRenderable_t >( proto );
-		auto&          protoTransform = entities->GetComponent< Transform >( proto );
+		CRenderable_t& renderComp     = GetEntitySystem()->GetComponent< CRenderable_t >( proto );
+		auto&          protoTransform = GetEntitySystem()->GetComponent< Transform >( proto );
 
 		bool           matrixChanged  = false;
 
@@ -496,6 +510,7 @@ void TEST_UpdateProtos( float frameTime )
 			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
 		}
 	}
+#endif
 }
 
 
@@ -569,7 +584,7 @@ CONCMD( snd_test_clear )
 
 void TEST_UpdateAudio()
 {
-	// auto& transform = entities->GetComponent< Transform >( gLocalPlayer );
+	// auto& transform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
 
 	for ( Handle stream : streams )
 	{

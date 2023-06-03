@@ -7,120 +7,110 @@
 #include <capnp/serialize-packed.h>
 
 
+NEW_CVAR_FLAG( CVARF_CL_EXEC );
+NEW_CVAR_FLAG( CVARF_SV_EXEC );
+
+
+static bool           gGameUseClient     = true;
+static ECommandSource gGameCommandSource = ECommandSource_Client;
+
 bool Game_IsHosting()
 {
 	return gServerData.aActive;
 }
+
 
 bool Game_IsClient()
 {
 	return true;
 }
 
+
 bool Game_IsServer()
 {
 	return gServerData.aActive;
 }
 
-// Entity Component stuff
-Transform NetComp_ReadTransform()
+
+bool Game_ProcessingClient()
 {
-	return {};
+	return gGameUseClient;
 }
 
-void NetComp_WriteTransform( capnp::MessageBuilder& srMessage, const Transform& srTransform )
+
+void Game_SetClient( bool client )
 {
-	auto          builder = srMessage.initRoot< NetCompTransform >();
-
-	Vec3::Builder pos = builder.getPos();
-	pos.setX( srTransform.aPos.x );
-	pos.setY( srTransform.aPos.y );
-	pos.setZ( srTransform.aPos.z );
-
-	Vec3::Builder ang = builder.getAng();
-	ang.setX( srTransform.aAng.x );
-	ang.setY( srTransform.aAng.y );
-	ang.setZ( srTransform.aAng.z );
-
-	Vec3::Builder scale = builder.getScale();
-	scale.setX( srTransform.aScale.x );
-	scale.setY( srTransform.aScale.y );
-	scale.setZ( srTransform.aScale.z );
+	gGameUseClient = client;
 }
 
-TransformSmall NetComp_ReadTransformSmall()
+
+ECommandSource Game_GetCommandSource()
 {
-	return {};
+	return gGameCommandSource;
 }
 
-void NetComp_WriteTransformSmall( capnp::MessageBuilder& srMessage, const TransformSmall& srTransform )
+
+void Game_SetCommandSource( ECommandSource sSource )
 {
-	auto          builder = srMessage.initRoot< NetCompTransform >();
-
-	Vec3::Builder pos = builder.getPos();
-	pos.setX( srTransform.aPos.x );
-	pos.setY( srTransform.aPos.y );
-	pos.setZ( srTransform.aPos.z );
-
-	Vec3::Builder ang = builder.getAng();
-	ang.setX( srTransform.aAng.x );
-	ang.setY( srTransform.aAng.y );
-	ang.setZ( srTransform.aAng.z );
+	gGameCommandSource = sSource;
 }
 
-CCamera NetComp_ReadCamera()
+
+void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 {
-	return {};
-}
+	std::string                commandName;
+	std::vector< std::string > args;
 
-void NetComp_WriteCamera( capnp::MessageBuilder& srMessage, const CCamera& srCamera )
-{
-	auto builder = srMessage.initRoot< NetCompCamera >();
-
-	builder.setFov( srCamera.aFov );
-
-	Vec3::Builder pos = builder.getTransform().getPos();
-	pos.setX( srCamera.aTransform.aPos.x );
-	pos.setY( srCamera.aTransform.aPos.y );
-	pos.setZ( srCamera.aTransform.aPos.z );
-
-	Vec3::Builder ang = builder.getTransform().getAng();
-	ang.setX( srCamera.aTransform.aAng.x );
-	ang.setY( srCamera.aTransform.aAng.y );
-	ang.setZ( srCamera.aTransform.aAng.z );
-}
-
-// different, idk
-void NetComp_UpdatePlayerMoveData( CPlayerMoveData& srMoveData )
-{
-}
-
-void NetComp_WritePlayerMoveData( capnp::MessageBuilder& srMessage, const CPlayerMoveData& srMoveData )
-{
-	auto builder = srMessage.initRoot< NetCompPlayerMoveData >();
-
-	switch ( srMoveData.aMoveType )
+	for ( size_t i = 0; i < sCommand.size(); i++ )
 	{
-		case PlayerMoveType::Walk:
-			builder.setMoveType( EPlayerMoveType::WALK );
+		commandName.clear();
+		args.clear();
 
-		default:
-		case PlayerMoveType::NoClip:
-			builder.setMoveType( EPlayerMoveType::NO_CLIP );
+		Con_ParseCommandLineEx( sCommand, commandName, args, i );
+		str_lower( commandName );
 
-		case PlayerMoveType::Fly:
-			builder.setMoveType( EPlayerMoveType::FLY );
+		ConVarBase* cvarBase = Con_GetConVarBase( commandName );
+
+		ConVarFlag_t flags = cvarBase->GetFlags();
+
+		// if the command is from the server and we are the client, make sure they can execute it
+		if ( sSource == ECommandSource_Server && Game_ProcessingClient() )
+		{
+			// The Convar must have this flag
+			if ( !(flags & CVARF_SV_EXEC) )
+			{
+				Log_WarnF( "Server Tried Executing Command without flag to allow it: \"%s\"\n", commandName );
+				continue;
+			}
+		}
+
+		// if the command is from the client and we are the server, make sure they can execute it
+		else if ( sSource == ECommandSource_Client && !Game_ProcessingClient() )
+		{
+			// The Convar must have this flag
+			if ( !(flags & CVARF_CL_EXEC) )
+			{
+				Log_WarnF( "Client Tried Executing Command without flag to allow it: \"%s\"\n", commandName );
+				continue;
+			}
+		}
+
+		Con_RunCommandArgs( commandName, args );
 	}
+}
 
-	builder.setPlayerFlags( srMoveData.aPlayerFlags );
-	builder.setPrevPlayerFlags( srMoveData.aPrevPlayerFlags );
-	builder.setMaxSpeed( srMoveData.aMaxSpeed );
 
-	// Smooth Duck
-	builder.setPrevViewHeight( srMoveData.aPrevViewHeight );
-	builder.setTargetViewHeight( srMoveData.aTargetViewHeight );
-	builder.setOutViewHeight( srMoveData.aOutViewHeight );
-	builder.setDuckDuration( srMoveData.aDuckDuration );
-	builder.setDuckTime( srMoveData.aDuckTime );
+void NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec3 )
+{
+	srVec3.x = srReader.getX();
+	srVec3.y = srReader.getY();
+	srVec3.z = srReader.getZ();
+}
+
+void NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec3 )
+{
+	spBuilder->setX( srVec3.x );
+	spBuilder->setY( srVec3.y );
+	spBuilder->setZ( srVec3.z );
 }
 

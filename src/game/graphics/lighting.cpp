@@ -3,6 +3,8 @@
 #include "lighting.h"
 #include "types/transform.h"
 
+#include "../entity.h"
+
 // --------------------------------------------------------------------------------------
 // Lighting
 
@@ -520,9 +522,16 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 }
 
 
-Light_t* Graphics_CreateLight( ELightType sType )
+Light_t* Graphics_CreateLight( Entity sEntity, ELightType sType )
 {
-	Light_t* light       = new Light_t;
+	Light_t* light = (Light_t*)GetEntitySystem()->AddComponent( sEntity, "light" );
+
+	if ( !light )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create light\n" );
+		return nullptr;
+	}
+
 	light->aType         = sType;
 	gNeedLightInfoUpdate = true;
 
@@ -539,7 +548,7 @@ void Graphics_UpdateLight( Light_t* spLight )
 }
 
 
-void Graphics_DestroyLight( Light_t* spLight )
+void Graphics_DestroyLight( Entity sEntity, Light_t* spLight )
 {
 	if ( !spLight )
 		return;
