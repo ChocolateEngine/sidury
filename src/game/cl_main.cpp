@@ -36,6 +36,7 @@ static float                      gClientTimeout = 0.f;
 
 // Console Commands to send to the server to process, like noclip
 static std::vector< std::string > gCommandsToSend;
+static UserCmd_t                  gClientUserCmd{};
 
 extern Entity                     gLocalPlayer;
 
@@ -89,11 +90,7 @@ CONCMD( connect )
 
 bool CL_Init()
 {
-	EntitySystem::CreateClient();
-
-	// Con_QueueCommand( "connect localhost" );
-
-	return true;
+	return EntitySystem::CreateClient();
 }
 
 
@@ -183,6 +180,7 @@ void CL_Update( float frameTime )
 				}
 			}
 
+			gClientState = EClientState_Connected;
 			break;
 		}
 
@@ -192,6 +190,8 @@ void CL_Update( float frameTime )
 			CL_GetServerMessages();
 
 			// CL_ExecServerCommands();
+
+			CL_UpdateUserCmd();
 
 			CL_GameUpdate( frameTime );
 
@@ -206,7 +206,7 @@ void CL_Update( float frameTime )
 			}
 
 			// Send UserCmd
-			CL_CreateUserCmd();
+			CL_SendUserCmd();
 			break;
 		}
 	}
@@ -284,28 +284,32 @@ void CL_GameUpdate( float frameTime )
 }
 
 
-void CL_CreateUserCmd()
+void CL_UpdateUserCmd()
 {
-	UserCmd_t userCmd{};
-	userCmd.aAng;
+	gClientUserCmd.aAng;
 
-	userCmd.aButtons = 0;
+	gClientUserCmd.aButtons = 0;
 
 	if ( in_duck )
-		userCmd.aButtons |= EBtnInput_Duck;
+		gClientUserCmd.aButtons |= EBtnInput_Duck;
 
 	else if ( in_sprint )
-		userCmd.aButtons |= EBtnInput_Sprint;
+		gClientUserCmd.aButtons |= EBtnInput_Sprint;
 
-	if ( in_forward ) userCmd.aButtons |= EBtnInput_Forward;
-	if ( in_back )    userCmd.aButtons |= EBtnInput_Back;
-	if ( in_left )    userCmd.aButtons |= EBtnInput_Left;
-	if ( in_right )   userCmd.aButtons |= EBtnInput_Right;
-	if ( in_jump )    userCmd.aButtons |= EBtnInput_Jump;
-	if ( in_zoom )    userCmd.aButtons |= EBtnInput_Zoom;
+	if ( in_forward ) gClientUserCmd.aButtons |= EBtnInput_Forward;
+	if ( in_back )    gClientUserCmd.aButtons |= EBtnInput_Back;
+	if ( in_left )    gClientUserCmd.aButtons |= EBtnInput_Left;
+	if ( in_right )   gClientUserCmd.aButtons |= EBtnInput_Right;
+	if ( in_jump )    gClientUserCmd.aButtons |= EBtnInput_Jump;
+	if ( in_zoom )    gClientUserCmd.aButtons |= EBtnInput_Zoom;
 	
 	if ( in_flashlight == IN_CVAR_JUST_PRESSED )
-		userCmd.aFlashlight = true;
+		gClientUserCmd.aFlashlight = true;
+}
+
+
+void CL_SendUserCmd()
+{
 }
 
 
@@ -321,31 +325,45 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 		Entity entId  = entityUpdate.getId();
 		Entity entity = CH_ENT_INVALID;
 
-		if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
-		{
-			entity = GetEntitySystem()->CreateEntityFromServer( entId );
+		// if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
+		// {
+		// 	entity = GetEntitySystem()->CreateEntityFromServer( entId );
+		// 
+		// 	if ( entity == CH_ENT_INVALID )
+		// 		continue;
+		// }
+		// else if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+		// {
+		// 	GetEntitySystem()->DeleteEntity( entId );
+		// 	continue;
+		// }
 
-			if ( entity == CH_ENT_INVALID )
-				continue;
-		}
-		else if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
-		{
-			GetEntitySystem()->DeleteEntity( entId );
+		if ( entity == CH_ENT_INVALID )
 			continue;
-		}
 
 		for ( const NetMsgEntityUpdate::Component::Reader& componentRead : entityUpdate.getComponents() )
 		{
 			const char* spComponentName = componentRead.getName().cStr();
+			void*       componentData   = nullptr;
 
-			if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
+			// if ( componentRead.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+			// {
+			// 	GetEntitySystem()->RemoveComponent( entity, spComponentName );
+			// 	continue;
+			// }
+
+			componentData = GetEntitySystem()->GetComponent( entity, spComponentName );
+
+			// else if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
+			if ( !componentData )
 			{
 				// Create the component
-				void* componentData = GetEntitySystem()->AddComponent( entity, spComponentName );
+				componentData = GetEntitySystem()->AddComponent( entity, spComponentName );
 
 				if ( componentData == nullptr )
 				{
 					Log_ErrorF( "Failed to create component\n" );
+					continue;
 				}
 			}
 		}

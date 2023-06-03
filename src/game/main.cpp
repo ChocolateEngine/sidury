@@ -158,6 +158,7 @@ bool Game_Init()
 #endif
 
 	players = new PlayerManager;
+	players->Init();
 
 	Log_Msg( "Game Loaded!\n" );
 	return true;
@@ -231,12 +232,6 @@ void Game_UpdateGame( float frameTime )
 
 	Input_Update();
 
-	if ( gServerData.aActive )
-		SV_Update( frameTime );
-
-	// when do i call these lol
-	CL_Update( frameTime );
-
 	Game_CheckPaused();
 
 	if ( gPaused )
@@ -249,19 +244,11 @@ void Game_UpdateGame( float frameTime )
 
 	gCurTime += gFrameTime;
 
-	MapManager_Update();
+	if ( gServerData.aActive )
+		SV_Update( gFrameTime );
 
-	players->Update( gFrameTime );
-
-	Phys_Simulate( physenv, gFrameTime );
-
-	TEST_EntUpdate();
-
-	// stupid
-	for ( auto& player: players->aPlayerList )
-	{
-		players->apMove->UpdatePosition( player );
-	}
+	// when do i call these lol
+	CL_Update( gFrameTime );
 
 	players->apMove->DisplayPlayerStats( gLocalPlayer );
 

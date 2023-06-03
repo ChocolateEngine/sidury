@@ -31,5 +31,6 @@ void CL_Connect( const char* spAddress );
 void CL_Disconnect( const char* spReason = nullptr );
 
 void CL_GameUpdate( float frameTime );
-void CL_CreateUserCmd();
+void CL_UpdateUserCmd();
+void CL_SendUserCmd();
 void CL_GetServerMessages();

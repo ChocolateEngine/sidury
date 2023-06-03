@@ -133,7 +133,7 @@ void SV_Update( float frameTime )
 	SV_GameUpdate( frameTime );
 
 	// TEMP - REMOVE ONCE YOU HAVE FRAME UPDATE DATA
-	return;
+	// return;
 
 	// Send updated data to clients
 	capnp::MallocMessageBuilder message;
@@ -145,10 +145,11 @@ void SV_Update( float frameTime )
 		if ( client.aState != ESV_ClientState_Connected )
 			continue;
 
-		int write = Net_Write( client.aSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &client.aAddr );
+		// int write = Net_Write( client.aSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &client.aAddr );
+		int write = client.Write( array.asChars().begin(), array.size() * sizeof( capnp::word ) );
 
 		// If we failed to write, disconnect them?
-		if ( write != 0 )
+		if ( write == 0 )
 		{
 			Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
 			client.aState = ESV_ClientState_Disconnected;
@@ -159,11 +160,46 @@ void SV_Update( float frameTime )
 
 void SV_GameUpdate( float frameTime )
 {
+	MapManager_Update();
+
+	players->Update( frameTime );
+
+	Phys_Simulate( physenv, frameTime );
+
+	// TEST_EntUpdate();
+
+	// stupid
+	for ( auto& player : players->aPlayerList )
+	{
+		players->apMove->UpdatePosition( player );
+	}
 }
 
 
-void SV_BuildUpdatedData( capnp::MessageBuilder& srMessage )
+void SV_BuildEntityList( capnp::MessageBuilder& srBuilder )
 {
+	GetEntitySystem()->WriteEntityUpdates( srBuilder );
+}
+
+
+void SV_BuildUpdatedData( capnp::MessageBuilder& srBuilder )
+{
+	// if ( GetEntitySystem()->aEntityCount == 0 )
+	// 	return;
+
+	// TODO: do more than just entity list, allow a list of messages from the server in one go
+	auto root = srBuilder.initRoot< MsgSrcServer >();
+	root.setType( EMsgSrcServer::ENTITY_LIST );
+
+	capnp::MallocMessageBuilder entListBuilder;
+	SV_BuildEntityList( entListBuilder );
+
+	auto array = capnp::messageToFlatArray( entListBuilder );
+	auto data  = root.initData( array.size() * sizeof( capnp::word ) );
+
+	// This is probably awful and highly inefficent
+	// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
+	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
 }
 
 
@@ -278,67 +314,70 @@ void SV_HandleMsg_UserCmd( SV_Client_t& srClient, NetMsgUserCmd::Reader& srReade
 
 void SV_ProcessClientMsg( SV_Client_t& srClient )
 {
-	ChVector< char > data( 8192 );
-	int              len = srClient.Read( data.data(), data.size() );
-
-	// Timer here for each client to make sure they are connected
-	// anything received from the client will reset their connection timer
-	if ( len <= 0 )
+	while ( true )
 	{
-		// They haven't sent anything in a while, disconnect them
-		if ( sv_client_timeout_enable && Game_GetCurTime() > srClient.aTimeout )
-			SV_SendDisconnect( srClient );
+		ChVector< char > data( 8192 );
+		int              len = srClient.Read( data.data(), data.size() );
 
-		return;
-	}
-
-	// Reset the connection timer
-	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
-
-	// Read the message sent from the client
-	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-	auto                          clientMsg = reader.getRoot< MsgSrcClient >();
-
-	auto                          msgType   = clientMsg.getType();
-	auto                          msgData   = clientMsg.getData();
-
-	capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), data.size() ) );
-
-	switch ( msgType )
-	{
-		// Client is Disconnecting
-		case EMsgSrcClient::DISCONNECT:
+		// Timer here for each client to make sure they are connected
+		// anything received from the client will reset their connection timer
+		if ( len <= 0 )
 		{
-			srClient.aState = ESV_ClientState_Disconnected;
+			// They haven't sent anything in a while, disconnect them
+			if ( sv_client_timeout_enable && Game_GetCurTime() > srClient.aTimeout )
+				SV_SendDisconnect( srClient );
+
 			return;
 		}
 
-		case EMsgSrcClient::CLIENT_INFO:
-		{
-			SV_HandleMsg_ClientInfo();
-			break;
-		}
+		// Reset the connection timer
+		srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
 
-		case EMsgSrcClient::CON_VAR:
-		{
-			SV_SetCommandClient( &srClient );
-			auto msgConVar = dataReader.getRoot< NetMsgConVar >();
-			Game_ExecCommandsSafe( ECommandSource_Client, msgConVar.getCommand().cStr() );
-			SV_SetCommandClient( nullptr );  // Clear it
-			break;
-		}
+		// Read the message sent from the client
+		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+		auto                          clientMsg = reader.getRoot< MsgSrcClient >();
 
-		case EMsgSrcClient::USER_CMD:
-		{
-			auto msgUserCmd = dataReader.getRoot< NetMsgUserCmd >();
-			SV_HandleMsg_UserCmd( srClient, msgUserCmd );
-			break;
-		}
+		auto                          msgType   = clientMsg.getType();
+		auto                          msgData   = clientMsg.getData();
 
-		default:
-			// TODO: have a message type to string function
-			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
-			break;
+		capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), msgData.size() ) );
+
+		switch ( msgType )
+		{
+			// Client is Disconnecting
+			case EMsgSrcClient::DISCONNECT:
+			{
+				srClient.aState = ESV_ClientState_Disconnected;
+				return;
+			}
+
+			case EMsgSrcClient::CLIENT_INFO:
+			{
+				SV_HandleMsg_ClientInfo();
+				break;
+			}
+
+			case EMsgSrcClient::CON_VAR:
+			{
+				SV_SetCommandClient( &srClient );
+				auto msgConVar = dataReader.getRoot< NetMsgConVar >();
+				Game_ExecCommandsSafe( ECommandSource_Client, msgConVar.getCommand().cStr() );
+				SV_SetCommandClient( nullptr );  // Clear it
+				break;
+			}
+
+			case EMsgSrcClient::USER_CMD:
+			{
+				auto msgUserCmd = dataReader.getRoot< NetMsgUserCmd >();
+				SV_HandleMsg_UserCmd( srClient, msgUserCmd );
+				break;
+			}
+
+			default:
+				// TODO: have a message type to string function
+				Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
+				break;
+		}
 	}
 }
 
@@ -346,6 +385,8 @@ void SV_ProcessClientMsg( SV_Client_t& srClient )
 void SV_ConnectClientFinish( SV_Client_t& srClient )
 {
 	srClient.aState = ESV_ClientState_Connected;
+
+	vec_remove( gServerData.aClientsConnecting, &srClient );
 
 	// Spawn the player in!
 	players->Spawn( srClient.aEntity );

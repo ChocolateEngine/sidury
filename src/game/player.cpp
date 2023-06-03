@@ -219,12 +219,12 @@ PlayerManager::~PlayerManager()
 
 void PlayerManager::RegisterComponents()
 {
-	CH_REGISTER_COMPONENT( CPlayerInfo, player_info );
+	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, Entity, aEnt, ent );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
-	CH_REGISTER_COMPONENT( CPlayerZoom, player_zoom );
+	CH_REGISTER_COMPONENT( CPlayerZoom, playerZoom, false, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
@@ -232,8 +232,8 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
 
 	// what the fuck
-	CH_REGISTER_COMPONENT( Model, model );
-	CH_REGISTER_COMPONENT( Renderable_t, renderable );
+	CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
 
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();
@@ -258,6 +258,21 @@ void PlayerManager::Create( Entity player )
 	GetEntitySystem()->AddComponent( player, "rigidBody" );
 	GetEntitySystem()->AddComponent( player, "camera" );
 	GetEntitySystem()->AddComponent( player, "direction" );
+
+	if ( Game_ProcessingClient() )
+	{
+		auto playerInfo            = GetPlayerInfo( player );
+		playerInfo->aIsLocalPlayer = player == gLocalPlayer;
+	}
+	else
+	{
+		SV_Client_t* client = SV_GetClientFromEntity( player );
+		if ( !client )
+			return;
+
+		auto playerInfo   = GetPlayerInfo( player );
+		playerInfo->aName = client->aName;
+	}
 
 	Transform* transform  = (Transform*)GetEntitySystem()->AddComponent( player, "transform" );
 
@@ -351,7 +366,7 @@ void Player_UpdateFlashlight( Entity player, UserCmd_t* spUserCmd )
 
 	Transform* transform  = GetTransform( player );
 	CCamera*   camera     = GetCamera( player );
-	Light_t*   flashlight = static_cast< Light_t* >( GetEntitySystem()->GetComponent( player, "light" ) );
+	Light_t*   flashlight = Ent_GetComponent< Light_t >( player, "light" );
 
 	Assert( transform );
 	Assert( camera );
@@ -462,6 +477,8 @@ inline void ClampAngles( Transform& transform, CCamera& camera )
 
 void PlayerManager::DoMouseLook( Entity player )
 {
+	Assert( Game_ProcessingClient() );
+
 	auto transform = GetTransform( player );
 	auto camera = GetCamera( player );
 
@@ -671,8 +688,22 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 // ============================================================
 
 
+void PlayerMovement::EnsureUserCmd( Entity player )
+{
+	apUserCmd           = nullptr;
+	SV_Client_t* client = SV_GetClientFromEntity( player );
+
+	if ( !client )
+		return;
+
+	apUserCmd = &client->aUserCmd;
+}
+
+
 void PlayerMovement::OnPlayerSpawn( Entity player )
 {
+	EnsureUserCmd( player );
+
 	auto move   = GetPlayerMoveData( player );
 	auto camera = GetCamera(player );
 
@@ -688,6 +719,8 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 
 void PlayerMovement::OnPlayerRespawn( Entity player )
 {
+	EnsureUserCmd( player );
+
 	auto move      = GetPlayerMoveData( player );
 	auto transform = GetTransform( player );
 
@@ -714,7 +747,7 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 	apRigidBody = GetRigidBody( player );
 	apTransform = GetTransform( player );
 	apCamera    = GetCamera( player );
-	apDir       = static_cast< CDirection* >( GetEntitySystem()->GetComponent( player, "direction" ) );
+	apDir       = Ent_GetComponent< CDirection >( player, "direction" );
 	//apPhysObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
 
 	apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
@@ -757,6 +790,9 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 float PlayerMovement::GetViewHeight(  )
 {
+	if ( !apUserCmd )
+		return cl_view_height;
+
 	return ( apUserCmd->aButtons & EBtnInput_Duck ) ? cl_view_height_duck : cl_view_height;
 }
 

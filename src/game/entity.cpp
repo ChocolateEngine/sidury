@@ -112,8 +112,8 @@ bool EntitySystem::Init()
 	// 	aEntityPool.push( entity );
 
 	aEntityPool.resize( CH_MAX_ENTITIES );
-	for ( Entity entity = 0; entity < CH_MAX_ENTITIES; ++entity )
-		aEntityPool[ entity ] = entity;
+	for ( Entity entity = CH_MAX_ENTITIES - 1, index = 0; entity > 0; --entity, ++index )
+		aEntityPool[ index ] = entity;
 
 	CreateComponentPools();
 
@@ -129,7 +129,17 @@ void EntitySystem::Shutdown()
 void EntitySystem::CreateComponentPools()
 {
 	// i can't create component pools without passing template in ffs
-	Log_Error( " *** CREATE ENTITY COMPONENT POOLS *** \n" );
+	// Log_Error( " *** CREATE ENTITY COMPONENT POOLS *** \n" );
+#if COMPONENT_POOLS_TEMP
+	
+	// iterate through all registered components and create a component pool for them
+	// NOTE: this will not account for components registered later on
+	for ( auto& [ name, componentData ] : gEntComponentRegistry.aComponentNames )
+	{
+		EntityComponentPool* pool  = new EntityComponentPool( name.data() );
+		aComponentPools[ name ] = pool;
+	}
+#endif
 }
 
 
@@ -138,10 +148,13 @@ Entity EntitySystem::CreateEntity()
 	Assert( aEntityCount < CH_MAX_ENTITIES && "Too many entities in existence." );
 
 	// Take an ID from the front of the queue
-	Entity id = aEntityPool.front();
+	// Entity id = aEntityPool.front();
+	Entity id = aEntityPool.back();
 	// aEntityPool.pop();
 	aEntityPool.pop_back();
 	++aEntityCount;
+
+	aUsedEntities.push_back( id );
 
 	return id;
 }
@@ -156,26 +169,20 @@ void EntitySystem::DeleteEntity( Entity ent )
 
 	// Put the destroyed ID at the back of the queue
 	// aEntityPool.push( ent );
-	aEntityPool.push_back( ent );
+	// aEntityPool.push_back( ent );
+	aEntityPool.insert( aEntityPool.begin(), ent );
 	--aEntityCount;
 
-	// Notify each component array that an entity has been destroyed
-	// If it has a component for that entity, it will remove it
-	// for ( auto const& pair : aComponentArrays )
-	// {
-	// 	auto const& component = pair.second;
-	// 
-	// 	component->EntityDestroyed( ent );
-	// }
+	vec_remove( aUsedEntities, ent );
 
-	// Erase a destroyed entity from all system lists
-	// mEntities is a set so no check needed
-	// for ( auto const& pair : aSystems )
-	// {
-	// 	auto const& system = pair.second;
-	// 
-	// 	system->aEntities.erase( ent );
-	// }
+	// Tell each Component Pool that this entity was destroyed
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		pool->EntityDestroyed( ent );
+	}
+
+	// TODO: maybe have some IComponentSystem class that has it's own list of entities
+	// so we can tell those that it was destroyed as well
 }
 
 
@@ -210,6 +217,61 @@ void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
 
 void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 {
+	Assert( aEntityCount == aUsedEntities.size() );
+
+	auto root       = srBuilder.initRoot< NetMsgEntityUpdates >();
+	auto updateList = root.initUpdateList( aEntityCount );
+
+	// TODO: probably rethink this so it's a list of components on their own, not a list of entities to update everything on
+	// though we should have some sort of system to detect whether it's dirty or not
+
+	for ( size_t i = 0; i < aEntityCount; i++ )
+	{
+		Entity entity = aUsedEntities[ i ];
+		auto   update = updateList[ i ];
+
+		update.setId( entity );
+		// update.setState( NetMsgEntityUpdate::EState::NONE );  // hmmm
+
+		// this is the worst thing ever
+		std::vector< IEntityComponentPool* > pools;
+
+		// Find all component pools that contain this Entity
+		// That means the Entity has the type of component that pool is for
+		for ( auto& [ name, pool ] : aComponentPools )
+		{
+			if ( pool->Contains( entity ) )
+				pools.push_back( pool );
+		}
+
+		// Now init components with the correct size
+		auto componentsList = update.initComponents( pools.size() );
+
+		for ( size_t i = 0; i < pools.size(); i++ )
+		{
+			auto compBuilder = componentsList[ i ];
+			auto pool        = pools[ i ];
+
+			auto data        = pool->GetData( entity );
+			auto regData     = pool->GetRegistryData();
+
+			compBuilder.setName( regData->apName );
+
+			if ( !regData->apWrite )
+			{
+				compBuilder.initValues( 0 );
+				continue;
+			}
+
+			capnp::MallocMessageBuilder compMessageBuilder;
+			regData->apWrite( compMessageBuilder, data );
+			auto array = capnp::messageToFlatArray( compMessageBuilder );
+
+			auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
+			// std::copy( array.begin(), array.end(), valueBuilder.begin() );
+			memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+		}
+	}
 }
 
 
@@ -223,9 +285,9 @@ void EntitySystem::WriteComponents( Entity sEnt, capnp::MessageBuilder& srBuilde
 }
 
 
-void EntitySystem::MarkComponentNetworked( Entity ent, const char* spName )
-{
-}
+// void EntitySystem::MarkComponentNetworked( Entity ent, const char* spName )
+// {
+// }
 
 
 // Add a component to an entity
@@ -243,6 +305,13 @@ void* EntitySystem::AddComponent( Entity entity, const char* spName )
 }
 
 
+// Does this entity have this component?
+bool EntitySystem::HasComponent( Entity entity, const char* spName )
+{
+	return GetComponent( entity, spName ) != nullptr;
+}
+
+
 // Get a component from an entity
 void* EntitySystem::GetComponent( Entity entity, const char* spName )
 {
@@ -255,6 +324,76 @@ void* EntitySystem::GetComponent( Entity entity, const char* spName )
 	}
 
 	return pool->GetData( entity );
+}
+
+
+// Remove a component from an entity
+void EntitySystem::RemoveComponent( Entity entity, const char* spName )
+{
+	auto pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_FatalF( "Failed to remove component - no component pool found: \"%s\"\n", spName );
+		return;
+	}
+
+	pool->Remove( entity );
+}
+
+
+// Sets Prediction on this component
+void EntitySystem::SetComponentPredicted( Entity entity, const char* spName, bool sPredicted )
+{
+	if ( this == sv_entities )
+	{
+		// The server does not need to know if it's predicted, the client will have special handling for this
+		Log_ErrorF( "Tried to mark entity component as predicted on server - \"%s\"\n", spName );
+		return;
+	}
+
+	auto pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_FatalF( "Failed to set component prediction - no component pool found: \"%s\"\n", spName );
+		return;
+	}
+
+	pool->SetPredicted( entity, sPredicted );
+}
+
+
+// Is this component predicted for this Entity?
+bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
+{
+	if ( this == sv_entities )
+	{
+		// The server does not need to know if it's predicted, the client will have special handling for this
+		Log_ErrorF( "Tried to find a predicted entity component on server - \"%s\"\n", spName );
+		return false;
+	}
+
+	auto pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_FatalF( "Failed to get component prediction - no component pool found: \"%s\"\n", spName );
+		return false;
+	}
+
+	return pool->IsPredicted( entity );
+}
+
+
+IEntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
+{
+	auto it = aComponentPools.find( spName );
+
+	if ( it == aComponentPools.end() )
+		Log_FatalF( "Component not registered before use: \"%s\"\n", spName );
+
+	return it->second;
 }
 
 
@@ -288,8 +427,11 @@ void TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
 	const Transform* spTransform = static_cast< const Transform* >( spData );
 	auto             builder     = srMessage.initRoot< NetCompTransform >();
 
-	// NetHelper_WriteVec3( &builder.initPos(), spTransform->aPos );
-	// NetHelper_WriteVec3( &builder.initAng(), spTransform->aAng );
+	auto             pos         = builder.initPos();
+	NetHelper_WriteVec3( &pos, spTransform->aPos );
+
+	auto ang = builder.initAng();
+	NetHelper_WriteVec3( &ang, spTransform->aAng );
 	// NetHelper_WriteVec3( &builder.initScale(), spTransform->aScale );
 }
 
@@ -532,31 +674,34 @@ CH_COMPONENT_WRITE_DEF( Light_t )
 
 void Ent_RegisterBaseComponents()
 {
-	EntComp_RegisterComponent< Transform >( "transform" );
+	EntComp_RegisterComponent< Transform >( "transform", true, EEntComponentNetType_Both,
+		[ & ]() { return new Transform; }, [ & ]( void* spData ) { delete (Transform*)spData; } );
+
 	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aPos", "pos", offsetof( Transform, aPos ) );
 	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aAng", "ang", offsetof( Transform, aAng ) );
 	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aScale", "scale", offsetof( Transform, aScale ) );
 	EntComp_RegisterComponentReadWrite< Transform >( TEMP_TransformRead, TEMP_TransformWrite );
 
-	CH_REGISTER_COMPONENT_RW( TransformSmall, transformSmall );
+	CH_REGISTER_COMPONENT_RW( TransformSmall, transformSmall, true );
 	CH_REGISTER_COMPONENT_VAR( TransformSmall, glm::vec3, aPos, pos );
 	CH_REGISTER_COMPONENT_VAR( TransformSmall, glm::vec3, aAng, ang );
 
-	CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody );
+	CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
 	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aVel, vel );
 	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aAccel, accel );
 
-	CH_REGISTER_COMPONENT_RW( CDirection, direction );
+	CH_REGISTER_COMPONENT_RW( CDirection, direction, true );
 	CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aForward, forward );
 	CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aUp, up );
 	// CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aRight, right );
 	CH_REGISTER_COMP_VAR_VEC3( CDirection, aRight, right );
 
-	CH_REGISTER_COMPONENT_RW( CGravity, gravity );
+	CH_REGISTER_COMPONENT_RW( CGravity, gravity, true );
 	CH_REGISTER_COMP_VAR_VEC3( CGravity, aForce, force );
 
 	// might be a bit weird
-	CH_REGISTER_COMPONENT_RW( CCamera, camera );
+	// HACK HACK: DONT OVERRIDE CLIENT VALUE, IT WILL NEVER BE UPDATED
+	CH_REGISTER_COMPONENT_RW( CCamera, camera, false );
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov );
 	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aForward, forward );
 	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aUp, up );
@@ -564,15 +709,15 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aPos ) );
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aAng ) );
 
-	CH_REGISTER_COMPONENT_RW( CModelPath, model_path );
+	CH_REGISTER_COMPONENT_RW( CModelPath, modelPath, true );
 	CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
 
 	// Probably should be in graphics?
-	CH_REGISTER_COMPONENT_RW( Light_t, light );
+	CH_REGISTER_COMPONENT( Light_t, light, true, EEntComponentNetType_Both );
 	// CH_REGISTER_COMPONENT_VAR( Light_t, int, aMoveType, moveType );
 
 	// TODO: SHOULD NOT BE HERE !!!!!
-	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData );
+	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPlayerFlags, playerFlags );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );

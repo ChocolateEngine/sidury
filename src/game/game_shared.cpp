@@ -38,6 +38,12 @@ bool Game_ProcessingClient()
 }
 
 
+bool Game_ProcessingServer()
+{
+	return !gGameUseClient;
+}
+
+
 void Game_SetClient( bool client )
 {
 	gGameUseClient = client;

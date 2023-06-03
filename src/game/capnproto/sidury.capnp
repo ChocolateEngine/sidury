@@ -124,19 +124,18 @@ struct NetMsgEntityUpdate
 
     struct Component
     {
-        name  @0 :Text;    # Registered Component Name
-        state @1 :EState;  # Component State
-        data  @2 :Data;    # Component Data
+        name   @0 :Text;    # Registered Component Name
+        values @1 :Data;    # Component Data
     }
 
     # Entity to update
     id @0 :UInt32;
 
     # Entity State
-    state @1 :EState;
+    # state @1 :EState;
 
     # List of all component data
-    components @2 :List(Component);
+    components @1 :List(Component);
 }
 
 struct NetMsgEntityUpdates

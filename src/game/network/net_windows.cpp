@@ -349,7 +349,8 @@ int Net_GetSocketPort( ch_sockaddr& srAddr )
 
 void Net_SetSocketPort( ch_sockaddr& srAddr, unsigned short sPort )
 {
-	( (sockaddr_in*)&srAddr )->sin_port = htons( sPort );
+	// ( (sockaddr_in*)&srAddr )->sin_port = htons( sPort );
+	( (sockaddr_in*)&srAddr )->sin_port = sPort;
 }
 
 

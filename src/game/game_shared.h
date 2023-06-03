@@ -42,6 +42,7 @@ bool                  Game_IsServer();
 
 // Should we use client or server versions of systems?
 bool                  Game_ProcessingClient();
+bool                  Game_ProcessingServer();
 void                  Game_SetClient( bool client = true );
 
 ECommandSource        Game_GetCommandSource();

@@ -52,7 +52,14 @@ CONCMD_DROP( map, map_dropdown )
 		return;
 	}
 
+	// Map Command is always on server, but the function to load can be loaded on client
+	// like when connecting to a server
+	bool old = Game_ProcessingClient();
+	Game_SetClient( false );
+
 	MapManager_LoadMap( args[0] );
+
+	Game_SetClient( old );
 
 	if ( Game_GetCommandSource() == ECommandSource_Client )
 	{

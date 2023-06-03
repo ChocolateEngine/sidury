@@ -97,7 +97,7 @@ struct CPlayerInfo
 {
 	Entity          aEnt;
 	std::string     aName = "";
-	bool            aIsLocalPlayer = false;
+	bool            aIsLocalPlayer = false;  // only used on client, probably should split off from this
 };
 
 
@@ -109,6 +109,8 @@ struct CPlayerInfo
 class PlayerMovement // : public ComponentSystem
 {
   public:
+	void             EnsureUserCmd( Entity player );
+
 	void             OnPlayerSpawn( Entity player );
 	void             OnPlayerRespawn( Entity player );
 
@@ -235,22 +237,13 @@ public:
 
 
 // convinence
-// inline auto& GetPlayerMoveData( Entity ent )	    { return GetEntitySystem()->GetComponent< CPlayerMoveData >( ent ); }
-// inline auto& GetPlayerZoom( Entity ent )            { return GetEntitySystem()->GetComponent< CPlayerZoom >( ent ); }
-// inline auto& GetPlayerInfo( Entity ent )            { return GetEntitySystem()->GetComponent< CPlayerInfo >( ent ); }
-// inline auto& GetTransform( Entity ent )             { return GetEntitySystem()->GetComponent< Transform >( ent ); }
-// inline auto& GetCamera( Entity ent )                { return GetEntitySystem()->GetComponent< CCamera >( ent ); }
-// inline auto& GetRigidBody( Entity ent )             { return GetEntitySystem()->GetComponent< CRigidBody >( ent ); }
-// inline HModel GetModel( Entity ent )                 { return GetEntitySystem()->GetComponent< HModel >( ent ); }
-
-// convinence
-inline auto GetPlayerMoveData( Entity ent ) { return static_cast< CPlayerMoveData* >( GetEntitySystem()->GetComponent( ent, "playerMoveData" ) ); }
-inline auto GetPlayerZoom( Entity ent )     { return static_cast< CPlayerZoom* >( GetEntitySystem()->GetComponent( ent, "playerZoom" ) ); }
-inline auto GetPlayerInfo( Entity ent )     { return static_cast< CPlayerInfo* >( GetEntitySystem()->GetComponent( ent, "playerInfo" ) ); }
-inline auto GetTransform( Entity ent )      { return static_cast< Transform* >( GetEntitySystem()->GetComponent( ent, "transform" ) ); }
-inline auto GetCamera( Entity ent )         { return static_cast< CCamera* >( GetEntitySystem()->GetComponent( ent, "camera" ) ); }
-inline auto GetRigidBody( Entity ent )      { return static_cast< CRigidBody* >( GetEntitySystem()->GetComponent( ent, "rigidBody" ) ); }
-inline auto GetComp_Direction( Entity ent ) { return static_cast< CDirection* >( GetEntitySystem()->GetComponent( ent, "direction" ) ); }
+inline auto GetPlayerMoveData( Entity ent ) { return Ent_GetComponent< CPlayerMoveData >( ent, "playerMoveData" ); }
+inline auto GetPlayerZoom( Entity ent )     { return Ent_GetComponent< CPlayerZoom >(  ent, "playerZoom" ); }
+inline auto GetPlayerInfo( Entity ent )     { return Ent_GetComponent< CPlayerInfo >( ent, "playerInfo" ); }
+inline auto GetTransform( Entity ent )      { return Ent_GetComponent< Transform >( ent, "transform" ); }
+inline auto GetCamera( Entity ent )         { return Ent_GetComponent< CCamera >( ent, "camera" ); }
+inline auto GetRigidBody( Entity ent )      { return Ent_GetComponent< CRigidBody >( ent, "rigidBody" ); }
+inline auto GetComp_Direction( Entity ent ) { return Ent_GetComponent< CDirection >( ent, "direction" ); }
 
 
 extern PlayerManager* players;

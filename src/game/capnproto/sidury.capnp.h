@@ -270,7 +270,7 @@ struct NetMsgEntityUpdate::Component {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(e7322c7bf1113918, 1, 2)
+    CAPNP_DECLARE_STRUCT_HEADER(e7322c7bf1113918, 0, 2)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -1400,8 +1400,6 @@ public:
 
   inline  ::uint32_t getId() const;
 
-  inline  ::NetMsgEntityUpdate::EState getState() const;
-
   inline bool hasComponents() const;
   inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader getComponents() const;
 
@@ -1435,9 +1433,6 @@ public:
 
   inline  ::uint32_t getId();
   inline void setId( ::uint32_t value);
-
-  inline  ::NetMsgEntityUpdate::EState getState();
-  inline void setState( ::NetMsgEntityUpdate::EState value);
 
   inline bool hasComponents();
   inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder getComponents();
@@ -1492,10 +1487,8 @@ public:
   inline bool hasName() const;
   inline  ::capnp::Text::Reader getName() const;
 
-  inline  ::NetMsgEntityUpdate::EState getState() const;
-
-  inline bool hasData() const;
-  inline  ::capnp::Data::Reader getData() const;
+  inline bool hasValues() const;
+  inline  ::capnp::Data::Reader getValues() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -1532,15 +1525,12 @@ public:
   inline void adoptName(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownName();
 
-  inline  ::NetMsgEntityUpdate::EState getState();
-  inline void setState( ::NetMsgEntityUpdate::EState value);
-
-  inline bool hasData();
-  inline  ::capnp::Data::Builder getData();
-  inline void setData( ::capnp::Data::Reader value);
-  inline  ::capnp::Data::Builder initData(unsigned int size);
-  inline void adoptData(::capnp::Orphan< ::capnp::Data>&& value);
-  inline ::capnp::Orphan< ::capnp::Data> disownData();
+  inline bool hasValues();
+  inline  ::capnp::Data::Builder getValues();
+  inline void setValues( ::capnp::Data::Reader value);
+  inline  ::capnp::Data::Builder initValues(unsigned int size);
+  inline void adoptValues(::capnp::Orphan< ::capnp::Data>&& value);
+  inline ::capnp::Orphan< ::capnp::Data> disownValues();
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -3013,20 +3003,6 @@ inline void NetMsgEntityUpdate::Builder::setId( ::uint32_t value) {
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Reader::getState() const {
-  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
-}
-
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Builder::getState() {
-  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
-}
-inline void NetMsgEntityUpdate::Builder::setState( ::NetMsgEntityUpdate::EState value) {
-  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
-}
-
 inline bool NetMsgEntityUpdate::Reader::hasComponents() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -3095,50 +3071,36 @@ inline ::capnp::Orphan< ::capnp::Text> NetMsgEntityUpdate::Component::Builder::d
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Component::Reader::getState() const {
-  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
-}
-
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Component::Builder::getState() {
-  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
-}
-inline void NetMsgEntityUpdate::Component::Builder::setState( ::NetMsgEntityUpdate::EState value) {
-  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
-}
-
-inline bool NetMsgEntityUpdate::Component::Reader::hasData() const {
+inline bool NetMsgEntityUpdate::Component::Reader::hasValues() const {
   return !_reader.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
 }
-inline bool NetMsgEntityUpdate::Component::Builder::hasData() {
+inline bool NetMsgEntityUpdate::Component::Builder::hasValues() {
   return !_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
 }
-inline  ::capnp::Data::Reader NetMsgEntityUpdate::Component::Reader::getData() const {
+inline  ::capnp::Data::Reader NetMsgEntityUpdate::Component::Reader::getValues() const {
   return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_reader.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
-inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::getData() {
+inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::getValues() {
   return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
-inline void NetMsgEntityUpdate::Component::Builder::setData( ::capnp::Data::Reader value) {
+inline void NetMsgEntityUpdate::Component::Builder::setValues( ::capnp::Data::Reader value) {
   ::capnp::_::PointerHelpers< ::capnp::Data>::set(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS), value);
 }
-inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::initData(unsigned int size) {
+inline  ::capnp::Data::Builder NetMsgEntityUpdate::Component::Builder::initValues(unsigned int size) {
   return ::capnp::_::PointerHelpers< ::capnp::Data>::init(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS), size);
 }
-inline void NetMsgEntityUpdate::Component::Builder::adoptData(
+inline void NetMsgEntityUpdate::Component::Builder::adoptValues(
     ::capnp::Orphan< ::capnp::Data>&& value) {
   ::capnp::_::PointerHelpers< ::capnp::Data>::adopt(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
 }
-inline ::capnp::Orphan< ::capnp::Data> NetMsgEntityUpdate::Component::Builder::disownData() {
+inline ::capnp::Orphan< ::capnp::Data> NetMsgEntityUpdate::Component::Builder::disownValues() {
   return ::capnp::_::PointerHelpers< ::capnp::Data>::disown(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS));
 }

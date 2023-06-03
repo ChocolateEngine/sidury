@@ -39,6 +39,9 @@ constexpr ComponentType MAX_COMPONENTS  = 64;
 // uh, idk
 using Signature = std::bitset<MAX_COMPONENTS>;
 
+#define COMPONENT_POOLS 1
+#define COMPONENT_POOLS_TEMP 1
+
 // NEW entity component system
 
 // ====================================================================================================
@@ -69,6 +72,9 @@ using Signature = std::bitset<MAX_COMPONENTS>;
 // template< typename T >
 // using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const T& srData );
 
+using FEntComp_New       = std::function< void*() >;
+using FEntComp_Free      = std::function< void( void* spData ) >;
+
 using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
 using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const void* spData );
 
@@ -98,6 +104,14 @@ enum EEntComponentVarType
 };
 
 
+enum EEntComponentNetType
+{
+	EEntComponentNetType_Both,
+	EEntComponentNetType_Client,
+	EEntComponentNetType_Server,
+};
+
+
 // Var Data for a component
 struct EntComponentVarData_t
 {
@@ -120,6 +134,12 @@ struct EntComponentData_t
 
 	FEntComp_ReadFunc*                                  apRead;
 	FEntComp_WriteFunc*                                 apWrite;
+	
+	bool                                                aOverrideClient;
+	EEntComponentNetType                                aNetType;
+
+	FEntComp_New                                        aFuncNew;
+	FEntComp_Free                                       aFuncFree;
 };
 
 
@@ -179,22 +199,202 @@ void* EntComponentRegistry_GetVarHandler();
 class IEntityComponentPool
 {
   public:
-	virtual ~IEntityComponentPool()                = default;
+	virtual ~IEntityComponentPool()                              = default;
 
 	// Called whenever an entity is destroyed on all Component Pools
-	virtual void  EntityDestroyed( Entity entity ) = 0;
+	virtual bool                Init( const char* spName )                     = 0;
+
+	// Get Component Registry Data
+	virtual EntComponentData_t* GetRegistryData()                              = 0;
+
+	// Does this pool contain a component for this entity?
+	virtual bool                Contains( Entity entity )                      = 0;
+
+	// Called whenever an entity is destroyed on all Component Pools
+	virtual void                EntityDestroyed( Entity entity )               = 0;
 
 	// Adds This component to the entity
-	virtual void* Create( Entity entity )          = 0;
+	virtual void*               Create( Entity entity )                        = 0;
 
 	// Removes this component from the entity
-	virtual void  Remove( Entity entity )          = 0;
+	virtual void                Remove( Entity entity )                        = 0;
 
 	// Gets the data for this component
-	virtual void* GetData( Entity entity )         = 0;
+	virtual void*               GetData( Entity entity )                       = 0;
+
+	// Marks this component as predicted
+	virtual void                SetPredicted( Entity entity, bool sPredicted ) = 0;
+
+	// Is this component predicted for this Entity?
+	virtual bool                IsPredicted( Entity entity )                   = 0;
 };
 
 
+class EntityComponentPool : public IEntityComponentPool
+{
+  public:
+	EntityComponentPool( const char* spName )
+	{
+		aCount = 0;
+		Init( spName );
+	}
+
+	virtual ~EntityComponentPool()
+	{
+	}
+
+	virtual bool Init( const char* spName ) override
+	{
+		apName  = spName;
+
+		// Get Creation and Free functions
+		auto it = gEntComponentRegistry.aComponentNames.find( apName );
+
+		if ( it == gEntComponentRegistry.aComponentNames.end() )
+		{
+			Log_FatalF( "Component not registered: \"%s\"\n", apName );
+			return false;
+		}
+
+		Assert( it->second->aFuncNew );
+		Assert( it->second->aFuncFree );
+
+		aFuncNew  = it->second->aFuncNew;
+		aFuncFree = it->second->aFuncFree;
+
+		return true;
+	}
+
+	// Get Component Registry Data
+	virtual EntComponentData_t* GetRegistryData() override
+	{
+		return gEntComponentRegistry.aComponentNames[ apName ];
+	}
+
+	// Does this pool contain a component for this entity?
+	virtual bool Contains( Entity entity ) override
+	{
+		auto it = aMapEntityToComponent.find( entity );
+		return ( it != aMapEntityToComponent.end() );
+	}
+
+	virtual void EntityDestroyed( Entity entity ) override
+	{
+		auto it = aMapEntityToComponent.find( entity );
+
+		if ( it != aMapEntityToComponent.end() )
+		{
+			Remove( entity );
+		}
+	}
+
+	// Adds This component to the entity
+	virtual void* Create( Entity entity ) override
+	{
+		aMapComponentToEntity[ aCount ] = entity;
+		aMapEntityToComponent[ entity ] = aCount;
+
+		void* data                      = aFuncNew();
+
+		aComponents[ aCount++ ]         = data;
+
+		return data;
+	}
+
+	// Removes this component from the entity
+	virtual void Remove( Entity entity ) override
+	{
+		auto it = aMapEntityToComponent.find( entity );
+
+		if ( it == aMapEntityToComponent.end() )
+		{
+			Log_ErrorF( "Failed to remove component from entity - \"%s\"\n", apName );
+			return;
+		}
+
+		size_t index = it->second;
+		aMapComponentToEntity.erase( index );
+		aMapEntityToComponent.erase( it );
+
+		void* data = aComponents[ index ];
+		Assert( data );
+
+		aFuncFree( data );
+
+		aCount--;
+	}
+
+	// Gets the data for this component
+	virtual void* GetData( Entity entity ) override
+	{
+		auto it = aMapEntityToComponent.find( entity );
+
+		if ( it != aMapEntityToComponent.end() )
+		{
+			size_t index = it->second;
+			return &aComponents[ index ];
+		}
+
+		return nullptr;
+	}
+
+	// Marks this component as predicted
+	virtual void SetPredicted( Entity entity, bool sPredicted ) override
+	{
+		auto it = aMapEntityToComponent.find( entity );
+
+		if ( it == aMapEntityToComponent.end() )
+		{
+			Log_ErrorF( "Failed to mark Entity Component as predicted, Entity does not have this component - \"%s\"\n", apName );
+			return;
+		}
+
+		if ( sPredicted )
+		{
+			// We want this component predicted, add it to the prediction set
+			aPredicted.emplace( entity );
+		}
+		else
+		{
+			// We don't want this component predicted, remove it from the prediction set if it exists
+			auto find = aPredicted.find( entity );
+			if ( find != aPredicted.end() )
+				aPredicted.erase( find );
+		}
+	}
+
+	virtual bool IsPredicted( Entity entity ) override
+	{
+		// If the entity is in this set, then this component is predicted
+		auto it = aPredicted.find( entity );
+		return ( it != aPredicted.end() );
+	}
+
+	// Map Component Index to Entity
+	std::unordered_map< size_t, Entity > aMapComponentToEntity;
+
+	// Map Entity to Component Index
+	std::unordered_map< Entity, size_t > aMapEntityToComponent;
+
+	// Memory Pool of Components
+	// This is an std::array so that when a component is freed, it does not changes the index of each component
+	std::array< void*, CH_MAX_ENTITIES > aComponents{};
+
+	// Entity's that are in here will have this component type predicted for it
+	std::set< Entity >                   aPredicted{};
+
+	// Amount of Components we have allocated
+	size_t                               aCount;
+
+	// Component Name
+	const char*                          apName;
+
+	// Component Creation and Free Func
+	FEntComp_New                         aFuncNew;
+	FEntComp_Free                        aFuncFree;
+};
+
+#if 0
 // AAAAAAAAAAAAAA THIS WONT WORK !!!!!
 // when an entity system is created, it will need to make these component pools
 // but they require a template argument for it's creation
@@ -270,10 +470,11 @@ class EntityComponentPool : public IEntityComponentPool
 	// Amount of Components we have allocated
 	size_t                               aCount;
 };
+#endif
 
 
 template< typename T >
-inline void EntComp_RegisterComponent( const char* spName )
+inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient, EEntComponentNetType sNetType, FEntComp_New sFuncNew, FEntComp_Free sFuncFree )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -286,6 +487,11 @@ inline void EntComp_RegisterComponent( const char* spName )
 
 	EntComponentData_t& data                        = gEntComponentRegistry.aComponents[ typeHash ];
 	data.apName                                     = spName;
+	data.aOverrideClient                            = sOverrideClient;
+	data.aNetType                                   = sNetType;
+	data.aFuncNew                                   = sFuncNew;
+	data.aFuncFree                                  = sFuncFree;
+
 	gEntComponentRegistry.aComponentNames[ spName ] = &data;
 }
 
@@ -387,109 +593,56 @@ void Ent_RegisterBaseComponents();
 class EntitySystem
 {
   public:
-	static bool  CreateClient();
-	static bool  CreateServer();
+	static bool                                                   CreateClient();
+	static bool                                                   CreateServer();
 
-	static void  DestroyClient();
-	static void  DestroyServer();
+	static void                                                   DestroyClient();
+	static void                                                   DestroyServer();
 
-	bool         Init();
-	void         Shutdown();
+	bool                                                          Init();
+	void                                                          Shutdown();
 
-	void         CreateComponentPools();
+	void                                                          CreateComponentPools();
 
-	Entity       CreateEntity();
-	void         DeleteEntity( Entity ent );
-	void         DeleteEntityQueued( Entity ent );
-	void         DeleteQueuedEntities();
-	Entity       GetEntityCount();
+	Entity                                                        CreateEntity();
+	void                                                          DeleteEntity( Entity ent );
+	void                                                          DeleteEntityQueued( Entity ent );
+	void                                                          DeleteQueuedEntities();
+	Entity                                                        GetEntityCount();
 
 	// kind of a hack, this just allocates the entity for the client
 	// but what if a client only entity is using an ID that a newly created server entity is using?
 	// curl up into a ball and die i guess
-	Entity       CreateEntityFromServer( Entity desiredId );
+	Entity                                                        CreateEntityFromServer( Entity desiredId );
 
 	// Read and write from the network
-	void         ReadEntityUpdates( capnp::MessageReader& srReader );
-	void         WriteEntityUpdates( capnp::MessageBuilder& srBuilder );
+	void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
+	void                                                          WriteEntityUpdates( capnp::MessageBuilder& srBuilder );
 
-	void         ReadComponents( Entity ent, capnp::MessageReader& srReader );
-	void         WriteComponents( Entity ent, capnp::MessageBuilder& srBuilder );
+	void                                                          ReadComponents( Entity ent, capnp::MessageReader& srReader );
+	void                                                          WriteComponents( Entity ent, capnp::MessageBuilder& srBuilder );
 
-	void         MarkComponentNetworked( Entity ent, const char* spName );
+	// void                                                          MarkComponentNetworked( Entity ent, const char* spName );
 
 	// Add a component to an entity
-	void*        AddComponent( Entity entity, const char* spName );
+	void*                                                         AddComponent( Entity entity, const char* spName );
+
+	// Does this entity have this component?
+	bool                                                          HasComponent( Entity entity, const char* spName );
 
 	// Get a component from an entity
-	void*        GetComponent( Entity entity, const char* spName );
+	void*                                                         GetComponent( Entity entity, const char* spName );
 
+	// Remove a component from an entity
+	void                                                          RemoveComponent( Entity entity, const char* spName );
 
-#if 0
-	// Add a component to an entity
-	template< typename T >
-	T& AddComponent( Entity ent, const char* spName )
-	{
-		auto pool = GetComponentPool< T >();
+	// Sets Prediction on this component
+	void                                                          SetComponentPredicted( Entity entity, const char* spName, bool sPredicted );
 
-		void* data = EntComponentRegistry_Create( spName );
+	// Is this component predicted for this Entity?
+	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
 
-		if ( data == nullptr )
-		{
-			Log_FatalF( "Failed to create component: \"%s\"\n", spName );
-		}
-	}
-
-	// Add a component to an entity
-	template< typename T >
-	T& AddComponent( Entity ent )
-	{
-	}
-	
-	template< typename T >
-	void AddComponent( Entity entity, T component )
-	{
-	}
-
-	template< typename T >
-	T& GetComponent( Entity ent )
-	{
-	}
-
-	// template< typename T >
-	// u8 GetComponentCount( Entity ent )
-	// {
-	// 	return 0;
-	// }
-	// 
-	// inline u8 GetComponentCount( Entity ent, const char* spName )
-	// {
-	// 	return 0;
-	// }
-
-	template< typename T >
-	EntityComponentPool< T >& GetComponentPool()
-	{
-		size_t typeHash = typeid( T ).hash_code();
-
-		auto   it       = aComponentPools.find( typeHash );
-
-		if ( it == aComponentPools.end() )
-			Log_FatalF( "Component not registered before use: \"%s\"\n", typeid( T ).name() );
-
-		return (EntityComponentPool< T >)it->second;
-	}
-#endif
-
-	IEntityComponentPool* GetComponentPool( const char* spName )
-	{
-		auto it = aComponentPoolsStr.find( spName );
-
-		if ( it == aComponentPoolsStr.end() )
-			Log_FatalF( "Component not registered before use: \"%s\"\n", spName );
-
-		return it->second;
-	}
+	IEntityComponentPool*                                         GetComponentPool( const char* spName );
 
 	// Queue of unused entity IDs
 	// TODO: CHANGE BACK TO QUEUE
@@ -497,7 +650,10 @@ class EntitySystem
 	std::vector< Entity >                                         aEntityPool{};
 
 	// Entities queued to delete later
-	std::vector< Entity >                                         aDeleteEntities{};
+	std::set< Entity >                                            aDeleteEntities{};
+
+	// Entity ID's in use
+	std::vector< Entity >                                         aUsedEntities{};
 
 	// Array of signatures where the index corresponds to the entity ID
 	// std::array< Signature, CH_MAX_ENTITIES > aSignatures{};
@@ -506,12 +662,22 @@ class EntitySystem
 	Entity                                                        aEntityCount = 0;
 
 	// Component Array - list of all of this type of component in existence
-	std::unordered_map< size_t, IEntityComponentPool* >           aComponentPools;
-	std::unordered_map< std::string_view, IEntityComponentPool* > aComponentPoolsStr;
+	std::unordered_map< std::string_view, IEntityComponentPool* > aComponentPools;
 };
 
 
 EntitySystem* GetEntitySystem();
+
+inline void*  Ent_GetComponent( Entity sEnt, const char* spName )
+{
+	return GetEntitySystem()->GetComponent( sEnt, spName );
+}
+
+template< typename T >
+inline T* Ent_GetComponent( Entity sEnt, const char* spName )
+{
+	return static_cast< T* >( GetEntitySystem()->GetComponent( sEnt, spName ) );
+}
 
 
 // ====================================================================================================
@@ -878,8 +1044,8 @@ struct CModelPath
 
 
 // Helper Macros
-#define CH_REGISTER_COMPONENT( type, name ) \
-  EntComp_RegisterComponent< type >( #name )
+#define CH_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
+  EntComp_RegisterComponent< type >( #name, overrideClient, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; } )
 
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
   EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ) )
@@ -897,9 +1063,18 @@ struct CModelPath
 #define CH_COMPONENT_READ( type )  __EntCompFunc_Read_##type
 #define CH_COMPONENT_WRITE( type ) __EntCompFunc_Write_##type
 
-#define CH_REGISTER_COMPONENT_RW( type, name ) \
-  CH_REGISTER_COMPONENT( type, name );  \
+#define CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, netType ) \
+  CH_REGISTER_COMPONENT( type, name, overrideClient, netType );  \
   EntComp_RegisterComponentReadWrite< type >( CH_COMPONENT_RW( type ) )
+
+#define CH_REGISTER_COMPONENT_RW( type, name, overrideClient ) \
+  CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, EEntComponentNetType_Both );
+
+#define CH_REGISTER_COMPONENT_RW_CL( type, name, overrideClient ) \
+  CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Client )
+
+#define CH_REGISTER_COMPONENT_RW_SV( type, name, overrideClient ) \
+  CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Server )
 
 
 // Helper Macros for Registering Standard Var Types
