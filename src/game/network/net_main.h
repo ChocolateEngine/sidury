@@ -32,6 +32,12 @@ struct ch_sockaddr
 };
 
 
+struct NetChannel_t
+{
+
+};
+
+
 using Socket_t = void*;
 #define CH_INVALID_SOCKET ( Socket_t )( ~0 )
 
@@ -51,12 +57,6 @@ Socket_t    Net_OpenSocket( const char* spPort );
 void        Net_CloseSocket( Socket_t sSocket );
 int         Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr );
 
-bool        Net_GetPacket( NetAddr_t& srFrom, void* spData, int& sSize, int sMaxSize );
-bool        Net_GetPacketBlocking( NetAddr_t& srFrom, void* spData, int& sSize, int sMaxSize, int sTimeOut );
-void        Net_SendPacket( const NetAddr_t& srTo, const void* spData, int sSize );
-
-Socket_t    Net_CheckNewConnections();
-
 // Read Incoming Data from a Socket
 int         Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFrom );
 
@@ -67,17 +67,5 @@ int         Net_MakeSocketBroadcastCapable( Socket_t sSocket );
 
 
 // ---------------------------------------------------------------------------
-// Temp Functions, unsure how long these will actually last
-
-bool        Net_OpenServer();
-void        Net_CloseServer();
-void        Net_UpdateServer();
-
-bool        Net_ConnectToServer();
-void        Net_UpdateClient();
-void        Net_Disconnect();
-
-// Used to check if the program is running a server and/or is a client
-bool        Net_IsServer();
-bool        Net_IsClient();
+// Network Channels
 

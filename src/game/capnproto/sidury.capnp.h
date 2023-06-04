@@ -1400,6 +1400,8 @@ public:
 
   inline  ::uint32_t getId() const;
 
+  inline  ::NetMsgEntityUpdate::EState getState() const;
+
   inline bool hasComponents() const;
   inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Reader getComponents() const;
 
@@ -1433,6 +1435,9 @@ public:
 
   inline  ::uint32_t getId();
   inline void setId( ::uint32_t value);
+
+  inline  ::NetMsgEntityUpdate::EState getState();
+  inline void setState( ::NetMsgEntityUpdate::EState value);
 
   inline bool hasComponents();
   inline  ::capnp::List< ::NetMsgEntityUpdate::Component,  ::capnp::Kind::STRUCT>::Builder getComponents();
@@ -3001,6 +3006,20 @@ inline  ::uint32_t NetMsgEntityUpdate::Builder::getId() {
 inline void NetMsgEntityUpdate::Builder::setId( ::uint32_t value) {
   _builder.setDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Reader::getState() const {
+  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Builder::getState() {
+  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgEntityUpdate::Builder::setState( ::NetMsgEntityUpdate::EState value) {
+  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgEntityUpdate::Reader::hasComponents() const {

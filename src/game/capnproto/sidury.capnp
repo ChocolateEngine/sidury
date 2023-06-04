@@ -132,10 +132,10 @@ struct NetMsgEntityUpdate
     id @0 :UInt32;
 
     # Entity State
-    # state @1 :EState;
+    state @1 :EState;
 
     # List of all component data
-    components @1 :List(Component);
+    components @2 :List(Component);
 }
 
 struct NetMsgEntityUpdates

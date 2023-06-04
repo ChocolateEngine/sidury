@@ -12,8 +12,6 @@
 LOG_REGISTER_CHANNEL2( Network, LogColor::DarkCyan );
 
 static bool        gOfflineMode    = Args_Register( "Disable All Networking", "-offline" );
-static const char* gTestServerIP   = Args_Register( "127.0.0.1", "Test Server IPv4", "-ip" );
-static const char* gTestServerPort = Args_Register( "27016", "Test Server Port", "-port" );
 
 static bool        gNetInit        = false;
 
@@ -28,8 +26,6 @@ constexpr int      CH_NET_BUF_LEN  = 1000;
 
 static ChVector< Socket_t > gSockets;
 
-// Socket to listen for connections on
-static Socket_t             gListenSocket = CH_INVALID_SOCKET;
 
 inline SOCKET Net_ToSysSocket( Socket_t sSocket )
 {
@@ -349,8 +345,8 @@ int Net_GetSocketPort( ch_sockaddr& srAddr )
 
 void Net_SetSocketPort( ch_sockaddr& srAddr, unsigned short sPort )
 {
-	// ( (sockaddr_in*)&srAddr )->sin_port = htons( sPort );
-	( (sockaddr_in*)&srAddr )->sin_port = sPort;
+	( (sockaddr_in*)&srAddr )->sin_port = htons( sPort );
+	// ( (sockaddr_in*)&srAddr )->sin_port = sPort;
 }
 
 
@@ -401,7 +397,7 @@ Socket_t Net_OpenSocket( const char* spPort )
 
 	// Make this socket broadcast capable
 	// HACK FOR CLIENT
-	if ( strcmp( spPort, "0" ) != 0 )
+	// if ( strcmp( spPort, "0" ) != 0 )
 	{
 		int i = 1;
 		if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )
@@ -441,21 +437,21 @@ void Net_CloseSocket( Socket_t sSocket )
 }
 
 
-bool Net_GetPacket( Socket_t sSocket, NetAddr_t& srFrom, void* spData, int& sSize, int sMaxSize )
+int Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr )
 {
-	SOCKET socket = Net_ToSysSocket( sSocket );
+	int ret = connect( (SOCKET)sSocket, (const sockaddr*)&srAddr, sizeof( ch_sockaddr ) );
 
-	return false;
+	// check error
+	if ( ret != 0 )
+	{
+		Log_ErrorF( gLC_Network, "Failed to connect: %s\n", Net_ErrorString() );
+	}
+
+	return ret;
 }
 
 
-bool Net_GetPacketBlocking( NetAddr_t& srFrom, void* spData, int& sSize, int sMaxSize, int sTimeOut )
-{
-	return false;
-}
-
-
-void Net_SendPacket( const NetAddr_t& srTo, const void* spData, int sSize )
+void Net_Disconnect()
 {
 }
 
@@ -463,22 +459,6 @@ void Net_SendPacket( const NetAddr_t& srTo, const void* spData, int sSize )
 void Net_Listen()
 {
 	// int ret = listen( (SOCKET)gListenSocket, )
-}
-
-
-Socket_t Net_CheckNewConnections()
-{
-	char buf[ 4096 ];
-
-	if ( gListenSocket == CH_INVALID_SOCKET )
-		return CH_INVALID_SOCKET;
-
-	if ( recvfrom( (SOCKET)gListenSocket, buf, sizeof( buf ), MSG_PEEK, NULL, NULL ) != SOCKET_ERROR )
-	{
-		return gListenSocket;
-	}
-
-	return CH_INVALID_SOCKET;
 }
 
 
@@ -493,10 +473,10 @@ int Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFrom )
 	{
 		int errno_ = WSAGetLastError();
 
-		Log_ErrorF( gLC_Network, "Failed to read from socket: %s\n", Net_ErrorString() );
-
 		if ( errno_ == WSAEWOULDBLOCK || errno_ == WSAECONNREFUSED )
 			return 0;
+
+		Log_ErrorF( gLC_Network, "Failed to read from socket: %s\n", Net_ErrorString() );
 	}
 
 	return ret;
@@ -510,9 +490,10 @@ int Net_Write( Socket_t sSocket, const char* spData, int sLen, ch_sockaddr* spAd
 
 	if ( ret == -1 )
 	{
-		Log_ErrorF( gLC_Network, "Failed to write to socket: %s\n", Net_ErrorString() );
 		if ( WSAGetLastError() == WSAEWOULDBLOCK )
 			return 0;
+
+		Log_ErrorF( gLC_Network, "Failed to write to socket: %s\n", Net_ErrorString() );
 	}
 
 	return ret;
@@ -535,145 +516,5 @@ int Net_MakeSocketBroadcastCapable( Socket_t sSocket )
 	// net_broadcastsocket = socket;
 
 	return 0;
-}
-
-
-// ---------------------------------------------------------------------------
-
-
-// open a loopback server
-bool Net_OpenServer()
-{
-	gListenSocket = Net_OpenSocket( gTestServerPort );
-	return gListenSocket != CH_INVALID_SOCKET;
-
-#if 0
-	iResult = listen( gSrv_ListenSocket, SOMAXCONN );
-	if ( iResult == SOCKET_ERROR )
-	{
-		printf( "listen failed with error: %d\n", WSAGetLastError() );
-		closesocket( gSrv_ListenSocket );
-		return false;
-	}
-
-	// Accept a client socket (BLOCKING OPERATION)
-	gSrv_ClientSocket = accept( gSrv_ListenSocket, NULL, NULL );
-	if ( gSrv_ClientSocket == INVALID_SOCKET )
-	{
-		printf( "accept failed with error: %d\n", WSAGetLastError() );
-		closesocket( gSrv_ListenSocket );
-		return false;
-	}
-
-	// No longer need server socket
-	closesocket( gSrv_ListenSocket );
-
-	// Receive until the peer shuts down the connection
-	do
-	{
-		iResult = recv( gSrv_ClientSocket, recvbuf, recvbuflen, 0 );
-		if ( iResult > 0 )
-		{
-			printf( "Bytes received: %d\n", iResult );
-
-			// Echo the buffer back to the sender
-			iSendResult = send( gSrv_ClientSocket, recvbuf, iResult, 0 );
-			if ( iSendResult == SOCKET_ERROR )
-			{
-				printf( "send failed with error: %d\n", WSAGetLastError() );
-				closesocket( gSrv_ClientSocket );
-				return false;
-			}
-			printf( "Bytes sent: %d\n", iSendResult );
-		}
-		else if ( iResult == 0 )
-			printf( "Connection closing...\n" );
-		else
-		{
-			printf( "recv failed with error: %d\n", WSAGetLastError() );
-			closesocket( gSrv_ClientSocket );
-			return false;
-		}
-
-	} while ( iResult > 0 );
-	
-	return true;
-#endif
-}
-
-
-void Net_CloseServer()
-{
-	// shutdown the connection since we're done
-	// int iResult = shutdown( gSrv_ClientSocket, SD_SEND );
-	// 
-	// if ( iResult == SOCKET_ERROR )
-	// {
-	// 	printf( "shutdown failed with error: %d\n", WSAGetLastError() );
-	// 	closesocket( gSrv_ClientSocket );
-	// }
-	// 
-	// // cleanup
-	// closesocket( gSrv_ClientSocket );
-}
-
-
-void Net_UpdateServer()
-{
-}
-
-
-void Net_UpdateClient()
-{
-}
-
-
-bool Net_ConnectToServer()
-{
-	SOCKET           ConnectSocket = INVALID_SOCKET;
-	struct addrinfo *result        = NULL,
-					*ptr           = NULL,
-					hints;
-
-	const char* sendbuf = "Sidury Test Connection";
-	char        recvbuf[ CH_NET_BUF_LEN ];
-	int         iResult;
-	int         recvbuflen = CH_NET_BUF_LEN;
-
-	// connect();
-
-	return true;
-}
-
-
-int Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr )
-{
-	int ret = connect( (SOCKET)sSocket, (const sockaddr*)&srAddr, sizeof( ch_sockaddr ) );
-
-	// check error
-	if ( ret != 0 )
-	{
-		Log_ErrorF( gLC_Network, "Failed to connect: %s\n", Net_ErrorString() );
-	}
-
-	return ret;
-}
-
-
-void Net_Disconnect()
-{
-}
-
-
-// Used to check if the program is running a server and/or is a client
-bool Net_IsServer()
-{
-	return true;
-}
-
-
-bool Net_IsClient()
-{
-	return true;
 }
 

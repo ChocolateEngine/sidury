@@ -263,6 +263,8 @@ void PlayerManager::Create( Entity player )
 	{
 		auto playerInfo            = GetPlayerInfo( player );
 		playerInfo->aIsLocalPlayer = player == gLocalPlayer;
+
+		Log_Msg( "Client Creating Local Player\n" );
 	}
 	else
 	{
@@ -270,8 +272,14 @@ void PlayerManager::Create( Entity player )
 		if ( !client )
 			return;
 
+		auto value = _heapchk();
+		Assert( value == _HEAPOK );
+
 		auto playerInfo   = GetPlayerInfo( player );
-		playerInfo->aName = client->aName;
+		// playerInfo->aName = client->aName;
+		playerInfo->aName = "bruh";
+
+		Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
 	}
 
 	Transform* transform  = (Transform*)GetEntitySystem()->AddComponent( player, "transform" );
@@ -416,6 +424,21 @@ void Player_UpdateFlashlight( Entity player, UserCmd_t* spUserCmd )
 }
 
 
+inline float DegreeConstrain( float num )
+{
+	num = std::fmod(num, 360.0f);
+	return (num < 0.0f) ? num += 360.0f : num;
+}
+
+
+inline void ClampAngles( Transform& transform, CCamera& camera )
+{
+	transform.aAng[YAW] = DegreeConstrain( transform.aAng[YAW] );
+	camera.aTransform.aAng[YAW] = DegreeConstrain( camera.aTransform.aAng[YAW] );
+	camera.aTransform.aAng[PITCH] = std::clamp( camera.aTransform.aAng[PITCH], -90.0f, 90.0f );
+};
+
+
 void PlayerManager::Update( float frameTime )
 {
 	PROF_SCOPE();
@@ -435,7 +458,21 @@ void PlayerManager::Update( float frameTime )
 
 		if ( !Game_IsPaused() )
 		{
-			DoMouseLook( player );
+			// DoMouseLook( player );
+
+			// Update Client UserCmd
+			auto            transform = GetTransform( player );
+			auto            camera    = GetCamera( player );
+
+			// transform.aAng[PITCH] = -mouse.y;
+			camera->aTransform.aAng[ PITCH ] = userCmd.aAng[ PITCH ];
+			camera->aTransform.aAng[ YAW ]   = userCmd.aAng[ YAW ];
+			camera->aTransform.aAng[ ROLL ]  = userCmd.aAng[ ROLL ];
+
+			transform->aAng[ YAW ]           = userCmd.aAng[ YAW ];
+
+			ClampAngles( *transform, *camera );
+
 			apMove->MovePlayer( player, &userCmd );
 			Player_UpdateFlashlight( player, &userCmd );
 		}
@@ -460,19 +497,30 @@ void PlayerManager::Update( float frameTime )
 }
 
 
-inline float DegreeConstrain( float num )
+void PlayerManager::UpdateLocalPlayer()
 {
-	num = std::fmod(num, 360.0f);
-	return (num < 0.0f) ? num += 360.0f : num;
+	auto userCmd = gClientUserCmd;
+
+	auto playerMove = GetPlayerMoveData( gLocalPlayer );
+	auto playerInfo = GetPlayerInfo( gLocalPlayer );
+	auto camera     = GetCamera( gLocalPlayer );
+
+	Assert( playerMove );
+	Assert( playerInfo );
+	Assert( camera );
+
+	if ( !Game_IsPaused() )
+	{
+		DoMouseLook( gLocalPlayer );
+		// apMove->MovePlayer( gLocalPlayer, &userCmd );
+		// Player_UpdateFlashlight( gLocalPlayer, &userCmd );
+
+		// TEMP
+		camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
+	}
+
+	UpdateView( playerInfo, gLocalPlayer );
 }
-
-
-inline void ClampAngles( Transform& transform, CCamera& camera )
-{
-	transform.aAng[YAW] = DegreeConstrain( transform.aAng[YAW] );
-	camera.aTransform.aAng[YAW] = DegreeConstrain( camera.aTransform.aAng[YAW] );
-	camera.aTransform.aAng[PITCH] = std::clamp( camera.aTransform.aAng[PITCH], -90.0f, 90.0f );
-};
 
 
 void PlayerManager::DoMouseLook( Entity player )
@@ -666,6 +714,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	}
 
 	if ( info->aIsLocalPlayer )
+	// if ( player == gLocalPlayer )
 	{
 		// scale the nearz and farz
 		gView.aFarZ  = r_farz;
@@ -1041,38 +1090,41 @@ float Math_EaseInOutCubic( float x )
 // VERY BUGGY STILL
 void PlayerMovement::DoSmoothDuck()
 {
-	if ( IsOnGround() && apMove->aMoveType == PlayerMoveType::Walk )
+	if ( Game_ProcessingServer() )
 	{
-		if ( apMove->aTargetViewHeight != GetViewHeight() )
+		if ( IsOnGround() && apMove->aMoveType == PlayerMoveType::Walk )
+		{
+			if ( apMove->aTargetViewHeight != GetViewHeight() )
+			{
+				apMove->aPrevViewHeight = apMove->aOutViewHeight;
+				apMove->aTargetViewHeight = GetViewHeight();
+				apMove->aDuckTime = 0.f;
+
+				apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight );
+
+				// this is stupid
+				if ( apMove->aTargetViewHeight == cl_view_height.GetFloat() )
+					apMove->aDuckDuration = 1 - apMove->aDuckDuration;
+
+				apMove->aDuckDuration *= cl_duck_time;
+			}
+		}
+		else if ( WasOnGround() )
 		{
 			apMove->aPrevViewHeight = apMove->aOutViewHeight;
-			apMove->aTargetViewHeight = GetViewHeight();
+			apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
 			apMove->aDuckTime = 0.f;
-
-			apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight );
-
-			// this is stupid
-			if ( apMove->aTargetViewHeight == cl_view_height.GetFloat() )
-				apMove->aDuckDuration = 1 - apMove->aDuckDuration;
-
-			apMove->aDuckDuration *= cl_duck_time;
 		}
-	}
-	else if ( WasOnGround() )
-	{
-		apMove->aPrevViewHeight = apMove->aOutViewHeight;
-		apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
-		apMove->aDuckTime = 0.f;
-	}
 
-	apMove->aDuckTime += gFrameTime;
+		apMove->aDuckTime += gFrameTime;
 
-	if ( apMove->aDuckDuration >= apMove->aDuckTime )
-	{
-		float time = (apMove->aDuckTime / apMove->aDuckDuration);
-		float timeCurve = Math_EaseOutQuart( time );
+		if ( apMove->aDuckDuration >= apMove->aDuckTime )
+		{
+			float time = (apMove->aDuckTime / apMove->aDuckDuration);
+			float timeCurve = Math_EaseOutQuart( time );
 
-		apMove->aOutViewHeight = std::lerp( apMove->aPrevViewHeight, apMove->aTargetViewHeight, timeCurve );
+			apMove->aOutViewHeight = std::lerp( apMove->aPrevViewHeight, apMove->aTargetViewHeight, timeCurve );
+		}
 	}
 
 	apCamera->aTransform.aPos[W_UP] = apMove->aOutViewHeight;

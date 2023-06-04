@@ -205,6 +205,7 @@ public:
 	void                    Spawn( Entity player );
 	void                    Respawn( Entity player );
 	void                    Update( float frameTime );  // ??
+	void                    UpdateLocalPlayer();
 
 	void                    UpdateView( CPlayerInfo* info, Entity player );
 	void                    DoMouseLook( Entity player );

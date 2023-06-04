@@ -3,6 +3,7 @@
 #include "game_shared.h"
 #include "inputsystem.h"
 #include "mapmanager.h"
+#include "player.h"
 #include "network/net_main.h"
 #include "capnproto/sidury.capnp.h"
 
@@ -36,26 +37,28 @@ static float                      gClientTimeout = 0.f;
 
 // Console Commands to send to the server to process, like noclip
 static std::vector< std::string > gCommandsToSend;
-static UserCmd_t                  gClientUserCmd{};
+UserCmd_t                         gClientUserCmd{};
 
 extern Entity                     gLocalPlayer;
 
 // NEW_CVAR_FLAG( CVARF_CLIENT );
 
+
 CONVAR( cl_connect_timeout_duration, 30.f, "How long we will wait for the server to send us connection information" );
 CONVAR( cl_timeout_duration, 120.f, "How long we will wait for the server to start responding again before disconnecting" );
 CONVAR( cl_timeout_threshold, 4.f, "If the server doesn't send anything after this amount of time, show the connection problem message" );
 
-CONVAR( in_forward, 0, CVARF_INPUT );
-CONVAR( in_back, 0, CVARF_INPUT );
-CONVAR( in_left, 0, CVARF_INPUT );
-CONVAR( in_right, 0, CVARF_INPUT );
+CONVAR( in_forward, 0, CVARF( INPUT ) );
+CONVAR( in_back, 0, CVARF( INPUT ) );
+CONVAR( in_left, 0, CVARF( INPUT ) );
+CONVAR( in_right, 0, CVARF( INPUT ) );
 
-CONVAR( in_duck, 0, CVARF_INPUT );
-CONVAR( in_sprint, 0, CVARF_INPUT );
-CONVAR( in_jump, 0, CVARF_INPUT );
-CONVAR( in_zoom, 0, CVARF_INPUT );
-CONVAR( in_flashlight, 0, CVARF_INPUT );
+CONVAR( in_duck, 0, CVARF( INPUT ) );
+CONVAR( in_sprint, 0, CVARF( INPUT ) );
+CONVAR( in_jump, 0, CVARF( INPUT ) );
+CONVAR( in_zoom, 0, CVARF( INPUT ) );
+CONVAR( in_flashlight, 0, CVARF( INPUT ) );
+
 
 CONVAR_CMD_EX( cl_username, "greg", CVARF_ARCHIVE, "Your Username" )
 {
@@ -88,6 +91,7 @@ CONCMD( connect )
 	CL_Connect( args[ 0 ].data() );
 }
 
+
 bool CL_Init()
 {
 	return EntitySystem::CreateClient();
@@ -99,43 +103,6 @@ void CL_Shutdown()
 	CL_Disconnect();
 
 	EntitySystem::DestroyClient();
-}
-
-
-bool CL_RecvServerInfo()
-{
-	ChVector< char > data( 8192 );
-	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
-
-	if ( len <= 0 )
-	{
-		// NOTE: this might get hit, we need some sort of retry thing
-		Log_Warn( gLC_Client, "No Server Info\n" );
-
-		if ( gClientConnectTimeout < Game_GetCurTime() )
-			return false;
-
-		// keep waiting i guess?
-		return true;
-	}
-
-	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
-
-	// hack, should not be part of this server info message, should be a message prior to this
-	// will set up later
-	if ( serverInfoMsg.getNewPort() != -1 )
-	{
-		Net_SetSocketPort( gClientAddr, serverInfoMsg.getNewPort() );
-	}
-
-	gClientServerData.aName                     = serverInfoMsg.getName();
-	gClientServerData.aMapName                  = serverInfoMsg.getMapName();
-	gClientState                                = EClientState_Connecting;
-
-	gLocalPlayer                                = serverInfoMsg.getPlayerEntityId();
-
-	return true;
 }
 
 
@@ -181,6 +148,7 @@ void CL_Update( float frameTime )
 			}
 
 			gClientState = EClientState_Connected;
+			players->Create( gLocalPlayer );
 			break;
 		}
 
@@ -206,13 +174,50 @@ void CL_Update( float frameTime )
 			}
 
 			// Send UserCmd
-			CL_SendUserCmd();
+			capnp::MallocMessageBuilder builder;
+			auto                        root = builder.initRoot< MsgSrcClient >();
+			root.setType( EMsgSrcClient::USER_CMD );
+
+			capnp::MallocMessageBuilder userCmdBuilder;
+			CL_SendUserCmd( userCmdBuilder );
+
+			auto array = capnp::messageToFlatArray( userCmdBuilder );
+			auto data  = root.initData( array.size() * sizeof( capnp::word ) );
+
+			// This is probably awful and highly inefficent
+			// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
+			memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+
+			auto finalMessage = capnp::messageToFlatArray( builder );
+
+			int  write        = Net_Write( gClientSocket, finalMessage.asChars().begin(), finalMessage.size() * sizeof( capnp::word ), &gClientAddr );
+
 			break;
 		}
 	}
 
 	Game_SetCommandSource( ECommandSource_Client );
 }
+
+
+void CL_GameUpdate( float frameTime )
+{
+	// Check connection timeout
+	// if ( ( cl_timeout_duration - cl_timeout_threshold ) < gClientTimeout )
+	if ( cl_timeout_duration < ( gClientTimeout - cl_timeout_threshold ) )
+	{
+		// Show Connection Warning
+		// flood console lol
+		Log_WarnF( gLC_Client, "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
+	}
+
+	players->UpdateLocalPlayer();
+}
+
+
+// =======================================================================
+// Client Networking
+// =======================================================================
 
 
 void CL_Disconnect( const char* spReason )
@@ -272,22 +277,51 @@ void CL_Connect( const char* spAddress )
 }
 
 
-void CL_GameUpdate( float frameTime )
+bool CL_RecvServerInfo()
 {
-	// Check connection timeout
-	if ( cl_timeout_duration - cl_timeout_threshold < gClientTimeout )
+	ChVector< char > data( 8192 );
+	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
+
+	if ( len <= 0 )
 	{
-		// Show Connection Warning
-		// floood console lol
-		Log_WarnF( gLC_Client, "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
+		// NOTE: this might get hit, we need some sort of retry thing
+		Log_Warn( gLC_Client, "No Server Info\n" );
+
+		if ( gClientConnectTimeout < Game_GetCurTime() )
+			return false;
+
+		// keep waiting i guess?
+		return true;
 	}
+
+	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
+
+	// hack, should not be part of this server info message, should be a message prior to this
+	// will set up later
+	// if ( serverInfoMsg.getNewPort() != -1 )
+	// {
+	// 	Net_SetSocketPort( gClientAddr, serverInfoMsg.getNewPort() );
+	// }
+
+	gClientServerData.aName                     = serverInfoMsg.getName();
+	gClientServerData.aMapName                  = serverInfoMsg.getMapName();
+	gClientState                                = EClientState_Connecting;
+
+	gLocalPlayer                                = serverInfoMsg.getPlayerEntityId();
+
+	return true;
 }
 
 
 void CL_UpdateUserCmd()
 {
-	gClientUserCmd.aAng;
+	// Get the camera component from the local player, and get the angles from it
+	CCamera* camera = GetCamera( gLocalPlayer );
 
+	Assert( camera );
+
+	gClientUserCmd.aAng     = camera->aTransform.aAng;
 	gClientUserCmd.aButtons = 0;
 
 	if ( in_duck )
@@ -308,7 +342,20 @@ void CL_UpdateUserCmd()
 }
 
 
-void CL_SendUserCmd()
+void CL_SendUserCmd( capnp::MessageBuilder& srBuilder )
+{
+	auto builder = srBuilder.initRoot< NetMsgUserCmd >();
+	
+	auto ang     = builder.initAngles();
+	NetHelper_WriteVec3( &ang, gClientUserCmd.aAng );
+
+	builder.setButtons( gClientUserCmd.aButtons );
+	builder.setFlashlight( gClientUserCmd.aFlashlight );
+	builder.setMoveType( static_cast< EPlayerMoveType >( gClientUserCmd.aMoveType ) );
+}
+
+
+void CL_SendMessageToServer( EMsgSrcClient sSrcType )
 {
 }
 
@@ -320,30 +367,44 @@ void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
 
 void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 {
+	PROF_SCOPE();
+
 	for ( const NetMsgEntityUpdate::Reader& entityUpdate : srReader.getUpdateList() )
 	{
 		Entity entId  = entityUpdate.getId();
 		Entity entity = CH_ENT_INVALID;
 
-		// if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
-		// {
-		// 	entity = GetEntitySystem()->CreateEntityFromServer( entId );
-		// 
-		// 	if ( entity == CH_ENT_INVALID )
-		// 		continue;
-		// }
-		// else if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
-		// {
-		// 	GetEntitySystem()->DeleteEntity( entId );
-		// 	continue;
-		// }
+		if ( GetEntitySystem()->EntityExists( entId ) )
+		{
+			entity = entId;
+		}
+		else
+		{
+			entity = GetEntitySystem()->CreateEntityFromServer( entId );
+
+			if ( entity == CH_ENT_INVALID )
+				continue;
+		}
+
+		if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
+		{
+			entity = GetEntitySystem()->CreateEntityFromServer( entId );
+		
+			if ( entity == CH_ENT_INVALID )
+				continue;
+		}
+		else if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+		{
+			GetEntitySystem()->DeleteEntity( entId );
+			continue;
+		}
 
 		if ( entity == CH_ENT_INVALID )
 			continue;
 
 		for ( const NetMsgEntityUpdate::Component::Reader& componentRead : entityUpdate.getComponents() )
 		{
-			const char* spComponentName = componentRead.getName().cStr();
+			const char* componentName = componentRead.getName().cStr();
 			void*       componentData   = nullptr;
 
 			// if ( componentRead.getState() == NetMsgEntityUpdate::EState::DESTROYED )
@@ -352,13 +413,13 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 			// 	continue;
 			// }
 
-			componentData = GetEntitySystem()->GetComponent( entity, spComponentName );
+			componentData               = GetEntitySystem()->GetComponent( entity, componentName );
 
 			// else if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
 			if ( !componentData )
 			{
 				// Create the component
-				componentData = GetEntitySystem()->AddComponent( entity, spComponentName );
+				componentData = GetEntitySystem()->AddComponent( entity, componentName );
 
 				if ( componentData == nullptr )
 				{
@@ -366,76 +427,122 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 					continue;
 				}
 			}
-		}
 
-		// use component manager data
-		gEntComponentRegistry.aComponents;
+			IEntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
+
+			if ( !pool )
+			{
+				Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
+				continue;
+			}
+
+			EntComponentData_t* regData = pool->GetRegistryData();
+
+			Assert( regData );
+
+			// Assert( regData->apRead );
+
+			if ( !regData->apRead )
+				continue;
+
+			if ( !regData->aOverrideClient )
+				continue;
+
+			auto values = componentRead.getValues();
+
+			// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.data(), values.size() ) );
+			capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.begin(), values.size() ) );
+			regData->apRead( reader, componentData );
+
+			Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
+
+
+			// NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
+			// 
+			// capnp::MallocMessageBuilder compMessageBuilder;
+			// regData->apRead( compMessageBuilder, data );
+			// auto array        = capnp::messageToFlatArray( compMessageBuilder );
+			// 
+			// auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
+			// // std::copy( array.begin(), array.end(), valueBuilder.begin() );
+			// memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+			// 
+			// componentRead.getValues();
+		}
 	}
 }
 
 
 void CL_GetServerMessages()
 {
-	ChVector< char > data( 8192 );
-	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
+	PROF_SCOPE();
 
-	if ( len <= 0 )
+	while ( true )
 	{
-		gClientTimeout -= gFrameTime;
+		ChVector< char > data( 8192 );
+		int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
 
-		// The server hasn't sent anything in a while, so just disconnect
-		if ( gClientTimeout < 0.0 )
-			CL_Disconnect();
-
-		return;
-	}
-
-	// Reset the connection timer
-	gClientTimeout = cl_timeout_duration;
-
-	// Read the message sent from the client
-	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-	auto                          serverMsg = reader.getRoot< MsgSrcServer >();
-
-	auto                          msgType   = serverMsg.getType();
-	auto                          msgData   = serverMsg.getData();
-
-	capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), data.size() ) );
-
-	switch ( msgType )
-	{
-		// Client is Disconnecting
-		case EMsgSrcServer::DISCONNECT:
+		if ( len <= 0 )
 		{
-			CL_Disconnect();
+			gClientTimeout -= gFrameTime;
+
+			// The server hasn't sent anything in a while, so just disconnect
+			if ( gClientTimeout < 0.0 )
+				CL_Disconnect();
+
 			return;
 		}
 
-		case EMsgSrcServer::SERVER_INFO:
-		{
-			auto msgServerInfo = dataReader.getRoot< NetMsgServerInfo >();
-			CL_HandleMsg_ServerInfo( msgServerInfo );
-			break;
-		}
+		// Reset the connection timer
+		gClientTimeout = cl_timeout_duration;
 
-		case EMsgSrcServer::CON_VAR:
-		{
-			auto msgConVar = dataReader.getRoot< NetMsgConVar >();
-			Game_ExecCommandsSafe( ECommandSource_Server, msgConVar.getCommand().cStr() );
-			break;
-		}
+		// Read the message sent from the client
+		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+		auto                          serverMsg = reader.getRoot< MsgSrcServer >();
 
-		case EMsgSrcServer::ENTITY_LIST:
-		{
-			auto msgUserCmd = dataReader.getRoot< NetMsgEntityUpdates >();
-			CL_HandleMsg_EntityList( msgUserCmd );
-			break;
-		}
+		auto                          msgType   = serverMsg.getType();
+		auto                          msgData   = serverMsg.getData();
 
-		default:
-			// TODO: have a message type to string function
-			Log_WarnF( gLC_Client, "Unknown Message Type from Server: %s\n", msgType );
-			break;
+		Assert( msgType <= EMsgSrcServer::ENTITY_LIST );
+		Assert( msgType >= EMsgSrcServer::DISCONNECT );
+
+		capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), data.size() ) );
+
+		switch ( msgType )
+		{
+			// Client is Disconnecting
+			case EMsgSrcServer::DISCONNECT:
+			{
+				CL_Disconnect();
+				return;
+			}
+
+			case EMsgSrcServer::SERVER_INFO:
+			{
+				auto msgServerInfo = dataReader.getRoot< NetMsgServerInfo >();
+				CL_HandleMsg_ServerInfo( msgServerInfo );
+				break;
+			}
+
+			case EMsgSrcServer::CON_VAR:
+			{
+				auto msgConVar = dataReader.getRoot< NetMsgConVar >();
+				Game_ExecCommandsSafe( ECommandSource_Server, msgConVar.getCommand().cStr() );
+				break;
+			}
+
+			case EMsgSrcServer::ENTITY_LIST:
+			{
+				auto msgUserCmd = dataReader.getRoot< NetMsgEntityUpdates >();
+				CL_HandleMsg_EntityList( msgUserCmd );
+				break;
+			}
+
+			default:
+				// TODO: have a message type to string function
+				Log_WarnF( gLC_Client, "Unknown Message Type from Server: %s\n", msgType );
+				break;
+		}
 	}
 }
 

@@ -11,6 +11,7 @@ Loads Sidury Map Files (smf)
 #include "game_shared.h"
 #include "player.h"
 #include "skybox.h"
+#include "sv_main.h"
 #include "graphics/graphics.h"
 
 #include "mapmanager.h"
@@ -56,6 +57,13 @@ CONCMD_DROP( map, map_dropdown )
 	// like when connecting to a server
 	bool old = Game_ProcessingClient();
 	Game_SetClient( false );
+
+	if ( !SV_StartServer() )
+	{
+		Log_Error( "Failed to Load map - Failed to Start Server\n" );
+		Game_SetClient( old );
+		return;
+	}
 
 	MapManager_LoadMap( args[0] );
 

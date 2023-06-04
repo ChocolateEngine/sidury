@@ -207,14 +207,62 @@ Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
 }
 
 
+bool EntitySystem::EntityExists( Entity desiredId )
+{
+	size_t index = vec_index( aEntityPool, desiredId );
+
+	// if the entity is not in the pool, it exists
+	return ( index == SIZE_MAX );
+}
+
+
 // Read and write from the network
 void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
 {
 	// NetEntityUpdates
 	// NetEntityUpdate
+
+	// const char* spComponentName = componentRead.getName().cStr();
+	// void*       componentData   = nullptr;
+	// 
+	// // if ( componentRead.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+	// // {
+	// // 	GetEntitySystem()->RemoveComponent( entity, spComponentName );
+	// // 	continue;
+	// // }
+	// 
+	// componentData               = GetEntitySystem()->GetComponent( entity, spComponentName );
+	// 
+	// // else if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
+	// if ( !componentData )
+	// {
+	// 	// Create the component
+	// 	componentData = GetEntitySystem()->AddComponent( entity, spComponentName );
+	// 
+	// 	if ( componentData == nullptr )
+	// 	{
+	// 		Log_ErrorF( "Failed to create component\n" );
+	// 		continue;
+	// 	}
+	// }
+	// 
+	// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+	// NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
+	// 
+	// capnp::MallocMessageBuilder   compMessageBuilder;
+	// regData->apWrite( compMessageBuilder, data );
+	// auto array        = capnp::messageToFlatArray( compMessageBuilder );
+	// 
+	// auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
+	// // std::copy( array.begin(), array.end(), valueBuilder.begin() );
+	// memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+	// 
+	// componentRead.getValues();
 }
 
 
+// TODO: probably rethink this so it's a list of components on their own, not a list of entities to update everything on
+// though we should have some sort of system to detect whether it's dirty or not
 void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 {
 	Assert( aEntityCount == aUsedEntities.size() );
@@ -222,16 +270,12 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 	auto root       = srBuilder.initRoot< NetMsgEntityUpdates >();
 	auto updateList = root.initUpdateList( aEntityCount );
 
-	// TODO: probably rethink this so it's a list of components on their own, not a list of entities to update everything on
-	// though we should have some sort of system to detect whether it's dirty or not
-
 	for ( size_t i = 0; i < aEntityCount; i++ )
 	{
 		Entity entity = aUsedEntities[ i ];
 		auto   update = updateList[ i ];
 
 		update.setId( entity );
-		// update.setState( NetMsgEntityUpdate::EState::NONE );  // hmmm
 
 		// this is the worst thing ever
 		std::vector< IEntityComponentPool* > pools;
@@ -432,7 +476,9 @@ void TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
 
 	auto ang = builder.initAng();
 	NetHelper_WriteVec3( &ang, spTransform->aAng );
-	// NetHelper_WriteVec3( &builder.initScale(), spTransform->aScale );
+
+	auto scale = builder.initScale();
+	NetHelper_WriteVec3( &scale, spTransform->aScale );
 }
 
 

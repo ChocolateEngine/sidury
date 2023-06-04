@@ -1,6 +1,7 @@
 #include "inputsystem.h"
 #include "iinput.h"
 #include "main.h"
+#include "game_shared.h"
 
 extern IInputSystem* input;
 
@@ -288,6 +289,8 @@ static void CmdBindArchive( std::string& srOutput )
 
 void Input_Init()
 {
+	Assert( Game_ProcessingClient() );
+
 	Input_CalcMouseDelta();
 
 	Con_AddArchiveCallback( CmdBindArchive );
@@ -315,6 +318,8 @@ void Input_Init()
 
 void Input_Update()
 {
+	Assert( Game_ProcessingClient() );
+
 	// update mouse inputs
 	gMouseDelta = {};
 	Input_CalcMouseDelta();
@@ -364,6 +369,8 @@ void Input_Update()
 
 void Input_CalcMouseDelta()
 {
+	Assert( Game_ProcessingClient() );
+
 	const glm::ivec2& baseDelta = input->GetMouseDelta();
 
 	gMouseDelta.x = baseDelta.x * m_sensitivity;
@@ -373,24 +380,32 @@ void Input_CalcMouseDelta()
 
 glm::vec2 Input_GetMouseDelta()
 {
+	Assert( Game_ProcessingClient() );
+
 	return gMouseDelta * gMouseDeltaScale;
 }
 
 
 void Input_SetMouseDeltaScale( const glm::vec2& scale )
 {
+	Assert( Game_ProcessingClient() );
+
 	gMouseDeltaScale = scale;
 }
 
 
 const glm::vec2& Input_GetMouseDeltaScale()
 {
+	Assert( Game_ProcessingClient() );
+
 	return gMouseDeltaScale;
 }
 
 
 ButtonInput_t Input_RegisterButton()
 {
+	Assert( Game_ProcessingClient() );
+
 	ButtonInput_t newBitShift = (1 << gButtonInputs.size());
 	gButtonInputs.push_back( newBitShift );
 	return newBitShift;
@@ -399,12 +414,16 @@ ButtonInput_t Input_RegisterButton()
 
 ButtonInput_t Input_GetButtonStates()
 {
+	Assert( Game_ProcessingClient() );
+
 	return gButtons;
 }
 
 
 void Input_BindKey( SDL_Scancode key, const std::string& cmd )
 {
+	Assert( Game_ProcessingClient() );
+
 	input->RegisterKey( key );
 
 	auto it = gKeyBinds.find( key );

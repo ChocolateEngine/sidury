@@ -25,7 +25,6 @@ enum ESVClientState
 
 struct SV_Client_t
 {
-	Socket_t       aSocket;
 	ch_sockaddr    aAddr;
 
 	std::string    aName = "[unnamed]";
@@ -56,9 +55,8 @@ void                SV_Update( float frameTime );
 void                SV_GameUpdate( float frameTime );
 void                SV_BuildUpdatedData( capnp::MessageBuilder& srMessage );
 
-void                SV_ProcessClientMsg( SV_Client_t& srClient );
-void                SV_CheckForNewClients();
-void                SV_ConnectClientFinish( SV_Client_t& srClient );
+bool                SV_StartServer();
+void                SV_StopServer();
 
 void                SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage );
 void                SV_SendServerInfo( SV_Client_t& srClient );
@@ -70,4 +68,10 @@ SV_Client_t*        SV_GetCommandClient();
 Entity              SV_GetCommandClientEntity();
 SV_Client_t*        SV_GetClientFromEntity( Entity sEntity );
 
+void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
+void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData );
+void                SV_ConnectClientFinish( SV_Client_t& srClient );
+void                SV_ProcessSocketMsgs();
+
 extern ServerData_t gServerData;
+

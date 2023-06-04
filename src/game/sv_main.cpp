@@ -14,6 +14,9 @@
 
 LOG_REGISTER_CHANNEL2( Server, LogColor::Green );
 
+static const char* gTestServerIP   = Args_Register( "127.0.0.1", "Test Server IPv4", "-ip" );
+static const char* gTestServerPort = Args_Register( "27016", "Test Server Port", "-port" );
+
 NEW_CVAR_FLAG( CVARF_SERVER );
 
 CONVAR( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE );
@@ -21,6 +24,8 @@ CONVAR( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
 
 ServerData_t        gServerData;
+
+static Socket_t     gServerSocket   = CH_INVALID_SOCKET;
 
 static SV_Client_t* gpCommandClient = nullptr;
 
@@ -35,13 +40,13 @@ static std::vector< SV_ClientCommand_t > gClientCommandQueue;
 
 int SV_Client_t::Read( char* spData, int sLen )
 {
-	return Net_Read( aSocket, spData, sLen, &aAddr );
+	return Net_Read( gServerSocket, spData, sLen, &aAddr );
 }
 
 
 int SV_Client_t::Write( const char* spData, int sLen )
 {
-	return Net_Write( aSocket, spData, sLen, &aAddr );
+	return Net_Write( gServerSocket, spData, sLen, &aAddr );
 }
 
 
@@ -59,41 +64,19 @@ int SV_Client_t::Write( const char* spData, int sLen )
 
 bool SV_Init()
 {
-	// Create Server Physics and Entity System
-	EntitySystem::CreateServer();
-
-	// temp
-	if ( !Net_OpenServer() )
-	{
-		Log_Error( gLC_Server, "Failed to Open Test Server\n" );
-		return false;
-	}
-
-	gServerData.aActive = true;
-
 	return true;
 }
 
 
 void SV_Shutdown()
 {
-	for ( auto& client : gServerData.aClients )
-	{
-		SV_SendDisconnect( client );
-	}
-
-	EntitySystem::DestroyServer();
-
-	gServerData.aActive = false;
-	gServerData.aClients.clear();
+	SV_StopServer();
 }
 
 
 void SV_Update( float frameTime )
 {
 	Game_SetClient( false );
-
-	SV_CheckForNewClients();
 
 	// for ( auto& client : gServerData.aClients )
 	for ( size_t i = 0; i < gServerData.aClients.size(); i++ )
@@ -114,10 +97,9 @@ void SV_Update( float frameTime )
 			i--;
 			continue;
 		}
-
-		// Process incoming data from clients
-		SV_ProcessClientMsg( client );
 	}
+
+	SV_ProcessSocketMsgs();
 
 	// Process console commands sent from clients
 	// for ( auto& clientCmd : gClientCommandQueue )
@@ -176,6 +158,47 @@ void SV_GameUpdate( float frameTime )
 }
 
 
+bool SV_StartServer()
+{
+	SV_StopServer();
+
+	// Create Server Physics and Entity System
+	if ( !EntitySystem::CreateServer() )
+	{
+		Log_ErrorF( "Failed to Create Server Entity System\n" );
+		return false;
+	}
+
+	gServerSocket = Net_OpenSocket( gTestServerPort );
+
+	if ( gServerSocket == CH_INVALID_SOCKET )
+	{
+		Log_Error( gLC_Server, "Failed to Open Test Server\n" );
+		return false;
+	}
+
+	gServerData.aActive = true;
+	return true;
+}
+
+
+void SV_StopServer()
+{
+	for ( auto& client : gServerData.aClients )
+	{
+		SV_SendDisconnect( client );
+	}
+
+	EntitySystem::DestroyServer();
+
+	gServerData.aActive = false;
+	gServerData.aClients.clear();
+
+	Net_CloseSocket( gServerSocket );
+	gServerSocket = CH_INVALID_SOCKET;
+}
+
+
 void SV_BuildEntityList( capnp::MessageBuilder& srBuilder )
 {
 	GetEntitySystem()->WriteEntityUpdates( srBuilder );
@@ -200,20 +223,22 @@ void SV_BuildUpdatedData( capnp::MessageBuilder& srBuilder )
 	// This is probably awful and highly inefficent
 	// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
 	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+
+	Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
 }
 
 
 void SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage )
 {
 	auto array = capnp::messageToFlatArray( srMessage );
-	int  write = Net_Write( srClient.aSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
+	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
 }
 
 
 void SV_SendMessageToClient2( SV_Client_t& srClient, capnp::MessageBuilder& srMessage, EMsgSrcServer sType )
 {
 	auto array = capnp::messageToFlatArray( srMessage );
-	int  write = Net_Write( srClient.aSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
+	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
 }
 
 
@@ -230,6 +255,8 @@ void SV_BuildServerInfo( capnp::MessageBuilder& srMessage )
 
 	// hack
 	serverInfo.setNewPort( -1 );
+
+	Log_DevF( gLC_Server, 1, "Building Server Info\n" );
 }
 
 
@@ -251,6 +278,8 @@ void SV_SendDisconnect( SV_Client_t& srClient )
 	SV_SendMessageToClient( srClient, message );
 
 	srClient.aState = ESV_ClientState_Disconnected;
+
+	Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
 }
 
 
@@ -289,7 +318,7 @@ SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
 			return &client;
 	}
 
-	Log_Error( gLC_Server, "SV_GetClientFromEntity(): Failed to find entity attached to a client!\n" );
+	Log_ErrorF( gLC_Server, "SV_GetClientFromEntity(): Failed to find entity attached to a client! (Entity %zd)\n", sEntity );
 	return nullptr;
 }
 
@@ -306,78 +335,123 @@ void SV_HandleMsg_ClientInfo()
 
 void SV_HandleMsg_UserCmd( SV_Client_t& srClient, NetMsgUserCmd::Reader& srReader )
 {
+	Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.aName.c_str() );
+
 	NetHelper_ReadVec3( srReader.getAngles(), srClient.aUserCmd.aAng );
 	srClient.aUserCmd.aButtons  = srReader.getButtons();
 	srClient.aUserCmd.aMoveType = static_cast< PlayerMoveType >( srReader.getMoveType() );
 }
 
 
-void SV_ProcessClientMsg( SV_Client_t& srClient )
+void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader )
+{
+	// TODO: move this connection timer elsewhere
+#if 0
+	// Timer here for each client to make sure they are connected
+	// anything received from the client will reset their connection timer
+	if ( len <= 0 )
+	{
+		// They haven't sent anything in a while, disconnect them
+		if ( sv_client_timeout_enable && Game_GetCurTime() > srClient.aTimeout )
+			SV_SendDisconnect( srClient );
+
+		srClient.aTimeout -= gFrameTime;
+
+		return;
+	}
+#endif
+
+	// Reset the connection timer
+	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
+
+	// Read the message sent from the client
+	auto                          clientMsg = srReader.getRoot< MsgSrcClient >();
+
+	EMsgSrcClient                 msgType   = clientMsg.getType();
+	auto                          msgData   = clientMsg.getData();
+
+	capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), msgData.size() ) );
+
+	switch ( msgType )
+	{
+		// Client is Disconnecting
+		case EMsgSrcClient::DISCONNECT:
+		{
+			srClient.aState = ESV_ClientState_Disconnected;
+			return;
+		}
+
+		case EMsgSrcClient::CLIENT_INFO:
+		{
+			SV_HandleMsg_ClientInfo();
+			break;
+		}
+
+		case EMsgSrcClient::CON_VAR:
+		{
+			SV_SetCommandClient( &srClient );
+			auto msgConVar = dataReader.getRoot< NetMsgConVar >();
+			Game_ExecCommandsSafe( ECommandSource_Client, msgConVar.getCommand().cStr() );
+			SV_SetCommandClient( nullptr );  // Clear it
+			break;
+		}
+
+		case EMsgSrcClient::USER_CMD:
+		{
+			auto msgUserCmd = dataReader.getRoot< NetMsgUserCmd >();
+			SV_HandleMsg_UserCmd( srClient, msgUserCmd );
+			break;
+		}
+
+		default:
+			// TODO: have a message type to string function
+			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
+			break;
+	}
+}
+
+
+SV_Client_t* SV_GetClientFromAddr( ch_sockaddr& srAddr )
+{
+	for ( auto& client : gServerData.aClients )
+	{
+		// if ( client.aAddr.sa_data == clientAddr.sa_data && client.aAddr.sa_family == clientAddr.sa_family )
+		// if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data ) == 0 && client.aAddr.sa_family == clientAddr.sa_family )
+		if ( memcmp( client.aAddr.sa_data, srAddr.sa_data, sizeof( client.aAddr.sa_data ) ) == 0 )
+		{
+			return &client;
+		}
+	}
+
+	return nullptr;
+}
+
+
+void SV_ProcessSocketMsgs()
 {
 	while ( true )
 	{
 		ChVector< char > data( 8192 );
-		int              len = srClient.Read( data.data(), data.size() );
+		ch_sockaddr      clientAddr;
+		int              len = Net_Read( gServerSocket, data.data(), data.size(), &clientAddr );
 
-		// Timer here for each client to make sure they are connected
-		// anything received from the client will reset their connection timer
 		if ( len <= 0 )
-		{
-			// They haven't sent anything in a while, disconnect them
-			if ( sv_client_timeout_enable && Game_GetCurTime() > srClient.aTimeout )
-				SV_SendDisconnect( srClient );
-
 			return;
+
+		SV_Client_t* client = SV_GetClientFromAddr( clientAddr );
+
+		if ( !client )
+		{
+			SV_ConnectClient( clientAddr, data );
+			continue;
 		}
 
 		// Reset the connection timer
-		srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
+		client->aTimeout = Game_GetCurTime() + sv_client_timeout;
 
 		// Read the message sent from the client
 		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-		auto                          clientMsg = reader.getRoot< MsgSrcClient >();
-
-		auto                          msgType   = clientMsg.getType();
-		auto                          msgData   = clientMsg.getData();
-
-		capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), msgData.size() ) );
-
-		switch ( msgType )
-		{
-			// Client is Disconnecting
-			case EMsgSrcClient::DISCONNECT:
-			{
-				srClient.aState = ESV_ClientState_Disconnected;
-				return;
-			}
-
-			case EMsgSrcClient::CLIENT_INFO:
-			{
-				SV_HandleMsg_ClientInfo();
-				break;
-			}
-
-			case EMsgSrcClient::CON_VAR:
-			{
-				SV_SetCommandClient( &srClient );
-				auto msgConVar = dataReader.getRoot< NetMsgConVar >();
-				Game_ExecCommandsSafe( ECommandSource_Client, msgConVar.getCommand().cStr() );
-				SV_SetCommandClient( nullptr );  // Clear it
-				break;
-			}
-
-			case EMsgSrcClient::USER_CMD:
-			{
-				auto msgUserCmd = dataReader.getRoot< NetMsgUserCmd >();
-				SV_HandleMsg_UserCmd( srClient, msgUserCmd );
-				break;
-			}
-
-			default:
-				// TODO: have a message type to string function
-				Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
-				break;
-		}
+		SV_ProcessClientMsg( *client, reader );
 	}
 }
 
@@ -390,9 +464,47 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 
 	// Spawn the player in!
 	players->Spawn( srClient.aEntity );
+
+	// Reset the connection timer
+	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
 }
 
 
+void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
+{
+	// Get Client Info
+	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)srData.data(), srData.size() ) );
+	NetMsgClientInfo::Reader      clientInfoRead = reader.getRoot< NetMsgClientInfo >();
+
+	SV_Client_t&                  client         = gServerData.aClients.emplace_back();
+	client.aName                                 = clientInfoRead.getName();
+	client.aAddr                                 = srAddr;
+	client.aState                                = ESV_ClientState_Connecting;
+
+	// Make an entity for them
+	client.aEntity      = GetEntitySystem()->CreateEntity();
+
+	players->Create( client.aEntity );
+
+	// Send them the server info and new port
+	capnp::MallocMessageBuilder message;
+	SV_BuildServerInfo( message );
+
+	NetMsgServerInfo::Builder serverInfo = message.getRoot< NetMsgServerInfo >();
+
+	serverInfo.setPlayerEntityId( client.aEntity );
+
+	auto array = capnp::messageToFlatArray( message );
+
+	// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
+	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srAddr );
+
+	gServerData.aClientsConnecting.push_back( &client );
+}
+
+
+// TODO: REMOVE ME
+#if 0
 void SV_CheckForNewClients()
 {
 	// Check for all incoming connections until none are left
@@ -409,6 +521,22 @@ void SV_CheckForNewClients()
 		if ( len < 0 )
 			continue;
 
+		// HACK: check if this clientAddr is in the list of clients
+		bool hasClientAlready = false;
+		for ( auto& client : gServerData.aClients )
+		{
+			// if ( client.aAddr.sa_data == clientAddr.sa_data && client.aAddr.sa_family == clientAddr.sa_family )
+			// if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data ) == 0 && client.aAddr.sa_family == clientAddr.sa_family )
+			if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data, sizeof( client.aAddr.sa_data ) ) == 0 )
+			{
+				hasClientAlready = true;
+				break;
+			}
+		}
+
+		if ( hasClientAlready )
+			continue;
+
 		// Get Client Info
 		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
 		NetMsgClientInfo::Reader      clientInfoRead = reader.getRoot< NetMsgClientInfo >();
@@ -417,25 +545,24 @@ void SV_CheckForNewClients()
 		// TODO: also check to see if we are at the max player count
 
 		// Open a new socket for them
-		Socket_t                      newSocket      = Net_OpenSocket( "0" );
+		// Socket_t                      newSocket      = Net_OpenSocket( "0" );
 
 		// Connect to them with a new socket to communicate with them on
-		int ret = Net_Connect( newSocket, clientAddr );
-		if ( ret != 0 )
-		{
-			Net_CloseSocket( newSocket );
-			continue;
-		}
+		// int ret = Net_Connect( newSocket, clientAddr );
+		// if ( ret != 0 )
+		// {
+		// 	Net_CloseSocket( newSocket );
+		// 	continue;
+		// }
 		
 		// Get the port of this new socket
-		ch_sockaddr newAddr;
-		Net_GetSocketAddr( newSocket, newAddr );
-		int          newPort = Net_GetSocketPort( newAddr );
+		// ch_sockaddr newAddr;
+		// Net_GetSocketAddr( newSocket, newAddr );
+		// int          newPort = Net_GetSocketPort( newAddr );
 
 		// Create a new client struct
 		SV_Client_t& client  = gServerData.aClients.emplace_back();
 		client.aName         = clientInfoRead.getName();
-		client.aSocket       = newSocket;
 		client.aAddr         = clientAddr;
 		client.aState        = ESV_ClientState_Connecting;
 
@@ -451,7 +578,7 @@ void SV_CheckForNewClients()
 		NetMsgServerInfo::Builder serverInfo = message.getRoot< NetMsgServerInfo >();
 
 		// hack, tell the client to use switch over to this port
-		serverInfo.setNewPort( newPort );
+		// serverInfo.setNewPort( newPort );
 		serverInfo.setPlayerEntityId( client.aEntity );
 
 		auto array = capnp::messageToFlatArray( message );
@@ -459,7 +586,13 @@ void SV_CheckForNewClients()
 		// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
 		int  write = Net_Write( listenSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &clientAddr );
 
+		// ChVector< char > tempTest;
+		// tempTest.push_back( 40 );
+
+		// client.Write( tempTest.begin(), tempTest.size() * sizeof( char ) );
+
 		gServerData.aClientsConnecting.push_back( &client );
 	}
 }
+#endif
 

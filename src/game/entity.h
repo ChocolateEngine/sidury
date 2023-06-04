@@ -106,8 +106,13 @@ enum EEntComponentVarType
 
 enum EEntComponentNetType
 {
+	// This component is on both client and server
 	EEntComponentNetType_Both,
+
+	// This component is only on the client
 	EEntComponentNetType_Client,
+
+	// This component is only on the server
 	EEntComponentNetType_Server,
 };
 
@@ -199,7 +204,7 @@ void* EntComponentRegistry_GetVarHandler();
 class IEntityComponentPool
 {
   public:
-	virtual ~IEntityComponentPool()                              = default;
+	virtual ~IEntityComponentPool()                                            = default;
 
 	// Called whenever an entity is destroyed on all Component Pools
 	virtual bool                Init( const char* spName )                     = 0;
@@ -241,6 +246,10 @@ class EntityComponentPool : public IEntityComponentPool
 
 	virtual ~EntityComponentPool()
 	{
+		for ( auto& [ entity, component ] : aMapEntityToComponent )
+		{
+			Remove( entity );
+		}
 	}
 
 	virtual bool Init( const char* spName ) override
@@ -297,6 +306,10 @@ class EntityComponentPool : public IEntityComponentPool
 		void* data                      = aFuncNew();
 
 		aComponents[ aCount++ ]         = data;
+
+		// TODO: use malloc and use that pointer in the constructor for this
+		// use placement new
+		// https://stackoverflow.com/questions/2494471/c-is-it-possible-to-call-a-constructor-directly-without-new
 
 		return data;
 	}
@@ -614,6 +627,7 @@ class EntitySystem
 	// but what if a client only entity is using an ID that a newly created server entity is using?
 	// curl up into a ball and die i guess
 	Entity                                                        CreateEntityFromServer( Entity desiredId );
+	bool                                                          EntityExists( Entity desiredId );
 
 	// Read and write from the network
 	void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
@@ -663,6 +677,9 @@ class EntitySystem
 
 	// Component Array - list of all of this type of component in existence
 	std::unordered_map< std::string_view, IEntityComponentPool* > aComponentPools;
+
+	// Entity States, will store if an entity is just created or deleted for one frame
+	std::unordered_map< Entity, IEntityComponentPool* > aEntitySates;
 };
 
 
