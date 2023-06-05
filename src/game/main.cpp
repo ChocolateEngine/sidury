@@ -36,7 +36,7 @@ IRender*         render       = nullptr;
 IInputSystem*    input        = nullptr;
 IAudioSystem*    audio        = nullptr;
 
-static bool      gPaused      = true;
+static bool      gPaused      = false;
 float            gFrameTime   = 0.f;
 double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
@@ -53,10 +53,10 @@ CONVAR( dbg_global_axis_size, 15 );
 CONVAR( r_render, 1 );
 
 
-CON_COMMAND( pause )
-{
-	gui->ShowConsole();
-}
+// CON_COMMAND( pause )
+// {
+// 	gui->ShowConsole();
+// }
 
 
 void Game_Shutdown()
@@ -73,8 +73,13 @@ void Game_Shutdown()
 }
 
 
+// disabled cause for some reason, it could jump to the WindowProc function mid frame and call this 
+#define CH_LIVE_WINDOW_RESIZE 0
+
+
 void WindowResizeCallback()
 {
+#if CH_LIVE_WINDOW_RESIZE
 	PROF_SCOPE_NAMED( "WindowResizeCallback" );
 
 	ImGui::NewFrame();
@@ -94,6 +99,7 @@ void WindowResizeCallback()
 	{
 		ImGui::EndFrame();
 	}
+#endif
 }
 
 
@@ -157,9 +163,6 @@ bool Game_Init()
 	players->Spawn( gLocalPlayer );
 #endif
 
-	players = new PlayerManager;
-	players->Init();
-
 	Log_Msg( "Game Loaded!\n" );
 	return true;
 }
@@ -208,14 +211,6 @@ void Game_Update( float frameTime )
 }
 
 
-void CenterMouseOnScreen()
-{
-	int w, h;
-	SDL_GetWindowSize( render->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
-}
-
-
 bool Game_InMap()
 {
 	return MapManager_HasMap();
@@ -250,16 +245,11 @@ void Game_UpdateGame( float frameTime )
 	// when do i call these lol
 	CL_Update( gFrameTime );
 
-	players->apMove->DisplayPlayerStats( gLocalPlayer );
+	GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
 
 	Game_SetupModels( gFrameTime );
 	Game_ResetInputs();
 	Game_UpdateAudio();
-
-	if ( input->WindowHasFocus() && !gPaused )
-	{
-		CenterMouseOnScreen();
-	}
 }
 
 
@@ -277,6 +267,8 @@ bool Game_IsPaused()
 
 void Game_CheckPaused()
 {
+	// TODO: reenable this for when in single player, or we allow server pausing
+#if 0
 	bool wasPaused = gPaused;
 	gPaused = gui->IsConsoleShown();
 
@@ -291,6 +283,7 @@ void Game_CheckPaused()
 	}
 
 	audio->SetPaused( gPaused );
+#endif
 }
 
 

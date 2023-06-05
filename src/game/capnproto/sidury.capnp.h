@@ -67,6 +67,7 @@ CAPNP_DECLARE_SCHEMA(a48eaffd3c607de5);
 CAPNP_DECLARE_SCHEMA(87183ad1670e2bbc);
 CAPNP_DECLARE_SCHEMA(a1a4c4fabcd5b477);
 CAPNP_DECLARE_SCHEMA(bb66ad8408c8ace8);
+CAPNP_DECLARE_SCHEMA(f360e1373ce69ffa);
 CAPNP_DECLARE_SCHEMA(adc97680de0560d0);
 
 }  // namespace schemas
@@ -391,6 +392,21 @@ struct NetCompModelPath {
 
   struct _capnpPrivate {
     CAPNP_DECLARE_STRUCT_HEADER(bb66ad8408c8ace8, 0, 1)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetCompLight {
+  NetCompLight() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(f360e1373ce69ffa, 3, 3)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -2299,6 +2315,145 @@ private:
 };
 #endif  // !CAPNP_LITE
 
+class NetCompLight::Reader {
+public:
+  typedef NetCompLight Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::int32_t getType() const;
+
+  inline bool hasColor() const;
+  inline  ::Vec4::Reader getColor() const;
+
+  inline bool hasPos() const;
+  inline  ::Vec3::Reader getPos() const;
+
+  inline bool hasAng() const;
+  inline  ::Vec3::Reader getAng() const;
+
+  inline float getInnerFov() const;
+
+  inline float getOuterFov() const;
+
+  inline float getRadius() const;
+
+  inline float getLength() const;
+
+  inline bool getShadow() const;
+
+  inline bool getEnabled() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompLight::Builder {
+public:
+  typedef NetCompLight Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::int32_t getType();
+  inline void setType( ::int32_t value);
+
+  inline bool hasColor();
+  inline  ::Vec4::Builder getColor();
+  inline void setColor( ::Vec4::Reader value);
+  inline  ::Vec4::Builder initColor();
+  inline void adoptColor(::capnp::Orphan< ::Vec4>&& value);
+  inline ::capnp::Orphan< ::Vec4> disownColor();
+
+  inline bool hasPos();
+  inline  ::Vec3::Builder getPos();
+  inline void setPos( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initPos();
+  inline void adoptPos(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownPos();
+
+  inline bool hasAng();
+  inline  ::Vec3::Builder getAng();
+  inline void setAng( ::Vec3::Reader value);
+  inline  ::Vec3::Builder initAng();
+  inline void adoptAng(::capnp::Orphan< ::Vec3>&& value);
+  inline ::capnp::Orphan< ::Vec3> disownAng();
+
+  inline float getInnerFov();
+  inline void setInnerFov(float value);
+
+  inline float getOuterFov();
+  inline void setOuterFov(float value);
+
+  inline float getRadius();
+  inline void setRadius(float value);
+
+  inline float getLength();
+  inline void setLength(float value);
+
+  inline bool getShadow();
+  inline void setShadow(bool value);
+
+  inline bool getEnabled();
+  inline void setEnabled(bool value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompLight::Pipeline {
+public:
+  typedef NetCompLight Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+  inline  ::Vec4::Pipeline getColor();
+  inline  ::Vec3::Pipeline getPos();
+  inline  ::Vec3::Pipeline getAng();
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
 class NetCompPlayerMoveData::Reader {
 public:
   typedef NetCompPlayerMoveData Reads;
@@ -3711,6 +3866,221 @@ inline void NetCompModelPath::Builder::adoptPath(
 inline ::capnp::Orphan< ::capnp::Text> NetCompModelPath::Builder::disownPath() {
   return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::int32_t NetCompLight::Reader::getType() const {
+  return _reader.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::int32_t NetCompLight::Builder::getType() {
+  return _builder.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setType( ::int32_t value) {
+  _builder.setDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetCompLight::Reader::hasColor() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompLight::Builder::hasColor() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec4::Reader NetCompLight::Reader::getColor() const {
+  return ::capnp::_::PointerHelpers< ::Vec4>::get(_reader.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline  ::Vec4::Builder NetCompLight::Builder::getColor() {
+  return ::capnp::_::PointerHelpers< ::Vec4>::get(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec4::Pipeline NetCompLight::Pipeline::getColor() {
+  return  ::Vec4::Pipeline(_typeless.getPointerField(0));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompLight::Builder::setColor( ::Vec4::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec4>::set(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec4::Builder NetCompLight::Builder::initColor() {
+  return ::capnp::_::PointerHelpers< ::Vec4>::init(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+inline void NetCompLight::Builder::adoptColor(
+    ::capnp::Orphan< ::Vec4>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec4>::adopt(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec4> NetCompLight::Builder::disownColor() {
+  return ::capnp::_::PointerHelpers< ::Vec4>::disown(_builder.getPointerField(
+      ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompLight::Reader::hasPos() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompLight::Builder::hasPos() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompLight::Reader::getPos() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompLight::Builder::getPos() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompLight::Pipeline::getPos() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(1));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompLight::Builder::setPos( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompLight::Builder::initPos() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline void NetCompLight::Builder::adoptPos(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompLight::Builder::disownPos() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline bool NetCompLight::Reader::hasAng() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline bool NetCompLight::Builder::hasAng() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline  ::Vec3::Reader NetCompLight::Reader::getAng() const {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline  ::Vec3::Builder NetCompLight::Builder::getAng() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::get(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::Vec3::Pipeline NetCompLight::Pipeline::getAng() {
+  return  ::Vec3::Pipeline(_typeless.getPointerField(2));
+}
+#endif  // !CAPNP_LITE
+inline void NetCompLight::Builder::setAng( ::Vec3::Reader value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::set(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), value);
+}
+inline  ::Vec3::Builder NetCompLight::Builder::initAng() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::init(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline void NetCompLight::Builder::adoptAng(
+    ::capnp::Orphan< ::Vec3>&& value) {
+  ::capnp::_::PointerHelpers< ::Vec3>::adopt(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::Vec3> NetCompLight::Builder::disownAng() {
+  return ::capnp::_::PointerHelpers< ::Vec3>::disown(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+
+inline float NetCompLight::Reader::getInnerFov() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompLight::Builder::getInnerFov() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setInnerFov(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompLight::Reader::getOuterFov() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompLight::Builder::getOuterFov() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setOuterFov(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompLight::Reader::getRadius() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompLight::Builder::getRadius() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setRadius(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompLight::Reader::getLength() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompLight::Builder::getLength() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setLength(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetCompLight::Reader::getShadow() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<160>() * ::capnp::ELEMENTS);
+}
+
+inline bool NetCompLight::Builder::getShadow() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<160>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setShadow(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<160>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool NetCompLight::Reader::getEnabled() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<161>() * ::capnp::ELEMENTS);
+}
+
+inline bool NetCompLight::Builder::getEnabled() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<161>() * ::capnp::ELEMENTS);
+}
+inline void NetCompLight::Builder::setEnabled(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<161>() * ::capnp::ELEMENTS, value);
 }
 
 inline  ::EPlayerMoveType NetCompPlayerMoveData::Reader::getMoveType() const {

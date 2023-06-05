@@ -5,6 +5,11 @@
 #include "mapmanager.h"
 #include "player.h"
 #include "network/net_main.h"
+
+#include "igui.h"
+#include "iinput.h"
+#include "render/irender.h"
+
 #include "capnproto/sidury.capnp.h"
 
 #include <capnp/message.h>
@@ -29,11 +34,12 @@ static Socket_t                   gClientSocket = CH_INVALID_SOCKET;
 static ch_sockaddr                gClientAddr;
 
 static EClientState               gClientState = EClientState_Idle;
-static CL_ServerData_t            gClientServerData;
+CL_ServerData_t                   gClientServerData;
 
 // How much time we have until we give up connecting if the server doesn't respond anymore
 static double                     gClientConnectTimeout = 0.f;
-static float                      gClientTimeout = 0.f;
+static float                      gClientTimeout        = 0.f;
+static bool                       gClientMenuShown      = true;
 
 // Console Commands to send to the server to process, like noclip
 static std::vector< std::string > gCommandsToSend;
@@ -92,9 +98,30 @@ CONCMD( connect )
 }
 
 
+CONCMD( disconnect )
+{
+	CL_Disconnect();
+}
+
+
+static void CenterMouseOnScreen()
+{
+	int w, h;
+	SDL_GetWindowSize( render->GetWindow(), &w, &h );
+	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
+}
+
+
 bool CL_Init()
 {
-	return EntitySystem::CreateClient();
+	if ( !EntitySystem::CreateClient() )
+		return false;
+
+	PlayerManager::CreateClient();
+
+	Phys_CreateEnv( true );
+
+	return true;
 }
 
 
@@ -103,6 +130,19 @@ void CL_Shutdown()
 	CL_Disconnect();
 
 	EntitySystem::DestroyClient();
+	PlayerManager::DestroyClient();
+
+	Phys_DestroyEnv( true );
+}
+
+
+void CL_WriteMsgData( MsgSrcClient::Builder& srBuilder, capnp::MessageBuilder& srBuilderData )
+{
+	auto array = capnp::messageToFlatArray( srBuilderData );
+	auto data  = srBuilder.initData( array.size() * sizeof( capnp::word ) );
+
+	// This is probably awful and highly inefficent
+	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
 }
 
 
@@ -148,7 +188,7 @@ void CL_Update( float frameTime )
 			}
 
 			gClientState = EClientState_Connected;
-			players->Create( gLocalPlayer );
+			GetPlayers()->Create( gLocalPlayer );
 			break;
 		}
 
@@ -181,16 +221,8 @@ void CL_Update( float frameTime )
 			capnp::MallocMessageBuilder userCmdBuilder;
 			CL_SendUserCmd( userCmdBuilder );
 
-			auto array = capnp::messageToFlatArray( userCmdBuilder );
-			auto data  = root.initData( array.size() * sizeof( capnp::word ) );
-
-			// This is probably awful and highly inefficent
-			// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
-			memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
-
-			auto finalMessage = capnp::messageToFlatArray( builder );
-
-			int  write        = Net_Write( gClientSocket, finalMessage.asChars().begin(), finalMessage.size() * sizeof( capnp::word ), &gClientAddr );
+			CL_WriteMsgData( root, userCmdBuilder );
+			CL_WriteToServer( builder );
 
 			break;
 		}
@@ -202,6 +234,8 @@ void CL_Update( float frameTime )
 
 void CL_GameUpdate( float frameTime )
 {
+	CL_UpdateMenuShown();
+
 	// Check connection timeout
 	// if ( ( cl_timeout_duration - cl_timeout_threshold ) < gClientTimeout )
 	if ( cl_timeout_duration < ( gClientTimeout - cl_timeout_threshold ) )
@@ -211,7 +245,35 @@ void CL_GameUpdate( float frameTime )
 		Log_WarnF( gLC_Client, "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
 	}
 
-	players->UpdateLocalPlayer();
+	GetPlayers()->UpdateLocalPlayer();
+
+	if ( input->WindowHasFocus() && !CL_IsMenuShown() )
+	{
+		CenterMouseOnScreen();
+	}
+}
+
+
+bool CL_IsMenuShown()
+{
+	return gClientMenuShown;
+}
+
+
+void CL_UpdateMenuShown()
+{
+	bool wasShown    = gClientMenuShown;
+	gClientMenuShown = gui->IsConsoleShown();
+
+	if ( wasShown != gClientMenuShown )
+	{
+		SDL_SetRelativeMouseMode( (SDL_bool)!gClientMenuShown );
+
+		if ( gClientMenuShown )
+		{
+			CenterMouseOnScreen();
+		}
+	}
 }
 
 
@@ -220,16 +282,24 @@ void CL_GameUpdate( float frameTime )
 // =======================================================================
 
 
-void CL_Disconnect( const char* spReason )
+void CL_Disconnect( bool sSendReason, const char* spReason )
 {
 	if ( gClientSocket != CH_INVALID_SOCKET )
 	{
-		if ( spReason )
+		if ( sSendReason )
 		{
-			// Tell the server why we are disconnecting
-			// ::capnp::MallocMessageBuilder message;
-			// NetMsgClientInfo::Builder     clientInfoBuild = message.initRoot< NetMsgClientInfo >();
+			// Tell the server we are disconnecting
+			capnp::MallocMessageBuilder builder;
+			auto                        root = builder.initRoot< MsgSrcClient >();
+			root.setType( EMsgSrcClient::DISCONNECT );
 
+			capnp::MallocMessageBuilder disconnectBuilder;
+			auto                        msgDisconnect = disconnectBuilder.initRoot< NetMsgDisconnect >();
+
+			msgDisconnect.setReason( spReason ? spReason : "Client Disconnect" );
+
+			CL_WriteMsgData( root, disconnectBuilder );
+			CL_WriteToServer( builder );
 		}
 
 		Net_CloseSocket( gClientSocket );
@@ -261,7 +331,10 @@ void CL_Connect( const char* spAddress )
 
 	Net_NetadrToSockaddr( &netAddr, (struct sockaddr*)&gClientAddr );
 
-	int  what  = Net_Connect( gClientSocket, gClientAddr );
+	int connectRet = Net_Connect( gClientSocket, gClientAddr );
+
+	if ( connectRet != 0 )
+		return;
 
 	// kj::HandleOutputStream out( (HANDLE)gClientSocket );
 	// capnp::writeMessage( out, message );
@@ -277,12 +350,19 @@ void CL_Connect( const char* spAddress )
 }
 
 
+int CL_WriteToServer( capnp::MessageBuilder& srBuilder )
+{
+	auto finalMessage = capnp::messageToFlatArray( srBuilder );
+	return Net_Write( gClientSocket, finalMessage.asChars().begin(), finalMessage.size() * sizeof( capnp::word ), &gClientAddr );
+}
+
+
 bool CL_RecvServerInfo()
 {
 	ChVector< char > data( 8192 );
 	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
 
-	if ( len <= 0 )
+	if ( len == 0 )
 	{
 		// NOTE: this might get hit, we need some sort of retry thing
 		Log_Warn( gLC_Client, "No Server Info\n" );
@@ -292,6 +372,11 @@ bool CL_RecvServerInfo()
 
 		// keep waiting i guess?
 		return true;
+	}
+	else if ( len < 0 )
+	{
+		CL_Disconnect( false );
+		return false;
 	}
 
 	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
@@ -321,8 +406,15 @@ void CL_UpdateUserCmd()
 
 	Assert( camera );
 
+	// Reset Values
+	gClientUserCmd.aButtons    = 0;
+	gClientUserCmd.aFlashlight = false;
+
 	gClientUserCmd.aAng     = camera->aTransform.aAng;
-	gClientUserCmd.aButtons = 0;
+
+	// Don't update buttons if the menu is shown
+	if ( CL_IsMenuShown() )
+	 	return;
 
 	if ( in_duck )
 		gClientUserCmd.aButtons |= EBtnInput_Duck;

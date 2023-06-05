@@ -50,6 +50,11 @@ void                  Game_SetCommandSource( ECommandSource sSource );
 void                  Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand );
 
 // Network Helper functions
-void                  NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec3 );
-void                  NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec3 );
+void                  NetHelper_ReadVec2( const Vec2::Reader& srReader, glm::vec2& srVec );
+void                  NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec );
+void                  NetHelper_ReadVec4( const Vec4::Reader& srReader, glm::vec4& srVec );
+
+void                  NetHelper_WriteVec2( Vec2::Builder* spBuilder, const glm::vec2& srVec );
+void                  NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec );
+void                  NetHelper_WriteVec4( Vec4::Builder* spBuilder, const glm::vec4& srVec );
 

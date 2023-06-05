@@ -29,13 +29,21 @@ struct CL_ServerData_t
 };
 
 
+extern CL_ServerData_t gClientServerData;
+
+
 bool CL_Init();
 void CL_Shutdown();
 void CL_Update( float frameTime );
 void CL_GameUpdate( float frameTime );
 
+bool CL_IsMenuShown();
+void CL_UpdateMenuShown();
+
 void CL_Connect( const char* spAddress );
-void CL_Disconnect( const char* spReason = nullptr );
+void CL_Disconnect( bool sSendReason = true, const char* spReason = nullptr );
+
+int  CL_WriteToServer( capnp::MessageBuilder& srBuilder );
 
 bool CL_RecvServerInfo();
 void CL_UpdateUserCmd();

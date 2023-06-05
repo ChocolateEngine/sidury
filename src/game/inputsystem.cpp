@@ -1,6 +1,7 @@
 #include "inputsystem.h"
 #include "iinput.h"
 #include "main.h"
+#include "cl_main.h"
 #include "game_shared.h"
 
 extern IInputSystem* input;
@@ -324,8 +325,8 @@ void Input_Update()
 	gMouseDelta = {};
 	Input_CalcMouseDelta();
 
-	// Don't run inputs when the game is paused
-	if ( !Game_IsPaused() )
+	// Don't run inputs when the menu is shown
+	if ( !CL_IsMenuShown() )
 	{
 		// Update button binds and run the commands they are bound to
 		for ( auto& [ scancode, command ] : gKeyBinds )

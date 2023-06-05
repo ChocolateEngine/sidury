@@ -1509,7 +1509,6 @@ ViewInfo_t& Graphics_GetViewInfo()
 }
 
 
-
 Handle Graphics_CreateRenderable( Handle sModel )
 {
 	Model* model = nullptr;
@@ -1518,6 +1517,8 @@ Handle Graphics_CreateRenderable( Handle sModel )
 		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
 		return InvalidHandle;
 	}
+
+	Log_Dev( gLC_ClientGraphics, 1, "Created Renderable\n" );
 
 	Renderable_t* modelDraw  = nullptr;
 	Handle        drawHandle = InvalidHandle;

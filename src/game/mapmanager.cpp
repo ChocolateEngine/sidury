@@ -95,10 +95,10 @@ void MapManager_CloseMap()
 	}
 
 	for ( auto physObj : gpMap->aWorldPhysObjs )
-		physenv->DestroyObject( physObj );
+		GetPhysEnv()->DestroyObject( physObj );
 
 	for ( auto physShape : gpMap->aWorldPhysShapes )
-		physenv->DestroyShape( physShape );
+		GetPhysEnv()->DestroyShape( physShape );
 
 	gpMap->aWorldPhysObjs.clear();
 	gpMap->aWorldPhysShapes.clear();
@@ -238,7 +238,7 @@ bool MapManager_LoadWorldModel()
 	}
 
 #if 1
-	IPhysicsShape* physShape = physenv->CreateShape( shapeInfo );
+	IPhysicsShape* physShape = GetPhysEnv()->CreateShape( shapeInfo );
 
 	if ( physShape == nullptr )
 		return false;
@@ -248,7 +248,7 @@ bool MapManager_LoadWorldModel()
 	PhysicsObjectInfo physInfo;
 	physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
 
-	IPhysicsObject* physObj = physenv->CreateObject( physShape, physInfo );
+	IPhysicsObject* physObj = GetPhysEnv()->CreateObject( physShape, physInfo );
 
 	gpMap->aWorldPhysShapes.push_back( physShape );
 	gpMap->aWorldPhysObjs.push_back( physObj );

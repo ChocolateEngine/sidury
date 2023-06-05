@@ -1,4 +1,6 @@
 #include "game_physics.h"
+#include "game_shared.h"
+#include "entity.h"
 #include "render/irender.h"
 #include "graphics/graphics.h"
 #include "graphics/mesh_builder.h"
@@ -6,15 +8,34 @@
 
 extern IRender*          render;
 
-IPhysicsEnvironment*     physenv    = nullptr;
+// IPhysicsEnvironment*     physenv    = nullptr;
+IPhysicsEnvironment*     cl_physenv    = nullptr;
+IPhysicsEnvironment*     sv_physenv    = nullptr;
+
 Ch_IPhysics*             ch_physics = nullptr;
 
 static Phys_DebugFuncs_t gPhysDebugFuncs;
 
+IPhysicsEnvironment*     GetPhysEnv()
+{
+	if ( Game_ProcessingClient() )
+	{
+		Assert( cl_physenv );
+		return cl_physenv;
+	}
+
+	Assert( sv_physenv );
+	return sv_physenv;
+}
 
 CONVAR_CMD( phys_gravity, -800 )
 {
-	physenv->SetGravityZ( phys_gravity );
+	if ( Game_GetCommandSource() == ECommandSource_Client )
+	{
+		// return;
+	}
+
+	GetPhysEnv()->SetGravityZ( phys_gravity );
 }
 
 extern ConVar r_debug_draw;
@@ -470,9 +491,8 @@ void Phys_Init()
 
 	ch_physics->SetDebugDrawFuncs( gPhysDebugFuncs );
 
-	physenv = ch_physics->CreatePhysEnv();
-	physenv->Init(  );
-	physenv->SetGravityZ( phys_gravity );
+	CH_REGISTER_COMPONENT( CPhysShape, physShape, false, EEntComponentNetType_None );
+	CH_REGISTER_COMPONENT( CPhysObject, physObject, false, EEntComponentNetType_None );
 }
 
 
@@ -488,7 +508,46 @@ void Phys_Shutdown()
 
 	gPhysRenderables.clear();
 
-	ch_physics->DestroyPhysEnv( physenv );
+	Phys_DestroyEnv( true );
+	Phys_DestroyEnv( false );
+}
+
+
+void Phys_CreateEnv( bool sClient )
+{
+	Phys_DestroyEnv( sClient );
+
+	if ( sClient )
+	{
+		cl_physenv = ch_physics->CreatePhysEnv();
+		cl_physenv->Init();
+		cl_physenv->SetGravityZ( phys_gravity );
+	}
+	else
+	{
+		sv_physenv = ch_physics->CreatePhysEnv();
+		sv_physenv->Init();
+		sv_physenv->SetGravityZ( phys_gravity );
+	}
+}
+
+
+void Phys_DestroyEnv( bool sClient )
+{
+	if ( sClient )
+	{
+		if ( cl_physenv )
+			ch_physics->DestroyPhysEnv( cl_physenv );
+
+		cl_physenv = nullptr;
+	}
+	else
+	{
+		if ( sv_physenv )
+			ch_physics->DestroyPhysEnv( sv_physenv );
+
+		sv_physenv = nullptr;
+	}
 }
 
 
@@ -523,5 +582,58 @@ void Phys_SetMaxVelocities( IPhysicsObject* spPhysObj )
 
 	spPhysObj->SetMaxLinearVelocity( 50000.f );
 	spPhysObj->SetMaxAngularVelocity( 50000.f );
+}
+
+
+IPhysicsShape* Phys_CreateShape( Entity sEntity, PhysicsShapeInfo& srShapeInfo )
+{
+	IPhysicsShape* shape = GetPhysEnv()->CreateShape( srShapeInfo );
+
+	if ( !shape )
+	{
+		Log_Error( "Failed to create physics shape\n" );
+		return nullptr;
+	}
+
+	// Attach it to the Entity
+	auto shapeWrapper     = static_cast< CPhysShape* >( GetEntitySystem()->AddComponent( sEntity, "physShape" ) );
+	shapeWrapper->apShape = shape;
+
+	return shape;
+}
+
+
+IPhysicsObject* Phys_CreateObject( Entity sEntity, PhysicsObjectInfo& srObjectInfo )
+{
+	// Get the physics shape from the entity
+	CPhysShape* shape = GetComp_PhysShape( sEntity );
+
+	if ( !shape )
+	{
+		Log_Error( "Failed to find physics shape on entity\n" );
+		return nullptr;
+	}
+
+	return Phys_CreateObject( sEntity, shape->apShape, srObjectInfo );
+}
+
+
+IPhysicsObject* Phys_CreateObject( Entity sEntity, IPhysicsShape* spShape, PhysicsObjectInfo& srObjectInfo )
+{
+	IPhysicsObject* object = GetPhysEnv()->CreateObject( spShape, srObjectInfo );
+
+	if ( !object )
+	{
+		Log_Error( "Failed to create physics object\n" );
+		return nullptr;
+	}
+
+	CPhysObject* objWrapper  = static_cast< CPhysObject* >( GetEntitySystem()->AddComponent( sEntity, "physObject" ) );
+	objWrapper->apObj        = object;
+
+	// sanity check
+	CPhysObject* testWrapper = GetComp_PhysObject( sEntity );
+
+	return object;
 }
 

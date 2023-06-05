@@ -105,6 +105,275 @@ void EntitySystem::DestroyServer()
 // -------------------------------------------------------------
 
 
+const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType )
+{
+	switch ( sNetType )
+	{
+		case EEntComponentNetType_None:
+			return "None - This component is never networked";
+
+		case EEntComponentNetType_Both:
+			return "Both - This component is on both client and server";
+
+		case EEntComponentNetType_Client:
+			return "Client - This component is only on the Client";
+
+		case EEntComponentNetType_Server:
+			return "Server - This component is only on the Server";
+
+		default:
+			return "UNKNOWN";
+	}
+}
+
+
+static const char* gEntVarTypeStr[ EEntComponentVarType_Count ] = {
+	"INVALID",
+
+	"bool",
+
+	"float",
+	"double",
+
+#if 0
+	"s8",
+	"s16",
+	"s32",
+	"s64",
+
+	"u8",
+	"u16",
+	"u32",
+	"u64",
+#else
+	"char",
+	"short",
+	"int",
+	"long long",
+
+	"unsigned char",
+	"unsigned short",
+	"unsigned int",
+	"unsigned long long",
+#endif
+
+	"glm::vec2",
+	"glm::vec3",
+	"glm::vec4",
+};
+
+
+const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType )
+{
+	if ( sVarType < 0 || sVarType > EEntComponentVarType_Count )
+		return gEntVarTypeStr[ EEntComponentVarType_Invalid ];
+
+	return gEntVarTypeStr[ sVarType ];
+}
+
+
+std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType )
+{
+	switch ( sVarType )
+	{
+		default:
+		{
+			return "INVALID OR UNFINISHED";
+		}
+		case EEntComponentVarType_Invalid:
+		{
+			return "INVALID";
+		}
+		case EEntComponentVarType_Bool:
+		{
+			return *static_cast< bool* >( spData ) ? "TRUE" : "FALSE";
+		}
+
+		case EEntComponentVarType_Float:
+		{
+			return ToString( *static_cast< float* >( spData ) );
+		}
+		case EEntComponentVarType_Double:
+		{
+			return ToString( *static_cast< double* >( spData ) );
+		}
+
+		case EEntComponentVarType_S8:
+		{
+			s8 value = *static_cast< s8* >( spData );
+			return vstring( "%c", value );
+		}
+		case EEntComponentVarType_S16:
+		{
+			s16 value = *static_cast< s16* >( spData );
+			return vstring( "%d", value );
+		}
+		case EEntComponentVarType_S32:
+		{
+			s32 value = *static_cast< s32* >( spData );
+			return vstring( "%d", value );
+		}
+		case EEntComponentVarType_S64:
+		{
+			s32 value = *static_cast< s32* >( spData );
+			return vstring( "%lld", value );
+		}
+
+		case EEntComponentVarType_U8:
+		{
+			u8 value = *static_cast< u8* >( spData );
+			return vstring( "%uc", value );
+		}
+		case EEntComponentVarType_U16:
+		{
+			u16 value = *static_cast< u16* >( spData );
+			return vstring( "%ud", value );
+		}
+		case EEntComponentVarType_U32:
+		{
+			u32 value = *static_cast< u32* >( spData );
+			return vstring( "%ud", value );
+		}
+		case EEntComponentVarType_U64:
+		{
+			u64 value = *static_cast< u64* >( spData );
+			return vstring( "%zd", value );
+		}
+
+		case EEntComponentVarType_Vec2:
+		{
+			const glm::vec2* value = (const glm::vec2*)spData;
+			return vstring( "(%.4f, %.4f)", value->x, value->y );
+		}
+		case EEntComponentVarType_Vec3:
+		{
+			return Vec2Str( *(const glm::vec3*)spData );
+		}
+		case EEntComponentVarType_Vec4:
+		{
+			const glm::vec4* value = (const glm::vec4*)spData;
+			return vstring( "(%.4f, %.4f, %.4f, %.4f)", value->x, value->y, value->z, value->w );
+		}
+	}
+}
+
+
+std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntComponentVarType sVarType )
+{
+	char* data = static_cast< char* >( spData );
+	return EntComp_GetStrValueOfVar( data + sOffset, sVarType );
+}
+
+
+CONCMD( ent_dump_registry )
+{
+	LogGroup group = Log_GroupBegin();
+
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+
+	for ( const auto& [ name, regData ] : gEntComponentRegistry.aComponentNames )
+	{
+		Assert( regData );
+
+		if ( !regData )
+			continue;
+
+		Log_GroupF( group, "\nComponent: %s\n", regData->apName );
+		Log_GroupF( group, "   Override Client: %s\n", regData->aOverrideClient ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Networking Type: %s\n", EntComp_NetTypeToStr( regData->aNetType ) );
+		Log_GroupF( group, "   Has Write:       %s\n", regData->apWrite ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Has Read:        %s\n", regData->apRead ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Variable Count:  %zd\n", regData->aVars.size() );
+
+		for ( const auto & [ offset, var ] : regData->aVars )
+		{
+			Log_GroupF( group, "       %s - %s\n", EntComp_VarTypeToStr( var.aType ), var.apName );
+		}
+	}
+
+	Log_GroupEnd( group );
+}
+
+
+CONCMD( ent_dump )
+{
+	bool useServer = false;
+
+	if ( Game_IsHosting() && Game_ProcessingClient() )
+	{
+		// We have access to the server's entity system, so if we want it, use that
+		if ( args.size() > 0 && args[ 0 ] == "server" )
+		{
+			useServer = true;
+			Game_SetClient( false );
+		}
+	}
+
+	LogGroup group = Log_GroupBegin();
+
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+
+	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+
+	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	{
+		Assert( pool );
+
+		if ( !pool )
+			continue;
+
+		Log_GroupF( group, "Component Pool: %s - %zd Components in Pool\n", name.data(), pool->GetCount() );
+	}
+
+	Log_GroupF( group, "Components: %zd\n", GetEntitySystem()->aComponentPools.size() );
+
+	for ( Entity i = 0; i < GetEntitySystem()->aEntityCount; i++ )
+	{
+		Entity entity = GetEntitySystem()->aUsedEntities[ i ];
+
+		// this is the worst thing ever
+		std::vector< IEntityComponentPool* > pools;
+
+		// Find all component pools that contain this Entity
+		// That means the Entity has the type of component that pool is for
+		for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+		{
+			if ( pool->Contains( entity ) )
+				pools.push_back( pool );
+		}
+
+		Log_GroupF( group, "\nEntity %zd\n", entity );
+		// Log_GroupF( group, "    Predicted: %s\n", GetEntitySystem() );
+
+		for ( IEntityComponentPool* pool : pools )
+		{
+			auto data    = pool->GetData( entity );
+			auto regData = pool->GetRegistryData();
+
+			Log_GroupF( group, "\n    Component: %s\n", regData->apName );
+			Log_GroupF( group,   "    Predicted: %s\n", pool->IsPredicted( entity ) ? "TRUE" : "FALSE" );
+
+			for ( const auto& [ offset, var ] : regData->aVars )
+			{
+				Log_GroupF( group, "        %s = %s\n", var.apName, EntComp_GetStrValueOfVarOffset( offset, data, var.aType ).c_str() );
+			}
+		}
+	}
+
+	Log_GroupEnd( group );
+
+	// Make sure to reset this
+	if ( useServer )
+	{
+		Game_SetClient( true );
+	}
+}
+
+
+// -------------------------------------------------------------
+
+
 bool EntitySystem::Init()
 {
 	// Initialize the queue with all possible entity IDs
@@ -145,7 +414,7 @@ void EntitySystem::CreateComponentPools()
 
 Entity EntitySystem::CreateEntity()
 {
-	Assert( aEntityCount < CH_MAX_ENTITIES && "Too many entities in existence." );
+	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
 
 	// Take an ID from the front of the queue
 	// Entity id = aEntityPool.front();
@@ -162,7 +431,7 @@ Entity EntitySystem::CreateEntity()
 
 void EntitySystem::DeleteEntity( Entity ent )
 {
-	Assert( ent < CH_MAX_ENTITIES && "Entity out of range." );
+	AssertMsg( ent < CH_MAX_ENTITIES, "Entity out of range" );
 
 	// Invalidate the destroyed entity's signature
 	// aSignatures[ ent ].reset();
@@ -194,6 +463,8 @@ Entity EntitySystem::GetEntityCount()
 
 Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
 {
+	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
+
 	size_t index = vec_index( aEntityPool, desiredId );
 
 	if ( index == SIZE_MAX )
@@ -203,6 +474,9 @@ Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
 	}
 
 	vec_remove_index( aEntityPool, index );
+	aUsedEntities.push_back( desiredId );
+	++aEntityCount;
+
 	return desiredId;
 }
 
@@ -454,8 +728,6 @@ IEntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
 // void TEMP_TransformRead( NetCompTransform::Reader& srReader, void* spData )
 void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
 {
-	Assert( spData );
-
 	Transform* spTransform = static_cast< Transform* >( spData );
 	auto       message     = srReader.getRoot< NetCompTransform >();
 
@@ -466,8 +738,6 @@ void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
 
 void TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
 {
-	Assert( spData );
-
 	const Transform* spTransform = static_cast< const Transform* >( spData );
 	auto             builder     = srMessage.initRoot< NetCompTransform >();
 
@@ -484,7 +754,6 @@ void TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
 
 CH_COMPONENT_READ_DEF( TransformSmall )
 {
-	Assert( spData );
 	TransformSmall* spTransform = static_cast< TransformSmall* >( spData );
 	auto            message     = srReader.getRoot< NetCompTransformSmall >();
 
@@ -494,8 +763,6 @@ CH_COMPONENT_READ_DEF( TransformSmall )
 
 CH_COMPONENT_WRITE_DEF( TransformSmall )
 {
-	Assert( spData );
-
 	const TransformSmall* spTransform = static_cast< const TransformSmall* >( spData );
 	auto                  builder     = srMessage.initRoot< NetCompTransformSmall >();
 
@@ -506,7 +773,6 @@ CH_COMPONENT_WRITE_DEF( TransformSmall )
 
 CH_COMPONENT_READ_DEF( CRigidBody )
 {
-	Assert( spData );
 	CRigidBody* spRigidBody = static_cast< CRigidBody* >( spData );
 	auto        message     = srReader.getRoot< NetCompRigidBody >();
 
@@ -516,8 +782,6 @@ CH_COMPONENT_READ_DEF( CRigidBody )
 
 CH_COMPONENT_WRITE_DEF( CRigidBody )
 {
-	Assert( spData );
-
 	const CRigidBody* spRigidBody = static_cast< const CRigidBody* >( spData );
 	auto              builder  = srMessage.initRoot< NetCompRigidBody >();
 
@@ -542,8 +806,6 @@ void NetComp_WriteDirection( NetCompDirection::Builder* spBuilder, const CDirect
 
 CH_COMPONENT_READ_DEF( CDirection )
 {
-	Assert( spData );
-
 	CDirection* spDirection = static_cast< CDirection* >( spData );
 	auto        message     = srReader.getRoot< NetCompDirection >();
 
@@ -552,8 +814,6 @@ CH_COMPONENT_READ_DEF( CDirection )
 
 CH_COMPONENT_WRITE_DEF( CDirection )
 {
-	Assert( spData );
-
 	const CDirection* spDirection = static_cast< const CDirection* >( spData );
 	auto              builder     = srMessage.initRoot< NetCompDirection >();
 
@@ -563,8 +823,6 @@ CH_COMPONENT_WRITE_DEF( CDirection )
 
 CH_COMPONENT_READ_DEF( CCamera )
 {
-	Assert( spData );
-
 	CCamera* spCamera = static_cast< CCamera* >( spData );
 	auto     message  = srReader.getRoot< NetCompCamera >();
 
@@ -578,8 +836,6 @@ CH_COMPONENT_READ_DEF( CCamera )
 
 CH_COMPONENT_WRITE_DEF( CCamera )
 {
-	Assert( spData );
-
 	const CCamera* spCamera = static_cast< const CCamera* >( spData );
 	auto           builder  = srMessage.initRoot< NetCompCamera >();
 
@@ -601,8 +857,6 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 
 CH_COMPONENT_READ_DEF( CGravity )
 {
-	Assert( spData );
-
 	CGravity* spGravity = static_cast< CGravity* >( spData );
 	auto      message  = srReader.getRoot< NetCompGravity >();
 
@@ -611,8 +865,6 @@ CH_COMPONENT_READ_DEF( CGravity )
 
 CH_COMPONENT_WRITE_DEF( CGravity )
 {
-	Assert( spData );
-
 	const CGravity* spGravity = static_cast< const CGravity* >( spData );
 	auto            builder   = srMessage.initRoot< NetCompGravity >();
 
@@ -622,8 +874,6 @@ CH_COMPONENT_WRITE_DEF( CGravity )
 
 CH_COMPONENT_READ_DEF( CModelPath )
 {
-	Assert( spData );
-
 	auto* spModelPath = static_cast< CModelPath* >( spData );
 	auto  message     = srReader.getRoot< NetCompModelPath >();
 
@@ -632,8 +882,6 @@ CH_COMPONENT_READ_DEF( CModelPath )
 
 CH_COMPONENT_WRITE_DEF( CModelPath )
 {
-	Assert( spData );
-
 	const auto* spModelPath = static_cast< const CModelPath* >( spData );
 	auto        builder     = srMessage.initRoot< NetCompModelPath >();
 
@@ -643,8 +891,6 @@ CH_COMPONENT_WRITE_DEF( CModelPath )
 
 CH_COMPONENT_READ_DEF( CPlayerMoveData )
 {
-	Assert( spData );
-
 	auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
 	auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
 
@@ -677,8 +923,6 @@ CH_COMPONENT_READ_DEF( CPlayerMoveData )
 
 CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 {
-	Assert( spData );
-
 	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
 	auto  builder   = srMessage.initRoot< NetCompPlayerMoveData >();
 
@@ -710,16 +954,74 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 
 CH_COMPONENT_READ_DEF( Light_t )
 {
+	auto* spLight = static_cast< Light_t* >( spData );
+	auto  message = srReader.getRoot< NetCompLight >();
+
+	NetHelper_ReadVec4( message.getColor(), spLight->aColor );
+	NetHelper_ReadVec3( message.getPos(), spLight->aPos );
+	NetHelper_ReadVec3( message.getAng(), spLight->aAng );
+
+	spLight->aType     = static_cast< ELightType >( message.getType() );
+	spLight->aInnerFov = message.getInnerFov();
+	spLight->aOuterFov = message.getOuterFov();
+	spLight->aRadius   = message.getRadius();
+	spLight->aLength   = message.getLength();
+
+	spLight->aShadow   = message.getShadow();
+	spLight->aEnabled  = message.getEnabled();
+
+	//ADJIAWDI)JDAIW)D 
+	Graphics_UpdateLight( spLight );
 }
 
 
 CH_COMPONENT_WRITE_DEF( Light_t )
 {
+	auto* spLight = static_cast< const Light_t* >( spData );
+	auto  builder = srMessage.initRoot< NetCompLight >();
+
+	auto  color   = builder.initColor();
+	NetHelper_WriteVec4( &color, spLight->aColor );
+
+	auto pos = builder.initPos();
+	NetHelper_WriteVec3( &pos, spLight->aPos );
+
+	auto ang = builder.initAng();
+	NetHelper_WriteVec3( &ang, spLight->aAng );
+
+	builder.setType( spLight->aType );
+	builder.setInnerFov( spLight->aInnerFov );
+	builder.setOuterFov( spLight->aOuterFov );
+	builder.setRadius( spLight->aRadius );
+	builder.setLength( spLight->aLength );
+
+	builder.setShadow( spLight->aShadow );
+	builder.setEnabled( spLight->aEnabled );
 }
 
 
 void Ent_RegisterBaseComponents()
 {
+	// Setup Types
+	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]      = EEntComponentVarType_Bool;
+	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]     = EEntComponentVarType_Float;
+	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]    = EEntComponentVarType_Double;
+
+	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]        = EEntComponentVarType_S8;
+	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]       = EEntComponentVarType_S16;
+	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]       = EEntComponentVarType_S32;
+	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]       = EEntComponentVarType_S64;
+
+	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]        = EEntComponentVarType_U8;
+	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]       = EEntComponentVarType_U16;
+	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]       = EEntComponentVarType_U32;
+	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]       = EEntComponentVarType_U64;
+
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ] = EEntComponentVarType_Vec2;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ] = EEntComponentVarType_Vec3;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ] = EEntComponentVarType_Vec4;
+
+	// Now Register Base Components
 	EntComp_RegisterComponent< Transform >( "transform", true, EEntComponentNetType_Both,
 		[ & ]() { return new Transform; }, [ & ]( void* spData ) { delete (Transform*)spData; } );
 
@@ -756,11 +1058,25 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aAng ) );
 
 	CH_REGISTER_COMPONENT_RW( CModelPath, modelPath, true );
-	CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
+	// CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
 
 	// Probably should be in graphics?
-	CH_REGISTER_COMPONENT( Light_t, light, true, EEntComponentNetType_Both );
-	// CH_REGISTER_COMPONENT_VAR( Light_t, int, aMoveType, moveType );
+	CH_REGISTER_COMPONENT_RW( Light_t, light, true );
+	CH_REGISTER_COMPONENT_VAR( Light_t, ELightType, aType, type );
+	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec4, aColor, color );
+
+	// TODO: these 2 should not be here
+    // it should be attached to it's own entity that can be parented
+    // and that entity needs to contain the transform (or transform small) component
+	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec3, aPos, pos );
+	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec3, aAng, ang );
+
+	CH_REGISTER_COMPONENT_VAR( Light_t, float, aInnerFov, innerFov );
+	CH_REGISTER_COMPONENT_VAR( Light_t, float, aOuterFov, outerFov );
+	CH_REGISTER_COMPONENT_VAR( Light_t, float, aRadius, radius );
+	CH_REGISTER_COMPONENT_VAR( Light_t, float, aLength, length );
+	CH_REGISTER_COMPONENT_VAR( Light_t, bool, aShadow, shadow );
+	CH_REGISTER_COMPONENT_VAR( Light_t, bool, aEnabled, enabled );
 
 	// TODO: SHOULD NOT BE HERE !!!!!
 	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );

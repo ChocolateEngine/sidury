@@ -85,16 +85,20 @@ enum EEntComponentVarType
 {
 	EEntComponentVarType_Invalid,
 
+	EEntComponentVarType_Bool,
+
 	EEntComponentVarType_Float,
 	EEntComponentVarType_Double,
 
 	EEntComponentVarType_S8,    // signed char
 	EEntComponentVarType_S16,   // signed short
 	EEntComponentVarType_S32,   // signed int
+	EEntComponentVarType_S64,   // signed long long
 	
 	EEntComponentVarType_U8,    // unsigned char
 	EEntComponentVarType_U16,   // unsigned short
 	EEntComponentVarType_U32,   // unsigned int
+	EEntComponentVarType_U64,   // unsigned long long
 
 	EEntComponentVarType_Vec2,  // glm::vec2
 	EEntComponentVarType_Vec3,  // glm::vec3
@@ -106,6 +110,9 @@ enum EEntComponentVarType
 
 enum EEntComponentNetType
 {
+	// This component is never networked
+	EEntComponentNetType_None,
+
 	// This component is on both client and server
 	EEntComponentNetType_Both,
 
@@ -187,10 +194,13 @@ class EntComponentVarHandler_Vec3 : public IEntComponentVarHandler
 struct EntComponentRegistry_t
 {
 	// [type hash of component] = Component Data
-	std::unordered_map< size_t, EntComponentData_t > aComponents;
+	std::unordered_map< size_t, EntComponentData_t >            aComponents;
 
 	// Component Name to Component Data
 	std::unordered_map< std::string_view, EntComponentData_t* > aComponentNames;
+
+	// [type hash of var] = Var Type Enum
+	std::unordered_map< size_t, EEntComponentVarType >          aVarTypes;
 };
 
 
@@ -232,6 +242,9 @@ class IEntityComponentPool
 
 	// Is this component predicted for this Entity?
 	virtual bool                IsPredicted( Entity entity )                   = 0;
+
+	// How Many Components are in this Pool?
+	virtual size_t              GetCount()                                     = 0;
 };
 
 
@@ -271,6 +284,8 @@ class EntityComponentPool : public IEntityComponentPool
 		aFuncNew  = it->second->aFuncNew;
 		aFuncFree = it->second->aFuncFree;
 
+		apData    = it->second;
+
 		return true;
 	}
 
@@ -300,6 +315,9 @@ class EntityComponentPool : public IEntityComponentPool
 	// Adds This component to the entity
 	virtual void* Create( Entity entity ) override
 	{
+		// Is this a client or server component pool?
+		// Make sure this component can be created on it
+
 		aMapComponentToEntity[ aCount ] = entity;
 		aMapEntityToComponent[ entity ] = aCount;
 
@@ -345,7 +363,8 @@ class EntityComponentPool : public IEntityComponentPool
 		if ( it != aMapEntityToComponent.end() )
 		{
 			size_t index = it->second;
-			return &aComponents[ index ];
+			// return &aComponents[ index ];
+			return aComponents[ index ];
 		}
 
 		return nullptr;
@@ -383,6 +402,12 @@ class EntityComponentPool : public IEntityComponentPool
 		return ( it != aPredicted.end() );
 	}
 
+	// How Many Components are in this Pool?
+	virtual size_t GetCount() override
+	{
+		return aCount;
+	}
+
 	// Map Component Index to Entity
 	std::unordered_map< size_t, Entity > aMapComponentToEntity;
 
@@ -405,6 +430,8 @@ class EntityComponentPool : public IEntityComponentPool
 	// Component Creation and Free Func
 	FEntComp_New                         aFuncNew;
 	FEntComp_Free                        aFuncFree;
+
+	EntComponentData_t*                  apData;
 };
 
 #if 0
@@ -516,8 +543,8 @@ struct EntCompVarTypeToEnum_t
 };
 
 
-
 template< typename T, typename VAR_TYPE >
+// inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, EEntComponentVarType sVarType, size_t sOffset )
 inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset )
 {
 	size_t typeHash = typeid( T ).hash_code();
@@ -542,12 +569,17 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 	varData.apVarName = spVarName;
 	varData.apName    = spName;
 
-	// switch ( typeid( VAR_TYPE ).hash_code() )
-	// {
-	// 	case typeid( glm::vec2 ).hash_code():
-	// 		varData.aType = EEntComponentVarType_Vec2;
-	// 		break;
-	// }
+	// Get Var Type
+	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
+	auto   findEnum    = gEntComponentRegistry.aVarTypes.find( varTypeHash );
+
+	if ( findEnum == gEntComponentRegistry.aVarTypes.end() )
+	{
+		Log_ErrorF( "Component Var Type not registered in EEntComponentVarType: \"%s\"\n", typeid( VAR_TYPE ).name() );
+		return;
+	}
+
+	varData.aType = findEnum->second;
 }
 
 
@@ -616,6 +648,8 @@ class EntitySystem
 	void                                                          Shutdown();
 
 	void                                                          CreateComponentPools();
+
+	// Entity                                                        CreateEntityNetworked();
 
 	Entity                                                        CreateEntity();
 	void                                                          DeleteEntity( Entity ent );
@@ -1063,6 +1097,9 @@ struct CModelPath
 // Helper Macros
 #define CH_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; } )
+
+#define CH_REGISTER_COMPONENT_NEWFREE( type, name, overrideClient, netType, newFunc, freeFunc ) \
+  EntComp_RegisterComponent< type >( #name, overrideClient, netType, newFunc, freeFunc )
 
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
   EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ) )

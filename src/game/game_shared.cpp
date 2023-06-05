@@ -1,4 +1,5 @@
 #include "game_shared.h"
+#include "cl_main.h"
 #include "sv_main.h"
 #include "entity.h"
 #include "player.h"
@@ -13,6 +14,24 @@ NEW_CVAR_FLAG( CVARF_SV_EXEC );
 
 static bool           gGameUseClient     = true;
 static ECommandSource gGameCommandSource = ECommandSource_Client;
+
+
+CONCMD( status )
+{
+	size_t playerCount = GetPlayers()->aPlayerList.size();
+
+	// if ( Game_IsHosting() )
+	// {
+	// 	playerCount = gServerData.aClients.size();
+	// }
+	// else
+	// {
+	// 	playerCount = gClientServerData.aPlayerCount;
+	// }
+
+	Log_MsgF( "%zd Players Currently on Server\n", playerCount );
+}
+
 
 bool Game_IsHosting()
 {
@@ -106,17 +125,46 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 }
 
 
-void NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec3 )
+void NetHelper_ReadVec2( const Vec2::Reader& srReader, glm::vec2& srVec )
 {
-	srVec3.x = srReader.getX();
-	srVec3.y = srReader.getY();
-	srVec3.z = srReader.getZ();
+	srVec.x = srReader.getX();
+	srVec.y = srReader.getY();
 }
 
-void NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec3 )
+void NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec )
 {
-	spBuilder->setX( srVec3.x );
-	spBuilder->setY( srVec3.y );
-	spBuilder->setZ( srVec3.z );
+	srVec.x = srReader.getX();
+	srVec.y = srReader.getY();
+	srVec.z = srReader.getZ();
+}
+
+void NetHelper_ReadVec4( const Vec4::Reader& srReader, glm::vec4& srVec )
+{
+	srVec.x = srReader.getX();
+	srVec.y = srReader.getY();
+	srVec.z = srReader.getZ();
+	srVec.w = srReader.getW();
+}
+
+
+void NetHelper_WriteVec3( Vec2::Builder* spBuilder, const glm::vec2& srVec )
+{
+	spBuilder->setX( srVec.x );
+	spBuilder->setY( srVec.y );
+}
+
+void NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec )
+{
+	spBuilder->setX( srVec.x );
+	spBuilder->setY( srVec.y );
+	spBuilder->setZ( srVec.z );
+}
+
+void NetHelper_WriteVec4( Vec4::Builder* spBuilder, const glm::vec4& srVec )
+{
+	spBuilder->setX( srVec.x );
+	spBuilder->setY( srVec.y );
+	spBuilder->setZ( srVec.z );
+	spBuilder->setW( srVec.w );
 }
 

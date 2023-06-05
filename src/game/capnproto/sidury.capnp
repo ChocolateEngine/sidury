@@ -191,6 +191,27 @@ struct NetCompModelPath
 }
 
 # only some stuff in here is actually networked
+struct NetCompLight
+{
+    type     @0 :Int32;  # TODO: MAKE AN ENUM
+    color    @1 :Vec4;
+
+    # TODO: this should not be here
+    # it should be attached to it's own entity that can be parented
+    # and that entity needs to contain the transform (or transform small) component
+    pos      @2 :Vec3;
+    ang      @3 :Vec3;
+
+    innerFov @4 :Float32;
+    outerFov @5 :Float32;
+    radius   @6 :Float32;
+    length   @7 :Float32;
+
+    shadow   @8 :Bool;
+    enabled  @9 :Bool;
+}
+
+# only some stuff in here is actually networked
 struct NetCompPlayerMoveData
 {
     moveType        @0 :EPlayerMoveType;

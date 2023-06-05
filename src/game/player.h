@@ -187,6 +187,12 @@ class PlayerMovement // : public ComponentSystem
 	CCamera*         apCamera    = nullptr;
 	CDirection*      apDir       = nullptr;
 
+	// CPhysShape*      apPhysShape = nullptr;
+	// CPhysObject*     apPhysObj   = nullptr;
+
+	IPhysicsShape*   apPhysShape = nullptr;
+	IPhysicsObject*  apPhysObj   = nullptr;
+
 	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;
 };
@@ -199,6 +205,12 @@ public:
 	~PlayerManager();
 
 	static void             RegisterComponents();
+
+	static void             CreateClient();
+	static void             CreateServer();
+
+	static void             DestroyClient();
+	static void             DestroyServer();
 
 	void                    Init();
 	void                    Create( Entity player );
@@ -216,25 +228,7 @@ public:
 };
 
 
-// class CL_PlayerManager: public System
-// {
-// public:
-// 	CL_PlayerManager();
-// 	~CL_PlayerManager();
-// 
-// 	void                    Init();
-// 	Entity                  Create();
-// 	void                    Spawn( Entity player );
-// 	void                    Respawn( Entity player );
-// 	void                    Update( float frameTime );  // ??
-// 
-// 	void                    UpdateView( CPlayerInfo& info, Entity player );
-// 	void                    DoMouseLook( Entity player );
-// 
-// 	std::vector< Entity > aPlayerList;
-// 	
-// 	PlayerMovement* apMove = nullptr;
-// };
+PlayerManager* GetPlayers();
 
 
 // convinence
@@ -245,9 +239,4 @@ inline auto GetTransform( Entity ent )      { return Ent_GetComponent< Transform
 inline auto GetCamera( Entity ent )         { return Ent_GetComponent< CCamera >( ent, "camera" ); }
 inline auto GetRigidBody( Entity ent )      { return Ent_GetComponent< CRigidBody >( ent, "rigidBody" ); }
 inline auto GetComp_Direction( Entity ent ) { return Ent_GetComponent< CDirection >( ent, "direction" ); }
-
-
-extern PlayerManager* players;
-// extern CL_PlayerManager* cl_players;
-// extern PlayerManager*    sv_players;
 

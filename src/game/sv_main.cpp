@@ -38,6 +38,12 @@ struct SV_ClientCommand_t
 static std::vector< SV_ClientCommand_t > gClientCommandQueue;
 
 
+CONCMD( pause )
+{
+	Game_SetPaused( !Game_IsPaused() );
+}
+
+
 int SV_Client_t::Read( char* spData, int sLen )
 {
 	return Net_Read( gServerSocket, spData, sLen, &aAddr );
@@ -144,16 +150,16 @@ void SV_GameUpdate( float frameTime )
 {
 	MapManager_Update();
 
-	players->Update( frameTime );
+	GetPlayers()->Update( frameTime );
 
-	Phys_Simulate( physenv, frameTime );
+	Phys_Simulate( GetPhysEnv(), frameTime );
 
 	// TEST_EntUpdate();
 
 	// stupid
-	for ( auto& player : players->aPlayerList )
+	for ( auto& player : GetPlayers()->aPlayerList )
 	{
-		players->apMove->UpdatePosition( player );
+		GetPlayers()->apMove->UpdatePosition( player );
 	}
 }
 
@@ -169,6 +175,10 @@ bool SV_StartServer()
 		return false;
 	}
 
+	PlayerManager::CreateServer();
+
+	Phys_CreateEnv( false );
+
 	gServerSocket = Net_OpenSocket( gTestServerPort );
 
 	if ( gServerSocket == CH_INVALID_SOCKET )
@@ -176,6 +186,8 @@ bool SV_StartServer()
 		Log_Error( gLC_Server, "Failed to Open Test Server\n" );
 		return false;
 	}
+
+	GetPlayers()->Init();
 
 	gServerData.aActive = true;
 	return true;
@@ -190,6 +202,9 @@ void SV_StopServer()
 	}
 
 	EntitySystem::DestroyServer();
+	PlayerManager::DestroyServer();
+
+	Phys_DestroyEnv( false );
 
 	gServerData.aActive = false;
 	gServerData.aClients.clear();
@@ -338,8 +353,9 @@ void SV_HandleMsg_UserCmd( SV_Client_t& srClient, NetMsgUserCmd::Reader& srReade
 	Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.aName.c_str() );
 
 	NetHelper_ReadVec3( srReader.getAngles(), srClient.aUserCmd.aAng );
-	srClient.aUserCmd.aButtons  = srReader.getButtons();
-	srClient.aUserCmd.aMoveType = static_cast< PlayerMoveType >( srReader.getMoveType() );
+	srClient.aUserCmd.aButtons    = srReader.getButtons();
+	srClient.aUserCmd.aFlashlight = srReader.getFlashlight();
+	srClient.aUserCmd.aMoveType   = static_cast< PlayerMoveType >( srReader.getMoveType() );
 }
 
 
@@ -463,7 +479,7 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 	vec_remove( gServerData.aClientsConnecting, &srClient );
 
 	// Spawn the player in!
-	players->Spawn( srClient.aEntity );
+	GetPlayers()->Spawn( srClient.aEntity );
 
 	// Reset the connection timer
 	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
@@ -484,7 +500,7 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	// Make an entity for them
 	client.aEntity      = GetEntitySystem()->CreateEntity();
 
-	players->Create( client.aEntity );
+	GetPlayers()->Create( client.aEntity );
 
 	// Send them the server info and new port
 	capnp::MallocMessageBuilder message;
@@ -501,98 +517,4 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 
 	gServerData.aClientsConnecting.push_back( &client );
 }
-
-
-// TODO: REMOVE ME
-#if 0
-void SV_CheckForNewClients()
-{
-	// Check for all incoming connections until none are left
-	while ( true )
-	{
-		Socket_t listenSocket = Net_CheckNewConnections();
-		if ( listenSocket == CH_INVALID_SOCKET )
-			break;
-
-		ch_sockaddr      clientAddr;
-		ChVector< char > data( 8192 );
-		int              len = Net_Read( listenSocket, data.data(), data.size(), &clientAddr );
-		
-		if ( len < 0 )
-			continue;
-
-		// HACK: check if this clientAddr is in the list of clients
-		bool hasClientAlready = false;
-		for ( auto& client : gServerData.aClients )
-		{
-			// if ( client.aAddr.sa_data == clientAddr.sa_data && client.aAddr.sa_family == clientAddr.sa_family )
-			// if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data ) == 0 && client.aAddr.sa_family == clientAddr.sa_family )
-			if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data, sizeof( client.aAddr.sa_data ) ) == 0 )
-			{
-				hasClientAlready = true;
-				break;
-			}
-		}
-
-		if ( hasClientAlready )
-			continue;
-
-		// Get Client Info
-		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-		NetMsgClientInfo::Reader      clientInfoRead = reader.getRoot< NetMsgClientInfo >();
-
-		// TODO: check to see if they are already connected?
-		// TODO: also check to see if we are at the max player count
-
-		// Open a new socket for them
-		// Socket_t                      newSocket      = Net_OpenSocket( "0" );
-
-		// Connect to them with a new socket to communicate with them on
-		// int ret = Net_Connect( newSocket, clientAddr );
-		// if ( ret != 0 )
-		// {
-		// 	Net_CloseSocket( newSocket );
-		// 	continue;
-		// }
-		
-		// Get the port of this new socket
-		// ch_sockaddr newAddr;
-		// Net_GetSocketAddr( newSocket, newAddr );
-		// int          newPort = Net_GetSocketPort( newAddr );
-
-		// Create a new client struct
-		SV_Client_t& client  = gServerData.aClients.emplace_back();
-		client.aName         = clientInfoRead.getName();
-		client.aAddr         = clientAddr;
-		client.aState        = ESV_ClientState_Connecting;
-
-		// Make an entity for them
-		client.aEntity       = GetEntitySystem()->CreateEntity();
-
-		players->Create( client.aEntity );
-
-		// Send them the server info and new port
-		capnp::MallocMessageBuilder message;
-		SV_BuildServerInfo( message );
-
-		NetMsgServerInfo::Builder serverInfo = message.getRoot< NetMsgServerInfo >();
-
-		// hack, tell the client to use switch over to this port
-		// serverInfo.setNewPort( newPort );
-		serverInfo.setPlayerEntityId( client.aEntity );
-
-		auto array = capnp::messageToFlatArray( message );
-
-		// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
-		int  write = Net_Write( listenSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &clientAddr );
-
-		// ChVector< char > tempTest;
-		// tempTest.push_back( 40 );
-
-		// client.Write( tempTest.begin(), tempTest.size() * sizeof( char ) );
-
-		gServerData.aClientsConnecting.push_back( &client );
-	}
-}
-#endif
 
