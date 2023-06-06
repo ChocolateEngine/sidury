@@ -123,10 +123,11 @@ void CL_Shutdown()
 {
 	CL_Disconnect();
 
-	EntitySystem::DestroyClient();
 	PlayerManager::DestroyClient();
 
 	Phys_DestroyEnv( true );
+
+	EntitySystem::DestroyClient();
 }
 
 
