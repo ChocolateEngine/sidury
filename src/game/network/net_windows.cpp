@@ -248,9 +248,99 @@ void Net_Shutdown()
 }
 
 
+bool Net_ParseIPv4NetAddr( NetAddr_t& srAddr, std::string_view sString )
+{
+	// Check for a port first
+	const char* portCheck = strstr( sString.data(), ":" );
+
+	if ( portCheck )
+	{
+		// is there actually something after the ":"?
+		auto remain = &sString.back() - portCheck;
+
+		if ( remain )
+		{
+			// parse the port
+			long num = 0;
+			if ( !ToLong3( portCheck + 1, num ) )
+			{
+				Log_WarnF( gLC_Network, "Failed to convert IPv4 Address Port to Integer: \"%s\"\n", portCheck + 1 );
+				return false;
+			}
+
+			srAddr.aPort = num;
+		}
+	}
+
+	const char* prev = sString.data();
+	const char* cur  = sString.data();
+
+	int         i    = 0;
+	for ( i = 0; i < 4; i++ )
+	{
+		if ( !prev )
+			break;
+
+		cur      = strstr( prev, "." );
+		std::string numStr;
+		
+		if ( cur )
+		{
+			numStr = std::string( prev, cur - prev );
+		}
+		else
+		{
+			if ( portCheck )
+			{
+				cur = strstr( prev, ":" );
+
+				if ( !cur )
+					break;
+
+				numStr = std::string( prev, cur - prev );
+			}
+			else if ( prev )
+			{
+				numStr = std::string( prev );
+			}
+		}
+		
+		long num = 0;
+		if ( !ToLong2( numStr, num ) )
+		{
+			Log_WarnF( gLC_Network, "Failed to convert part of IPv4 Address to Integer: \"%s\"\n", numStr.c_str() );
+			return false;
+		}
+
+		// Assign it
+		srAddr.aIPV4[ i ]  = num;
+
+		auto remain        = &sString.back() - cur;
+		if ( remain )
+		{
+			prev = cur + 1;
+		}
+		else
+		{
+			i++;
+			break;
+		}
+	}
+
+	if ( i != 4 )
+	{
+		Log_WarnF( gLC_Network, "Not all parts of IPv4 Address Found: \"%s\"\n", sString.data() );
+		return false;
+	}
+
+	return true;
+}
+
+
 NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
 {
 	NetAddr_t netAddr;
+	netAddr.aPort = 0;
 
 	if ( sString == "127.0.0.1" || sString == "localhost" )
 	{
@@ -264,7 +354,20 @@ NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
 		return netAddr;
 	}
 	
-	Log_Warn( gLC_Network, "FINISH Net_GetNetAddrFromString !!!!!\n" );
+	// TODO: support IPv6
+
+	const char* ipv4Test = strchr( sString.data(), '.' );
+
+	if ( ipv4Test )
+	{
+		if ( Net_ParseIPv4NetAddr( netAddr, sString ) )
+			netAddr.aType = ENetType_IP;
+	}
+	else
+	{
+		Log_Warn( gLC_Network, "TODO: Support IPV6 in Net_GetNetAddrFromString\n" );
+	}
+	
 	return netAddr;
 }
 

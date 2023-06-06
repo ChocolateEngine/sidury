@@ -361,18 +361,7 @@ bool CL_RecvServerInfo()
 	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
 	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
 
-	// hack, should not be part of this server info message, should be a message prior to this
-	// will set up later
-	// if ( serverInfoMsg.getNewPort() != -1 )
-	// {
-	// 	Net_SetSocketPort( gClientAddr, serverInfoMsg.getNewPort() );
-	// }
-
-	gClientServerData.aName                     = serverInfoMsg.getName();
-	gClientServerData.aMapName                  = serverInfoMsg.getMapName();
-	gClientState                                = EClientState_Connecting;
-
-	gLocalPlayer                                = serverInfoMsg.getPlayerEntityId();
+	CL_HandleMsg_ServerInfo( serverInfoMsg );
 
 	return true;
 }
@@ -389,6 +378,7 @@ bool CL_SendConVarIfClient( std::string_view sName, const std::vector< std::stri
 
 	return false;
 }
+
 
 void CL_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs )
 {
@@ -502,6 +492,11 @@ void CL_SendMessageToServer( EMsgSrcClient sSrcType )
 
 void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
 {
+	gClientServerData.aName    = srReader.getName();
+	gClientServerData.aMapName = srReader.getMapName();
+	gClientState               = EClientState_Connecting;
+
+	gLocalPlayer               = srReader.getPlayerEntityId();
 }
 
 
