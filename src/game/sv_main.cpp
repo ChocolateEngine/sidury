@@ -156,7 +156,8 @@ void SV_GameUpdate( float frameTime )
 
 	// TEST_EntUpdate();
 
-	// stupid
+	// Update player positions after physics simulation
+	// NOTE: This probably needs to be done for everything with physics
 	for ( auto& player : GetPlayers()->aPlayerList )
 	{
 		GetPlayers()->apMove->UpdatePosition( player );
@@ -239,7 +240,7 @@ void SV_BuildUpdatedData( capnp::MessageBuilder& srBuilder )
 	// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
 	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
 
-	Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
+	//Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
 }
 
 

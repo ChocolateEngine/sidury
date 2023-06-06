@@ -13,7 +13,13 @@
 #include "capnproto/sidury.capnp.h"
 
 
+LOG_REGISTER_CHANNEL2( Entity, LogColor::White );
+
+
 EntComponentRegistry_t gEntComponentRegistry;
+
+EntitySystem*          cl_entities                                     = nullptr;
+EntitySystem*          sv_entities                                     = nullptr;
 
 
 // void* EntComponentRegistry_Create( std::string_view sName )
@@ -34,75 +40,6 @@ EntComponentRegistry_t gEntComponentRegistry;
 EntCompVarTypeToEnum_t gEntCompVarToEnum[ EEntComponentVarType_Count ] = {
 	{ typeid( glm::vec3 ).hash_code(), EEntComponentVarType_Vec3 },
 };
-
-
-
-EntitySystem* cl_entities = nullptr;
-EntitySystem* sv_entities = nullptr;
-
-
-EntitySystem* GetEntitySystem()
-{
-	if ( Game_ProcessingClient() )
-	{
-		Assert( cl_entities );
-		return cl_entities;
-	}
-
-	Assert( sv_entities );
-	return sv_entities;
-}
-
-
-bool EntitySystem::CreateClient()
-{
-	Assert( !cl_entities );
-	if ( cl_entities )
-		return false;
-
-	cl_entities = new EntitySystem;
-	return cl_entities->Init();
-}
-
-
-bool EntitySystem::CreateServer()
-{
-	Assert( !sv_entities );
-	if ( sv_entities )
-		return false;
-
-	sv_entities = new EntitySystem;
-	return sv_entities->Init();
-}
-
-
-void EntitySystem::DestroyClient()
-{
-	if ( cl_entities )
-	{
-		// Make sure it's shut down
-		cl_entities->Shutdown();
-		delete cl_entities;
-	}
-
-	cl_entities = nullptr;
-}
-
-
-void EntitySystem::DestroyServer()
-{
-	if ( sv_entities )
-	{
-		// Make sure it's shut down
-		sv_entities->Shutdown();
-		delete sv_entities;
-	}
-
-	sv_entities = nullptr;
-}
-
-
-// -------------------------------------------------------------
 
 
 const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType )
@@ -265,113 +202,280 @@ std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntCo
 }
 
 
-CONCMD( ent_dump_registry )
+void EntComp_AddRegisterCallback( FEntComp_Register* spFunc )
 {
-	LogGroup group = Log_GroupBegin();
+	AssertMsg( spFunc, "Trying to register nullptr for a Entity Component Register Callback\n" );
 
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
-	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
-
-	for ( const auto& [ name, regData ] : gEntComponentRegistry.aComponentNames )
+	if ( !spFunc )
 	{
-		Assert( regData );
-
-		if ( !regData )
-			continue;
-
-		Log_GroupF( group, "\nComponent: %s\n", regData->apName );
-		Log_GroupF( group, "   Override Client: %s\n", regData->aOverrideClient ? "TRUE" : "FALSE" );
-		Log_GroupF( group, "   Networking Type: %s\n", EntComp_NetTypeToStr( regData->aNetType ) );
-		Log_GroupF( group, "   Has Write:       %s\n", regData->apWrite ? "TRUE" : "FALSE" );
-		Log_GroupF( group, "   Has Read:        %s\n", regData->apRead ? "TRUE" : "FALSE" );
-		Log_GroupF( group, "   Variable Count:  %zd\n", regData->aVars.size() );
-
-		for ( const auto & [ offset, var ] : regData->aVars )
-		{
-			Log_GroupF( group, "       %s - %s\n", EntComp_VarTypeToStr( var.aType ), var.apName );
-		}
+		Log_Warn( gLC_Entity, "Trying to register nullptr for a Entity Component Register Callback\n" );
+		return;
 	}
 
-	Log_GroupEnd( group );
+	gEntComponentRegistry.aCallbacks.push_back( spFunc );
 }
 
 
-CONCMD( ent_dump )
+void EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc )
 {
-	bool useServer = false;
-
-	if ( Game_IsHosting() && Game_ProcessingClient() )
+	size_t index = vec_index( gEntComponentRegistry.aCallbacks, spFunc );
+	if ( index != SIZE_MAX )
 	{
-		// We have access to the server's entity system, so if we want it, use that
-		if ( args.size() > 0 && args[ 0 ] == "server" )
-		{
-			useServer = true;
-			Game_SetClient( false );
-		}
+		gEntComponentRegistry.aCallbacks.erase( gEntComponentRegistry.aCallbacks.begin() + index );
 	}
-
-	LogGroup group = Log_GroupBegin();
-
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
-
-	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
-
-	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	else
 	{
-		Assert( pool );
-
-		if ( !pool )
-			continue;
-
-		Log_GroupF( group, "Component Pool: %s - %zd Components in Pool\n", name.data(), pool->GetCount() );
-	}
-
-	Log_GroupF( group, "Components: %zd\n", GetEntitySystem()->aComponentPools.size() );
-
-	for ( Entity i = 0; i < GetEntitySystem()->aEntityCount; i++ )
-	{
-		Entity entity = GetEntitySystem()->aUsedEntities[ i ];
-
-		// this is the worst thing ever
-		std::vector< IEntityComponentPool* > pools;
-
-		// Find all component pools that contain this Entity
-		// That means the Entity has the type of component that pool is for
-		for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
-		{
-			if ( pool->Contains( entity ) )
-				pools.push_back( pool );
-		}
-
-		Log_GroupF( group, "\nEntity %zd\n", entity );
-		// Log_GroupF( group, "    Predicted: %s\n", GetEntitySystem() );
-
-		for ( IEntityComponentPool* pool : pools )
-		{
-			auto data    = pool->GetData( entity );
-			auto regData = pool->GetRegistryData();
-
-			Log_GroupF( group, "\n    Component: %s\n", regData->apName );
-			Log_GroupF( group,   "    Predicted: %s\n", pool->IsPredicted( entity ) ? "TRUE" : "FALSE" );
-
-			for ( const auto& [ offset, var ] : regData->aVars )
-			{
-				Log_GroupF( group, "        %s = %s\n", var.apName, EntComp_GetStrValueOfVarOffset( offset, data, var.aType ).c_str() );
-			}
-		}
-	}
-
-	Log_GroupEnd( group );
-
-	// Make sure to reset this
-	if ( useServer )
-	{
-		Game_SetClient( true );
+		Log_Warn( gLC_Entity, "Trying to remove component register callback that was isn't registered\n" );
 	}
 }
 
 
-// -------------------------------------------------------------
+void EntComp_RunRegisterCallbacks( const char* spName )
+{
+	for ( auto callback : gEntComponentRegistry.aCallbacks )
+	{
+		callback( spName );
+	}
+}
+
+
+// ===================================================================================
+// Entity Component Pool
+// ===================================================================================
+
+
+EntityComponentPool::EntityComponentPool()
+{
+	aCount = 0;
+}
+
+
+EntityComponentPool::~EntityComponentPool()
+{
+	for ( auto& [ entity, component ] : aMapEntityToComponent )
+	{
+		Remove( entity );
+	}
+}
+
+
+bool EntityComponentPool::Init( const char* spName )
+{
+	apName  = spName;
+
+	// Get Creation and Free functions
+	auto it = gEntComponentRegistry.aComponentNames.find( apName );
+
+	if ( it == gEntComponentRegistry.aComponentNames.end() )
+	{
+		Log_FatalF( gLC_Entity, "Component not registered: \"%s\"\n", apName );
+		return false;
+	}
+
+	Assert( it->second->aFuncNew );
+	Assert( it->second->aFuncFree );
+
+	aFuncNew  = it->second->aFuncNew;
+	aFuncFree = it->second->aFuncFree;
+
+	apData    = it->second;
+
+	return true;
+}
+
+
+// Get Component Registry Data
+EntComponentData_t* EntityComponentPool::GetRegistryData()
+{
+	return gEntComponentRegistry.aComponentNames[ apName ];
+}
+
+
+// Does this pool contain a component for this entity?
+bool EntityComponentPool::Contains( Entity entity )
+{
+	auto it = aMapEntityToComponent.find( entity );
+	return ( it != aMapEntityToComponent.end() );
+}
+
+
+void EntityComponentPool::EntityDestroyed( Entity entity )
+{
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it != aMapEntityToComponent.end() )
+	{
+		Remove( entity );
+	}
+}
+
+
+// Adds This component to the entity
+void* EntityComponentPool::Create( Entity entity )
+{
+	// Is this a client or server component pool?
+	// Make sure this component can be created on it
+
+	aMapComponentToEntity[ aCount ] = entity;
+	aMapEntityToComponent[ entity ] = aCount;
+
+	void* data                      = aFuncNew();
+
+	aComponents[ aCount++ ]         = data;
+
+	// TODO: use malloc and use that pointer in the constructor for this
+	// use placement new
+	// https://stackoverflow.com/questions/2494471/c-is-it-possible-to-call-a-constructor-directly-without-new
+
+	return data;
+}
+
+
+// Removes this component from the entity
+void EntityComponentPool::Remove( Entity entity )
+{
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it == aMapEntityToComponent.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to remove component from entity - \"%s\"\n", apName );
+		return;
+	}
+
+	size_t index = it->second;
+	aMapComponentToEntity.erase( index );
+	aMapEntityToComponent.erase( it );
+
+	void* data = aComponents[ index ];
+	Assert( data );
+
+	aFuncFree( data );
+
+	aCount--;
+}
+
+
+// Gets the data for this component
+void* EntityComponentPool::GetData( Entity entity )
+{
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it != aMapEntityToComponent.end() )
+	{
+		size_t index = it->second;
+		// return &aComponents[ index ];
+		return aComponents[ index ];
+	}
+
+	return nullptr;
+}
+
+
+// Marks this component as predicted
+void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
+{
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it == aMapEntityToComponent.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to mark Entity Component as predicted, Entity does not have this component - \"%s\"\n", apName );
+		return;
+	}
+
+	if ( sPredicted )
+	{
+		// We want this component predicted, add it to the prediction set
+		aPredicted.emplace( entity );
+	}
+	else
+	{
+		// We don't want this component predicted, remove it from the prediction set if it exists
+		auto find = aPredicted.find( entity );
+		if ( find != aPredicted.end() )
+			aPredicted.erase( find );
+	}
+}
+
+
+bool EntityComponentPool::IsPredicted( Entity entity )
+{
+	// If the entity is in this set, then this component is predicted
+	auto it = aPredicted.find( entity );
+	return ( it != aPredicted.end() );
+}
+
+
+// How Many Components are in this Pool?
+size_t EntityComponentPool::GetCount()
+{
+	return aCount;
+}
+
+
+// ===================================================================================
+// Entity System
+// ===================================================================================
+
+
+EntitySystem* GetEntitySystem()
+{
+	if ( Game_ProcessingClient() )
+	{
+		Assert( cl_entities );
+		return cl_entities;
+	}
+
+	Assert( sv_entities );
+	return sv_entities;
+}
+
+
+bool EntitySystem::CreateClient()
+{
+	Assert( !cl_entities );
+	if ( cl_entities )
+		return false;
+
+	cl_entities = new EntitySystem;
+	return cl_entities->Init();
+}
+
+
+bool EntitySystem::CreateServer()
+{
+	Assert( !sv_entities );
+	if ( sv_entities )
+		return false;
+
+	sv_entities = new EntitySystem;
+	return sv_entities->Init();
+}
+
+
+void EntitySystem::DestroyClient()
+{
+	if ( cl_entities )
+	{
+		// Make sure it's shut down
+		cl_entities->Shutdown();
+		delete cl_entities;
+	}
+
+	cl_entities = nullptr;
+}
+
+
+void EntitySystem::DestroyServer()
+{
+	if ( sv_entities )
+	{
+		// Make sure it's shut down
+		sv_entities->Shutdown();
+		delete sv_entities;
+	}
+
+	sv_entities = nullptr;
+}
 
 
 bool EntitySystem::Init()
@@ -397,18 +501,21 @@ void EntitySystem::Shutdown()
 
 void EntitySystem::CreateComponentPools()
 {
-	// i can't create component pools without passing template in ffs
-	// Log_Error( " *** CREATE ENTITY COMPONENT POOLS *** \n" );
-#if COMPONENT_POOLS_TEMP
-	
 	// iterate through all registered components and create a component pool for them
 	// NOTE: this will not account for components registered later on
 	for ( auto& [ name, componentData ] : gEntComponentRegistry.aComponentNames )
 	{
-		EntityComponentPool* pool  = new EntityComponentPool( name.data() );
+		EntityComponentPool* pool = new EntityComponentPool;
+
+		if ( !pool->Init( name.data() ) )
+		{
+			Log_ErrorF( gLC_Entity, "Failed to create component pool for \"%s\"", name.data() );
+			delete pool;
+			continue;
+		}
+		
 		aComponentPools[ name ] = pool;
 	}
-#endif
 }
 
 
@@ -469,7 +576,7 @@ Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
 
 	if ( index == SIZE_MAX )
 	{
-		Log_Error( "Entity ID from Server is already taken on Client\n" );
+		Log_Error( gLC_Entity, "Entity ID from Server is already taken on Client\n" );
 		return CH_ENT_INVALID;
 	}
 
@@ -535,8 +642,9 @@ void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
 }
 
 
-// TODO: probably rethink this so it's a list of components on their own, not a list of entities to update everything on
-// though we should have some sort of system to detect whether it's dirty or not
+// TODO: redo this by having it loop through component pools, and not entitys
+// right now, it's doing a lot of entirely unnecessary checks
+// we can avoid those if we loop through the pools instead
 void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 {
 	Assert( aEntityCount == aUsedEntities.size() );
@@ -552,7 +660,8 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 		update.setId( entity );
 
 		// this is the worst thing ever
-		std::vector< IEntityComponentPool* > pools;
+		std::vector< EntityComponentPool* > pools;
+		pools.reserve( aComponentPools.size() );
 
 		// Find all component pools that contain this Entity
 		// That means the Entity has the type of component that pool is for
@@ -615,7 +724,7 @@ void* EntitySystem::AddComponent( Entity entity, const char* spName )
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( "Failed to create component - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to create component - no component pool found: \"%s\"\n", spName );
 		return nullptr;
 	}
 
@@ -637,7 +746,7 @@ void* EntitySystem::GetComponent( Entity entity, const char* spName )
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( "Failed to get component - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to get component - no component pool found: \"%s\"\n", spName );
 		return nullptr;
 	}
 
@@ -652,7 +761,7 @@ void EntitySystem::RemoveComponent( Entity entity, const char* spName )
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( "Failed to remove component - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to remove component - no component pool found: \"%s\"\n", spName );
 		return;
 	}
 
@@ -666,7 +775,7 @@ void EntitySystem::SetComponentPredicted( Entity entity, const char* spName, boo
 	if ( this == sv_entities )
 	{
 		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( "Tried to mark entity component as predicted on server - \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Tried to mark entity component as predicted on server - \"%s\"\n", spName );
 		return;
 	}
 
@@ -674,7 +783,7 @@ void EntitySystem::SetComponentPredicted( Entity entity, const char* spName, boo
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( "Failed to set component prediction - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to set component prediction - no component pool found: \"%s\"\n", spName );
 		return;
 	}
 
@@ -688,7 +797,7 @@ bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
 	if ( this == sv_entities )
 	{
 		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( "Tried to find a predicted entity component on server - \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Tried to find a predicted entity component on server - \"%s\"\n", spName );
 		return false;
 	}
 
@@ -696,7 +805,7 @@ bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( "Failed to get component prediction - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to get component prediction - no component pool found: \"%s\"\n", spName );
 		return false;
 	}
 
@@ -704,14 +813,125 @@ bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
 }
 
 
-IEntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
+EntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
 {
 	auto it = aComponentPools.find( spName );
 
 	if ( it == aComponentPools.end() )
-		Log_FatalF( "Component not registered before use: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Component not registered before use: \"%s\"\n", spName );
 
 	return it->second;
+}
+
+
+// ===================================================================================
+// Console Commands
+// ===================================================================================
+
+
+CONCMD( ent_dump_registry )
+{
+	LogGroup group = Log_GroupBegin( gLC_Entity );
+
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+
+	for ( const auto& [ name, regData ] : gEntComponentRegistry.aComponentNames )
+	{
+		Assert( regData );
+
+		if ( !regData )
+			continue;
+
+		Log_GroupF( group, "\nComponent: %s\n", regData->apName );
+		Log_GroupF( group, "   Override Client: %s\n", regData->aOverrideClient ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Networking Type: %s\n", EntComp_NetTypeToStr( regData->aNetType ) );
+		Log_GroupF( group, "   Has Write:       %s\n", regData->apWrite ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Has Read:        %s\n", regData->apRead ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Variable Count:  %zd\n", regData->aVars.size() );
+
+		for ( const auto& [ offset, var ] : regData->aVars )
+		{
+			Log_GroupF( group, "       %s - %s\n", EntComp_VarTypeToStr( var.aType ), var.apName );
+		}
+	}
+
+	Log_GroupEnd( group );
+}
+
+
+CONCMD( ent_dump )
+{
+	bool useServer = false;
+
+	if ( Game_IsHosting() && Game_ProcessingClient() )
+	{
+		// We have access to the server's entity system, so if we want it, use that
+		if ( args.size() > 0 && args[ 0 ] == "server" )
+		{
+			useServer = true;
+			Game_SetClient( false );
+		}
+	}
+
+	LogGroup group = Log_GroupBegin( gLC_Entity );
+
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+
+	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+
+	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	{
+		Assert( pool );
+
+		if ( !pool )
+			continue;
+
+		Log_GroupF( group, "Component Pool: %s - %zd Components in Pool\n", name.data(), pool->GetCount() );
+	}
+
+	Log_GroupF( group, "Components: %zd\n", GetEntitySystem()->aComponentPools.size() );
+
+	for ( Entity i = 0; i < GetEntitySystem()->aEntityCount; i++ )
+	{
+		Entity                              entity = GetEntitySystem()->aUsedEntities[ i ];
+
+		// this is the worst thing ever
+		std::vector< EntityComponentPool* > pools;
+
+		// Find all component pools that contain this Entity
+		// That means the Entity has the type of component that pool is for
+		for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+		{
+			if ( pool->Contains( entity ) )
+				pools.push_back( pool );
+		}
+
+		Log_GroupF( group, "\nEntity %zd\n", entity );
+		// Log_GroupF( group, "    Predicted: %s\n", GetEntitySystem() );
+
+		for ( EntityComponentPool* pool : pools )
+		{
+			auto data    = pool->GetData( entity );
+			auto regData = pool->GetRegistryData();
+
+			Log_GroupF( group, "\n    Component: %s\n", regData->apName );
+			Log_GroupF( group, "    Predicted: %s\n", pool->IsPredicted( entity ) ? "TRUE" : "FALSE" );
+
+			for ( const auto& [ offset, var ] : regData->aVars )
+			{
+				Log_GroupF( group, "        %s = %s\n", var.apName, EntComp_GetStrValueOfVarOffset( offset, data, var.aType ).c_str() );
+			}
+		}
+	}
+
+	Log_GroupEnd( group );
+
+	// Make sure to reset this
+	if ( useServer )
+	{
+		Game_SetClient( true );
+	}
 }
 
 
@@ -1092,227 +1312,3 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckTime, duckTime );
 }
 
-
-// maybe some static component registering
-// gEC stands for "global entity component"
-// static gEC_RigidBody = Entity_RegisterComponent< CRigidBody >();
-// 
-// Each component has it's own memory pool
-// Now for getting components, this could happen:
-// 
-// CRigidBody* rigidBody = nullptr;
-// bool found = Entity_GetComponent( player, gEC_RigidBody, &rigidBody );
-// 
-// Handle compHandle = Entity_AddComponent( player, gEC_RigidBody, rigidBody );
-// 
-// data you can write to is stored in rigidBody as an output pointer
-// Handle compHandle = Entity_CreateComponent( player, gEC_RigidBody, &rigidBody );
-// 
-// Still no such thing as multiple components
-// Maybe what you can do instead is multiple entities parented to one? idk
-// 
-// Or if you still want it, do this
-// size_t count = Entity_GetComponentCount( player, gEC_RigidBody );
-// bool found   = Entity_GetComponents( player, gEC_RigidBody, &rigidBody, count );
-// 
-// -----------------------------------------------------------
-// 
-// But what about for an editor?
-// It needs to know the data in the components so it can modify them
-// Maybe do some weird thing with static initilization
-// Or go the C route, and just have some functions and structs for defining component data types
-// 
-// there has to be some way to manage these data types
-// like something to manage vec3's, mat4's, etc.
-// or maybe just only allow certain types internally
-// probably do that, yeah
-// ChVector's will be funny though (no std::vector allowed)
-// 
-// use the typeinfo to determine what to do with this and how it shows in the editor
-// Entity_RegisterComponentVar( offset, size, name, typeinfo );
-//
-
-#if 0
-
-int EntityManager::Init()
-{
-	// Initialize the queue with all possible entity IDs
-	for (Entity entity = 0; entity < MAX_ENTITIES; ++entity)
-		aEntityPool.push(entity);
-
-	// Register Base Components
-	RegisterComponent< Transform >();
-	RegisterComponent< TransformSmall >();
-	
-	// uhhhhh
-	RegisterComponent< Handle >();
-	RegisterComponent< HModel >();
-	RegisterComponent< CRenderable_t >();
-
-	RegisterComponent< Light_t* >();
-
-	//RegisterComponent< ModelData >();  // doesn't like this
-	RegisterComponent< CRigidBody >();
-	RegisterComponent< CGravity >();
-	RegisterComponent< CCamera >();
-	RegisterComponent< CSound >();
-	RegisterComponent< CDirection >();
-
-#if 1
-	RegisterComponent< IPhysicsShape* >();
-	RegisterComponent< IPhysicsObject* >();
-
-	// HACK HACK HACK
-	// so this ECS doesn't support multiple of the same component on this,
-	// so i'll just allow a vector of these physics objects for now
-	// RegisterComponent< std::vector<PhysicsObject*> >();
-#endif
-
-	return 0;
-}
-
-
-Entity EntityManager::CreateEntity()
-{
-	assert(aEntityCount < MAX_ENTITIES && "Too many entities in existence.");
-
-	// Take an ID from the front of the queue
-	Entity id = aEntityPool.front();
-	aEntityPool.pop();
-	++aEntityCount;
-
-	return id;
-}
-
-
-void EntityManager::DeleteEntity( Entity ent )
-{
-	assert(ent < MAX_ENTITIES && "Entity out of range.");
-
-	// Invalidate the destroyed entity's signature
-	aSignatures[ent].reset();
-
-	// Put the destroyed ID at the back of the queue
-	aEntityPool.push(ent);
-	--aEntityCount;
-
-	// Notify each component array that an entity has been destroyed
-	// If it has a component for that entity, it will remove it
-	for (auto const& pair : aComponentArrays)
-	{
-		auto const& component = pair.second;
-
-		component->EntityDestroyed( ent );
-	}
-
-	// Erase a destroyed entity from all system lists
-	// mEntities is a set so no check needed
-	for (auto const& pair : aSystems)
-	{
-		auto const& system = pair.second;
-
-		system->aEntities.erase( ent );
-	}
-}
-
-
-void EntityManager::SetSignature( Entity ent, Signature sig )
-{
-	assert(ent < MAX_ENTITIES && "Entity out of range.");
-
-	// Put this entity's signature into the array
-	aSignatures[ent] = sig;
-}
-
-
-Signature EntityManager::GetSignature( Entity ent )
-{
-	assert(ent < MAX_ENTITIES && "Entity out of range.");
-
-	// Get this entity's signature from the array
-	return aSignatures[ent];
-}
-
-
-void EntityManager::EntitySignatureChanged( Entity ent, Signature entSig )
-{
-	// Notify each system that an entity's signature changed
-	for (auto const& pair : aSystems)
-	{
-		auto const& type = pair.first;
-		auto const& system = pair.second;
-		auto const& systemSignature = aSystemSignatures[type];
-
-		// Entity signature matches system signature - insert into set
-		if ((entSig & systemSignature) == systemSignature)
-		{
-			system->aEntities.insert(ent);
-		}
-		// Entity signature does not match system signature - erase from set
-		else
-		{
-			system->aEntities.erase(ent);
-		}
-	}
-}
-
-
-#if 0
-template<typename T>
-void ComponentArray<T>::InsertData( Entity entity, T component )
-{
-	assert( aEntityToIndexMap.find(entity) == aEntityToIndexMap.end() && "Component added to same entity more than once." );
-
-	// Put new entry at end and update the maps
-	size_t newIndex = aSize;
-	aEntityToIndexMap[entity] = newIndex;
-	aIndexToEntityMap[newIndex] = entity;
-	aComponentArray[newIndex] = component;
-	++aSize;
-}
-
-
-template<typename T>
-void ComponentArray<T>::RemoveData( Entity entity )
-{
-	assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Removing non-existent component." );
-
-	// Copy element at end into deleted element's place to maintain density
-	size_t indexOfRemovedEntity = aEntityToIndexMap[entity];
-	size_t indexOfLastElement = aSize - 1;
-	aComponentArray[indexOfRemovedEntity] = aComponentArray[indexOfLastElement];
-
-	// Update map to point to moved spot
-	Entity entityOfLastElement = aIndexToEntityMap[indexOfLastElement];
-	aEntityToIndexMap[entityOfLastElement] = indexOfRemovedEntity;
-	aIndexToEntityMap[indexOfRemovedEntity] = entityOfLastElement;
-
-	aEntityToIndexMap.erase(entity);
-	aIndexToEntityMap.erase(indexOfLastElement);
-
-	--aSize;
-}
-
-
-template<typename T>
-T& ComponentArray<T>::GetData( Entity entity )
-{
-	assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Retrieving non-existent component." );
-
-	// Return a reference to the entity's component
-	return aComponentArray[aEntityToIndexMap[entity]];
-}
-
-
-template<typename T>
-void ComponentArray<T>::EntityDestroyed( Entity entity )
-{
-	if ( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() )
-	{
-		// Remove the entity's component if it existed
-		RemoveData(entity);
-	}
-}
-#endif
-
-#endif

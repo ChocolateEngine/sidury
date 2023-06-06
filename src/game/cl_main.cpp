@@ -520,7 +520,7 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 				}
 			}
 
-			IEntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
+			EntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
 
 			if ( !pool )
 			{

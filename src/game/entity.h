@@ -36,9 +36,6 @@ constexpr Entity        CH_ENT_INVALID  = SIZE_MAX;
 
 constexpr ComponentType MAX_COMPONENTS  = 64;
 
-// uh, idk
-using Signature = std::bitset<MAX_COMPONENTS>;
-
 #define COMPONENT_POOLS 1
 #define COMPONENT_POOLS_TEMP 1
 
@@ -72,11 +69,17 @@ using Signature = std::bitset<MAX_COMPONENTS>;
 // template< typename T >
 // using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const T& srData );
 
+// Functions for creating and freeing components
 using FEntComp_New       = std::function< void*() >;
 using FEntComp_Free      = std::function< void( void* spData ) >;
 
+// Functions for serializing and deserializing Components with Cap'n Proto
 using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
 using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const void* spData );
+
+// Callback Function for when a new component is registered at runtime
+// Used for creating a new component pool for client and/or server entity system
+using FEntComp_Register  = void( const char* spName );
 
 using FEntComp_VarCopy   = void( void* spSrc, size_t sOffset, void* spOut );
 
@@ -124,6 +127,19 @@ enum EEntComponentNetType
 };
 
 
+enum EEntityCreateState
+{
+	// Entity still exists
+	EEntityCreateState_None,
+
+	// Entity was just created
+	EEntityCreateState_Created,
+
+	// Entity was destroyed and is queued for removal
+	EEntityCreateState_Destroyed,
+};
+
+
 // Var Data for a component
 struct EntComponentVarData_t
 {
@@ -147,7 +163,7 @@ struct EntComponentData_t
 	FEntComp_ReadFunc*                                  apRead;
 	FEntComp_WriteFunc*                                 apWrite;
 	
-	bool                                                aOverrideClient;
+	bool                                                aOverrideClient;  // probably temporary until prediction
 	EEntComponentNetType                                aNetType;
 
 	FEntComp_New                                        aFuncNew;
@@ -201,212 +217,63 @@ struct EntComponentRegistry_t
 
 	// [type hash of var] = Var Type Enum
 	std::unordered_map< size_t, EEntComponentVarType >          aVarTypes;
+
+	// Callback Functions for when a new component is registered at runtime
+	// Used for creating a new component pool for client and/or server entity system
+	std::vector< FEntComp_Register* >                           aCallbacks;
+};
+
+
+struct EntCompVarTypeToEnum_t
+{
+	size_t               aHashCode;
+	EEntComponentVarType aType;
 };
 
 
 extern EntComponentRegistry_t gEntComponentRegistry;
 
 // void* EntComponentRegistry_Create( std::string_view sName );
+// void* EntComponentRegistry_GetVarHandler();
 
-void* EntComponentRegistry_GetVarHandler();
 
-
-class IEntityComponentPool
+class EntityComponentPool
 {
   public:
-	virtual ~IEntityComponentPool()                                            = default;
+	EntityComponentPool();
+	~EntityComponentPool();
 
 	// Called whenever an entity is destroyed on all Component Pools
-	virtual bool                Init( const char* spName )                     = 0;
+	bool                                 Init( const char* spName );
 
 	// Get Component Registry Data
-	virtual EntComponentData_t* GetRegistryData()                              = 0;
+	EntComponentData_t*                  GetRegistryData();
 
 	// Does this pool contain a component for this entity?
-	virtual bool                Contains( Entity entity )                      = 0;
+	bool                                 Contains( Entity entity );
 
 	// Called whenever an entity is destroyed on all Component Pools
-	virtual void                EntityDestroyed( Entity entity )               = 0;
+	void                                 EntityDestroyed( Entity entity );
 
 	// Adds This component to the entity
-	virtual void*               Create( Entity entity )                        = 0;
+	void*                                Create( Entity entity );
 
 	// Removes this component from the entity
-	virtual void                Remove( Entity entity )                        = 0;
+	void                                 Remove( Entity entity );
 
 	// Gets the data for this component
-	virtual void*               GetData( Entity entity )                       = 0;
+	void*                                GetData( Entity entity );
 
 	// Marks this component as predicted
-	virtual void                SetPredicted( Entity entity, bool sPredicted ) = 0;
+	void                                 SetPredicted( Entity entity, bool sPredicted );
 
 	// Is this component predicted for this Entity?
-	virtual bool                IsPredicted( Entity entity )                   = 0;
+	bool                                 IsPredicted( Entity entity );
 
 	// How Many Components are in this Pool?
-	virtual size_t              GetCount()                                     = 0;
-};
+	size_t                               GetCount();
 
-
-class EntityComponentPool : public IEntityComponentPool
-{
-  public:
-	EntityComponentPool( const char* spName )
-	{
-		aCount = 0;
-		Init( spName );
-	}
-
-	virtual ~EntityComponentPool()
-	{
-		for ( auto& [ entity, component ] : aMapEntityToComponent )
-		{
-			Remove( entity );
-		}
-	}
-
-	virtual bool Init( const char* spName ) override
-	{
-		apName  = spName;
-
-		// Get Creation and Free functions
-		auto it = gEntComponentRegistry.aComponentNames.find( apName );
-
-		if ( it == gEntComponentRegistry.aComponentNames.end() )
-		{
-			Log_FatalF( "Component not registered: \"%s\"\n", apName );
-			return false;
-		}
-
-		Assert( it->second->aFuncNew );
-		Assert( it->second->aFuncFree );
-
-		aFuncNew  = it->second->aFuncNew;
-		aFuncFree = it->second->aFuncFree;
-
-		apData    = it->second;
-
-		return true;
-	}
-
-	// Get Component Registry Data
-	virtual EntComponentData_t* GetRegistryData() override
-	{
-		return gEntComponentRegistry.aComponentNames[ apName ];
-	}
-
-	// Does this pool contain a component for this entity?
-	virtual bool Contains( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-		return ( it != aMapEntityToComponent.end() );
-	}
-
-	virtual void EntityDestroyed( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it != aMapEntityToComponent.end() )
-		{
-			Remove( entity );
-		}
-	}
-
-	// Adds This component to the entity
-	virtual void* Create( Entity entity ) override
-	{
-		// Is this a client or server component pool?
-		// Make sure this component can be created on it
-
-		aMapComponentToEntity[ aCount ] = entity;
-		aMapEntityToComponent[ entity ] = aCount;
-
-		void* data                      = aFuncNew();
-
-		aComponents[ aCount++ ]         = data;
-
-		// TODO: use malloc and use that pointer in the constructor for this
-		// use placement new
-		// https://stackoverflow.com/questions/2494471/c-is-it-possible-to-call-a-constructor-directly-without-new
-
-		return data;
-	}
-
-	// Removes this component from the entity
-	virtual void Remove( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it == aMapEntityToComponent.end() )
-		{
-			Log_ErrorF( "Failed to remove component from entity - \"%s\"\n", apName );
-			return;
-		}
-
-		size_t index = it->second;
-		aMapComponentToEntity.erase( index );
-		aMapEntityToComponent.erase( it );
-
-		void* data = aComponents[ index ];
-		Assert( data );
-
-		aFuncFree( data );
-
-		aCount--;
-	}
-
-	// Gets the data for this component
-	virtual void* GetData( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it != aMapEntityToComponent.end() )
-		{
-			size_t index = it->second;
-			// return &aComponents[ index ];
-			return aComponents[ index ];
-		}
-
-		return nullptr;
-	}
-
-	// Marks this component as predicted
-	virtual void SetPredicted( Entity entity, bool sPredicted ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it == aMapEntityToComponent.end() )
-		{
-			Log_ErrorF( "Failed to mark Entity Component as predicted, Entity does not have this component - \"%s\"\n", apName );
-			return;
-		}
-
-		if ( sPredicted )
-		{
-			// We want this component predicted, add it to the prediction set
-			aPredicted.emplace( entity );
-		}
-		else
-		{
-			// We don't want this component predicted, remove it from the prediction set if it exists
-			auto find = aPredicted.find( entity );
-			if ( find != aPredicted.end() )
-				aPredicted.erase( find );
-		}
-	}
-
-	virtual bool IsPredicted( Entity entity ) override
-	{
-		// If the entity is in this set, then this component is predicted
-		auto it = aPredicted.find( entity );
-		return ( it != aPredicted.end() );
-	}
-
-	// How Many Components are in this Pool?
-	virtual size_t GetCount() override
-	{
-		return aCount;
-	}
+	// ------------------------------------------------------------------
 
 	// Map Component Index to Entity
 	std::unordered_map< size_t, Entity > aMapComponentToEntity;
@@ -434,83 +301,17 @@ class EntityComponentPool : public IEntityComponentPool
 	EntComponentData_t*                  apData;
 };
 
-#if 0
-// AAAAAAAAAAAAAA THIS WONT WORK !!!!!
-// when an entity system is created, it will need to make these component pools
-// but they require a template argument for it's creation
-// and the components are not registered in the entity system, so uh
-template< typename T >
-class EntityComponentPool : public IEntityComponentPool
-{
-  public:
-	virtual ~EntityComponentPool()
-	{
-	}
 
-	virtual void EntityDestroyed( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-		
-		if ( it != aMapEntityToComponent.end() )
-		{
-			Remove( entity );
-		}
-	}
+const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType );
+const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType );
+std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType );
+std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntComponentVarType sVarType );
 
-	// Adds This component to the entity
-	virtual void* Create( Entity entity ) override
-	{
-		aMapComponentToEntity[ aCount ] = entity;
-		aMapEntityToComponent[ entity ] = aCount;
+void        EntComp_AddRegisterCallback( FEntComp_Register* spFunc );
+void        EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc );
+void        EntComp_RunRegisterCallbacks( const char* spName );
 
-		return &aComponents[ aCount++ ];
-	}
-
-	// Removes this component from the entity
-	virtual void Remove( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it == aMapEntityToComponent.end() )
-		{
-			Log_Error( "Failed to remove component from entity\n" );
-		}
-
-		size_t index = it->second;
-		aMapComponentToEntity.erase( index );
-		aMapEntityToComponent.erase( it );
-
-		aCount--;
-	}
-
-	// Gets the data for this component
-	virtual void* GetData( Entity entity ) override
-	{
-		auto it = aMapEntityToComponent.find( entity );
-
-		if ( it != aMapEntityToComponent.end() )
-		{
-			size_t index = it->second;
-			return &aComponents[ index ];
-		}
-
-		return nullptr;
-	}
-
-	// Map Component Index to Entity
-	std::unordered_map< size_t, Entity > aMapComponentToEntity;
-
-	// Map Entity to Component Index
-	std::unordered_map< Entity, size_t > aMapEntityToComponent;
-
-	// Memory Pool of Components
-	// This is an std::array so that when a component is freed, it does not changes the index of each component
-	std::array< T, CH_MAX_ENTITIES >     aComponents{};
-
-	// Amount of Components we have allocated
-	size_t                               aCount;
-};
-#endif
+void        Ent_RegisterBaseComponents();
 
 
 template< typename T >
@@ -533,18 +334,13 @@ inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient,
 	data.aFuncFree                                  = sFuncFree;
 
 	gEntComponentRegistry.aComponentNames[ spName ] = &data;
+
+	// Run Callbacks
+	EntComp_RunRegisterCallbacks( spName );
 }
 
 
-struct EntCompVarTypeToEnum_t
-{
-	size_t               aHashCode;
-	EEntComponentVarType aType;
-};
-
-
 template< typename T, typename VAR_TYPE >
-// inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, EEntComponentVarType sVarType, size_t sOffset )
 inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset )
 {
 	size_t typeHash = typeid( T ).hash_code();
@@ -606,15 +402,6 @@ template< typename T >
 inline void EntComp_RegisterVarHandler()
 {
 }
-
-
-inline void EntComp_TestRegisterVarHandlers()
-{
-
-}
-
-
-void Ent_RegisterBaseComponents();
 
 
 // template< typename T >
@@ -690,7 +477,7 @@ class EntitySystem
 	// Is this component predicted for this Entity?
 	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
 
-	IEntityComponentPool*                                         GetComponentPool( const char* spName );
+	EntityComponentPool*                                          GetComponentPool( const char* spName );
 
 	// Queue of unused entity IDs
 	// TODO: CHANGE BACK TO QUEUE
@@ -710,10 +497,10 @@ class EntitySystem
 	Entity                                                        aEntityCount = 0;
 
 	// Component Array - list of all of this type of component in existence
-	std::unordered_map< std::string_view, IEntityComponentPool* > aComponentPools;
+	std::unordered_map< std::string_view, EntityComponentPool* >  aComponentPools;
 
 	// Entity States, will store if an entity is just created or deleted for one frame
-	std::unordered_map< Entity, IEntityComponentPool* > aEntitySates;
+	std::unordered_map< Entity, EntityComponentPool* >            aEntityStates;
 };
 
 
@@ -729,314 +516,6 @@ inline T* Ent_GetComponent( Entity sEnt, const char* spName )
 {
 	return static_cast< T* >( GetEntitySystem()->GetComponent( sEnt, spName ) );
 }
-
-
-// ====================================================================================================
-// OLD entity component system
-
-// The one instance of virtual inheritance in the entire implementation.
-// An interface is needed so that the ComponentManager (seen later)
-// can tell a generic ComponentArray that an entity has been destroyed
-// and that it needs to update its array mappings.
-
-/*
-The virtual inheritance of IComponentArray is unfortunate but, as far as I can tell, unavoidable.
-As seen later, we'll have a list of every ComponentArray (one per component type),
-and we need to notify all of them when an entity is destroyed so that it can remove the entity's data if it exists.
-The only way to keep a list of multiple templated types is to keep a list
-of their common interface so that we can call EntityDestroyed() on all of them.
-
-Another method is to use events,
-so that every ComponentArray can subscribe to an Entity Destroyed event and then respond accordingly.
-This was my original approach but I decided to keep ComponentArrays relatively stupid.
-
-Yet another method would be to use some fancy template magic and reflection,
-but I wanted to keep it as simple as possibe for my own sanity.
-The cost of calling the virtual function EntityDestroyed()
-should be minimal because it isn't something that happens every single frame.
-*/
-
-#if 0
-
-class System
-{
-public:
-	std::set<Entity> aEntities;
-};
-
-
-class IComponentArray
-{
-public:
-	virtual ~IComponentArray() = default;
-	virtual void EntityDestroyed( Entity entity ) = 0;
-};
-
-
-template<typename T>
-class ComponentArray : public IComponentArray
-{
-public:
-	void InsertData( Entity entity, T component )
-	{
-		assert( aEntityToIndexMap.find(entity) == aEntityToIndexMap.end() && "Component added to same entity more than once." );
-
-		// Put new entry at end and update the maps
-		size_t newIndex = aSize;
-		aEntityToIndexMap[entity] = newIndex;
-		aIndexToEntityMap[newIndex] = entity;
-		aComponentArray[newIndex] = component;
-		++aSize;
-	}
-
-	void RemoveData( Entity entity )
-	{
-		assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Removing non-existent component." );
-
-		// Copy element at end into deleted element's place to maintain density
-		size_t indexOfRemovedEntity = aEntityToIndexMap[entity];
-		size_t indexOfLastElement = aSize - 1;
-		aComponentArray[indexOfRemovedEntity] = aComponentArray[indexOfLastElement];
-
-		// Update map to point to moved spot
-		Entity entityOfLastElement = aIndexToEntityMap[indexOfLastElement];
-		aEntityToIndexMap[entityOfLastElement] = indexOfRemovedEntity;
-		aIndexToEntityMap[indexOfRemovedEntity] = entityOfLastElement;
-
-		aEntityToIndexMap.erase(entity);
-		aIndexToEntityMap.erase(indexOfLastElement);
-
-		--aSize;
-	}
-
-	T& GetData( Entity entity )
-	{
-		auto it = aEntityToIndexMap.find( entity );
-
-		if ( it == aEntityToIndexMap.end() )
-			Log_FatalF( "Retrieving non-existent component: \"%s\"\n", typeid( T ).name() );
-
-		// Return a reference to the entity's component
-		return aComponentArray[it->second];
-
-
-		// assert( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() && "Retrieving non-existent component." );
-		// 
-		// // Return a reference to the entity's component
-		// return aComponentArray[aEntityToIndexMap[entity]];
-	}
-
-	void EntityDestroyed( Entity entity ) override
-	{
-		if ( aEntityToIndexMap.find(entity) != aEntityToIndexMap.end() )
-		{
-			// Remove the entity's component if it existed
-			RemoveData(entity);
-		}
-	}
-
-private:
-	// The packed array of components (of generic type T),
-	// set to a specified maximum amount, matching the maximum number
-	// of entities allowed to exist simultaneously, so that each entity
-	// has a unique spot.
-	std::array<T, MAX_ENTITIES> aComponentArray{};
-
-	// Map from an entity ID to an array index.
-	std::unordered_map<Entity, size_t> aEntityToIndexMap{};
-
-	// Map from an array index to an entity ID.
-	std::unordered_map<size_t, Entity> aIndexToEntityMap{};
-
-	// Total size of valid entries in the array.
-	size_t aSize = 0;
-
-	// Hash of data type
-	// size_t aTypeHash = 0;
-};
-
-
-class EntityManager
-{
-public:
-	int                         Init();
-
-	Entity                      CreateEntity();
-	void                        DeleteEntity( Entity ent );
-
-	void                        SetSignature( Entity ent, Signature sig );
-	Signature                   GetSignature( Entity ent );
-	void                        EntitySignatureChanged( Entity ent, Signature entSig );
-
-	template<typename T>
-	void RegisterComponent()
-	{
-		size_t typeHash = typeid(T).hash_code();
-
-		assert(aComponentTypes.find(typeHash) == aComponentTypes.end() && "Registering component type more than once.");
-
-		// Add this component type to the component type map
-		aComponentTypes.insert({typeHash, aNextComponentType});
-
-		// Create a ComponentArray pointer and add it to the component arrays map
-		aComponentArrays.insert({typeHash, new ComponentArray<T>});
-
-		// Increment the value so that the next component registered will be different
-		++aNextComponentType;
-	}
-
-	template<typename T>
-	ComponentType GetComponentType()
-	{
-		size_t typeHash = typeid(T).hash_code();
-
-		auto it = aComponentTypes.find( typeHash );
-
-		if ( it == aComponentTypes.end() )
-			Log_FatalF( "Component not registered before use: \"%s\"\n", typeid(T).name() );
-
-		// Return this component's type - used for creating signatures
-		return it->second;
-
-
-		// size_t typeHash = typeid(T).hash_code();
-		// 
-		// assert(aComponentTypes.find(typeHash) != aComponentTypes.end() && "Component not registered before use.");
-		// 
-		// return aComponentTypes[typeHash];
-	}
-
-	template<typename T>
-	void AddComponent( Entity entity, T component )
-	{
-		// Add a component to the array for an entity
-		GetComponentArray<T>()->InsertData( entity, component );
-
-		auto signature = GetSignature( entity );
-		signature.set( GetComponentType<T>(), true );
-
-		SetSignature( entity, signature );
-		EntitySignatureChanged( entity, signature );
-	}
-
-	template<typename T>
-	T& AddComponent( Entity entity )
-	{
-		// Add a component to the array for an entity
-		GetComponentArray<T>()->InsertData( entity, T{} );
-
-		auto signature = GetSignature( entity );
-		signature.set( GetComponentType<T>(), true );
-
-		SetSignature( entity, signature );
-		EntitySignatureChanged( entity, signature );
-
-		return GetComponentArray<T>()->GetData( entity );
-	}
-
-	template<typename T>
-	void RemoveComponent( Entity entity )
-	{
-		// Remove a component from the array for an entity
-		GetComponentArray<T>()->RemoveData( entity );
-
-		auto signature = GetSignature( entity );
-		signature.set( GetComponentType<T>(), false );
-
-		SetSignature( entity, signature );
-		EntitySignatureChanged( entity, signature );
-	}
-
-	template<typename T>
-	T& GetComponent( Entity entity )
-	{
-		// Get a reference to a component from the array for an entity
-		return GetComponentArray<T>()->GetData( entity );
-	}
-
-	/*
-	
-	Maintain a record of registered systems and their signatures.
-	When a system is registered, it’s added to a map with the same typeid(T).name() trick used for the components.
-	That same key is used for a map of system pointers as well.
-
-	As with components, this approach requires a call to RegisterSystem() for every additional system type added to the game.
-
-	Each system needs to have a signature set for it so that the manager can add appropriate entities to each systems’s list of entities.
-	When an entity’s signature has changed (due to components being added or removed),
-	then the system’s list of entities that it’s tracking needs to be updated.
-
-	If an entity that the system is tracking is destroyed, then it also needs to update its list.
-
-	*/
-
-	template<typename T>
-	T* RegisterSystem()
-	{
-		size_t typeHash = typeid(T).hash_code();
-
-		assert(aSystems.find(typeHash) == aSystems.end() && "Registering system more than once.");
-
-		// Create a pointer to the system and return it so it can be used externally
-		auto system = new T;
-		aSystems.insert({typeHash, system});
-		return system;
-	}
-
-	template<typename T>
-	void SetSystemSignature( Signature signature )
-	{
-		size_t typeHash = typeid(T).hash_code();
-
-		assert(aSystems.find(typeHash) != aSystems.end() && "System used before registered.");
-
-		// Set the signature for this system
-		aSystemSignatures.insert({typeHash, signature});
-	}
-
-private:
-	// Queue of unused entity IDs
-	std::queue<Entity> aEntityPool{};
-
-	// Array of signatures where the index corresponds to the entity ID
-	std::array<Signature, MAX_ENTITIES> aSignatures{};
-
-	// Total living entities - used to keep limits on how many exist
-	Entity aEntityCount = 0;
-
-private:
-	// Map from type hash value to a component type
-	std::unordered_map<size_t, ComponentType> aComponentTypes{};
-
-	// Map from type hash value to a component array
-	std::unordered_map<size_t, IComponentArray*> aComponentArrays{};
-
-	// The component type to be assigned to the next registered component - starting at 0
-	ComponentType aNextComponentType = 0;
-
-	// Convenience function to get the statically casted pointer to the ComponentArray of type T.
-	template<typename T>
-	ComponentArray<T>* GetComponentArray()
-	{
-		size_t typeHash = typeid(T).hash_code();
-
-		auto it = aComponentArrays.find( typeHash );
-
-		if ( it == aComponentArrays.end() )
-			Log_FatalF( "Component not registered before use: \"%s\"\n", typeid(T).name() );
-
-		return (ComponentArray<T>*)it->second;
-	}
-
-private:
-	// Map from system type string pointer to a signature
-	std::unordered_map<size_t, Signature> aSystemSignatures{};
-
-	// Map from system type string pointer to a system pointer
-	std::unordered_map<size_t, System*> aSystems{};
-};
-
-#endif
 
 
 // ==========================================
