@@ -217,6 +217,9 @@ public:
 	void                    ComponentAdded( Entity sEntity ) override;
 	void                    ComponentRemoved( Entity sEntity ) override;
 
+	// Set's current player to manage, and prepares all components for use
+	bool                    SetCurrentPlayer( Entity player );
+
 	void                    Init();
 	void                    Create( Entity player );
 	void                    Spawn( Entity player );

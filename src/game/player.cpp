@@ -108,17 +108,13 @@ extern Entity   gLocalPlayer;
 constexpr float PLAYER_MASS = 200.f;
 
 
-CON_COMMAND( respawn )
+CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 {
-	if ( Game_ProcessingClient() )
-	{
-		// forward to server
+	if ( CL_SendConVarIfClient( "respawn", args ) )
 		return;
-	}
 
-	if ( Game_GetCommandSource() == ECommandSource_Server )
-	{
-	}
+	if ( Game_GetCommandSource() != ECommandSource_Server )
+		return;
 
 	Entity player = SV_GetCommandClientEntity();
 
@@ -126,17 +122,13 @@ CON_COMMAND( respawn )
 }
 
 
-CON_COMMAND( reset_velocity )
+CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 {
-	if ( Game_ProcessingClient() )
-	{
-		// forward to server
+	if ( CL_SendConVarIfClient( "reset_velocity", args ) )
 		return;
-	}
 
-	if ( Game_GetCommandSource() == ECommandSource_Server )
-	{
-	}
+	if ( Game_GetCommandSource() != ECommandSource_Server )
+		return;
 
 	Entity player  = SV_GetCommandClientEntity();
 	auto rigidBody = GetRigidBody( player );
@@ -148,31 +140,56 @@ CON_COMMAND( reset_velocity )
 }
 
 
-// HACK: should set this properly
-static PlayerMoveType gHostMoveType;
-
-
 static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 {
 	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( sPlayer );
 	// SetMoveType( move, sMoveType );
 
-	if ( gHostMoveType == sMoveType )
-		gHostMoveType = PlayerMoveType::Walk;
+	auto move = GetPlayerMoveData( sPlayer );
+
+	if ( !move )
+	{
+		Log_Error( "Failed to find player move data component\n" );
+		return;
+	}
+
+	if ( !GetPlayers()->SetCurrentPlayer( sPlayer ) )
+		return;
+
+	// Toggle between the desired move type and walking
+	if ( move->aMoveType == sMoveType )
+		GetPlayers()->apMove->SetMoveType( *move, PlayerMoveType::Walk );
 	else
-		gHostMoveType = sMoveType;
+		GetPlayers()->apMove->SetMoveType( *move, sMoveType );
 }
 
 
-CONCMD( noclip )
+CONCMD_VA( noclip, CVARF( CL_EXEC ) )
 {
-	CmdSetPlayerMoveType( gLocalPlayer, PlayerMoveType::NoClip );
+	if ( CL_SendConVarIfClient( "noclip" ) )
+		return;
+
+	Entity player = SV_GetCommandClientEntity();
+
+	if ( !player )
+		return;
+
+	CmdSetPlayerMoveType( player, PlayerMoveType::NoClip );
 }
 
 
-CONCMD( fly )
+CONCMD_VA( fly, CVARF( CL_EXEC ) )
 {
-	CmdSetPlayerMoveType( gLocalPlayer, PlayerMoveType::Fly );
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "fly" ) )
+		return;
+
+	Entity player = SV_GetCommandClientEntity();
+
+	if ( !player )
+		return;
+
+	CmdSetPlayerMoveType( player, PlayerMoveType::Fly );
 }
 
 
@@ -294,6 +311,43 @@ void PlayerManager::ComponentAdded( Entity sEntity )
 
 void PlayerManager::ComponentRemoved( Entity sEntity )
 {
+}
+
+
+bool PlayerManager::SetCurrentPlayer( Entity player )
+{
+	Assert( apMove );
+
+	apMove->aPlayer = player;
+
+	if ( Game_ProcessingClient() )
+	{
+		apMove->apUserCmd = &gClientUserCmd;
+	}
+	else
+	{
+		SV_Client_t* client = SV_GetClientFromEntity( player );
+		if ( !client )
+			return false;
+
+		apMove->apUserCmd = &client->aUserCmd;
+	}
+
+	apMove->apDir       = Ent_GetComponent< CDirection >( player, "direction" );
+	apMove->apRigidBody = GetRigidBody( player );
+	apMove->apTransform = GetTransform( player );
+	apMove->apCamera    = GetCamera( player );
+	apMove->apPhysShape = GetComp_PhysShapePtr( player );
+	apMove->apPhysObj   = GetComp_PhysObjectPtr( player );
+
+	Assert( apMove->apDir );
+	Assert( apMove->apRigidBody );
+	Assert( apMove->apTransform );
+	Assert( apMove->apCamera );
+	Assert( apMove->apPhysShape );
+	Assert( apMove->apPhysObj );
+
+	return true;
 }
 
 
@@ -942,7 +996,7 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 }
 
 
-float PlayerMovement::GetViewHeight(  )
+float PlayerMovement::GetViewHeight()
 {
 	if ( !apUserCmd )
 		return cl_view_height;
@@ -954,11 +1008,11 @@ float PlayerMovement::GetViewHeight(  )
 void PlayerMovement::DetermineMoveType()
 {
 	// TODO: MULTIPLAYER
-	if ( gHostMoveType != apMove->aMoveType )
-	{
-		apMove->aMoveType = gHostMoveType;
-		SetMoveType( *apMove, gHostMoveType );
-	}
+	// if ( gHostMoveType != apMove->aMoveType )
+	// {
+	// 	apMove->aMoveType = gHostMoveType;
+	// 	SetMoveType( *apMove, gHostMoveType );
+	// }
 }
 
 

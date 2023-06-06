@@ -40,6 +40,9 @@ static std::vector< SV_ClientCommand_t > gClientCommandQueue;
 
 CONCMD( pause )
 {
+	if ( !Game_IsHosting() )
+		return;
+
 	Game_SetPaused( !Game_IsPaused() );
 }
 

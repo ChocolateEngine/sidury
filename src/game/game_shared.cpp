@@ -107,6 +107,13 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 
 		ConVarBase* cvarBase = Con_GetConVarBase( commandName );
 
+		if ( !cvarBase )
+		{
+			// how did this happen?
+			Log_ErrorF( "Game_ExecCommandsSafe(): Failed to find command \"%s\"\n", commandName.c_str() );
+			continue;
+		}
+
 		ConVarFlag_t flags = cvarBase->GetFlags();
 
 		// if the command is from the server and we are the client, make sure they can execute it

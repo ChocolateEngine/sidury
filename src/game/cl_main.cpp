@@ -198,25 +198,10 @@ void CL_Update( float frameTime )
 			CL_GameUpdate( frameTime );
 
 			// Send Console Commands
-			if ( gCommandsToSend.size() )
-			{
-				std::string command;
-
-				// Join it all into one string
-				for ( auto& cmd : gCommandsToSend )
-					command += cmd + ";";
-			}
+			CL_SendConVars();
 
 			// Send UserCmd
-			capnp::MallocMessageBuilder builder;
-			auto                        root = builder.initRoot< MsgSrcClient >();
-			root.setType( EMsgSrcClient::USER_CMD );
-
-			capnp::MallocMessageBuilder userCmdBuilder;
-			CL_SendUserCmd( userCmdBuilder );
-
-			CL_WriteMsgData( root, userCmdBuilder );
-			CL_WriteToServer( builder );
+			CL_SendUserCmd();
 
 			break;
 		}
@@ -393,6 +378,61 @@ bool CL_RecvServerInfo()
 }
 
 
+bool CL_SendConVarIfClient( std::string_view sName, const std::vector< std::string >& srArgs )
+{
+	if ( Game_ProcessingClient() )
+	{
+		// Send the command to the server
+		CL_SendConVar( sName, srArgs );
+		return true;
+	}
+
+	return false;
+}
+
+void CL_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs )
+{
+	// We have to rebuild this command to a normal string, fun
+	// Allocate a command to send with the command name
+	std::string& newCmd = gCommandsToSend.emplace_back( sName.data() );
+
+	// Add the command arguments
+	for ( const std::string& arg : srArgs )
+	{
+		newCmd += " " + arg;
+	}
+}
+
+
+void CL_SendConVars()
+{
+	// Only send if we actually have commands to send
+	if ( gCommandsToSend.empty() )
+		return;
+
+	capnp::MallocMessageBuilder builder;
+	auto                        root = builder.initRoot< MsgSrcClient >();
+	root.setType( EMsgSrcClient::CON_VAR );
+
+	capnp::MallocMessageBuilder convarBuilder;
+	auto                        convarMsg = convarBuilder.initRoot< NetMsgConVar >();
+
+	std::string command;
+
+	// Join it all into one string
+	for ( auto& cmd : gCommandsToSend )
+		command += cmd + ";";
+
+	// Clear it
+	gCommandsToSend.clear();
+
+	convarMsg.setCommand( command );
+
+	CL_WriteMsgData( root, convarBuilder );
+	CL_WriteToServer( builder );
+}
+
+
 void CL_UpdateUserCmd()
 {
 	// Get the camera component from the local player, and get the angles from it
@@ -428,7 +468,7 @@ void CL_UpdateUserCmd()
 }
 
 
-void CL_SendUserCmd( capnp::MessageBuilder& srBuilder )
+void CL_BuildUserCmd( capnp::MessageBuilder& srBuilder )
 {
 	auto builder = srBuilder.initRoot< NetMsgUserCmd >();
 	
@@ -438,6 +478,20 @@ void CL_SendUserCmd( capnp::MessageBuilder& srBuilder )
 	builder.setButtons( gClientUserCmd.aButtons );
 	builder.setFlashlight( gClientUserCmd.aFlashlight );
 	builder.setMoveType( static_cast< EPlayerMoveType >( gClientUserCmd.aMoveType ) );
+}
+
+
+void CL_SendUserCmd()
+{
+	capnp::MallocMessageBuilder builder;
+	auto                        root = builder.initRoot< MsgSrcClient >();
+	root.setType( EMsgSrcClient::USER_CMD );
+
+	capnp::MallocMessageBuilder userCmdBuilder;
+	CL_BuildUserCmd( userCmdBuilder );
+
+	CL_WriteMsgData( root, userCmdBuilder );
+	CL_WriteToServer( builder );
 }
 
 
