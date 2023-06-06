@@ -98,12 +98,6 @@ CONCMD( connect )
 }
 
 
-CONCMD( disconnect )
-{
-	CL_Disconnect();
-}
-
-
 static void CenterMouseOnScreen()
 {
 	int w, h;
@@ -188,7 +182,7 @@ void CL_Update( float frameTime )
 			}
 
 			gClientState = EClientState_Connected;
-			GetPlayers()->Create( gLocalPlayer );
+			GetEntitySystem()->AddComponent( gLocalPlayer, "playerInfo" );
 			break;
 		}
 

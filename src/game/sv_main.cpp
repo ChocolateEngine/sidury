@@ -87,7 +87,7 @@ void SV_Update( float frameTime )
 	// for ( auto& client : gServerData.aClients )
 	for ( size_t i = 0; i < gServerData.aClients.size(); i++ )
 	{
-		auto& client = gServerData.aClients[ i ];
+		SV_Client_t& client = gServerData.aClients[ i ];
 
 		// Continue connecting clients if any are joining
 		if ( client.aState == ESV_ClientState_Connecting )
@@ -98,6 +98,9 @@ void SV_Update( float frameTime )
 
 		if ( client.aState != ESV_ClientState_Connected )
 		{
+			// Remove their player entity
+			GetEntitySystem()->DeleteEntity( client.aEntity );
+
 			// Remove this client from the list
 			vec_remove_index( gServerData.aClients, i );
 			i--;
@@ -158,7 +161,7 @@ void SV_GameUpdate( float frameTime )
 
 	// Update player positions after physics simulation
 	// NOTE: This probably needs to be done for everything with physics
-	for ( auto& player : GetPlayers()->aPlayerList )
+	for ( auto& player : GetPlayers()->aEntities )
 	{
 		GetPlayers()->apMove->UpdatePosition( player );
 	}
@@ -197,21 +200,27 @@ bool SV_StartServer()
 
 void SV_StopServer()
 {
+	bool wasClient = Game_ProcessingClient();
+	Game_SetClient( false );
+
 	for ( auto& client : gServerData.aClients )
 	{
 		SV_SendDisconnect( client );
 	}
 
-	EntitySystem::DestroyServer();
 	PlayerManager::DestroyServer();
 
 	Phys_DestroyEnv( false );
+
+	EntitySystem::DestroyServer();
 
 	gServerData.aActive = false;
 	gServerData.aClients.clear();
 
 	Net_CloseSocket( gServerSocket );
 	gServerSocket = CH_INVALID_SOCKET;
+
+	Game_SetClient( wasClient );
 }
 
 
@@ -501,7 +510,8 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	// Make an entity for them
 	client.aEntity      = GetEntitySystem()->CreateEntity();
 
-	GetPlayers()->Create( client.aEntity );
+	// Add the playerInfo Component
+	GetEntitySystem()->AddComponent( client.aEntity, "playerInfo" );
 
 	// Send them the server info and new port
 	capnp::MallocMessageBuilder message;

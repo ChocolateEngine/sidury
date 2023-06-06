@@ -202,23 +202,23 @@ std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntCo
 }
 
 
-void EntComp_AddRegisterCallback( FEntComp_Register* spFunc )
+void EntComp_AddRegisterCallback( EntitySystem* spSystem )
 {
-	AssertMsg( spFunc, "Trying to register nullptr for a Entity Component Register Callback\n" );
+	AssertMsg( spSystem, "Trying to register nullptr for a Entity Component Register Callback\n" );
 
-	if ( !spFunc )
+	if ( !spSystem )
 	{
 		Log_Warn( gLC_Entity, "Trying to register nullptr for a Entity Component Register Callback\n" );
 		return;
 	}
 
-	gEntComponentRegistry.aCallbacks.push_back( spFunc );
+	gEntComponentRegistry.aCallbacks.push_back( spSystem );
 }
 
 
-void EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc )
+void EntComp_RemoveRegisterCallback( EntitySystem* spSystem )
 {
-	size_t index = vec_index( gEntComponentRegistry.aCallbacks, spFunc );
+	size_t index = vec_index( gEntComponentRegistry.aCallbacks, spSystem );
 	if ( index != SIZE_MAX )
 	{
 		gEntComponentRegistry.aCallbacks.erase( gEntComponentRegistry.aCallbacks.begin() + index );
@@ -232,9 +232,9 @@ void EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc )
 
 void EntComp_RunRegisterCallbacks( const char* spName )
 {
-	for ( auto callback : gEntComponentRegistry.aCallbacks )
+	for ( auto system : gEntComponentRegistry.aCallbacks )
 	{
-		callback( spName );
+		system->CreateComponentPool( spName );
 	}
 }
 
@@ -323,6 +323,13 @@ void* EntityComponentPool::Create( Entity entity )
 
 	aComponents[ aCount++ ]         = data;
 
+	// Add it to systems
+	for ( auto system : aComponentSystems )
+	{
+		system->aEntities.push_back( entity );
+		system->ComponentAdded( entity );
+	}
+
 	// TODO: use malloc and use that pointer in the constructor for this
 	// use placement new
 	// https://stackoverflow.com/questions/2494471/c-is-it-possible-to-call-a-constructor-directly-without-new
@@ -340,6 +347,13 @@ void EntityComponentPool::Remove( Entity entity )
 	{
 		Log_ErrorF( gLC_Entity, "Failed to remove component from entity - \"%s\"\n", apName );
 		return;
+	}
+
+	// Remove it from systems
+	for ( auto system : aComponentSystems )
+	{
+		system->ComponentRemoved( entity );
+		vec_remove( system->aEntities, entity );
 	}
 
 	size_t index = it->second;
@@ -436,7 +450,9 @@ bool EntitySystem::CreateClient()
 	if ( cl_entities )
 		return false;
 
-	cl_entities = new EntitySystem;
+	cl_entities            = new EntitySystem;
+	cl_entities->aIsClient = true;
+
 	return cl_entities->Init();
 }
 
@@ -447,7 +463,9 @@ bool EntitySystem::CreateServer()
 	if ( sv_entities )
 		return false;
 
-	sv_entities = new EntitySystem;
+	sv_entities            = new EntitySystem;
+	cl_entities->aIsClient = false;
+
 	return sv_entities->Init();
 }
 
@@ -490,19 +508,38 @@ bool EntitySystem::Init()
 
 	CreateComponentPools();
 
+	// Add callback
+	EntComp_AddRegisterCallback( this );
+
 	return true;
 }
 
 
 void EntitySystem::Shutdown()
 {
+	// Remove callback
+	EntComp_RemoveRegisterCallback( this );
+
+	// Tell all component pools every entity was destroyed
+	for ( Entity entity : aUsedEntities )
+	{
+		for ( auto& [ name, pool ] : aComponentPools )
+		{
+			pool->EntityDestroyed( entity );
+		}
+	}
+
+	// Free component pools
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		delete pool;
+	}
 }
 
 
 void EntitySystem::CreateComponentPools()
 {
 	// iterate through all registered components and create a component pool for them
-	// NOTE: this will not account for components registered later on
 	for ( auto& [ name, componentData ] : gEntComponentRegistry.aComponentNames )
 	{
 		EntityComponentPool* pool = new EntityComponentPool;
@@ -516,6 +553,49 @@ void EntitySystem::CreateComponentPools()
 		
 		aComponentPools[ name ] = pool;
 	}
+}
+
+
+void EntitySystem::CreateComponentPool( const char* spName )
+{
+	EntityComponentPool* pool = new EntityComponentPool;
+
+	if ( !pool->Init( spName ) )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to create component pool for \"%s\"", spName );
+		delete pool;
+		return;
+	}
+		
+	aComponentPools[ spName ] = pool;
+}
+
+
+void EntitySystem::RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem )
+{
+	EntityComponentPool* pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to register component system - no component pool found: \"%s\"\n", spName );
+		return;
+	}
+
+	pool->aComponentSystems.emplace( spSystem );
+}
+
+
+void EntitySystem::RemoveEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem )
+{
+	EntityComponentPool* pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to register component system - no component pool found: \"%s\"\n", spName );
+		return;
+	}
+
+	pool->aComponentSystems.erase( spSystem );
 }
 
 
@@ -556,9 +636,6 @@ void EntitySystem::DeleteEntity( Entity ent )
 	{
 		pool->EntityDestroyed( ent );
 	}
-
-	// TODO: maybe have some IComponentSystem class that has it's own list of entities
-	// so we can tell those that it was destroyed as well
 }
 
 

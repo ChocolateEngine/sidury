@@ -198,12 +198,14 @@ class PlayerMovement // : public ComponentSystem
 };
 
 
-class PlayerManager // : public ComponentSystem
+class PlayerManager : public IEntityComponentSystem
 {
 public:
 	PlayerManager();
 	~PlayerManager();
 
+	// TODO: maybe have a system to register component systems
+	// so we don't need to add these functions and call them manually
 	static void             RegisterComponents();
 
 	static void             CreateClient();
@@ -211,6 +213,9 @@ public:
 
 	static void             DestroyClient();
 	static void             DestroyServer();
+
+	void                    ComponentAdded( Entity sEntity ) override;
+	void                    ComponentRemoved( Entity sEntity ) override;
 
 	void                    Init();
 	void                    Create( Entity player );
@@ -221,8 +226,6 @@ public:
 
 	void                    UpdateView( CPlayerInfo* info, Entity player );
 	void                    DoMouseLook( Entity player );
-
-	std::vector< Entity > aPlayerList;
 	
 	PlayerMovement* apMove = nullptr;
 };

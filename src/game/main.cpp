@@ -147,22 +147,6 @@ bool Game_Init()
 		return false;
 	}
 
-#if 0
-	entities = new EntityManager;
-	GetEntitySystem()->Init();
-
-	players = GetEntitySystem()->RegisterSystem<PlayerManager>();
-	players->Init();
-
-	gLocalPlayer = players->Create();
-
-	// mark this as the local player
-	auto& playerInfo = GetEntitySystem()->GetComponent< CPlayerInfo >( gLocalPlayer );
-	playerInfo.aIsLocalPlayer = true;
-
-	players->Spawn( gLocalPlayer );
-#endif
-
 	Log_Msg( "Game Loaded!\n" );
 	return true;
 }

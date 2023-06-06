@@ -24,9 +24,8 @@ namespace capnp
 }
 
 
-// lot of help from this page
-// https://austinmorlan.com/posts/entity_component_system/
-
+class EntitySystem;
+class IEntityComponentSystem;
 
 using Entity                            = size_t;
 using ComponentType                     = uint8_t;
@@ -220,7 +219,8 @@ struct EntComponentRegistry_t
 
 	// Callback Functions for when a new component is registered at runtime
 	// Used for creating a new component pool for client and/or server entity system
-	std::vector< FEntComp_Register* >                           aCallbacks;
+	// std::vector< FEntComp_Register* >                           aCallbacks;
+	std::vector< EntitySystem* >                                aCallbacks;
 };
 
 
@@ -299,6 +299,10 @@ class EntityComponentPool
 	FEntComp_Free                        aFuncFree;
 
 	EntComponentData_t*                  apData;
+
+	// Component Systems that manage this component
+	// NOTE: This may always just be one
+	std::set< IEntityComponentSystem* >  aComponentSystems;
 };
 
 
@@ -307,8 +311,10 @@ const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType );
 std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType );
 std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntComponentVarType sVarType );
 
-void        EntComp_AddRegisterCallback( FEntComp_Register* spFunc );
-void        EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc );
+// void        EntComp_AddRegisterCallback( FEntComp_Register* spFunc );
+// void        EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc );
+void        EntComp_AddRegisterCallback( EntitySystem* spSystem );
+void        EntComp_RemoveRegisterCallback( EntitySystem* spSystem );
 void        EntComp_RunRegisterCallbacks( const char* spName );
 
 void        Ent_RegisterBaseComponents();
@@ -418,6 +424,31 @@ inline void EntComp_RegisterVarHandler()
 
 
 // ====================================================================================================
+// Entity Component System Interface
+// stores a list of entities with that component type
+// ====================================================================================================
+
+
+class IEntityComponentSystem
+{
+  public:
+	// virtual ~IEntityComponentSystem()                       = default;
+	virtual ~IEntityComponentSystem()
+	{
+		Log_Msg( "DELETING ENTITY COMPONENT SYSTEM\n" );
+	}
+
+	// Called when the component is added to this entity
+	virtual void          ComponentAdded( Entity sEntity ) = 0;
+
+	// Called when the component is removed from this entity
+	virtual void          ComponentRemoved( Entity sEntity ) = 0;
+
+	std::vector< Entity > aEntities;
+};
+
+
+// ====================================================================================================
 // Entity System
 // ====================================================================================================
 
@@ -435,6 +466,11 @@ class EntitySystem
 	void                                                          Shutdown();
 
 	void                                                          CreateComponentPools();
+	void                                                          CreateComponentPool( const char* spName );
+
+	// TODO: move this to part of registering components probably
+	void                                                          RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
+	void                                                          RemoveEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
 
 	// Entity                                                        CreateEntityNetworked();
 
@@ -478,6 +514,9 @@ class EntitySystem
 	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
 
 	EntityComponentPool*                                          GetComponentPool( const char* spName );
+
+	// TEMP DEBUG
+	bool                                                          aIsClient = false;
 
 	// Queue of unused entity IDs
 	// TODO: CHANGE BACK TO QUEUE

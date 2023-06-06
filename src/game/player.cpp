@@ -259,6 +259,8 @@ void PlayerManager::CreateClient()
 {
 	DestroyClient();
 	players[ CH_PLAYER_CL ] = new PlayerManager;
+
+	GetEntitySystem()->RegisterEntityComponentSystem( "playerInfo", players[ CH_PLAYER_CL ] );
 }
 
 
@@ -266,13 +268,18 @@ void PlayerManager::CreateServer()
 {
 	DestroyServer();
 	players[ CH_PLAYER_SV ] = new PlayerManager;
+
+	GetEntitySystem()->RegisterEntityComponentSystem( "playerInfo", players[ CH_PLAYER_SV ] );
 }
 
 
 void PlayerManager::DestroyClient()
 {
 	if ( players[ CH_PLAYER_CL ] )
+	{
+		GetEntitySystem()->RemoveEntityComponentSystem( "playerInfo", players[ CH_PLAYER_CL ] );
 		delete players[ CH_PLAYER_CL ];
+	}
 
 	players[ CH_PLAYER_CL ] = nullptr;
 }
@@ -281,9 +288,23 @@ void PlayerManager::DestroyClient()
 void PlayerManager::DestroyServer()
 {
 	if ( players[ CH_PLAYER_SV ] )
+	{
+		GetEntitySystem()->RemoveEntityComponentSystem( "playerInfo", players[ CH_PLAYER_SV ] );
 		delete players[ CH_PLAYER_SV ];
+	}
 
 	players[ CH_PLAYER_SV ] = nullptr;
+}
+
+
+void PlayerManager::ComponentAdded( Entity sEntity )
+{
+	Create( sEntity );
+}
+
+
+void PlayerManager::ComponentRemoved( Entity sEntity )
+{
 }
 
 
@@ -298,7 +319,7 @@ void PlayerManager::Create( Entity player )
 {
 	// Add Components to entity
 	GetEntitySystem()->AddComponent( player, "playerMoveData" );
-	GetEntitySystem()->AddComponent( player, "playerInfo" );
+	// GetEntitySystem()->AddComponent( player, "playerInfo" );
 	GetEntitySystem()->AddComponent( player, "playerZoom" );
 
 	GetEntitySystem()->AddComponent( player, "rigidBody" );
@@ -387,8 +408,6 @@ void PlayerManager::Create( Entity player )
 
 	// rotate 90 degrees
 	physObj->SetAng( { 90, 0, 0 } );
-
-	aPlayerList.push_back( player );
 }
 
 
@@ -504,7 +523,7 @@ void PlayerManager::Update( float frameTime )
 {
 	PROF_SCOPE();
 
-	for ( Entity player: aPlayerList )
+	for ( Entity player: aEntities )
 	{
 		SV_Client_t* client = SV_GetClientFromEntity( player );
 		if ( !client )

@@ -16,9 +16,20 @@ static bool           gGameUseClient     = true;
 static ECommandSource gGameCommandSource = ECommandSource_Client;
 
 
+CONCMD( disconnect )
+{
+	CL_Disconnect();
+
+	if ( Game_IsHosting() )
+	{
+		SV_StopServer();
+	}
+}
+
+
 CONCMD( status )
 {
-	size_t playerCount = GetPlayers()->aPlayerList.size();
+	size_t playerCount = GetPlayers()->aEntities.size();
 
 	// if ( Game_IsHosting() )
 	// {
