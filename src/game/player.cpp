@@ -138,7 +138,7 @@ CON_COMMAND( reset_velocity )
 	{
 	}
 
-	Entity player   = SV_GetCommandClientEntity();
+	Entity player  = SV_GetCommandClientEntity();
 	auto rigidBody = GetRigidBody( player );
 
 	if ( !rigidBody )
@@ -176,14 +176,6 @@ CONCMD( fly )
 }
 
 
-#define GET_KEY( key ) input->GetKeyState(key)
-
-#define KEY_PRESSED( key ) input->KeyPressed(key)
-#define KEY_RELEASED( key ) input->KeyReleased(key)
-#define KEY_JUST_PRESSED( key ) input->KeyJustPressed(key)
-#define KEY_JUST_RELEASED( key ) input->KeyJustReleased(key)
-
-
 // glm::normalize doesn't return a float
 // move to util.cpp?
 float vec3_norm(glm::vec3& v)
@@ -195,9 +187,6 @@ float vec3_norm(glm::vec3& v)
 
 	return length;
 }
-
-
-// TODO: MOVE ME !!!!!
 
 
 // ============================================================

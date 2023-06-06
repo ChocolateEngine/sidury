@@ -432,14 +432,10 @@ inline void EntComp_RegisterVarHandler()
 class IEntityComponentSystem
 {
   public:
-	// virtual ~IEntityComponentSystem()                       = default;
-	virtual ~IEntityComponentSystem()
-	{
-		Log_Msg( "DELETING ENTITY COMPONENT SYSTEM\n" );
-	}
+	virtual ~IEntityComponentSystem()                        = default;
 
 	// Called when the component is added to this entity
-	virtual void          ComponentAdded( Entity sEntity ) = 0;
+	virtual void          ComponentAdded( Entity sEntity )   = 0;
 
 	// Called when the component is removed from this entity
 	virtual void          ComponentRemoved( Entity sEntity ) = 0;
@@ -493,7 +489,7 @@ class EntitySystem
 	void                                                          ReadComponents( Entity ent, capnp::MessageReader& srReader );
 	void                                                          WriteComponents( Entity ent, capnp::MessageBuilder& srBuilder );
 
-	// void                                                          MarkComponentNetworked( Entity ent, const char* spName );
+	// void                                                          SetComponentNetworked( Entity ent, const char* spName );
 
 	// Add a component to an entity
 	void*                                                         AddComponent( Entity entity, const char* spName );
@@ -513,6 +509,7 @@ class EntitySystem
 	// Is this component predicted for this Entity?
 	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
 
+	// Get the Component Pool for this Component
 	EntityComponentPool*                                          GetComponentPool( const char* spName );
 
 	// TEMP DEBUG
