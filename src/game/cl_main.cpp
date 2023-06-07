@@ -10,6 +10,8 @@
 #include "iinput.h"
 #include "render/irender.h"
 
+#include "testing.h"
+
 #include "capnproto/sidury.capnp.h"
 
 #include <capnp/message.h>
@@ -111,8 +113,6 @@ bool CL_Init()
 	if ( !EntitySystem::CreateClient() )
 		return false;
 
-	PlayerManager::CreateClient();
-
 	Phys_CreateEnv( true );
 
 	return true;
@@ -123,11 +123,9 @@ void CL_Shutdown()
 {
 	CL_Disconnect();
 
-	PlayerManager::DestroyClient();
+	EntitySystem::DestroyClient();
 
 	Phys_DestroyEnv( true );
-
-	EntitySystem::DestroyClient();
 }
 
 
@@ -226,6 +224,8 @@ void CL_GameUpdate( float frameTime )
 	}
 
 	GetPlayers()->UpdateLocalPlayer();
+
+	TEST_CL_UpdateProtos( frameTime );
 
 	if ( input->WindowHasFocus() && !CL_IsMenuShown() )
 	{

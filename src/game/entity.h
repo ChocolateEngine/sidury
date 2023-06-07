@@ -72,6 +72,9 @@ constexpr ComponentType MAX_COMPONENTS  = 64;
 using FEntComp_New       = std::function< void*() >;
 using FEntComp_Free      = std::function< void( void* spData ) >;
 
+// Functions for creating component systems
+using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
+
 // Functions for serializing and deserializing Components with Cap'n Proto
 using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
 using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const void* spData );
@@ -101,6 +104,8 @@ enum EEntComponentVarType
 	EEntComponentVarType_U16,   // unsigned short
 	EEntComponentVarType_U32,   // unsigned int
 	EEntComponentVarType_U64,   // unsigned long long
+
+	EEntComponentVarType_StdString,  // std::string
 
 	EEntComponentVarType_Vec2,  // glm::vec2
 	EEntComponentVarType_Vec3,  // glm::vec3
@@ -167,6 +172,8 @@ struct EntComponentData_t
 
 	FEntComp_New                                        aFuncNew;
 	FEntComp_Free                                       aFuncFree;
+
+	FEntComp_NewSys                                     aFuncNewSystem;
 };
 
 
@@ -302,7 +309,8 @@ class EntityComponentPool
 
 	// Component Systems that manage this component
 	// NOTE: This may always just be one
-	std::set< IEntityComponentSystem* >  aComponentSystems;
+	// std::set< IEntityComponentSystem* >  aComponentSystems;
+	IEntityComponentSystem*              apComponentSystem = nullptr;
 };
 
 
@@ -343,6 +351,23 @@ inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient,
 
 	// Run Callbacks
 	EntComp_RunRegisterCallbacks( spName );
+}
+
+
+template< typename T >
+inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
+{
+	size_t typeHash = typeid( T ).hash_code();
+	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+
+	if ( it == gEntComponentRegistry.aComponents.end() )
+	{
+		Log_ErrorF( "Component not registered, can't set system creation function: \"%s\" - \"%s\"\n", typeid( T ).name() );
+		return;
+	}
+
+	EntComponentData_t& data = it->second;
+	data.aFuncNewSystem      = sFuncNewSys;
 }
 
 
@@ -468,6 +493,8 @@ class EntitySystem
 	void                                                          RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
 	void                                                          RemoveEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
 
+	IEntityComponentSystem*                                       GetComponentSystem( const char* spName );
+
 	// Entity                                                        CreateEntityNetworked();
 
 	Entity                                                        CreateEntity();
@@ -542,6 +569,18 @@ class EntitySystem
 
 EntitySystem* GetEntitySystem();
 
+inline void*  Ent_AddComponent( Entity sEnt, const char* spName )
+{
+	return GetEntitySystem()->AddComponent( sEnt, spName );
+}
+
+template< typename T >
+inline T* Ent_AddComponent( Entity sEnt, const char* spName )
+{
+	return static_cast< T* >( GetEntitySystem()->AddComponent( sEnt, spName ) );
+}
+
+
 inline void*  Ent_GetComponent( Entity sEnt, const char* spName )
 {
 	return GetEntitySystem()->GetComponent( sEnt, spName );
@@ -612,6 +651,18 @@ struct CModelPath
 // Helper Macros
 #define CH_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; } )
+
+#define CH_REGISTER_COMPONENT_SYS( type, systemClass, systemVar ) \
+  EntComp_RegisterComponentSystem< type >( [ & ]() { \
+		if ( Game_ProcessingClient() ) { \
+			systemVar[ 1 ] = new systemClass; \
+			return systemVar[ 1 ]; \
+		} \
+		else { \
+			systemVar[ 0 ] = new systemClass; \
+			return systemVar[ 0 ]; \
+		} \
+	} )
 
 #define CH_REGISTER_COMPONENT_NEWFREE( type, name, overrideClient, netType, newFunc, freeFunc ) \
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, newFunc, freeFunc )

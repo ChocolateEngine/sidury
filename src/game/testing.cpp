@@ -15,14 +15,6 @@
 // #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
 #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_25d.glb"
 
-CONCMD( servertest )
-{
-	// start loopback server
-
-	// connect to the loopback server
-	CL_Connect( "127.0.0.1" );
-}
-
 CONVAR( vrcmdl_scale, 40 );
 CONVAR( in_proto_spam, 0, CVARF_INPUT );
 CONVAR( proto_look, 1 );
@@ -32,17 +24,10 @@ CONVAR( proto_follow_speed, 400 );
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
 
-extern Entity                 gLocalPlayer;
+// extern Entity                 gLocalPlayer;
 
 // Audio Channels
 Handle                        hAudioMusic = InvalidHandle;
-
-
-// GET RID OF THIS
-std::vector< Entity >         g_protos;
-std::vector< Entity >         g_otherEnts;
-std::vector< Entity >         g_staticEnts;
-std::vector< ModelPhysTest* > g_physEnts;
 
 // testing
 std::vector< Handle >         streams{};
@@ -57,24 +42,83 @@ struct ProtoLookData_t
 };
 
 
-void CreateProtogen( const std::string& path )
+// Protogen Component
+// This acts a tag to put all entities here in a list automatically
+struct CProtogen
 {
-#if 0
-	Entity         proto       = GetEntitySystem()->CreateEntity();
+};
 
-	Handle         model       = Graphics_LoadModel( path );
 
-	CRenderable_t& renderComp  = GetEntitySystem()->AddComponent< CRenderable_t >( proto );
-	renderComp.aHandle         = Graphics_CreateRenderable( model );
+#define CH_PROTO_SV 0
+#define CH_PROTO_CL 1
 
-	Transform& transform       = GetEntitySystem()->AddComponent< Transform >( proto );
 
-	auto       playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
+class ProtogenSystem : public IEntityComponentSystem
+{
+  public:
+	ProtogenSystem()
+	{
+	}
 
-	transform.aPos             = playerTransform.aPos;
-	transform.aScale           = { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() };
+	~ProtogenSystem()
+	{
+	}
 
-	g_protos.push_back( proto );
+	void ComponentAdded( Entity sEntity ) override
+	{
+		if ( !Game_ProcessingClient() )
+			return;
+
+		// Add a renderable component
+		auto renderable     = Ent_AddComponent< CRenderable_t >( sEntity, "renderable" );
+		renderable->aHandle = InvalidHandle;
+	}
+
+	void ComponentRemoved( Entity sEntity ) override
+	{
+	}
+};
+
+
+static ProtogenSystem* gProtoSystems[ 2 ] = { 0, 0 };
+
+
+ProtogenSystem*        GetProtogenSys()
+{
+	int i = Game_ProcessingClient() ? CH_PROTO_CL : CH_PROTO_SV;
+	Assert( gProtoSystems[ i ] );
+	return gProtoSystems[ i ];
+}
+
+// ===========================================================================
+
+
+void CreateProtogen_f( const std::string& path )
+{
+#if 1
+	Entity player = SV_GetCommandClientEntity();
+
+	if ( !player )
+		return;
+
+	Entity proto = GetEntitySystem()->CreateEntity();
+
+	Ent_AddComponent( proto, "protogen" );
+
+	Handle      model          = Graphics_LoadModel( path );
+
+	CModelPath* modelPath      = Ent_AddComponent< CModelPath >( proto, "modelPath" );
+	modelPath->aPath           = path;
+
+	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
+	// renderComp->aHandle        = Graphics_CreateRenderable( model );
+
+	Transform* transform       = Ent_AddComponent< Transform >( proto, "transform" );
+
+	auto       playerTransform = Ent_GetComponent< Transform >( player, "transform" );
+
+	transform->aPos            = playerTransform->aPos;
+	transform->aScale          = { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() };
 #endif
 }
 
@@ -138,15 +182,25 @@ void CreatePhysEntity( const std::string& path )
 }
 
 
-CON_COMMAND( create_proto )
+CONCMD_VA( create_proto, CVARF( CL_EXEC ) )
 {
-	CreateProtogen( DEFAULT_PROTOGEN_PATH );
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_proto" ) )
+		return;
+
+	CreateProtogen_f( DEFAULT_PROTOGEN_PATH );
 }
 
-CON_COMMAND( create_gltf_proto )
+
+CONCMD_VA( create_gltf_proto, CVARF( CL_EXEC ) )
 {
-	CreateProtogen( "materials/models/protogen_wip_25d/protogen_25d.glb" );
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_gltf_proto" ) )
+		return;
+
+	CreateProtogen_f( "materials/models/protogen_wip_25d/protogen_25d.glb" );
 }
+
 
 static void model_dropdown(
   const std::vector< std::string >& args,  // arguments currently typed in by the user
@@ -166,44 +220,83 @@ static void model_dropdown(
 	}
 }
 
-CONCMD_DROP( create_look_entity, model_dropdown )
+
+CONCMD_DROP_VA( create_look_entity, model_dropdown, CVARF( CL_EXEC ) )
 {
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_look_entity", args ) )
+		return;
+
 	if ( args.size() )
-		CreateProtogen( args[ 0 ] );
+		CreateProtogen_f( args[ 0 ] );
 }
 
-CON_COMMAND( delete_protos )
+
+CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 {
-	for ( auto& proto : g_protos )
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "delete_protos" ) )
+		return;
+
+	// for ( auto& proto : GetProtogenSys()->aEntities )
+	while ( GetProtogenSys()->aEntities.size() )
 	{
 		// Graphics_FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
 		// Graphics_FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
-		// GetEntitySystem()->DeleteEntity( proto );
+		GetEntitySystem()->DeleteEntity( GetProtogenSys()->aEntities[ 0 ] );
 	}
-
-	g_protos.clear();
 }
 
-CON_COMMAND( create_phys_test )
+
+#if 0
+CONCMD_VA( create_phys_test, CVARF( CL_EXEC ) )
 {
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_phys_test" ) )
+		return;
+
 	CreatePhysEntity( "materials/models/riverhouse/riverhouse.obj" );
 }
 
-CON_COMMAND( create_phys_proto )
+
+CONCMD_VA( create_phys_proto, CVARF( CL_EXEC ) )
 {
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_phys_proto") )
+		return;
+
 	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
+}
+
+
+CONCMD_VA( create_phys_ent, CVARF( CL_EXEC ) )
+{
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( "create_phys_ent", args ) )
+		return;
+
+	if ( args.size() )
+		CreatePhysEntity( args[ 0 ] );
+}
+#endif
+
+
+void TEST_Init()
+{
+	CH_REGISTER_COMPONENT( CProtogen, protogen, false, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT_SYS( CProtogen, ProtogenSystem, gProtoSystems );
 }
 
 
 void TEST_Shutdown()
 {
-	for ( int i = 0; i < g_physEnts.size(); i++ )
-	{
-		if ( g_physEnts[ i ] )
-			delete g_physEnts[ i ];
-
-		g_physEnts[ i ] = nullptr;
-	}
+	// for ( int i = 0; i < g_physEnts.size(); i++ )
+	// {
+	// 	if ( g_physEnts[ i ] )
+	// 		delete g_physEnts[ i ];
+	// 
+	// 	g_physEnts[ i ] = nullptr;
+	// }
 }
 
 
@@ -362,25 +455,133 @@ CONVAR( r_proto_line_dist, 32.f );
 CONVAR( r_proto_line_dist2, 32.f );
 
 
-// will be used in the future for when updating bones and stuff
-void TEST_UpdateProtos( float frameTime )
+void TEST_CL_UpdateProtos( float frameTime )
 {
-#if 0
 	PROF_SCOPE();
 
-	auto& playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
-	// auto& camTransform = GetEntitySystem()->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+	// TEMP
+	for ( auto& proto : GetProtogenSys()->aEntities )
+	{
+		auto modelPath      = Ent_GetComponent< CModelPath >( proto, "modelPath" );
+		auto renderComp     = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
+		auto protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
 
-	if ( !Game_IsPaused() )
+		Assert( modelPath );
+		Assert( renderComp );
+		Assert( protoTransform );
+
+		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
+		if ( renderComp->aHandle == InvalidHandle )
+		{
+			Handle model = Graphics_LoadModel( modelPath->aPath );
+
+			if ( !model )
+				continue;
+
+			Handle        renderable = Graphics_CreateRenderable( model );
+			Renderable_t* renderData = Graphics_GetRenderableData( renderable );
+
+			if ( !renderData )
+			{
+				Log_Error( "scream\n" );
+				continue;
+			}
+
+			renderComp->aHandle = renderable;
+		}
+
+		Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+
+		if ( renderData )
+		{
+			renderData->aModelMatrix = protoTransform->ToMatrix();
+			Graphics_UpdateRenderableAABB( renderComp->aHandle );
+		}
+
+		// glm::vec3 modelForward, modelRight, modelUp;
+		// Util_GetMatrixDirection( protoTransform->ToMatrix(), &modelForward, &modelRight, &modelUp );
+		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
+		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
+		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+	}
+
+	return;
+
+	if ( !CL_IsMenuShown() && !Game_IsPaused() )
 	{
 		if ( in_proto_spam.GetBool() )
 		{
-			CreateProtogen( DEFAULT_PROTOGEN_PATH );
+			CL_SendConVar( "create_proto" );
 		}
 	}
 
-	//transform.aPos += camTransform.aPos;
-	//transform.aAng += camTransform.aAng;
+	// ?????
+	// float protoScale = vrcmdl_scale;
+
+	// TODO: maybe make this into some kind of "look at player" component? idk lol
+	// also could thread this as a test
+	for ( auto& proto : GetProtogenSys()->aEntities )
+	{
+		CRenderable_t* renderComp     = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
+		auto           protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
+
+		Assert( renderComp );
+		Assert( protoTransform );
+
+		bool          matrixChanged = false;
+
+		Renderable_t* renderable    = Graphics_GetRenderableData( renderComp->aHandle );
+
+		if ( renderable == nullptr )
+			continue;
+
+		// glm::length( renderable->aModelMatrix ) == 0.f
+
+		// TESTING: BROKEN
+		if ( proto_look == 2.f )
+		{
+		}
+		else if ( proto_look.GetBool() && !Game_IsPaused() )
+		{
+			matrixChanged = true;
+		}
+
+		// AAAAAAAAAAAAA
+		// if ( protoTransform->aScale.x != protoScale )
+		// {
+		// 	protoTransform->aScale = glm::vec3( protoScale );
+		// 	matrixChanged          = true;
+		// }
+
+		if ( matrixChanged )
+		{
+			renderable->aModelMatrix = protoTransform->ToMatrix();
+			Graphics_UpdateRenderableAABB( renderComp->aHandle );
+		}
+
+		// TEMP
+		{
+			glm::vec3 modelForward, modelRight, modelUp;
+			Util_GetMatrixDirection( renderable->aModelMatrix, &modelForward, &modelRight, &modelUp );
+			Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
+			Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
+			Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+		}
+	}
+}
+
+
+void TEST_SV_UpdateProtos( float frameTime )
+{
+#if 1
+	PROF_SCOPE();
+
+	// just use the first player for now
+	Entity player = SV_GetPlayerEntFromIndex( 0 );
+
+	auto   playerTransform = Ent_GetComponent< Transform >( player, "transform" );
+
+	Assert( playerTransform );
 
 	// ?????
 	float protoScale = vrcmdl_scale;
@@ -397,17 +598,11 @@ void TEST_UpdateProtos( float frameTime )
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
-	for ( auto& proto : g_protos )
+	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		CRenderable_t& renderComp     = GetEntitySystem()->GetComponent< CRenderable_t >( proto );
-		auto&          protoTransform = GetEntitySystem()->GetComponent< Transform >( proto );
+		auto protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
 
-		bool           matrixChanged  = false;
-
-		Renderable_t*  renderable     = Graphics_GetRenderableData( renderComp.aHandle );
-
-		if ( renderable == nullptr )
-			continue;
+		Assert( protoTransform );
 
 		// glm::length( renderable->aModelMatrix ) == 0.f
 
@@ -417,68 +612,67 @@ void TEST_UpdateProtos( float frameTime )
 			glm::vec3 forward, right, up;
 			//AngleToVectors( protoTransform.aAng, forward, right, up );
 			// Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
-			Util_GetMatrixDirection( playerTransform.ToMatrix( false ), &forward, &right, &up );
+			Util_GetMatrixDirection( playerTransform->ToMatrix( false ), &forward, &right, &up );
 
 			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
 			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
 			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
 
-			glm::vec3 protoView    = protoTransform.aPos;
+			glm::vec3 protoView    = protoTransform->aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction    = ( protoView - playerTransform.aPos );
+			glm::vec3 direction    = ( protoView - playerTransform->aPos );
 			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
 			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
 
-			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform.aPos, up );
+			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform->aPos, up );
 
 			glm::vec3 vForward, vRight, vUp;
 			Util_GetViewMatrixZDirection( protoViewMat, vForward, vRight, vUp );
 
 			glm::quat protoQuat   = protoViewMat;
 
-			glm::mat4 modelMatrix = glm::translate( protoTransform.aPos );
-
-			modelMatrix           = glm::scale( modelMatrix, glm::vec3( protoScale ) );
-
-			modelMatrix *= glm::toMat4( protoQuat );
-
-			renderable->aModelMatrix = modelMatrix;
+			// glm::mat4 modelMatrix = glm::translate( protoTransform->aPos );
+			// 
+			// modelMatrix           = glm::scale( modelMatrix, glm::vec3( protoScale ) );
+			// 
+			// modelMatrix *= glm::toMat4( protoQuat );
+			// 
+			// renderable->aModelMatrix = modelMatrix;
 		}
 		else if ( proto_look.GetBool() && !Game_IsPaused() )
 		{
-			matrixChanged = true;
+			// matrixChanged = true;
 
 			glm::vec3 forward, right, up;
-			Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
+			Util_GetDirectionVectors( playerTransform->aAng, &forward, &right, &up );
 
-			glm::vec3 protoView          = protoTransform.aPos;
+			glm::vec3 protoView          = protoTransform->aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction          = ( protoView - playerTransform.aPos );
+			glm::vec3 direction          = ( protoView - playerTransform->aPos );
 			glm::vec3 rotationAxis       = Util_VectorToAngles( direction, up );
 
-			protoTransform.aAng          = rotationAxis;
-			protoTransform.aAng[ PITCH ] = 0.f;
-			protoTransform.aAng[ YAW ] -= 90.f;
-			protoTransform.aAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
+			protoTransform->aAng          = rotationAxis;
+			protoTransform->aAng[ PITCH ] = 0.f;
+			protoTransform->aAng[ YAW ] -= 90.f;
+			protoTransform->aAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
 		}
 
-		if ( protoTransform.aScale.x != protoScale )
+		if ( protoTransform->aScale.x != protoScale )
 		{
-			protoTransform.aScale = glm::vec3( protoScale );
-			matrixChanged         = true;
+			protoTransform->aScale = glm::vec3( protoScale );
 		}
 
 		if ( proto_follow.GetBool() && !Game_IsPaused() )
 		{
-			matrixChanged = true;
-
+			// matrixChanged = true;
+		
 			glm::vec3 modelUp, modelRight, modelForward;
-			Util_GetMatrixDirection( renderable->aModelMatrix, &modelForward, &modelRight, &modelUp );
-
+			Util_GetMatrixDirection( protoTransform->ToMatrix(), &modelForward, &modelRight, &modelUp );
+		
 			ProtoTurn_t& protoTurn = protoTurnMap[ proto ];
-
+		
 			if ( protoTurn.aNextTime <= gCurTime )
 			{
 				protoTurn.aNextTime = gCurTime + ( rand() / ( RAND_MAX / 8.f ) );
@@ -486,28 +680,13 @@ void TEST_UpdateProtos( float frameTime )
 				// protoTurn.aRand     = ( rand() / ( RAND_MAX / 40.0f ) ) - 20.f;
 				protoTurn.aRand     = ( rand() / ( RAND_MAX / 360.0f ) ) - 180.f;
 			}
-
-			float randTurn      = std::lerp( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
-
-			protoTransform.aPos = protoTransform.aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
-
+		
+			float randTurn       = std::lerp( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
+		
+			protoTransform->aPos = protoTransform->aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
+		
 			// protoTransform.aAng    = protoTransform.aAng + ( modelForward * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
-			protoTransform.aAng = protoTransform.aAng + ( modelRight * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
-		}
-
-		if ( matrixChanged )
-		{
-			renderable->aModelMatrix = protoTransform.ToMatrix();
-			Graphics_UpdateRenderableAABB( renderComp.aHandle );
-		}
-
-		// TEMP
-		{
-			glm::vec3 modelForward, modelRight, modelUp;
-			Util_GetMatrixDirection( renderable->aModelMatrix, &modelForward, &modelRight, &modelUp );
-			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
-			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
-			Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+			protoTransform->aAng = protoTransform->aAng + ( modelRight * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
 		}
 	}
 #endif

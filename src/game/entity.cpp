@@ -94,6 +94,8 @@ static const char* gEntVarTypeStr[ EEntComponentVarType_Count ] = {
 	"unsigned long long",
 #endif
 
+	"std::string",
+
 	"glm::vec2",
 	"glm::vec3",
 	"glm::vec4",
@@ -175,6 +177,11 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarTyp
 		{
 			u64 value = *static_cast< u64* >( spData );
 			return vstring( "%zd", value );
+		}
+
+		case EEntComponentVarType_StdString:
+		{
+			return *(const std::string*)spData;
 		}
 
 		case EEntComponentVarType_Vec2:
@@ -324,10 +331,11 @@ void* EntityComponentPool::Create( Entity entity )
 	aComponents[ aCount++ ]         = data;
 
 	// Add it to systems
-	for ( auto system : aComponentSystems )
+	// for ( auto system : aComponentSystems )
+	if ( apComponentSystem )
 	{
-		system->aEntities.push_back( entity );
-		system->ComponentAdded( entity );
+		apComponentSystem->aEntities.push_back( entity );
+		apComponentSystem->ComponentAdded( entity );
 	}
 
 	// TODO: use malloc and use that pointer in the constructor for this
@@ -350,10 +358,11 @@ void EntityComponentPool::Remove( Entity entity )
 	}
 
 	// Remove it from systems
-	for ( auto system : aComponentSystems )
+	// for ( auto system : aComponentSystems )
+	if ( apComponentSystem )
 	{
-		system->ComponentRemoved( entity );
-		vec_remove( system->aEntities, entity );
+		apComponentSystem->ComponentRemoved( entity );
+		vec_remove( apComponentSystem->aEntities, entity );
 	}
 
 	size_t index = it->second;
@@ -532,6 +541,9 @@ void EntitySystem::Shutdown()
 	// Free component pools
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
+		if ( pool->apComponentSystem )
+			delete pool->apComponentSystem;
+
 		delete pool;
 	}
 }
@@ -552,6 +564,12 @@ void EntitySystem::CreateComponentPools()
 		}
 		
 		aComponentPools[ name ] = pool;
+
+		// Create component system if it has one registered for it
+		if ( pool->apData->aFuncNewSystem )
+		{
+			pool->apComponentSystem = pool->apData->aFuncNewSystem();
+		}
 	}
 }
 
@@ -571,6 +589,7 @@ void EntitySystem::CreateComponentPool( const char* spName )
 }
 
 
+#if 0
 void EntitySystem::RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem )
 {
 	EntityComponentPool* pool = GetComponentPool( spName );
@@ -591,11 +610,26 @@ void EntitySystem::RemoveEntityComponentSystem( const char* spName, IEntityCompo
 
 	if ( pool == nullptr )
 	{
-		Log_ErrorF( gLC_Entity, "Failed to register component system - no component pool found: \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Failed to remove component system - no component pool found: \"%s\"\n", spName );
 		return;
 	}
 
 	pool->aComponentSystems.erase( spSystem );
+}
+#endif
+
+
+IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
+{
+	EntityComponentPool* pool = GetComponentPool( spName );
+
+	if ( pool == nullptr )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to get component system - no component pool found: \"%s\"\n", spName );
+		return nullptr;
+	}
+
+	return pool->apComponentSystem;
 }
 
 
@@ -1355,7 +1389,7 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aAng ) );
 
 	CH_REGISTER_COMPONENT_RW( CModelPath, modelPath, true );
-	// CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
+	CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
 
 	// Probably should be in graphics?
 	CH_REGISTER_COMPONENT_RW( Light_t, light, true );

@@ -11,8 +11,12 @@ struct ModelPhysTest
 };
 
 
+void TEST_Init();
 void TEST_Shutdown();
 void TEST_EntUpdate();
-void TEST_UpdateProtos( float frameTime );
+
+void TEST_CL_UpdateProtos( float frameTime );
+void TEST_SV_UpdateProtos( float frameTime );
+
 void TEST_UpdateAudio();
 

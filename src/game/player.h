@@ -208,11 +208,11 @@ public:
 	// so we don't need to add these functions and call them manually
 	static void             RegisterComponents();
 
-	static void             CreateClient();
-	static void             CreateServer();
-
-	static void             DestroyClient();
-	static void             DestroyServer();
+	// static void             CreateClient();
+	// static void             CreateServer();
+	// 
+	// static void             DestroyClient();
+	// static void             DestroyServer();
 
 	void                    ComponentAdded( Entity sEntity ) override;
 	void                    ComponentRemoved( Entity sEntity ) override;

@@ -253,53 +253,14 @@ void PlayerManager::RegisterComponents()
 
 	// what the fuck
 	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
-	CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
+	CH_REGISTER_COMPONENT( CRenderable_t, renderable, false, EEntComponentNetType_Client );
+	// CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
 
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();
 	//GetEntitySystem()->RegisterComponent<PhysicsObject*>();
-}
 
-
-void PlayerManager::CreateClient()
-{
-	DestroyClient();
-	players[ CH_PLAYER_CL ] = new PlayerManager;
-
-	GetEntitySystem()->RegisterEntityComponentSystem( "playerInfo", players[ CH_PLAYER_CL ] );
-}
-
-
-void PlayerManager::CreateServer()
-{
-	DestroyServer();
-	players[ CH_PLAYER_SV ] = new PlayerManager;
-
-	GetEntitySystem()->RegisterEntityComponentSystem( "playerInfo", players[ CH_PLAYER_SV ] );
-}
-
-
-void PlayerManager::DestroyClient()
-{
-	if ( players[ CH_PLAYER_CL ] )
-	{
-		GetEntitySystem()->RemoveEntityComponentSystem( "playerInfo", players[ CH_PLAYER_CL ] );
-		delete players[ CH_PLAYER_CL ];
-	}
-
-	players[ CH_PLAYER_CL ] = nullptr;
-}
-
-
-void PlayerManager::DestroyServer()
-{
-	if ( players[ CH_PLAYER_SV ] )
-	{
-		GetEntitySystem()->RemoveEntityComponentSystem( "playerInfo", players[ CH_PLAYER_SV ] );
-		delete players[ CH_PLAYER_SV ];
-	}
-
-	players[ CH_PLAYER_SV ] = nullptr;
+	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 }
 
 

@@ -68,6 +68,8 @@ SV_Client_t*        SV_GetCommandClient();
 Entity              SV_GetCommandClientEntity();
 SV_Client_t*        SV_GetClientFromEntity( Entity sEntity );
 
+Entity              SV_GetPlayerEntFromIndex( size_t sIndex );
+
 void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
 void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData );
 void                SV_ConnectClientFinish( SV_Client_t& srClient );

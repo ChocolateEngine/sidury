@@ -59,7 +59,6 @@ void         Game_Update( float frameTime );
 void         Game_UpdateGame( float frameTime );  // epic name
 
 void         Game_SetupModels( float frameTime );
-void         Game_ResetInputs();
 void         Game_UpdateAudio();
 
 void         Game_HandleSystemEvents();

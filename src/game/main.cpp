@@ -127,6 +127,7 @@ bool Game_Init()
 	// Init Entity Component Registry
 	Ent_RegisterBaseComponents();
 	PlayerManager::RegisterComponents();
+	TEST_Init();
 
 	if ( !Net_Init() )
 	{
@@ -232,7 +233,6 @@ void Game_UpdateGame( float frameTime )
 	GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
 
 	Game_SetupModels( gFrameTime );
-	Game_ResetInputs();
 	Game_UpdateAudio();
 }
 
@@ -275,12 +275,6 @@ void Game_CheckPaused()
 void Game_SetupModels( float frameTime )
 {
 	PROF_SCOPE();
-	TEST_UpdateProtos( frameTime );
-}
-
-
-void Game_ResetInputs()
-{
 }
 
 

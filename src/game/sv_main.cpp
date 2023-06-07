@@ -5,6 +5,8 @@
 #include "entity.h"
 #include "player.h"
 
+#include "testing.h"
+
 #include <capnp/message.h>
 #include <capnp/serialize-packed.h>
 
@@ -162,6 +164,8 @@ void SV_GameUpdate( float frameTime )
 
 	// TEST_EntUpdate();
 
+	TEST_SV_UpdateProtos( frameTime );
+
 	// Update player positions after physics simulation
 	// NOTE: This probably needs to be done for everything with physics
 	for ( auto& player : GetPlayers()->aEntities )
@@ -181,8 +185,6 @@ bool SV_StartServer()
 		Log_ErrorF( "Failed to Create Server Entity System\n" );
 		return false;
 	}
-
-	PlayerManager::CreateServer();
 
 	Phys_CreateEnv( false );
 
@@ -211,11 +213,11 @@ void SV_StopServer()
 		SV_SendDisconnect( client );
 	}
 
-	PlayerManager::DestroyServer();
-
-	Phys_DestroyEnv( false );
+	MapManager_CloseMap();
 
 	EntitySystem::DestroyServer();
+
+	Phys_DestroyEnv( false );
 
 	gServerData.aActive = false;
 	gServerData.aClients.clear();
@@ -348,6 +350,15 @@ SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
 
 	Log_ErrorF( gLC_Server, "SV_GetClientFromEntity(): Failed to find entity attached to a client! (Entity %zd)\n", sEntity );
 	return nullptr;
+}
+
+
+Entity SV_GetPlayerEntFromIndex( size_t sIndex )
+{
+	if ( sIndex > gServerData.aClients.size() + 1 )
+		return CH_ENT_INVALID;
+
+	return gServerData.aClients[ sIndex ].aEntity;
 }
 
 
