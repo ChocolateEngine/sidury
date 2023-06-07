@@ -1305,6 +1305,8 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]       = EEntComponentVarType_U32;
 	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]       = EEntComponentVarType_U64;
 
+	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntComponentVarType_StdString;
+
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ] = EEntComponentVarType_Vec2;
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ] = EEntComponentVarType_Vec3;
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ] = EEntComponentVarType_Vec4;
