@@ -554,17 +554,6 @@ int Net_Connect( Socket_t sSocket, ch_sockaddr& srAddr )
 }
 
 
-void Net_Disconnect()
-{
-}
-
-
-void Net_Listen()
-{
-	// int ret = listen( (SOCKET)gListenSocket, )
-}
-
-
 // Read Incoming Data from a Socket
 int Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFrom )
 {

@@ -7,6 +7,8 @@
 #include "util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
+#include "ent_light.h"
+
 #include "graphics/graphics.h"
 
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
@@ -507,6 +509,10 @@ void EntitySystem::DestroyServer()
 
 bool EntitySystem::Init()
 {
+	aEntityCount = 0;
+	aUsedEntities.clear();
+	aComponentPools.clear();
+
 	// Initialize the queue with all possible entity IDs
 	// for ( Entity entity = 0; entity < CH_MAX_ENTITIES; ++entity )
 	// 	aEntityPool.push( entity );
@@ -545,6 +551,20 @@ void EntitySystem::Shutdown()
 			delete pool->apComponentSystem;
 
 		delete pool;
+	}
+
+	aEntityCount = 0;
+	aUsedEntities.clear();
+	aComponentPools.clear();
+}
+
+
+void EntitySystem::UpdateSystems()
+{
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		if ( pool->apComponentSystem )
+			pool->apComponentSystem->Update();
 	}
 }
 
@@ -1220,72 +1240,9 @@ CH_COMPONENT_WRITE_DEF( CModelPath )
 }
 
 
-CH_COMPONENT_READ_DEF( CPlayerMoveData )
+CH_COMPONENT_READ_DEF( CLight )
 {
-	auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
-	auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
-
-	auto  moveType   = message.getMoveType();
-
-	switch ( moveType )
-	{
-		case EPlayerMoveType::WALK:
-			spMoveData->aMoveType = PlayerMoveType::Walk;
-
-		default:
-		case EPlayerMoveType::NO_CLIP:
-			spMoveData->aMoveType = PlayerMoveType::NoClip;
-
-		case EPlayerMoveType::FLY:
-			spMoveData->aMoveType = PlayerMoveType::Fly;
-	}
-
-	spMoveData->aPlayerFlags      = message.getPlayerFlags();
-	spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
-	spMoveData->aMaxSpeed         = message.getMaxSpeed();
-
-	// Smooth Duck
-	spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
-	spMoveData->aTargetViewHeight = message.getTargetViewHeight();
-	spMoveData->aOutViewHeight    = message.getOutViewHeight();
-	spMoveData->aDuckDuration     = message.getDuckDuration();
-	spMoveData->aDuckTime         = message.getDuckTime();
-}
-
-CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
-{
-	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
-	auto  builder   = srMessage.initRoot< NetCompPlayerMoveData >();
-
-	switch ( spMoveData->aMoveType )
-	{
-		case PlayerMoveType::Walk:
-			builder.setMoveType( EPlayerMoveType::WALK );
-
-		default:
-		case PlayerMoveType::NoClip:
-			builder.setMoveType( EPlayerMoveType::NO_CLIP );
-
-		case PlayerMoveType::Fly:
-			builder.setMoveType( EPlayerMoveType::FLY );
-	}
-
-	builder.setPlayerFlags( spMoveData->aPlayerFlags );
-	builder.setPrevPlayerFlags( spMoveData->aPrevPlayerFlags );
-	builder.setMaxSpeed( spMoveData->aMaxSpeed );
-
-	// Smooth Duck
-	builder.setPrevViewHeight( spMoveData->aPrevViewHeight );
-	builder.setTargetViewHeight( spMoveData->aTargetViewHeight );
-	builder.setOutViewHeight( spMoveData->aOutViewHeight );
-	builder.setDuckDuration( spMoveData->aDuckDuration );
-	builder.setDuckTime( spMoveData->aDuckTime );
-}
-
-
-CH_COMPONENT_READ_DEF( Light_t )
-{
-	auto* spLight = static_cast< Light_t* >( spData );
+	auto* spLight = static_cast< CLight* >( spData );
 	auto  message = srReader.getRoot< NetCompLight >();
 
 	NetHelper_ReadVec4( message.getColor(), spLight->aColor );
@@ -1302,13 +1259,13 @@ CH_COMPONENT_READ_DEF( Light_t )
 	spLight->aEnabled  = message.getEnabled();
 
 	//ADJIAWDI)JDAIW)D 
-	Graphics_UpdateLight( spLight );
+	// Graphics_UpdateLight( spLight );
 }
 
 
-CH_COMPONENT_WRITE_DEF( Light_t )
+CH_COMPONENT_WRITE_DEF( CLight )
 {
-	auto* spLight = static_cast< const Light_t* >( spData );
+	auto* spLight = static_cast< const CLight* >( spData );
 	auto  builder = srMessage.initRoot< NetCompLight >();
 
 	auto  color   = builder.initColor();
@@ -1392,34 +1349,22 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
 
 	// Probably should be in graphics?
-	CH_REGISTER_COMPONENT_RW( Light_t, light, true );
-	CH_REGISTER_COMPONENT_VAR( Light_t, ELightType, aType, type );
-	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec4, aColor, color );
+	CH_REGISTER_COMPONENT_RW( CLight, light, true );
+	CH_REGISTER_COMPONENT_SYS( CLight, LightSystem, gLightEntSystems );
+	CH_REGISTER_COMPONENT_VAR( CLight, ELightType, aType, type );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec4, aColor, color );
 
 	// TODO: these 2 should not be here
     // it should be attached to it's own entity that can be parented
     // and that entity needs to contain the transform (or transform small) component
-	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec3, aPos, pos );
-	CH_REGISTER_COMPONENT_VAR( Light_t, glm::vec3, aAng, ang );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aPos, pos );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aAng, ang );
 
-	CH_REGISTER_COMPONENT_VAR( Light_t, float, aInnerFov, innerFov );
-	CH_REGISTER_COMPONENT_VAR( Light_t, float, aOuterFov, outerFov );
-	CH_REGISTER_COMPONENT_VAR( Light_t, float, aRadius, radius );
-	CH_REGISTER_COMPONENT_VAR( Light_t, float, aLength, length );
-	CH_REGISTER_COMPONENT_VAR( Light_t, bool, aShadow, shadow );
-	CH_REGISTER_COMPONENT_VAR( Light_t, bool, aEnabled, enabled );
-
-	// TODO: SHOULD NOT BE HERE !!!!!
-	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPlayerFlags, playerFlags );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
-
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewHeight, prevViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aTargetViewHeight, targetViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aOutViewHeight, outViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckDuration, duckDuration );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckTime, duckTime );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aInnerFov, innerFov );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aOuterFov, outerFov );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aRadius, radius );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aLength, length );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aShadow, shadow );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aEnabled, enabled );
 }
 

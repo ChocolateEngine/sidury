@@ -156,6 +156,8 @@ void SV_Update( float frameTime )
 
 void SV_GameUpdate( float frameTime )
 {
+	GetEntitySystem()->UpdateSystems();
+
 	MapManager_Update();
 
 	GetPlayers()->Update( frameTime );

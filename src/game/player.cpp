@@ -14,6 +14,7 @@
 #include "game_shared.h"
 #include "game_physics.h"
 #include "mapmanager.h"
+#include "ent_light.h"
 
 #include "imgui/imgui.h"
 
@@ -22,6 +23,10 @@
 #include <glm/gtx/compatibility.hpp>
 #include <algorithm>
 #include <cmath>
+
+#include "capnproto/sidury.capnp.h"
+#include <capnp/message.h>
+#include <capnp/serialize-packed.h>
 
 
 CONVAR( sv_sprint_mult, 2.4 );
@@ -209,6 +214,73 @@ float vec3_norm(glm::vec3& v)
 // ============================================================
 
 
+CH_COMPONENT_READ_DEF( CPlayerMoveData )
+{
+	auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
+	auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
+
+	auto  moveType   = message.getMoveType();
+
+	switch ( moveType )
+	{
+		case EPlayerMoveType::WALK:
+			spMoveData->aMoveType = PlayerMoveType::Walk;
+
+		default:
+		case EPlayerMoveType::NO_CLIP:
+			spMoveData->aMoveType = PlayerMoveType::NoClip;
+
+		case EPlayerMoveType::FLY:
+			spMoveData->aMoveType = PlayerMoveType::Fly;
+	}
+
+	spMoveData->aPlayerFlags      = message.getPlayerFlags();
+	spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
+	spMoveData->aMaxSpeed         = message.getMaxSpeed();
+
+	// Smooth Duck
+	spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
+	spMoveData->aTargetViewHeight = message.getTargetViewHeight();
+	spMoveData->aOutViewHeight    = message.getOutViewHeight();
+	spMoveData->aDuckDuration     = message.getDuckDuration();
+	spMoveData->aDuckTime         = message.getDuckTime();
+}
+
+
+CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
+{
+	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
+	auto  builder    = srMessage.initRoot< NetCompPlayerMoveData >();
+
+	switch ( spMoveData->aMoveType )
+	{
+		case PlayerMoveType::Walk:
+			builder.setMoveType( EPlayerMoveType::WALK );
+
+		default:
+		case PlayerMoveType::NoClip:
+			builder.setMoveType( EPlayerMoveType::NO_CLIP );
+
+		case PlayerMoveType::Fly:
+			builder.setMoveType( EPlayerMoveType::FLY );
+	}
+
+	builder.setPlayerFlags( spMoveData->aPlayerFlags );
+	builder.setPrevPlayerFlags( spMoveData->aPrevPlayerFlags );
+	builder.setMaxSpeed( spMoveData->aMaxSpeed );
+
+	// Smooth Duck
+	builder.setPrevViewHeight( spMoveData->aPrevViewHeight );
+	builder.setTargetViewHeight( spMoveData->aTargetViewHeight );
+	builder.setOutViewHeight( spMoveData->aOutViewHeight );
+	builder.setDuckDuration( spMoveData->aDuckDuration );
+	builder.setDuckTime( spMoveData->aDuckTime );
+}
+
+
+// ============================================================
+
+
 #define CH_PLAYER_SV 0
 #define CH_PLAYER_CL 1
 
@@ -239,7 +311,20 @@ PlayerManager::~PlayerManager()
 
 void PlayerManager::RegisterComponents()
 {
+	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPlayerFlags, playerFlags );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
+
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewHeight, prevViewHeight );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aTargetViewHeight, targetViewHeight );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aOutViewHeight, outViewHeight );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckDuration, duckDuration );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckTime, duckTime );
+
 	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, Entity, aEnt, ent );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
@@ -259,8 +344,6 @@ void PlayerManager::RegisterComponents()
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();
 	//GetEntitySystem()->RegisterComponent<PhysicsObject*>();
-
-	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 }
 
 
@@ -323,21 +406,23 @@ void PlayerManager::Create( Entity player )
 {
 	// Add Components to entity
 	GetEntitySystem()->AddComponent( player, "playerMoveData" );
-	// GetEntitySystem()->AddComponent( player, "playerInfo" );
 	GetEntitySystem()->AddComponent( player, "playerZoom" );
 
 	GetEntitySystem()->AddComponent( player, "rigidBody" );
 	GetEntitySystem()->AddComponent( player, "camera" );
 	GetEntitySystem()->AddComponent( player, "direction" );
 
-	Light_t* flashlight = nullptr;
+	CLight* flashlight = static_cast< CLight* >( GetEntitySystem()->AddComponent( player, "light" ) );
+
+	Assert( flashlight );
 
 	if ( Game_ProcessingClient() )
 	{
 		auto playerInfo            = GetPlayerInfo( player );
 		playerInfo->aIsLocalPlayer = player == gLocalPlayer;
 
-		flashlight                 = Graphics_CreateLight( player, ELightType_Cone );
+		Light_t* flashlightReal    = Graphics_CreateLight( ELightType_Cone );
+		flashlight->apLight        = flashlightReal;
 
 		Log_Msg( "Client Creating Local Player\n" );
 	}
@@ -356,14 +441,11 @@ void PlayerManager::Create( Entity player )
 
 		// This here is done just so the server can manage the light
 		// I really feel like im doing this wrong lol
-		flashlight        = static_cast< Light_t* >( GetEntitySystem()->AddComponent( player, "light" ) );
-		flashlight->aType = ELightType_Cone;
 
 		Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
 	}
 
-	Assert( flashlight );
-
+	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
@@ -610,7 +692,7 @@ void PlayerManager::UpdateLocalPlayer()
 
 		// apMove->MovePlayer( gLocalPlayer, &userCmd );
 		// Player_UpdateFlashlight( gLocalPlayer, &userCmd );
-		Graphics_UpdateLight( flashlight );
+		// Graphics_UpdateLight( flashlight );
 
 		// TEMP
 		camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;

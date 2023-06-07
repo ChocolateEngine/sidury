@@ -198,6 +198,16 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 	if ( it->second.aTexture )
 		render->FreeTexture( it->second.aTexture );
 
+	if ( it->second.aViewInfoIndex )
+	{
+		if ( gViewInfo.size() > it->second.aViewInfoIndex )
+		{
+			vec_remove_index( gViewInfo, it->second.aViewInfoIndex );
+			gViewInfoCount--;
+			gViewInfoUpdate = true;
+		}
+	}
+
 	gLightShadows.erase( spLight );
 }
 
@@ -522,9 +532,9 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 }
 
 
-Light_t* Graphics_CreateLight( Entity sEntity, ELightType sType )
+Light_t* Graphics_CreateLight( ELightType sType )
 {
-	Light_t* light = (Light_t*)GetEntitySystem()->AddComponent( sEntity, "light" );
+	Light_t* light = new Light_t;
 
 	if ( !light )
 	{
@@ -548,7 +558,7 @@ void Graphics_UpdateLight( Light_t* spLight )
 }
 
 
-void Graphics_DestroyLight( Entity sEntity, Light_t* spLight )
+void Graphics_DestroyLight( Light_t* spLight )
 {
 	if ( !spLight )
 		return;

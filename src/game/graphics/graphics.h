@@ -609,9 +609,9 @@ void               Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexD
 // ---------------------------------------------------------------------------------------
 // Lighting
 
-Light_t*           Graphics_CreateLight( Entity sEntity, ELightType sType );
+Light_t*           Graphics_CreateLight( ELightType sType );
 void               Graphics_UpdateLight( Light_t* spLight );
-void               Graphics_DestroyLight( Entity sEntity, Light_t* spLight );
+void               Graphics_DestroyLight( Light_t* spLight );
 
 // ---------------------------------------------------------------------------------------
 // Rendering

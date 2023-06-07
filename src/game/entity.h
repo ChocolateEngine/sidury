@@ -13,6 +13,9 @@
 #include "types/transform.h"
 #include "iaudio.h"
 
+// AAA
+#include "graphics/graphics.h"
+
 #include "iaudio.h"
 
 
@@ -465,6 +468,8 @@ class IEntityComponentSystem
 	// Called when the component is removed from this entity
 	virtual void          ComponentRemoved( Entity sEntity ) = 0;
 
+	virtual void          Update() {};
+
 	std::vector< Entity > aEntities;
 };
 
@@ -485,6 +490,8 @@ class EntitySystem
 
 	bool                                                          Init();
 	void                                                          Shutdown();
+
+	void                                                          UpdateSystems();
 
 	void                                                          CreateComponentPools();
 	void                                                          CreateComponentPool( const char* spName );
@@ -641,6 +648,13 @@ struct CRenderable_t
 struct CModelPath
 {
 	std::string aPath;
+};
+
+
+// wrapper for lights
+struct CLight : public Light_t
+{
+	Light_t* apLight;  // var not registered
 };
 
 

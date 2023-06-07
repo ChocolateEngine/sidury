@@ -223,6 +223,8 @@ void CL_GameUpdate( float frameTime )
 		Log_WarnF( gLC_Client, "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
 	}
 
+	GetEntitySystem()->UpdateSystems();
+
 	GetPlayers()->UpdateLocalPlayer();
 
 	TEST_CL_UpdateProtos( frameTime );
@@ -290,6 +292,8 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 
 	gClientState          = EClientState_Idle;
 	gClientConnectTimeout = 0.f;
+
+	GetEntitySystem()->Shutdown();
 }
 
 
@@ -300,6 +304,13 @@ void CL_Connect( const char* spAddress )
 {
 	// Make sure we are not connected to a server already
 	CL_Disconnect();
+
+	// This seems odd being here
+	if ( !GetEntitySystem()->Init() )
+	{
+		Log_Error( gLC_Client, "Failed to Init Client Entity System\n" );
+		return;
+	}
 
 	::capnp::MallocMessageBuilder message;
 	NetMsgClientInfo::Builder     clientInfoBuild = message.initRoot< NetMsgClientInfo >();
