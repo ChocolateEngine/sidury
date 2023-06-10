@@ -328,7 +328,7 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, Entity, aEnt, ent );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
 	CH_REGISTER_COMPONENT( CPlayerZoom, playerZoom, false, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
@@ -711,10 +711,10 @@ void PlayerManager::UpdateLocalPlayer()
 
 	for ( Entity player : aEntities )
 	{
-		auto     playerMove = GetPlayerMoveData( gLocalPlayer );
-		auto     playerInfo = GetPlayerInfo( gLocalPlayer );
-		auto     camera     = GetCamera( gLocalPlayer );
-		Light_t* flashlight = Ent_GetComponent< Light_t >( gLocalPlayer, "light" );
+		auto     playerMove = GetPlayerMoveData( player );
+		auto     playerInfo = GetPlayerInfo( player );
+		auto     camera     = GetCamera( player );
+		Light_t* flashlight = Ent_GetComponent< Light_t >( player, "light" );
 
 		Assert( playerMove );
 		Assert( playerInfo );
@@ -912,29 +912,30 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 		// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
 
+		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ();
+
 		if ( info->aIsLocalPlayer )
 		{
+			gViewInfo[ 0 ].aViewPos = thirdPerson.aPos;
+			Game_SetView( viewMat );
 			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
 		}
 
-		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ(  );
-
-		gViewInfo[ 0 ].aViewPos = thirdPerson.aPos;
-		Game_SetView( viewMat );
 		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
 	}
 	else
 	{
+		glm::mat4 viewMat = transformView.ToViewMatrixZ();
+
 		if ( info->aIsLocalPlayer )
 		{
 			// wtf broken??
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
+
+			gViewInfo[ 0 ].aViewPos = transformView.aPos;
+			Game_SetView( viewMat );
 		}
 
-		glm::mat4 viewMat = transformView.ToViewMatrixZ();
-
-		gViewInfo[ 0 ].aViewPos = transformView.aPos;
-		Game_SetView( viewMat );
 		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
 	}
 
