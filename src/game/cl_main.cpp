@@ -631,7 +631,8 @@ void CL_GetServerMessages()
 
 	while ( true )
 	{
-		ChVector< char > data( 8192 );
+		// TODO: SETUP FRAGMENT COMPRESSION !!!!!!!!
+		ChVector< char > data( 819200 );
 		int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
 
 		if ( len <= 0 )
