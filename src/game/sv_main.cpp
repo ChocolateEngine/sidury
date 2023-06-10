@@ -504,6 +504,8 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 
 	vec_remove( gServerData.aClientsConnecting, &srClient );
 
+	Log_MsgF( gLC_Server, "Client Connected: \"%s\"\n", srClient.aName.c_str() );
+
 	// Spawn the player in!
 	GetPlayers()->Spawn( srClient.aEntity );
 
@@ -522,6 +524,8 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	client.aName                                 = clientInfoRead.getName();
 	client.aAddr                                 = srAddr;
 	client.aState                                = ESV_ClientState_Connecting;
+
+	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", client.aName.c_str() );
 
 	// Make an entity for them
 	client.aEntity      = GetEntitySystem()->CreateEntity();

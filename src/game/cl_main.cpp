@@ -290,6 +290,7 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 
 	memset( &gClientAddr, 0, sizeof( gClientAddr ) );
 
+	Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
 	gClientState          = EClientState_Idle;
 	gClientConnectTimeout = 0.f;
 
@@ -311,6 +312,8 @@ void CL_Connect( const char* spAddress )
 		Log_Error( gLC_Client, "Failed to Init Client Entity System\n" );
 		return;
 	}
+
+	Log_MsgF( gLC_Client, "Connecting to \"%s\"\n", spAddress );
 
 	::capnp::MallocMessageBuilder message;
 	NetMsgClientInfo::Builder     clientInfoBuild = message.initRoot< NetMsgClientInfo >();
@@ -369,6 +372,8 @@ bool CL_RecvServerInfo()
 		CL_Disconnect( false );
 		return false;
 	}
+
+	Log_Msg( gLC_Client, "Receiving Server Info\n" );
 
 	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
 	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
