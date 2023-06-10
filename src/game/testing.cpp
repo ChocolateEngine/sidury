@@ -18,6 +18,8 @@ CONVAR( in_proto_spam, 0, CVARF_INPUT );
 CONVAR( proto_look, 1 );
 CONVAR( proto_follow, 0 );
 CONVAR( proto_follow_speed, 400 );
+CONVAR( proto_swap_target_sec_min, 1.0 );
+CONVAR( proto_swap_target_sec_max, 60.0 );
 
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
@@ -574,8 +576,21 @@ void TEST_SV_UpdateProtos( float frameTime )
 #if 1
 	PROF_SCOPE();
 
+	static float timeToDuel = 0.f;
+	static size_t playerID = 0;
+
+	if ( timeToDuel == 0.f )
+	{
+		timeToDuel = gCurTime + proto_swap_target_sec_min;
+	}
+	else if ( gCurTime > timeToDuel )
+	{
+		playerID = RandomInt( 0, gServerData.aClients.size() - 1 );
+		timeToDuel = gCurTime + RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+	}
+
 	// just use the first player for now
-	Entity player = SV_GetPlayerEntFromIndex( 0 );
+	Entity player = SV_GetPlayerEntFromIndex( playerID );
 
 	if ( player == CH_ENT_INVALID )
 		return;
