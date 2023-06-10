@@ -1223,17 +1223,17 @@ CH_COMPONENT_WRITE_DEF( CGravity )
 }
 
 
-CH_COMPONENT_READ_DEF( CModelPath )
+CH_COMPONENT_READ_DEF( CModelInfo )
 {
-	auto* spModelPath = static_cast< CModelPath* >( spData );
+	auto* spModelPath = static_cast< CModelInfo* >( spData );
 	auto  message     = srReader.getRoot< NetCompModelPath >();
 
 	spModelPath->aPath = message.getPath();
 }
 
-CH_COMPONENT_WRITE_DEF( CModelPath )
+CH_COMPONENT_WRITE_DEF( CModelInfo )
 {
-	const auto* spModelPath = static_cast< const CModelPath* >( spData );
+	const auto* spModelPath = static_cast< const CModelInfo* >( spData );
 	auto        builder     = srMessage.initRoot< NetCompModelPath >();
 
 	builder.setPath( spModelPath->aPath );
@@ -1291,25 +1291,25 @@ CH_COMPONENT_WRITE_DEF( CLight )
 void Ent_RegisterBaseComponents()
 {
 	// Setup Types
-	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]      = EEntComponentVarType_Bool;
-	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]     = EEntComponentVarType_Float;
-	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]    = EEntComponentVarType_Double;
+	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntComponentVarType_Bool;
+	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntComponentVarType_Float;
+	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]      = EEntComponentVarType_Double;
 
-	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]        = EEntComponentVarType_S8;
-	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]       = EEntComponentVarType_S16;
-	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]       = EEntComponentVarType_S32;
-	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]       = EEntComponentVarType_S64;
+	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]          = EEntComponentVarType_S8;
+	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]         = EEntComponentVarType_S16;
+	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]         = EEntComponentVarType_S32;
+	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]         = EEntComponentVarType_S64;
 
-	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]        = EEntComponentVarType_U8;
-	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]       = EEntComponentVarType_U16;
-	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]       = EEntComponentVarType_U32;
-	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]       = EEntComponentVarType_U64;
+	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]          = EEntComponentVarType_U8;
+	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]         = EEntComponentVarType_U16;
+	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntComponentVarType_U32;
+	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntComponentVarType_U64;
 
 	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntComponentVarType_StdString;
 
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ] = EEntComponentVarType_Vec2;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ] = EEntComponentVarType_Vec3;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ] = EEntComponentVarType_Vec4;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntComponentVarType_Vec2;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntComponentVarType_Vec3;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntComponentVarType_Vec4;
 
 	// Now Register Base Components
 	EntComp_RegisterComponent< Transform >( "transform", true, EEntComponentNetType_Both,
@@ -1347,8 +1347,9 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aPos ) );
 	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aAng ) );
 
-	CH_REGISTER_COMPONENT_RW( CModelPath, modelPath, true );
-	CH_REGISTER_COMPONENT_VAR( CModelPath, std::string, aPath, path );
+	CH_REGISTER_COMPONENT_RW( CModelInfo, modelInfo, true );
+	CH_REGISTER_COMPONENT_SYS( CModelInfo, EntSys_ModelInfo, gEntSys_ModelInfo );
+	CH_REGISTER_COMPONENT_VAR( CModelInfo, std::string, aPath, path );
 
 	// Probably should be in graphics?
 	CH_REGISTER_COMPONENT_RW( CLight, light, true );

@@ -12,8 +12,6 @@
 // This file is dedicated for random stuff and experiments with the game
 // and will be quite messy
 
-// #define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_wip_25d.obj"
-#define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_25d.glb"
 
 CONVAR( vrcmdl_scale, 40 );
 CONVAR( in_proto_spam, 0, CVARF_INPUT );
@@ -107,8 +105,8 @@ void CreateProtogen_f( const std::string& path )
 
 	Handle      model          = Graphics_LoadModel( path );
 
-	CModelPath* modelPath      = Ent_AddComponent< CModelPath >( proto, "modelPath" );
-	modelPath->aPath           = path;
+	CModelInfo* modelInfo      = Ent_AddComponent< CModelInfo >( proto, "modelInfo" );
+	modelInfo->aPath           = path;
 
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
 	// renderComp->aHandle        = Graphics_CreateRenderable( model );
@@ -462,18 +460,18 @@ void TEST_CL_UpdateProtos( float frameTime )
 	// TEMP
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		auto modelPath      = Ent_GetComponent< CModelPath >( proto, "modelPath" );
+		auto modelInfo      = Ent_GetComponent< CModelInfo >( proto, "modelInfo" );
 		auto renderComp     = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
 		auto protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
 
-		Assert( modelPath );
+		Assert( modelInfo );
 		Assert( renderComp );
 		Assert( protoTransform );
 
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
 		if ( renderComp->aHandle == InvalidHandle )
 		{
-			Handle model = Graphics_LoadModel( modelPath->aPath );
+			Handle model = Graphics_LoadModel( modelInfo->aPath );
 
 			if ( !model )
 				continue;
@@ -578,6 +576,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 	// just use the first player for now
 	Entity player = SV_GetPlayerEntFromIndex( 0 );
+
+	if ( player == CH_ENT_INVALID )
+		return;
 
 	auto   playerTransform = Ent_GetComponent< Transform >( player, "transform" );
 

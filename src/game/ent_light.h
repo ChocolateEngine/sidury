@@ -16,3 +16,20 @@ class LightSystem : public IEntityComponentSystem
 
 extern LightSystem* gLightEntSystems[ 2 ];
 
+
+// ------------------------------------------------------------
+
+
+class EntSys_ModelInfo : public IEntityComponentSystem
+{
+  public:
+	EntSys_ModelInfo();
+	~EntSys_ModelInfo();
+
+	void ComponentAdded( Entity sEntity ) override;
+	void ComponentRemoved( Entity sEntity ) override;
+	void Update() override;
+};
+
+extern EntSys_ModelInfo* gEntSys_ModelInfo[ 2 ];
+

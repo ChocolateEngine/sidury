@@ -74,3 +74,44 @@ LightSystem* GetLightEntSys()
 	return gLightEntSystems[ i ];
 }
 
+
+// ------------------------------------------------------------
+
+
+EntSys_ModelInfo::EntSys_ModelInfo()
+{
+}
+
+
+EntSys_ModelInfo::~EntSys_ModelInfo()
+{
+}
+
+
+void EntSys_ModelInfo::ComponentAdded( Entity sEntity )
+{
+	// darn, modelInfo->aPath will not be initialized, bruh this sucks
+	// i will have to do it in the Update function
+
+	// A potential solution to this, though not guaranteed,
+	// is to have AddComponent have a 3rd parameter containing data to initialize the component with
+	// though sometimes components could be added here without that data, so it's unreliable
+}
+
+
+void EntSys_ModelInfo::ComponentRemoved( Entity sEntity )
+{
+	if ( Game_ProcessingServer() )
+		return;
+}
+
+
+void EntSys_ModelInfo::Update()
+{
+	if ( Game_ProcessingServer() )
+		return;
+}
+
+
+EntSys_ModelInfo* gEntSys_ModelInfo[ 2 ] = { 0, 0 };
+

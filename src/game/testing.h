@@ -4,6 +4,9 @@ struct Model;
 class IPhysicsObject;
 
 
+#define DEFAULT_PROTOGEN_PATH "materials/models/protogen_wip_25d/protogen_25d.glb"
+
+
 struct ModelPhysTest
 {
 	Model*                         mdl;

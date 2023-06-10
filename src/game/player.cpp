@@ -15,6 +15,7 @@
 #include "game_physics.h"
 #include "mapmanager.h"
 #include "ent_light.h"
+#include "testing.h"
 
 #include "imgui/imgui.h"
 
@@ -412,6 +413,9 @@ void PlayerManager::Create( Entity player )
 	GetEntitySystem()->AddComponent( player, "camera" );
 	GetEntitySystem()->AddComponent( player, "direction" );
 
+	auto modelInfo     = Ent_AddComponent< CModelInfo >( player, "modelInfo" );
+	modelInfo->aPath   = DEFAULT_PROTOGEN_PATH;
+
 	CLight* flashlight = static_cast< CLight* >( GetEntitySystem()->AddComponent( player, "light" ) );
 
 	Assert( flashlight );
@@ -424,6 +428,11 @@ void PlayerManager::Create( Entity player )
 		Light_t* flashlightReal    = Graphics_CreateLight( ELightType_Cone );
 		flashlight->apLight        = flashlightReal;
 
+		auto renderComp = Ent_AddComponent< CRenderable_t >( player, "renderable" );
+		
+		Assert( renderComp );
+		//renderComp->aHandle = Graphics_CreateRenderable();
+
 		Log_Msg( "Client Creating Local Player\n" );
 	}
 	else
@@ -432,10 +441,8 @@ void PlayerManager::Create( Entity player )
 		if ( !client )
 			return;
 
-		auto value = _heapchk();
-		Assert( value == _HEAPOK );
-
-		auto playerInfo   = GetPlayerInfo( player );
+		// Setting the player name here crashes the game, amazing
+		auto playerInfo = GetPlayerInfo( player );
 		// playerInfo->aName = client->aName;
 		// playerInfo->aName = "bruh";
 
@@ -695,24 +702,49 @@ void PlayerManager::UpdateLocalPlayer()
 		// Graphics_UpdateLight( flashlight );
 
 		// TEMP
-		camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
+		// camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
 
-		UpdateView( playerInfo, gLocalPlayer );
+		// UpdateView( playerInfo, gLocalPlayer );
 	}
 
 	// We still need to do client updating of players actually, so
 
-	// for ( Entity player : aPlayerList )
-	// {
-	// 	// apMove->MovePlayer( gLocalPlayer, &userCmd );
-	// 
-	// 	// Player_UpdateFlashlight( player, &userCmd );
-	// 
-	// 	// TEMP
-	// 	camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
-	// 
-	// 	UpdateView( playerInfo, player );
-	// }
+	for ( Entity player : aEntities )
+	{
+		auto     playerMove = GetPlayerMoveData( gLocalPlayer );
+		auto     playerInfo = GetPlayerInfo( gLocalPlayer );
+		auto     camera     = GetCamera( gLocalPlayer );
+		Light_t* flashlight = Ent_GetComponent< Light_t >( gLocalPlayer, "light" );
+
+		Assert( playerMove );
+		Assert( playerInfo );
+		Assert( camera );
+		Assert( flashlight );
+
+		// apMove->MovePlayer( gLocalPlayer, &userCmd );
+	
+		// Player_UpdateFlashlight( player, &userCmd );
+	
+		// TEMP
+		camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
+	
+		UpdateView( playerInfo, player );
+
+		if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
+		{
+			// CRenderable_t* renderable = GetEntitySystem()->GetComponent< CRenderable_t* >( player );
+			//
+			// auto          model      = GetEntitySystem()->GetComponent< HModel >( player );
+			// Transform     transform  = GetEntitySystem()->GetComponent< Transform >( player );
+			//
+			// transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
+			//
+			// renderable->aModelMatrix = transform.ToMatrix();
+			// renderable->aModel = model.handle;
+
+			// Graphics_DrawModel( renderable );
+		}
+	}
 }
 
 

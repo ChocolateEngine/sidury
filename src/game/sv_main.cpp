@@ -17,7 +17,7 @@
 LOG_REGISTER_CHANNEL2( Server, LogColor::Green );
 
 static const char* gTestServerIP   = Args_Register( "127.0.0.1", "Test Server IPv4", "-ip" );
-static const char* gTestServerPort = Args_Register( "27016", "Test Server Port", "-port" );
+static const char* gTestServerPort = Args_Register( "27015", "Test Server Port", "-port" );
 
 NEW_CVAR_FLAG( CVARF_SERVER );
 
@@ -357,7 +357,7 @@ SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
 
 Entity SV_GetPlayerEntFromIndex( size_t sIndex )
 {
-	if ( sIndex > gServerData.aClients.size() + 1 )
+	if ( gServerData.aClients.empty() || sIndex > gServerData.aClients.size() + 1 )
 		return CH_ENT_INVALID;
 
 	return gServerData.aClients[ sIndex ].aEntity;

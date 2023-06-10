@@ -645,9 +645,12 @@ struct CRenderable_t
 };
 
 
-struct CModelPath
+struct CModelInfo
 {
+	// Path to model to load
 	std::string aPath;
+
+	// TODO: store animations, attachments, etc. here
 };
 
 

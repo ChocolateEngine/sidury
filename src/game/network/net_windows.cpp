@@ -345,7 +345,7 @@ NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
 	if ( sString == "127.0.0.1" || sString == "localhost" )
 	{
 		netAddr.aType = ENetType_Loopback;
-		netAddr.aPort = 27016;
+		netAddr.aPort = 27015;
 		netAddr.aIPV4[ 0 ] = 127;
 		netAddr.aIPV4[ 1 ] = 0;
 		netAddr.aIPV4[ 2 ] = 0;
@@ -500,7 +500,7 @@ Socket_t Net_OpenSocket( const char* spPort )
 
 	// Make this socket broadcast capable
 	// HACK FOR CLIENT
-	// if ( strcmp( spPort, "0" ) != 0 )
+	if ( strcmp( spPort, "0" ) != 0 )
 	{
 		int i = 1;
 		if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )
@@ -508,15 +508,15 @@ Socket_t Net_OpenSocket( const char* spPort )
 			Log_ErrorF( gLC_Network, "Failed to set socket option SO_BROADCAST: %s\n", Net_ErrorString() );
 			return CH_INVALID_SOCKET;
 		}
-	}
 
-	iResult = bind( newSocket, result->ai_addr, (int)result->ai_addrlen );
-	if ( iResult == SOCKET_ERROR )
-	{
-		Log_ErrorF( gLC_Network, "Failed to bind socket to address \"%s\": %s\n", Net_AddrToString( (ch_sockaddr&)result->ai_addr ), Net_ErrorString() );
-		freeaddrinfo( result );
-		closesocket( newSocket );
-		return CH_INVALID_SOCKET;
+		iResult = bind( newSocket, result->ai_addr, (int)result->ai_addrlen );
+		if ( iResult == SOCKET_ERROR )
+		{
+			Log_ErrorF( gLC_Network, "Failed to bind socket to address \"%s\": %s\n", Net_AddrToString( (ch_sockaddr&)result->ai_addr ), Net_ErrorString() );
+			freeaddrinfo( result );
+			closesocket( newSocket );
+			return CH_INVALID_SOCKET;
+		}
 	}
 
 	Log_DevF( gLC_Network, 1, "Opened Socket on Port \"%s\"\n", spPort );
