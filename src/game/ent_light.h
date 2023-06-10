@@ -11,6 +11,7 @@ class LightSystem : public IEntityComponentSystem
 
 	void ComponentAdded( Entity sEntity ) override;
 	void ComponentRemoved( Entity sEntity ) override;
+	void ComponentUpdated( Entity sEntity ) override;
 	void Update() override;
 };
 
@@ -29,6 +30,7 @@ class EntSys_ModelInfo : public IEntityComponentSystem
 
 	void ComponentAdded( Entity sEntity ) override;
 	void ComponentRemoved( Entity sEntity ) override;
+	void ComponentUpdated( Entity sEntity ) override;
 	void Update() override;
 };
 

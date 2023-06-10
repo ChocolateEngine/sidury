@@ -235,7 +235,7 @@ void LightEditor_DrawEditor()
 		return;
 	}
 
-	auto playerTransform = Ent_GetComponent< Transform >( gLocalPlayer, "transform" );
+	auto playerTransform = Ent_GetComponent< CTransform >( gLocalPlayer, "transform" );
 	auto camera          = Ent_GetComponent< CCamera >( gLocalPlayer, "camera" );
 
 	if ( !playerTransform )
@@ -244,7 +244,7 @@ void LightEditor_DrawEditor()
 	if ( !camera )
 		return;
 
-	TransformSmall& camTransform = camera->aTransform;
+	const CTransformSmall& camTransform = camera->aTransform.Get();
 
 	if ( ImGui::Button( "Create Directional Light" ) )
 	{
@@ -279,9 +279,9 @@ void LightEditor_DrawEditor()
 			light->aColor  = { 1, 1, 1, 10 };
 
 			// weird stuff to get the angle of the light correct from the player's view matrix stuff
-			light->aAng.x =  camTransform.aAng.z;
-			light->aAng.y = -camTransform.aAng.y;
-			light->aAng.z = -camTransform.aAng.x + 90.f;
+			light->aAng.x =  camTransform.aAng.Get().z;
+			light->aAng.y = -camTransform.aAng.Get().y;
+			light->aAng.z = -camTransform.aAng.Get().x + 90.f;
 
 			light->aInnerFov = 0.f;  // FOV
 			light->aOuterFov = 45.f;  // FOV

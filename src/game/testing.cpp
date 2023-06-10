@@ -76,7 +76,35 @@ class ProtogenSystem : public IEntityComponentSystem
 
 	void ComponentRemoved( Entity sEntity ) override
 	{
+		if ( !Game_ProcessingClient() )
+			return;
+
+		auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+
+		if ( !renderComp )
+			return;
+
+		Renderable_t* renderable = Graphics_GetRenderableData( renderComp->aHandle );
+
+		if ( renderable )
+			Graphics_FreeModel( renderable->aModel );
+
+		Graphics_FreeRenderable( renderComp->aHandle );
+
+		// GetEntitySystem()->RemoveComponent( sEntity, "renderable" );
 	}
+
+	void ComponentUpdated( Entity sEntity ) override
+	{
+		if ( Game_ProcessingClient() )
+			aUpdated.push_back( sEntity );
+	}
+
+	void Update() override
+	{
+	}
+
+	std::vector< Entity > aUpdated;
 };
 
 
@@ -113,12 +141,12 @@ void CreateProtogen_f( const std::string& path )
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
 	// renderComp->aHandle        = Graphics_CreateRenderable( model );
 
-	Transform* transform       = Ent_AddComponent< Transform >( proto, "transform" );
+	CTransform* transform       = Ent_AddComponent< CTransform >( proto, "transform" );
 
-	auto       playerTransform = Ent_GetComponent< Transform >( player, "transform" );
+	auto       playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
 
 	transform->aPos            = playerTransform->aPos;
-	transform->aScale          = { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() };
+	transform->aScale.Set( { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() } );
 #endif
 }
 
@@ -464,7 +492,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 	{
 		auto modelInfo      = Ent_GetComponent< CModelInfo >( proto, "modelInfo" );
 		auto renderComp     = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
-		auto protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
+		auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
 
 		Assert( modelInfo );
 		Assert( renderComp );
@@ -494,7 +522,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 
 		if ( renderData )
 		{
-			renderData->aModelMatrix = protoTransform->ToMatrix();
+			Util_ToMatrix( renderData->aModelMatrix, protoTransform->aPos, protoTransform->aAng, protoTransform->aScale );
 			Graphics_UpdateRenderableAABB( renderComp->aHandle );
 		}
 
@@ -504,6 +532,8 @@ void TEST_CL_UpdateProtos( float frameTime )
 		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
 		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
 	}
+
+	GetProtogenSys()->aUpdated.clear();
 }
 
 
@@ -531,7 +561,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 	if ( player == CH_ENT_INVALID )
 		return;
 
-	auto   playerTransform = Ent_GetComponent< Transform >( player, "transform" );
+	auto   playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
 
 	Assert( playerTransform );
 
@@ -552,7 +582,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 	// also could thread this as a test
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		auto protoTransform = Ent_GetComponent< Transform >( proto, "transform" );
+		auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
 
 		Assert( protoTransform );
 
@@ -564,7 +594,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 forward, right, up;
 			//AngleToVectors( protoTransform.aAng, forward, right, up );
 			// Util_GetDirectionVectors( playerTransform.aAng, &forward, &right, &up );
-			Util_GetMatrixDirection( playerTransform->ToMatrix( false ), &forward, &right, &up );
+			glm::mat4 playerMatrix;
+			Util_ToMatrix( playerMatrix, playerTransform->aPos, playerTransform->aAng );
+			Util_GetMatrixDirection( playerMatrix, &forward, &right, &up );
 
 			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
 			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
@@ -573,11 +605,11 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 protoView    = protoTransform->aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction    = ( protoView - playerTransform->aPos );
+			glm::vec3 direction    = ( protoView - playerTransform->aPos.Get() );
 			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
 			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
 
-			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform->aPos, up );
+			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform->aPos.Get(), up );
 
 			glm::vec3 vForward, vRight, vUp;
 			Util_GetViewMatrixZDirection( protoViewMat, vForward, vRight, vUp );
@@ -602,16 +634,16 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 protoView          = protoTransform->aPos;
 			//protoView.z += cl_view_height;
 
-			glm::vec3 direction          = ( protoView - playerTransform->aPos );
+			glm::vec3 direction          = ( protoView - playerTransform->aPos.Get() );
 			glm::vec3 rotationAxis       = Util_VectorToAngles( direction, up );
 
 			protoTransform->aAng          = rotationAxis;
-			protoTransform->aAng[ PITCH ] = 0.f;
-			protoTransform->aAng[ YAW ] -= 90.f;
-			protoTransform->aAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
+			protoTransform->aAng.Edit()[ PITCH ] = 0.f;
+			protoTransform->aAng.Edit()[ YAW ] -= 90.f;
+			protoTransform->aAng.Edit()[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
 		}
 
-		if ( protoTransform->aScale.x != protoScale )
+		if ( protoTransform->aScale.Get().x != protoScale )
 		{
 			protoTransform->aScale = glm::vec3( protoScale );
 		}
@@ -621,7 +653,11 @@ void TEST_SV_UpdateProtos( float frameTime )
 			// matrixChanged = true;
 		
 			glm::vec3 modelUp, modelRight, modelForward;
-			Util_GetMatrixDirection( protoTransform->ToMatrix(), &modelForward, &modelRight, &modelUp );
+
+			glm::mat4 protoMatrix;
+			Util_ToMatrix( protoMatrix, protoTransform->aPos, protoTransform->aAng, protoTransform->aScale );
+
+			Util_GetMatrixDirection( protoMatrix, &modelForward, &modelRight, &modelUp );
 		
 			ProtoTurn_t& protoTurn = protoTurnMap[ proto ];
 		

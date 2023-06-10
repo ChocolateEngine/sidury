@@ -6,6 +6,7 @@
 #include "player.h"
 
 #include "testing.h"
+#include "igui.h"
 
 #include <capnp/message.h>
 #include <capnp/serialize-packed.h>
@@ -128,20 +129,20 @@ void SV_Update( float frameTime )
 	// Main game loop
 	SV_GameUpdate( frameTime );
 
-	// TEMP - REMOVE ONCE YOU HAVE FRAME UPDATE DATA
-	// return;
+	// TODO: Sync Server Convars with clients
 
 	// Send updated data to clients
 	capnp::MallocMessageBuilder message;
 	SV_BuildUpdatedData( message );
 	auto array = capnp::messageToFlatArray( message );
 
+	int  writeSize = 0;
+
 	for ( auto& client : gServerData.aClients )
 	{
 		if ( client.aState != ESV_ClientState_Connected )
 			continue;
 
-		// int write = Net_Write( client.aSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &client.aAddr );
 		int write = client.Write( array.asChars().begin(), array.size() * sizeof( capnp::word ) );
 
 		// If we failed to write, disconnect them?
@@ -150,6 +151,15 @@ void SV_Update( float frameTime )
 			Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
 			client.aState = ESV_ClientState_Disconnected;
 		}
+		else
+		{
+			writeSize = write;
+		}
+	}
+
+	if ( Game_IsClient() )
+	{
+		gui->DebugMessage( "Data Written to Each Client: %d bytes", writeSize );
 	}
 }
 
@@ -163,8 +173,6 @@ void SV_GameUpdate( float frameTime )
 	GetPlayers()->Update( frameTime );
 
 	Phys_Simulate( GetPhysEnv(), frameTime );
-
-	// TEST_EntUpdate();
 
 	TEST_SV_UpdateProtos( frameTime );
 
@@ -267,13 +275,6 @@ void SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMes
 }
 
 
-void SV_SendMessageToClient2( SV_Client_t& srClient, capnp::MessageBuilder& srMessage, EMsgSrcServer sType )
-{
-	auto array = capnp::messageToFlatArray( srMessage );
-	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
-}
-
-
 // hi im a server here's a taco - agrimar
 void SV_BuildServerInfo( capnp::MessageBuilder& srMessage )
 {
@@ -303,7 +304,7 @@ void SV_SendServerInfo( SV_Client_t& srClient )
 void SV_SendDisconnect( SV_Client_t& srClient )
 {
 	capnp::MallocMessageBuilder message;
-	NetMsgDisconnect::Builder     disconnectMsg = message.initRoot< NetMsgDisconnect >();
+	NetMsgDisconnect::Builder   disconnectMsg = message.initRoot< NetMsgDisconnect >();
 
 	disconnectMsg.setReason( "Saving chunks." );
 

@@ -26,6 +26,8 @@ namespace capnp
 	class MessageBuilder;
 }
 
+template< typename T >
+struct ComponentNetVar;
 
 class EntitySystem;
 class IEntityComponentSystem;
@@ -80,7 +82,7 @@ using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
 
 // Functions for serializing and deserializing Components with Cap'n Proto
 using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
-using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const void* spData );
+using FEntComp_WriteFunc = bool( capnp::MessageBuilder& srMessage, const void* spData );
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
@@ -89,7 +91,7 @@ using FEntComp_Register  = void( const char* spName );
 using FEntComp_VarCopy   = void( void* spSrc, size_t sOffset, void* spOut );
 
 
-enum EEntComponentVarType
+enum EEntComponentVarType : u8
 {
 	EEntComponentVarType_Invalid,
 
@@ -151,9 +153,10 @@ enum EEntityCreateState
 struct EntComponentVarData_t
 {
 	EEntComponentVarType aType;
+	bool                 aIsNetVar;
+	size_t               aSize;
 	const char*          apVarName;
 	const char*          apName;
-	// size_t         aOffset;
 };
 
 
@@ -361,11 +364,12 @@ template< typename T >
 inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 {
 	size_t typeHash = typeid( T ).hash_code();
+
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
 
 	if ( it == gEntComponentRegistry.aComponents.end() )
 	{
-		Log_ErrorF( "Component not registered, can't set system creation function: \"%s\" - \"%s\"\n", typeid( T ).name() );
+		Log_ErrorF( "Component not registered, can't set system creation function: \"%s\"\n", typeid( T ).name() );
 		return;
 	}
 
@@ -375,7 +379,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset )
+inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -395,9 +399,23 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 		return;
 	}
 
-	auto& varData     = data.aVars[ sOffset ];
-	varData.apVarName = spVarName;
-	varData.apName    = spName;
+	auto& varData       = data.aVars[ sOffset ];
+	varData.apVarName   = spVarName;
+	varData.apName      = spName;
+	varData.aSize       = sizeof( VAR_TYPE );
+
+	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
+
+	if ( sVarHash != typeid( ComponentNetVar< VAR_TYPE > ).hash_code() )
+	{
+		varData.aIsNetVar = false;
+		// Log_ErrorF( "Not Registering Component Var, is not a ComponentNetVar Type: \"%s\" - \"%s\"\n", typeid( VAR_TYPE ).name(), spVarName );
+		// return;
+	}
+	else
+	{
+		varData.aIsNetVar = true;
+	}
 
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
@@ -468,6 +486,9 @@ class IEntityComponentSystem
 	// Called when the component is removed from this entity
 	virtual void          ComponentRemoved( Entity sEntity ) = 0;
 
+	// Called when the component data has been updated
+	virtual void          ComponentUpdated( Entity sEntity ) = 0;
+
 	virtual void          Update() {};
 
 	std::vector< Entity > aEntities;
@@ -496,10 +517,7 @@ class EntitySystem
 	void                                                          CreateComponentPools();
 	void                                                          CreateComponentPool( const char* spName );
 
-	// TODO: move this to part of registering components probably
-	void                                                          RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
-	void                                                          RemoveEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem );
-
+	// Get a system for managing this component 
 	IEntityComponentSystem*                                       GetComponentSystem( const char* spName );
 
 	// Entity                                                        CreateEntityNetworked();
@@ -546,6 +564,22 @@ class EntitySystem
 	// Get the Component Pool for this Component
 	EntityComponentPool*                                          GetComponentPool( const char* spName );
 
+	// Gets a component system by type_hash()
+	template< typename T >
+	inline T* GetSystem()
+	{
+		size_t hash = typeid( T ).hash_code();
+		auto   it   = aComponentSystems.find( hash );
+
+		if ( it != aComponentSystems.end() )
+		{
+			static_cast< T* >( it->second );
+		}
+
+		Log_ErrorF( "Failed to find Component System \"%s\"\n", typeid( T ).name() );
+		return nullptr;
+	}
+
 	// TEMP DEBUG
 	bool                                                          aIsClient = false;
 
@@ -569,8 +603,12 @@ class EntitySystem
 	// Component Array - list of all of this type of component in existence
 	std::unordered_map< std::string_view, EntityComponentPool* >  aComponentPools;
 
+	// All Component Systems, key is the type_hash() of the system
+	// NOTE: it's a bit strange to have them be stored here and one in each component pool
+	std::unordered_map< size_t, IEntityComponentSystem* >         aComponentSystems;
+
 	// Entity States, will store if an entity is just created or deleted for one frame
-	std::unordered_map< Entity, EntityComponentPool* >            aEntityStates;
+	// std::unordered_map< Entity, EntityComponentPool* >            aEntityStates;
 };
 
 
@@ -588,75 +626,447 @@ inline T* Ent_AddComponent( Entity sEnt, const char* spName )
 }
 
 
-inline void*  Ent_GetComponent( Entity sEnt, const char* spName )
+inline void* Ent_GetComponent( Entity sEnt, const char* spName )
 {
 	return GetEntitySystem()->GetComponent( sEnt, spName );
 }
 
+// Gets a component and static cast's it to the desired type
 template< typename T >
 inline T* Ent_GetComponent( Entity sEnt, const char* spName )
 {
 	return static_cast< T* >( GetEntitySystem()->GetComponent( sEnt, spName ) );
 }
 
+// Gets a component system by type_hash()
+template< typename T >
+inline T* Ent_GetSystem()
+{
+	return static_cast< T* >( GetEntitySystem()->GetSystem< T >() );
+}
+
+
+// ==========================================
+// Network Var
+// ==========================================
+
+
+template< typename T >
+struct ComponentNetVar
+{
+	T    aValue;
+	bool aIsDirty = true;
+
+	ComponentNetVar() :
+		aIsDirty( true ), aValue()
+	{
+	}
+
+	template< typename VAR_TYPE = int >
+	ComponentNetVar( VAR_TYPE var ) :
+		aIsDirty( true ), aValue( var )
+	{
+	}
+
+	~ComponentNetVar()
+	{
+	}
+
+	const T& Set( const T* spValue )
+	{
+		// if ( aValue != *spValue )
+		if ( memcmp( &aValue, spValue, sizeof( T ) ) != 0 )
+		{
+			aIsDirty = true;
+			aValue   = *spValue;
+		}
+
+		return aValue;
+	}
+
+	const T& Set( const T& srValue )
+	{
+		if ( memcmp( &aValue, &srValue, sizeof( T ) ) != 0 )
+		{
+			aIsDirty = true;
+			aValue   = srValue;
+		}
+
+		return aValue;
+	}
+
+	// const T& Set( const T& srValue )
+	// {
+	// 	if ( aValue != srValue )
+	// 	{
+	// 		aIsDirty = true;
+	// 		aValue   = srValue;
+	// 	}
+	// }
+
+	const T& Get() const
+	{
+		return aValue;
+	}
+
+	T& Edit()
+	{
+		aIsDirty = true;
+		return aValue;
+	}
+
+	// -------------------------------------------------
+	// Operators
+
+	operator const T&() const
+	{
+		return aValue;
+	}
+
+	// T* operator->() const
+	// {
+	// 	return &aValue;
+	// }
+
+	// T* operator()() const
+	// {
+	// 	return &aValue;
+	// }
+
+	const T& operator=( const T* spValue )
+	{
+		return Set( spValue );
+	}
+
+	// const T& operator=( const T& srValue )
+	// {
+	// 	return Set( srValue );
+	// }
+
+	bool operator==( const T& srValue ) const
+	{
+		return aValue == srValue;
+	}
+
+	bool operator!=( const T& srValue ) const
+	{
+		return aValue != srValue;
+	}
+
+	const T& operator+=( const T* spValue )
+	{
+		aIsDirty = true;
+		aValue += *spValue;
+		return aValue;
+	}
+
+	const T& operator+=( const T& srValue )
+	{
+		aIsDirty = true;
+		aValue += srValue;
+		return aValue;
+	}
+
+	const T& operator*=( const T* spValue )
+	{
+		aIsDirty = true;
+		aValue *= *spValue;
+		return aValue;
+	}
+
+	const T& operator*=( const T& srValue )
+	{
+		aIsDirty = true;
+		aValue *= srValue;
+		return aValue;
+	}
+
+	T operator*( const T& srValue ) const
+	{
+		return aValue * srValue;
+	}
+
+	T operator/( const T& srValue ) const
+	{
+		return aValue / srValue;
+	}
+
+	T operator+( const T& srValue ) const
+	{
+		return aValue + srValue;
+	}
+
+	T operator-( const T& srValue ) const
+	{
+		return aValue - srValue;
+	}
+
+	template< typename OTHER_TYPE = int >
+	T operator*( const OTHER_TYPE& srValue ) const
+	{
+		return aValue * srValue;
+	}
+
+#if 0
+	template< typename OTHER_TYPE = int >
+	T operator/( const OTHER_TYPE& srValue ) const
+	{
+		return aValue / srValue;
+	}
+
+	template< typename OTHER_TYPE = int >
+	T operator+( const OTHER_TYPE& srValue ) const
+	{
+		return aValue + srValue;
+	}
+
+	template< typename OTHER_TYPE = int >
+	T operator-( const OTHER_TYPE& srValue ) const
+	{
+		return aValue - srValue;
+	}
+
+	// Index into the buffer
+	template< typename INDEX_TYPE = int >
+	T& operator[]( INDEX_TYPE sIndex )
+	{
+		return aValue[ sIndex ];
+	}
+#endif
+
+	// -------------------------------------------------
+	// C++ class essentials
+
+	// copying
+	void assign( const ComponentNetVar& other )
+	{
+		Set( &other.aValue );
+	}
+
+	// moving
+	void assign( ComponentNetVar&& other )
+	{
+		Set( &other.aValue );
+
+		// swap the values of this one with that one
+		// std::swap( aIsDirty, other.aIsDirty );
+		// std::swap( aValue, other.aValue );
+	}
+
+#if 1
+	ComponentNetVar& operator=( const ComponentNetVar& other )
+	{
+		assign( other );
+		return *this;
+	}
+
+	ComponentNetVar& operator=( ComponentNetVar&& other )
+	{
+		assign( std::move( other ) );
+		return *this;
+	}
+#endif
+
+	// copying
+	ComponentNetVar( const ComponentNetVar& other )
+	{
+		assign( other );
+	}
+
+	// moving
+	ComponentNetVar( ComponentNetVar&& other )
+	{
+		assign( std::move( other ) );
+	}
+};
+
 
 // ==========================================
 // Some Base Types here for now
 
 
+struct CTransform
+{
+	ComponentNetVar< glm::vec3 > aPos   = {};
+	ComponentNetVar< glm::vec3 > aAng   = {};
+	ComponentNetVar< glm::vec3 > aScale = {};
+
+	// -------------------------------------------------
+	// C++ class essentials
+
+	CTransform()
+	{
+	}
+
+	~CTransform()
+	{
+	}
+
+	// copying
+	void                         assign( const CTransform& other )
+	{
+		aPos   = std::move( other.aPos );
+		aAng   = std::move( other.aAng );
+		aScale = std::move( other.aScale );
+	}
+
+	// moving
+	void assign( CTransform&& other )
+	{
+		// swap the values of this one with that one
+		std::swap( aPos, other.aPos );
+		std::swap( aAng, other.aAng );
+		std::swap( aScale, other.aScale );
+	}
+
+	CTransform& operator=( const CTransform& other )
+	{
+		assign( other );
+		return *this;
+	}
+
+	CTransform& operator=( CTransform&& other )
+	{
+		assign( std::move( other ) );
+		return *this;
+	}
+
+	// copying
+	CTransform( const CTransform& other )
+	{
+		assign( other );
+	}
+
+	// moving
+	CTransform( CTransform&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
+};
+
+
+struct CTransformSmall
+{
+	ComponentNetVar< glm::vec3 > aPos = {};
+	ComponentNetVar< glm::vec3 > aAng = {};
+
+	// -------------------------------------------------
+	// C++ class essentials
+
+	CTransformSmall()
+	{
+	}
+
+	~CTransformSmall()
+	{
+	}
+
+	// copying
+	void                         assign( const CTransformSmall& other )
+	{
+		aPos   = std::move( other.aPos );
+		aAng   = std::move( other.aAng );
+	}
+
+	// moving
+	void assign( CTransformSmall&& other )
+	{
+		// swap the values of this one with that one
+		std::swap( aPos, other.aPos );
+		std::swap( aAng, other.aAng );
+	}
+
+	CTransformSmall& operator=( const CTransformSmall& other )
+	{
+		assign( other );
+		return *this;
+	}
+
+	CTransformSmall& operator=( CTransformSmall&& other )
+	{
+		assign( std::move( other ) );
+		return *this;
+	}
+
+	// copying
+	CTransformSmall( const CTransformSmall& other )
+	{
+		assign( other );
+	}
+
+	// moving
+	CTransformSmall( CTransformSmall&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
+};
+
+
 struct CRigidBody
 {
-	glm::vec3 aVel = {};
-	glm::vec3 aAccel = {};
+	ComponentNetVar< glm::vec3 > aVel = {};
+	ComponentNetVar< glm::vec3 > aAccel = {};
 };
 
 
 struct CGravity
 {
-	glm::vec3 aForce = {};
+	// glm::vec3 aForce = {};
+	ComponentNetVar< glm::vec3 > aForce = {};
 };
 
 
 // Direction Vectors
 struct CDirection
 {
-	glm::vec3 aForward = {};
-	glm::vec3 aUp = {};
-	glm::vec3 aRight = {};
+	ComponentNetVar< glm::vec3 > aForward = {};
+	ComponentNetVar< glm::vec3 > aUp = {};
+	ComponentNetVar< glm::vec3 > aRight = {};
 };
 
 
 struct CCamera: public CDirection
 {
-	TransformSmall aTransform = {};
-	float          aFov = 90.f;
+	ComponentNetVar< CTransformSmall > aTransform = {};
+	ComponentNetVar< float >           aFov       = 90.f;
 };
 
 
 struct CSound
 {
-	Handle aStream = InvalidHandle;
+	ComponentNetVar< Handle > aStream = InvalidHandle;
 };
 
 
 struct CRenderable_t
 {
-	Handle aHandle;
+	ComponentNetVar< Handle > aHandle = InvalidHandle;
 };
 
 
 struct CModelInfo
 {
 	// Path to model to load
-	std::string aPath;
+	ComponentNetVar< std::string > aPath;
 
 	// TODO: store animations, attachments, etc. here
 };
 
 
 // wrapper for lights
-struct CLight : public Light_t
+struct CLight
 {
+	ComponentNetVar< ELightType > aType = ELightType_Directional;
+	ComponentNetVar< glm::vec4 >  aColor{};
+	ComponentNetVar< glm::vec3 >  aPos{};
+	ComponentNetVar< glm::vec3 >  aAng{};
+	ComponentNetVar< float >      aInnerFov = 45.f;
+	ComponentNetVar< float >      aOuterFov = 45.f;
+	ComponentNetVar< float >      aRadius   = 0.f;
+	ComponentNetVar< float >      aLength   = 0.f;
+	ComponentNetVar< bool >       aShadow   = true;
+	ComponentNetVar< bool >       aEnabled  = true;
+
 	Light_t* apLight;  // var not registered
 };
 
@@ -685,7 +1095,7 @@ struct CLight : public Light_t
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, newFunc, freeFunc )
 
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
-  EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ) )
+  EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
 
 #define CH_REGISTER_COMPONENT_RW_EX( type, read, write ) \
   EntComp_RegisterComponentReadWrite< type >( read, write )
@@ -694,7 +1104,7 @@ struct CLight : public Light_t
   static void __EntCompFunc_Read_##type( capnp::MessageReader& srReader, void* spData )
 
 #define CH_COMPONENT_WRITE_DEF( type ) \
-  static void __EntCompFunc_Write_##type( capnp::MessageBuilder& srMessage, const void* spData )
+  static bool __EntCompFunc_Write_##type( capnp::MessageBuilder& srMessage, const void* spData )
 
 #define CH_COMPONENT_RW( type )    __EntCompFunc_Read_##type, __EntCompFunc_Write_##type
 #define CH_COMPONENT_READ( type )  __EntCompFunc_Read_##type
@@ -717,8 +1127,8 @@ struct CLight : public Light_t
 // Helper Macros for Registering Standard Var Types
 
 #define CH_REGISTER_COMP_VAR_VEC3( type, varName, varStr ) \
-  EntComp_RegisterComponentVar< type, glm::vec3 >( #varName, #varStr, offsetof( type, varName ) )
+  CH_REGISTER_COMPONENT_VAR( type, glm::vec3, varName, varStr )
 
 #define CH_REGISTER_COMPT_VAR_FL( type, varName, varStr ) \
-  EntComp_RegisterComponentVar< type, float >( #varName, #varStr, offsetof( type, varName ) )
+  CH_REGISTER_COMPONENT_VAR( type, float, varName, varStr )
 

@@ -43,23 +43,23 @@ enum class PlayerMoveType
 struct CPlayerMoveData
 {
 	// General
-	PlayerMoveType          aMoveType = PlayerMoveType::Walk;
+	ComponentNetVar< PlayerMoveType > aMoveType         = PlayerMoveType::Walk;
 
-	PlayerFlags             aPlayerFlags = PlyNone;
-	PlayerFlags             aPrevPlayerFlags = PlyNone;
+	ComponentNetVar< PlayerFlags >    aPlayerFlags      = PlyNone;
+	ComponentNetVar< PlayerFlags >    aPrevPlayerFlags  = PlyNone;
 
-	float                   aMaxSpeed = 0.f;
+	ComponentNetVar< float >          aMaxSpeed         = 0.f;
 
 	// View Bobbing
-	float                   aWalkTime = 0.f;
-	float                   aBobOffsetAmount = 0.f;
+	float                             aWalkTime         = 0.f;
+	float                             aBobOffsetAmount  = 0.f;
 
 	// Smooth Duck
-	float                   aPrevViewHeight = 0.f;
-	float                   aTargetViewHeight = 0.f;
-	float                   aOutViewHeight = 0.f;
-	float                   aDuckDuration = 0.f;
-	float                   aDuckTime = 0.f;
+	ComponentNetVar< float >          aPrevViewHeight   = 0.f;
+	ComponentNetVar< float >          aTargetViewHeight = 0.f;
+	ComponentNetVar< float >          aOutViewHeight    = 0.f;
+	ComponentNetVar< float >          aDuckDuration     = 0.f;
+	ComponentNetVar< float >          aDuckTime         = 0.f;
 
 	// Sound Effects
 	double                  aLastStepTime = 0.f;
@@ -85,19 +85,19 @@ struct CPlayerMoveData
 
 struct CPlayerZoom
 {
-	float aOrigFov{};
-	float aNewFov{};
-	float aZoomChangeFov{};
-	float aZoomTime{};
-	float aZoomDuration{};
+	ComponentNetVar< float > aOrigFov{};
+	ComponentNetVar< float > aNewFov{};
+	ComponentNetVar< float > aZoomChangeFov{};
+	ComponentNetVar< float > aZoomTime{};
+	ComponentNetVar< float > aZoomDuration{};
+	ComponentNetVar< bool >  aWasZoomed{};
 };
 
 
 struct CPlayerInfo
 {
-	Entity          aEnt;
-	std::string     aName = "";
-	bool            aIsLocalPlayer = false;  // only used on client, probably should split off from this
+	// std::string aName;
+	bool        aIsLocalPlayer = false;  // only used on client, probably should split off from this
 };
 
 
@@ -183,7 +183,7 @@ class PlayerMovement // : public ComponentSystem
 
 	CPlayerMoveData* apMove      = nullptr;
 	CRigidBody*      apRigidBody = nullptr;
-	Transform*       apTransform = nullptr;
+	CTransform*      apTransform = nullptr;
 	CCamera*         apCamera    = nullptr;
 	CDirection*      apDir       = nullptr;
 
@@ -216,6 +216,7 @@ public:
 
 	void                    ComponentAdded( Entity sEntity ) override;
 	void                    ComponentRemoved( Entity sEntity ) override;
+	void                    ComponentUpdated( Entity sEntity ) override;
 
 	// Set's current player to manage, and prepares all components for use
 	bool                    SetCurrentPlayer( Entity player );
@@ -241,7 +242,7 @@ PlayerManager* GetPlayers();
 inline auto GetPlayerMoveData( Entity ent ) { return Ent_GetComponent< CPlayerMoveData >( ent, "playerMoveData" ); }
 inline auto GetPlayerZoom( Entity ent )     { return Ent_GetComponent< CPlayerZoom >(  ent, "playerZoom" ); }
 inline auto GetPlayerInfo( Entity ent )     { return Ent_GetComponent< CPlayerInfo >( ent, "playerInfo" ); }
-inline auto GetTransform( Entity ent )      { return Ent_GetComponent< Transform >( ent, "transform" ); }
+inline auto GetTransform( Entity ent )      { return Ent_GetComponent< CTransform >( ent, "transform" ); }
 inline auto GetCamera( Entity ent )         { return Ent_GetComponent< CCamera >( ent, "camera" ); }
 inline auto GetRigidBody( Entity ent )      { return Ent_GetComponent< CRigidBody >( ent, "rigidBody" ); }
 inline auto GetComp_Direction( Entity ent ) { return Ent_GetComponent< CDirection >( ent, "direction" ); }

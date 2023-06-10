@@ -92,7 +92,8 @@ enum : EShaderFlags
 };
 
 
-enum ELightType // : char
+using ELightType = int;
+enum : ELightType
 {
 	ELightType_Directional,  // World
 	ELightType_Point,

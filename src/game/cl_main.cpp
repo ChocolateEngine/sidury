@@ -451,7 +451,7 @@ void CL_UpdateUserCmd()
 	gClientUserCmd.aButtons    = 0;
 	gClientUserCmd.aFlashlight = false;
 
-	gClientUserCmd.aAng     = camera->aTransform.aAng;
+	gClientUserCmd.aAng     = camera->aTransform.Get().aAng;
 
 	// Don't update buttons if the menu is shown
 	if ( CL_IsMenuShown() )
@@ -600,13 +600,24 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 			if ( !regData->aOverrideClient )
 				continue;
 
-			auto values = componentRead.getValues();
+			if ( componentRead.hasValues() )
+			{
+				auto values = componentRead.getValues();
 
-			// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.data(), values.size() ) );
-			capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.begin(), values.size() ) );
-			regData->apRead( reader, componentData );
+				// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.data(), values.size() ) );
+				capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.begin(), values.size() ) );
+				regData->apRead( reader, componentData );
 
-			Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
+				Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
+
+				// Tell the Component System this entity's component updated
+				IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( regData->apName );
+
+				if ( system )
+				{
+					system->ComponentUpdated( entity );
+				}
+			}
 
 
 			// NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();

@@ -1,6 +1,7 @@
 #include <capnp/message.h>
 #include <capnp/serialize-packed.h>
 
+#include "main.h"
 #include "game_shared.h"
 #include "entity.h"
 #include "world.h"
@@ -8,6 +9,7 @@
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "ent_light.h"
+#include "igui.h"
 
 #include "graphics/graphics.h"
 
@@ -22,6 +24,9 @@ EntComponentRegistry_t gEntComponentRegistry;
 
 EntitySystem*          cl_entities                                     = nullptr;
 EntitySystem*          sv_entities                                     = nullptr;
+
+
+CONVAR( ent_write_all_data, 0, "Ignore whether a component var is dirty, and write all the data anyway" );
 
 
 // void* EntComponentRegistry_Create( std::string_view sName )
@@ -113,6 +118,88 @@ const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType )
 }
 
 
+void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
+{
+	size_t offset = 0;
+	switch ( sVarType )
+	{
+		default:
+		case EEntComponentVarType_Invalid:
+			return;
+
+		case EEntComponentVarType_Bool:
+			offset = sizeof( bool );
+			break;
+
+		case EEntComponentVarType_Float:
+			offset = sizeof( float );
+			break;
+
+		case EEntComponentVarType_Double:
+			offset = sizeof( double );
+			break;
+
+
+		case EEntComponentVarType_S8:
+			offset = sizeof( s8 );
+			break;
+
+		case EEntComponentVarType_S16:
+			offset = sizeof( s16 );
+			break;
+
+		case EEntComponentVarType_S32:
+			offset = sizeof( s32 );
+			break;
+
+		case EEntComponentVarType_S64:
+			offset = sizeof( s64 );
+			break;
+
+
+		case EEntComponentVarType_U8:
+			offset = sizeof( u8 );
+			break;
+
+		case EEntComponentVarType_U16:
+			offset = sizeof( u16 );
+			break;
+
+		case EEntComponentVarType_U32:
+		{
+			offset = sizeof( u32 );
+			break;
+		}
+		case EEntComponentVarType_U64:
+			offset = sizeof( u64 );
+			break;
+
+
+		case EEntComponentVarType_StdString:
+			offset = sizeof( std::string );
+			break;
+
+		case EEntComponentVarType_Vec2:
+			offset = sizeof( glm::vec2 );
+			break;
+
+		case EEntComponentVarType_Vec3:
+			offset = sizeof( glm::vec3 );
+			break;
+
+		case EEntComponentVarType_Vec4:
+			offset = sizeof( glm::vec4 );
+			break;
+	}
+
+	if ( offset )
+	{
+		bool* aIsDirty = reinterpret_cast< bool* >( spData + offset );
+		*aIsDirty      = false;
+	}
+}
+
+
 std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType )
 {
 	switch ( sVarType )
@@ -156,7 +243,7 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarTyp
 		}
 		case EEntComponentVarType_S64:
 		{
-			s32 value = *static_cast< s32* >( spData );
+			s64 value = *static_cast< s64* >( spData );
 			return vstring( "%lld", value );
 		}
 
@@ -548,7 +635,10 @@ void EntitySystem::Shutdown()
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
 		if ( pool->apComponentSystem )
+		{
+			aComponentSystems.erase( typeid( pool->apComponentSystem ).hash_code() );
 			delete pool->apComponentSystem;
+		}
 
 		delete pool;
 	}
@@ -574,22 +664,7 @@ void EntitySystem::CreateComponentPools()
 	// iterate through all registered components and create a component pool for them
 	for ( auto& [ name, componentData ] : gEntComponentRegistry.aComponentNames )
 	{
-		EntityComponentPool* pool = new EntityComponentPool;
-
-		if ( !pool->Init( name.data() ) )
-		{
-			Log_ErrorF( gLC_Entity, "Failed to create component pool for \"%s\"", name.data() );
-			delete pool;
-			continue;
-		}
-		
-		aComponentPools[ name ] = pool;
-
-		// Create component system if it has one registered for it
-		if ( pool->apData->aFuncNewSystem )
-		{
-			pool->apComponentSystem = pool->apData->aFuncNewSystem();
-		}
+		CreateComponentPool( name.data() );
 	}
 }
 
@@ -606,37 +681,14 @@ void EntitySystem::CreateComponentPool( const char* spName )
 	}
 		
 	aComponentPools[ spName ] = pool;
-}
 
-
-#if 0
-void EntitySystem::RegisterEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem )
-{
-	EntityComponentPool* pool = GetComponentPool( spName );
-
-	if ( pool == nullptr )
+	// Create component system if it has one registered for it
+	if ( pool->apData->aFuncNewSystem )
 	{
-		Log_ErrorF( gLC_Entity, "Failed to register component system - no component pool found: \"%s\"\n", spName );
-		return;
+		pool->apComponentSystem                                            = pool->apData->aFuncNewSystem();
+		aComponentSystems[ typeid( pool->apComponentSystem ).hash_code() ] = pool->apComponentSystem;
 	}
-
-	pool->aComponentSystems.emplace( spSystem );
 }
-
-
-void EntitySystem::RemoveEntityComponentSystem( const char* spName, IEntityComponentSystem* spSystem )
-{
-	EntityComponentPool* pool = GetComponentPool( spName );
-
-	if ( pool == nullptr )
-	{
-		Log_ErrorF( gLC_Entity, "Failed to remove component system - no component pool found: \"%s\"\n", spName );
-		return;
-	}
-
-	pool->aComponentSystems.erase( spSystem );
-}
-#endif
 
 
 IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
@@ -822,12 +874,36 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 			}
 
 			capnp::MallocMessageBuilder compMessageBuilder;
-			regData->apWrite( compMessageBuilder, data );
-			auto array = capnp::messageToFlatArray( compMessageBuilder );
+			if ( regData->apWrite( compMessageBuilder, data ) )
+			{
+				auto array = capnp::messageToFlatArray( compMessageBuilder );
 
-			auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
-			// std::copy( array.begin(), array.end(), valueBuilder.begin() );
-			memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+				if ( Game_IsClient() )
+				{
+					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, array.size() * sizeof( capnp::word ) );
+				}
+
+				auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
+				// std::copy( array.begin(), array.end(), valueBuilder.begin() );
+				memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+			}
+			else
+			{
+				// compBuilder.initValues( 0 );
+			}
+
+			// Reset Component Var Dirty Values
+			if ( !ent_write_all_data )
+			{
+				for ( const auto& [ offset, var ] : regData->aVars )
+				{
+					char* dataChar = static_cast< char* >( data );
+					// EntComp_ResetVarDirty( dataChar + offset, var.aType );
+
+					bool* aIsDirty = reinterpret_cast< bool* >( dataChar + var.aSize + offset );
+					*aIsDirty      = false;
+				}
+			}
 		}
 	}
 }
@@ -1075,50 +1151,125 @@ CONCMD( ent_dump )
 // ====================================================================================================
 
 
+#define CH_NET_WRITE_VEC2( varFunc, var ) \
+	if ( var.aIsDirty ) { \
+		auto builderVar = builder.init##varFunc(); \
+		NetHelper_WriteVec2( &builderVar, var ); \
+	}
+
+#define CH_NET_WRITE_VEC3( varFunc, var ) \
+	if ( var.aIsDirty ) { \
+		auto builderVar = builder.init##varFunc(); \
+		NetHelper_WriteVec3( &builderVar, var ); \
+	}
+
+#define CH_NET_WRITE_VEC4( varFunc, var ) \
+	if ( var.aIsDirty ) { \
+		auto builderVar = builder.init##varFunc(); \
+		NetHelper_WriteVec4( &builderVar, var ); \
+	}
+
+
+#define CH_NET_WRITE_VEC3_PTR( varFunc, var ) \
+	if ( var.aIsDirty ) { \
+		auto builderVar = builder->init##varFunc(); \
+		NetHelper_WriteVec3( &builderVar, var ); \
+	}
+
+
 // TODO: try this instead for all these
-// void TEMP_TransformRead( NetCompTransform::Reader& srReader, void* spData )
 void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
 {
-	Transform* spTransform = static_cast< Transform* >( spData );
+	CTransform* spTransform = static_cast< CTransform* >( spData );
 	auto       message     = srReader.getRoot< NetCompTransform >();
 
-	NetHelper_ReadVec3( message.getPos(), spTransform->aPos );
-	NetHelper_ReadVec3( message.getAng(), spTransform->aAng );
-	NetHelper_ReadVec3( message.getScale(), spTransform->aScale );
+	if ( message.hasPos() )
+		NetHelper_ReadVec3( message.getPos(), spTransform->aPos.Edit() );
+
+	if ( message.hasAng() )
+		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );
+
+	if ( message.hasScale() )
+		NetHelper_ReadVec3( message.getScale(), spTransform->aScale.Edit() );
 }
 
-void TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
+bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
 {
-	const Transform* spTransform = static_cast< const Transform* >( spData );
-	auto             builder     = srMessage.initRoot< NetCompTransform >();
+	const CTransform* spTransform = static_cast< const CTransform* >( spData );
+	bool              isDirty     = false;
 
-	auto             pos         = builder.initPos();
-	NetHelper_WriteVec3( &pos, spTransform->aPos );
+	isDirty |= spTransform->aPos.aIsDirty;
+	isDirty |= spTransform->aAng.aIsDirty;
+	isDirty |= spTransform->aScale.aIsDirty;
 
-	auto ang = builder.initAng();
-	NetHelper_WriteVec3( &ang, spTransform->aAng );
+	if ( !isDirty )
+		return false;
 
-	auto scale = builder.initScale();
-	NetHelper_WriteVec3( &scale, spTransform->aScale );
+	auto builder = srMessage.initRoot< NetCompTransform >();
+
+	if ( spTransform->aPos.aIsDirty )
+	{
+		auto pos = builder.initPos();
+		NetHelper_WriteVec3( &pos, spTransform->aPos );
+	}
+
+	CH_NET_WRITE_VEC3( Ang, spTransform->aAng );
+	CH_NET_WRITE_VEC3( Scale, spTransform->aScale );
+
+	// if ( spTransform->aAng.aIsDirty )
+	// {
+	// 	auto ang = builder.initAng();
+	// 	NetHelper_WriteVec3( &ang, spTransform->aAng );
+	// }
+	// 
+	// if ( spTransform->aScale.aIsDirty )
+	// {
+	// 	auto scale = builder.initScale();
+	// 	NetHelper_WriteVec3( &scale, spTransform->aScale );
+	// }
+
+	return true;
 }
 
 
-CH_COMPONENT_READ_DEF( TransformSmall )
+CH_COMPONENT_READ_DEF( CTransformSmall )
 {
-	TransformSmall* spTransform = static_cast< TransformSmall* >( spData );
-	auto            message     = srReader.getRoot< NetCompTransformSmall >();
+	CTransformSmall* spTransform = static_cast< CTransformSmall* >( spData );
+	auto             message     = srReader.getRoot< NetCompTransformSmall >();
 
-	NetHelper_ReadVec3( message.getPos(), spTransform->aPos );
-	NetHelper_ReadVec3( message.getAng(), spTransform->aAng );
+	if ( message.hasPos() )
+		NetHelper_ReadVec3( message.getPos(), spTransform->aPos.Edit() );
+
+	if ( message.hasAng() )
+		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );
 }
 
-CH_COMPONENT_WRITE_DEF( TransformSmall )
+CH_COMPONENT_WRITE_DEF( CTransformSmall )
 {
-	const TransformSmall* spTransform = static_cast< const TransformSmall* >( spData );
-	auto                  builder     = srMessage.initRoot< NetCompTransformSmall >();
+	const CTransformSmall* spTransform = static_cast< const CTransformSmall* >( spData );
+	bool                   isDirty     = false;
 
-	// NetHelper_WriteVec3( &builder.initPos(), spTransform->aPos );
-	// NetHelper_WriteVec3( &builder.initAng(), spTransform->aAng );
+	isDirty |= spTransform->aPos.aIsDirty;
+	isDirty |= spTransform->aAng.aIsDirty;
+
+	if ( !isDirty && !ent_write_all_data )
+		return false;
+
+	auto builder     = srMessage.initRoot< NetCompTransformSmall >();
+
+	if ( spTransform->aPos.aIsDirty )
+	{
+		auto pos = builder.initPos();
+		NetHelper_WriteVec3( &pos, spTransform->aPos );
+	}
+
+	if ( spTransform->aAng.aIsDirty )
+	{
+		auto ang = builder.initAng();
+		NetHelper_WriteVec3( &ang, spTransform->aAng );
+	}
+
+	return true;
 }
 
 
@@ -1127,32 +1278,50 @@ CH_COMPONENT_READ_DEF( CRigidBody )
 	CRigidBody* spRigidBody = static_cast< CRigidBody* >( spData );
 	auto        message     = srReader.getRoot< NetCompRigidBody >();
 
-	NetHelper_ReadVec3( message.getVel(), spRigidBody->aVel );
-	NetHelper_ReadVec3( message.getAccel(), spRigidBody->aAccel );
+	if ( message.hasVel() )
+		NetHelper_ReadVec3( message.getVel(), spRigidBody->aVel.Edit() );
+
+	if ( message.hasAccel() )
+		NetHelper_ReadVec3( message.getAccel(), spRigidBody->aAccel.Edit() );
 }
 
 CH_COMPONENT_WRITE_DEF( CRigidBody )
 {
 	const CRigidBody* spRigidBody = static_cast< const CRigidBody* >( spData );
-	auto              builder  = srMessage.initRoot< NetCompRigidBody >();
+	bool              isDirty     = false;
 
-	// NetHelper_WriteVec3( &builder.initVel(), spRigidBody->aVel );
-	// NetHelper_WriteVec3( &builder.initAccel(), spRigidBody->aAccel );
+	isDirty |= spRigidBody->aVel.aIsDirty;
+	isDirty |= spRigidBody->aAccel.aIsDirty;
+
+	if ( !isDirty && !ent_write_all_data )
+		return false;
+
+	auto builder  = srMessage.initRoot< NetCompRigidBody >();
+
+	CH_NET_WRITE_VEC3( Vel, spRigidBody->aVel );
+	CH_NET_WRITE_VEC3( Accel, spRigidBody->aAccel );
+
+	return true;
 }
 
 // TEMP, USE THESE PRIMARILY IN THE FUTURE
 void NetComp_ReadDirection( const NetCompDirection::Reader& srReader, CDirection& srData )
 {
-	NetHelper_ReadVec3( srReader.getForward(), srData.aForward );
-	NetHelper_ReadVec3( srReader.getUp(), srData.aUp );
-	NetHelper_ReadVec3( srReader.getRight(), srData.aRight );
+	if ( srReader.hasForward() )
+		NetHelper_ReadVec3( srReader.getForward(), srData.aForward.Edit() );
+
+	if ( srReader.hasUp() )
+		NetHelper_ReadVec3( srReader.getUp(), srData.aUp.Edit() );
+
+	if ( srReader.hasRight() )
+		NetHelper_ReadVec3( srReader.getRight(), srData.aRight.Edit() );
 }
 
-void NetComp_WriteDirection( NetCompDirection::Builder* spBuilder, const CDirection& srData )
+void NetComp_WriteDirection( NetCompDirection::Builder* builder, const CDirection& srData )
 {
-	// NetHelper_WriteVec3( &spBuilder->initForward(), srData.aForward );
-	// NetHelper_WriteVec3( &spBuilder->initUp(), srData.aUp );
-	// NetHelper_WriteVec3( &spBuilder->initRight(), srData.aRight );
+	CH_NET_WRITE_VEC3_PTR( Forward, srData.aForward );
+	CH_NET_WRITE_VEC3_PTR( Up, srData.aUp );
+	CH_NET_WRITE_VEC3_PTR( Right, srData.aRight );
 }
 
 CH_COMPONENT_READ_DEF( CDirection )
@@ -1166,8 +1335,16 @@ CH_COMPONENT_READ_DEF( CDirection )
 CH_COMPONENT_WRITE_DEF( CDirection )
 {
 	const CDirection* spDirection = static_cast< const CDirection* >( spData );
-	auto              builder     = srMessage.initRoot< NetCompDirection >();
+	bool              isDirty     = false;
 
+	isDirty |= spDirection->aForward.aIsDirty;
+	isDirty |= spDirection->aRight.aIsDirty;
+	isDirty |= spDirection->aUp.aIsDirty;
+
+	if ( !isDirty && !ent_write_all_data )
+		return false;
+
+	auto builder = srMessage.initRoot< NetCompDirection >();
 	NetComp_WriteDirection( &builder, *spDirection );
 }
 
@@ -1177,32 +1354,63 @@ CH_COMPONENT_READ_DEF( CCamera )
 	CCamera* spCamera = static_cast< CCamera* >( spData );
 	auto     message  = srReader.getRoot< NetCompCamera >();
 
-	NetComp_ReadDirection( message.getDirection(), *spCamera );
+	if ( message.hasDirection() )
+		NetComp_ReadDirection( message.getDirection(), *spCamera );
 
 	spCamera->aFov = message.getFov();
 
-	NetHelper_ReadVec3( message.getTransform().getPos(), spCamera->aTransform.aPos );
-	NetHelper_ReadVec3( message.getTransform().getAng(), spCamera->aTransform.aAng );
+	if ( message.hasTransform() )
+	{
+		if ( message.getTransform().hasPos() )
+			NetHelper_ReadVec3( message.getTransform().getPos(), spCamera->aTransform.Edit().aPos.Edit() );
+
+		if ( message.getTransform().hasAng() )
+			NetHelper_ReadVec3( message.getTransform().getAng(), spCamera->aTransform.Edit().aAng.Edit() );
+	}
 }
 
 CH_COMPONENT_WRITE_DEF( CCamera )
 {
 	const CCamera* spCamera = static_cast< const CCamera* >( spData );
-	auto           builder  = srMessage.initRoot< NetCompCamera >();
 
-	// NetComp_WriteDirection( &builder.initDirection(), *spCamera );
+	bool           isDirty  = false;
+	isDirty |= spCamera->aFov.aIsDirty;
+	isDirty |= spCamera->aTransform.aIsDirty;
+	isDirty |= spCamera->aForward.aIsDirty;
+	isDirty |= spCamera->aRight.aIsDirty;
+	isDirty |= spCamera->aUp.aIsDirty;
 
-	builder.setFov( spCamera->aFov );
+	if ( !isDirty )
+		return false;
 
-	Vec3::Builder pos = builder.getTransform().initPos();
-	pos.setX( spCamera->aTransform.aPos.x );
-	pos.setY( spCamera->aTransform.aPos.y );
-	pos.setZ( spCamera->aTransform.aPos.z );
+	auto builder  = srMessage.initRoot< NetCompCamera >();
 
-	Vec3::Builder ang = builder.getTransform().initAng();
-	ang.setX( spCamera->aTransform.aAng.x );
-	ang.setY( spCamera->aTransform.aAng.y );
-	ang.setZ( spCamera->aTransform.aAng.z );
+	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty )
+	{
+		auto dir = builder.initDirection();
+		NetComp_WriteDirection( &dir, *spCamera );
+	}
+
+	// if ( spCamera->aFov.aIsDirty )
+		builder.setFov( spCamera->aFov );
+
+	if ( spCamera->aTransform.Get().aPos.aIsDirty )
+	{
+		Vec3::Builder pos = builder.getTransform().initPos();
+		pos.setX( spCamera->aTransform.Get().aPos.Get().x );
+		pos.setY( spCamera->aTransform.Get().aPos.Get().y );
+		pos.setZ( spCamera->aTransform.Get().aPos.Get().z );
+	}
+
+	if ( spCamera->aTransform.Get().aAng.aIsDirty )
+	{
+		Vec3::Builder ang = builder.getTransform().initAng();
+		ang.setX( spCamera->aTransform.Get().aAng.Get().x );
+		ang.setY( spCamera->aTransform.Get().aAng.Get().y );
+		ang.setZ( spCamera->aTransform.Get().aAng.Get().z );
+	}
+
+	return true;
 }
 
 
@@ -1211,15 +1419,24 @@ CH_COMPONENT_READ_DEF( CGravity )
 	CGravity* spGravity = static_cast< CGravity* >( spData );
 	auto      message  = srReader.getRoot< NetCompGravity >();
 
-	NetHelper_ReadVec3( message.getForce(), spGravity->aForce );
+	if ( message.hasForce() )
+		NetHelper_ReadVec3( message.getForce(), spGravity->aForce.Edit() );
 }
 
 CH_COMPONENT_WRITE_DEF( CGravity )
 {
 	const CGravity* spGravity = static_cast< const CGravity* >( spData );
-	auto            builder   = srMessage.initRoot< NetCompGravity >();
+	bool            isDirty   = false;
 
-	// NetHelper_WriteVec3( &builder.initForce(), spGravity->aForce );
+	isDirty |= spGravity->aForce.aIsDirty;
+
+	if ( !isDirty )
+		return false;
+
+	auto builder = srMessage.initRoot< NetCompGravity >();
+
+	CH_NET_WRITE_VEC3( Force, spGravity->aForce );
+	return true;
 }
 
 
@@ -1233,10 +1450,17 @@ CH_COMPONENT_READ_DEF( CModelInfo )
 
 CH_COMPONENT_WRITE_DEF( CModelInfo )
 {
-	const auto* spModelPath = static_cast< const CModelInfo* >( spData );
-	auto        builder     = srMessage.initRoot< NetCompModelPath >();
+	const auto* spModelInfo = static_cast< const CModelInfo* >( spData );
 
-	builder.setPath( spModelPath->aPath );
+	bool        isDirty     = false;
+	isDirty |= spModelInfo->aPath.aIsDirty;
+
+	if ( !isDirty )
+		return false;
+
+	auto builder = srMessage.initRoot< NetCompModelPath >();
+
+	builder.setPath( spModelInfo->aPath.Get() );
 }
 
 
@@ -1245,9 +1469,14 @@ CH_COMPONENT_READ_DEF( CLight )
 	auto* spLight = static_cast< CLight* >( spData );
 	auto  message = srReader.getRoot< NetCompLight >();
 
-	NetHelper_ReadVec4( message.getColor(), spLight->aColor );
-	NetHelper_ReadVec3( message.getPos(), spLight->aPos );
-	NetHelper_ReadVec3( message.getAng(), spLight->aAng );
+	if ( message.hasColor() )
+		NetHelper_ReadVec4( message.getColor(), spLight->aColor.Edit() );
+
+	if ( message.hasPos() )
+		NetHelper_ReadVec3( message.getPos(), spLight->aPos.Edit() );
+
+	if ( message.hasAng() )
+		NetHelper_ReadVec3( message.getAng(), spLight->aAng.Edit() );
 
 	spLight->aType     = static_cast< ELightType >( message.getType() );
 	spLight->aInnerFov = message.getInnerFov();
@@ -1266,16 +1495,32 @@ CH_COMPONENT_READ_DEF( CLight )
 CH_COMPONENT_WRITE_DEF( CLight )
 {
 	auto* spLight = static_cast< const CLight* >( spData );
+
+	// Don't update anything else if the light isn't even enabled
+	// Actually, this may cause issues for a multiplayer map editor
+	// if ( !spLight->aEnabled && !spLight->aEnabled.aIsDirty )
+	// 	return false;
+
+	bool  isDirty = false;
+	isDirty |= spLight->aColor.aIsDirty;
+	isDirty |= spLight->aAng.aIsDirty;
+	isDirty |= spLight->aPos.aIsDirty;
+	isDirty |= spLight->aType.aIsDirty;
+	isDirty |= spLight->aInnerFov.aIsDirty;
+	isDirty |= spLight->aOuterFov.aIsDirty;
+	isDirty |= spLight->aRadius.aIsDirty;
+	isDirty |= spLight->aLength.aIsDirty;
+	isDirty |= spLight->aShadow.aIsDirty;
+	isDirty |= spLight->aEnabled.aIsDirty;
+
+	if ( !isDirty )
+		return false;
+
 	auto  builder = srMessage.initRoot< NetCompLight >();
 
-	auto  color   = builder.initColor();
-	NetHelper_WriteVec4( &color, spLight->aColor );
-
-	auto pos = builder.initPos();
-	NetHelper_WriteVec3( &pos, spLight->aPos );
-
-	auto ang = builder.initAng();
-	NetHelper_WriteVec3( &ang, spLight->aAng );
+	CH_NET_WRITE_VEC4( Color, spLight->aColor );
+	CH_NET_WRITE_VEC3( Pos, spLight->aPos );
+	CH_NET_WRITE_VEC3( Ang, spLight->aAng );
 
 	builder.setType( spLight->aType );
 	builder.setInnerFov( spLight->aInnerFov );
@@ -1312,17 +1557,30 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntComponentVarType_Vec4;
 
 	// Now Register Base Components
-	EntComp_RegisterComponent< Transform >( "transform", true, EEntComponentNetType_Both,
-		[ & ]() { return new Transform; }, [ & ]( void* spData ) { delete (Transform*)spData; } );
+	EntComp_RegisterComponent< CTransform >( "transform", true, EEntComponentNetType_Both,
+		[ & ]() { return new CTransform; }, [ & ]( void* spData ) { delete (CTransform*)spData; } );
 
-	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aPos", "pos", offsetof( Transform, aPos ) );
-	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aAng", "ang", offsetof( Transform, aAng ) );
-	EntComp_RegisterComponentVar< Transform, glm::vec3 >( "aScale", "scale", offsetof( Transform, aScale ) );
-	EntComp_RegisterComponentReadWrite< Transform >( TEMP_TransformRead, TEMP_TransformWrite );
+	// {
+	// 	size_t typeHashVar  = typeid( CTransform::aPos ).hash_code();
+	// 	size_t typeHashTest = typeid( ComponentNetVar< glm::vec3 > ).hash_code();
+	// 
+	// 	Assert( typeHashVar != typeid( ComponentNetVar< glm::vec3 > ).hash_code() );
+	// 
+	// 	if ( typeHashVar != typeid( ComponentNetVar< glm::vec3 > ).hash_code() )
+	// 	{
+	// 		Log_ErrorF( "Not Registering Component Var, is not a ComponentNetVar Type: \"%s\" - \"%s\"\n", typeid( glm::vec3 ).name(), "test" );
+	// 		return;
+	// 	}
+	// }
 
-	CH_REGISTER_COMPONENT_RW( TransformSmall, transformSmall, true );
-	CH_REGISTER_COMPONENT_VAR( TransformSmall, glm::vec3, aPos, pos );
-	CH_REGISTER_COMPONENT_VAR( TransformSmall, glm::vec3, aAng, ang );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aPos", "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
+	EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
+
+	CH_REGISTER_COMPONENT_RW( CTransformSmall, transformSmall, true );
+	CH_REGISTER_COMPONENT_VAR( CTransformSmall, glm::vec3, aPos, pos );
+	CH_REGISTER_COMPONENT_VAR( CTransformSmall, glm::vec3, aAng, ang );
 
 	CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
 	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aVel, vel );
@@ -1344,8 +1602,8 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aForward, forward );
 	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aUp, up );
 	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aRight, right );
-	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aPos ) );
-	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aAng ) );
+	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aValue.aPos ), typeid( CCamera::aTransform.aValue.aPos ).hash_code() );
+	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aValue.aAng ), typeid( CCamera::aTransform.aValue.aAng ).hash_code() );
 
 	CH_REGISTER_COMPONENT_RW( CModelInfo, modelInfo, true );
 	CH_REGISTER_COMPONENT_SYS( CModelInfo, EntSys_ModelInfo, gEntSys_ModelInfo );

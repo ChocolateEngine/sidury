@@ -142,7 +142,7 @@ CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 	if ( !rigidBody )
 		return;
 
-	rigidBody->aVel = {0, 0, 0};
+	rigidBody->aVel.Edit() = { 0, 0, 0 };
 }
 
 
@@ -251,7 +251,23 @@ CH_COMPONENT_READ_DEF( CPlayerMoveData )
 CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 {
 	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
-	auto  builder    = srMessage.initRoot< NetCompPlayerMoveData >();
+
+	bool  isDirty    = false;
+	isDirty |= spMoveData->aMoveType.aIsDirty;
+	isDirty |= spMoveData->aPlayerFlags.aIsDirty;
+	isDirty |= spMoveData->aPrevPlayerFlags.aIsDirty;
+	isDirty |= spMoveData->aMaxSpeed.aIsDirty;
+
+	isDirty |= spMoveData->aPrevViewHeight.aIsDirty;
+	isDirty |= spMoveData->aTargetViewHeight.aIsDirty;
+	isDirty |= spMoveData->aOutViewHeight.aIsDirty;
+	isDirty |= spMoveData->aDuckDuration.aIsDirty;
+	isDirty |= spMoveData->aDuckTime.aIsDirty;
+
+	if ( !isDirty )
+		return false;
+
+	auto builder = srMessage.initRoot< NetCompPlayerMoveData >();
 
 	switch ( spMoveData->aMoveType )
 	{
@@ -276,6 +292,8 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 	builder.setOutViewHeight( spMoveData->aOutViewHeight );
 	builder.setDuckDuration( spMoveData->aDuckDuration );
 	builder.setDuckTime( spMoveData->aDuckTime );
+
+	return true;
 }
 
 
@@ -313,7 +331,7 @@ PlayerManager::~PlayerManager()
 void PlayerManager::RegisterComponents()
 {
 	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerMoveType, aMoveType, moveType );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPlayerFlags, playerFlags );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
@@ -326,8 +344,7 @@ void PlayerManager::RegisterComponents()
 
 	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, Entity, aEnt, ent );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
 	CH_REGISTER_COMPONENT( CPlayerZoom, playerZoom, false, EEntComponentNetType_Both );
@@ -336,6 +353,7 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed );
 
 	// what the fuck
 	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
@@ -355,6 +373,11 @@ void PlayerManager::ComponentAdded( Entity sEntity )
 
 
 void PlayerManager::ComponentRemoved( Entity sEntity )
+{
+}
+
+
+void PlayerManager::ComponentUpdated( Entity sEntity )
 {
 }
 
@@ -456,7 +479,7 @@ void PlayerManager::Create( Entity player )
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
-	flashlight->aColor         = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
+	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
 	Transform*       transform = (Transform*)GetEntitySystem()->AddComponent( player, "transform" );
 
@@ -526,14 +549,14 @@ void PlayerManager::Respawn( Entity player )
 	Assert( zoom );
 	Assert( physObj );
 
-	transform->aPos         = MapManager_GetSpawnPos();
-	transform->aAng         = { 0, MapManager_GetSpawnAng().y, 0 };
-	camera->aTransform.aAng = MapManager_GetSpawnAng();
-	rigidBody->aVel         = { 0, 0, 0 };
-	rigidBody->aAccel       = { 0, 0, 0 };
+	transform->aPos                = MapManager_GetSpawnPos();
+	transform->aAng.Edit()         = { 0, MapManager_GetSpawnAng().y, 0 };
+	camera->aTransform.Edit().aAng = MapManager_GetSpawnAng();
+	rigidBody->aVel.Edit()         = { 0, 0, 0 };
+	rigidBody->aAccel.Edit()       = { 0, 0, 0 };
 
-	zoom->aOrigFov          = r_fov;
-	zoom->aNewFov           = r_fov;
+	zoom->aOrigFov                 = r_fov.GetFloat();
+	zoom->aNewFov                  = r_fov.GetFloat();
 
 	physObj->SetLinearVelocity( { 0, 0, 0 } );
 
@@ -545,9 +568,9 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 {
 	PROF_SCOPE();
 
-	Transform* transform  = GetTransform( player );
-	CCamera*   camera     = GetCamera( player );
-	Light_t*   flashlight = Ent_GetComponent< Light_t >( player, "light" );
+	CTransform* transform  = GetTransform( player );
+	CCamera*    camera     = GetCamera( player );
+	CLight*     flashlight = Ent_GetComponent< CLight >( player, "light" );
 
 	Assert( transform );
 	Assert( camera );
@@ -556,15 +579,15 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 	auto UpdateTransform = [ & ]()
 	{
 		// weird stuff to get the angle of the light correct
-		flashlight->aAng.x = camera->aTransform.aAng.z;
-		flashlight->aAng.y = -camera->aTransform.aAng.y;
-		flashlight->aAng.z = -camera->aTransform.aAng.x + 90.f;
+		flashlight->aAng.Edit().x = camera->aTransform.Get().aAng.Get().z;
+		flashlight->aAng.Edit().y = -camera->aTransform.Get().aAng.Get().y;
+		flashlight->aAng.Edit().z = -camera->aTransform.Get().aAng.Get().x + 90.f;
 
-		flashlight->aPos = transform->aPos + camera->aTransform.aPos;
+		flashlight->aPos   = transform->aPos.Get() + camera->aTransform.Get().aPos.Get();
 
 		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat() );
 
-		flashlight->aPos += offset * camera->aUp;
+		flashlight->aPos += offset * camera->aUp.Get();
 	};
 
 	// Toggle flashlight on or off
@@ -585,7 +608,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 	if ( flashlight->aEnabled )
 	{
 		// flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
-		flashlight->aColor = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
+		flashlight->aColor.Edit() = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
 		if ( !r_flashlight_lock.GetBool() )
 		{
@@ -604,11 +627,10 @@ inline float DegreeConstrain( float num )
 }
 
 
-inline void ClampAngles( Transform& transform, CCamera& camera )
+inline void ClampAngles( CTransform& transform, CCamera& camera )
 {
-	transform.aAng[YAW] = DegreeConstrain( transform.aAng[YAW] );
-	camera.aTransform.aAng[YAW] = DegreeConstrain( camera.aTransform.aAng[YAW] );
-	camera.aTransform.aAng[PITCH] = std::clamp( camera.aTransform.aAng[PITCH], -90.0f, 90.0f );
+	camera.aTransform.Edit().aAng.Edit()[ YAW ]   = DegreeConstrain( camera.aTransform.Get().aAng.Get()[ YAW ] );
+	camera.aTransform.Edit().aAng.Edit()[ PITCH ] = std::clamp( camera.aTransform.Get().aAng.Get()[ PITCH ], -90.0f, 90.0f );
 };
 
 
@@ -638,11 +660,11 @@ void PlayerManager::Update( float frameTime )
 			auto            camera    = GetCamera( player );
 
 			// transform.aAng[PITCH] = -mouse.y;
-			camera->aTransform.aAng[ PITCH ] = userCmd.aAng[ PITCH ];
-			camera->aTransform.aAng[ YAW ]   = userCmd.aAng[ YAW ];
-			camera->aTransform.aAng[ ROLL ]  = userCmd.aAng[ ROLL ];
+			camera->aTransform.Edit().aAng.Edit()[ PITCH ] = userCmd.aAng[ PITCH ];
+			camera->aTransform.Edit().aAng.Edit()[ YAW ]   = userCmd.aAng[ YAW ];
+			camera->aTransform.Edit().aAng.Edit()[ ROLL ]  = userCmd.aAng[ ROLL ];
 
-			transform->aAng[ YAW ]           = userCmd.aAng[ YAW ];
+			transform->aAng.Set( { 0.f, DegreeConstrain( userCmd.aAng[ YAW ] ), 0.f } );
 
 			ClampAngles( *transform, *camera );
 
@@ -685,7 +707,7 @@ void PlayerManager::UpdateLocalPlayer()
 	auto     playerMove = GetPlayerMoveData( gLocalPlayer );
 	auto     playerInfo = GetPlayerInfo( gLocalPlayer );
 	auto     camera     = GetCamera( gLocalPlayer );
-	Light_t* flashlight = Ent_GetComponent< Light_t >( gLocalPlayer, "light" );
+	CLight*  flashlight = Ent_GetComponent< CLight >( gLocalPlayer, "light" );
 
 	Assert( playerMove );
 	Assert( playerInfo );
@@ -714,7 +736,7 @@ void PlayerManager::UpdateLocalPlayer()
 		auto     playerMove = GetPlayerMoveData( player );
 		auto     playerInfo = GetPlayerInfo( player );
 		auto     camera     = GetCamera( player );
-		Light_t* flashlight = Ent_GetComponent< Light_t >( player, "light" );
+		CLight*  flashlight = Ent_GetComponent< CLight >( player, "light" );
 
 		Assert( playerMove );
 		Assert( playerInfo );
@@ -726,7 +748,7 @@ void PlayerManager::UpdateLocalPlayer()
 		// Player_UpdateFlashlight( player, &userCmd );
 	
 		// TEMP
-		camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
+		camera->aTransform.Edit().aPos.Edit()[ W_UP ] = playerMove->aOutViewHeight;
 	
 		UpdateView( playerInfo, player );
 
@@ -758,9 +780,9 @@ void PlayerManager::DoMouseLook( Entity player )
 	const glm::vec2 mouse = Input_GetMouseDelta();
 
 	// transform.aAng[PITCH] = -mouse.y;
-	camera->aTransform.aAng[PITCH] += mouse.y * m_pitch;
-	camera->aTransform.aAng[YAW] += mouse.x * m_yaw;
-	transform->aAng[YAW] += mouse.x * m_yaw;
+	camera->aTransform.Edit().aAng.Edit()[PITCH] += mouse.y * m_pitch;
+	camera->aTransform.Edit().aAng.Edit()[YAW] += mouse.x * m_yaw;
+	transform->aAng.Edit()[ YAW ] += mouse.x * m_yaw;
 
 	ClampAngles( *transform, *camera );
 }
@@ -801,7 +823,7 @@ float Math_EaseOutQuart( float x )
 
 void CalcZoom( CCamera* camera, Entity player )
 {
-	auto zoom = GetPlayerZoom( player );
+	CPlayerZoom* zoom = GetPlayerZoom( player );
 
 	Assert( zoom );
 
@@ -872,8 +894,8 @@ void CalcZoom( CCamera* camera, Entity player )
 	camera->aFov = zoom->aNewFov;
 #else
 	// disable zooming until networking is working
-	camera->aFov  = r_fov;
-	zoom->aNewFov = r_fov;
+	camera->aFov  = r_fov.GetFloat();
+	zoom->aNewFov = r_fov.GetFloat();
 #endif
 }
 
@@ -892,15 +914,20 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 	ClampAngles( *transform, *camera );
 
-	Util_GetViewMatrixZDirection( transform->ToViewMatrixZ(), dir->aForward, dir->aRight, dir->aUp );
+	if ( transform->aPos.aIsDirty || transform->aAng.aIsDirty )
+	{
+		glm::mat4 viewMatrixZ;
+		Util_ToViewMatrixZ( viewMatrixZ, transform->aPos, transform->aAng );
+		Util_GetViewMatrixZDirection( viewMatrixZ, dir->aForward.Edit(), dir->aRight.Edit(), dir->aUp.Edit() );
+	}
 
 	// MOVE ME ELSEWHERE IDK, MAYBE WHEN AN HEV SUIT COMPONENT IS MADE
 	CalcZoom( camera, player );
 
 	/* Copy the player transformation, and apply the view offsets to it. */
-	Transform transformView = *transform;
-	transformView.aPos += camera->aTransform.aPos;
-	transformView.aAng = camera->aTransform.aAng;
+	CTransform transformView = *transform;
+	transformView.aPos += camera->aTransform.Get().aPos;
+	transformView.aAng = camera->aTransform.Get().aAng;
 	//Transform transformView = transform;
 	//transformView.aAng += move.aViewAngOffset;
 
@@ -912,7 +939,10 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 		// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
 
-		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * transformView.ToViewMatrixZ();
+		glm::mat4 viewMatrixZ;
+		Util_ToViewMatrixZ( viewMatrixZ, transformView.aPos, transformView.aAng );
+
+		glm::mat4 viewMat = thirdPerson.ToMatrix( false ) * viewMatrixZ;
 
 		if ( info->aIsLocalPlayer )
 		{
@@ -921,11 +951,12 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
 		}
 
-		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera->aForward.Edit(), camera->aRight.Edit(), camera->aUp.Edit() );
 	}
 	else
 	{
-		glm::mat4 viewMat = transformView.ToViewMatrixZ();
+		glm::mat4 viewMat;
+		Util_ToViewMatrixZ( viewMat, transformView.aPos, transformView.aAng );
 
 		if ( info->aIsLocalPlayer )
 		{
@@ -936,7 +967,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			Game_SetView( viewMat );
 		}
 
-		Util_GetViewMatrixZDirection( viewMat, camera->aForward, camera->aRight, camera->aUp );
+		Util_GetViewMatrixZDirection( viewMat, camera->aForward.Edit(), camera->aRight.Edit(), camera->aUp.Edit() );
 	}
 
 	if ( info->aIsLocalPlayer )
@@ -988,7 +1019,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	// SetMoveType( *move, PlayerMoveType::Walk );
 	SetMoveType( *move, PlayerMoveType::NoClip );
 
-	camera->aTransform.aPos = {0, 0, cl_view_height.GetFloat()};
+	camera->aTransform.Edit().aPos.Edit() = { 0, 0, cl_view_height.GetFloat() };
 }
 
 
@@ -1005,7 +1036,7 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	Assert( physObj );
 
 	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
-	transform->aPos.z += phys_player_offset;
+	transform->aPos.Edit().z += phys_player_offset;
 
 	physObj->SetPos( transform->aPos );
 
@@ -1152,7 +1183,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 
 	auto  camTransform = camera->aTransform;
 
-	float speed        = glm::length( glm::vec2( rigidBody->aVel.x, rigidBody->aVel.y ) );
+	float speed        = glm::length( glm::vec2( rigidBody->aVel.Get().x, rigidBody->aVel.Get().y ) );
 
 	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform->aPos).c_str() );
 	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform->aAng).c_str() );
@@ -1160,8 +1191,8 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
 	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov );
-	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.aPos).c_str() );
-	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.aAng).c_str() );
+	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.Get().aPos).c_str() );
+	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.Get().aAng).c_str() );
 }
 
 
@@ -1188,22 +1219,22 @@ const glm::vec3& PlayerMovement::GetAng() const
 
 void PlayerMovement::UpdateInputs()
 {
-	apRigidBody->aAccel = {0, 0, 0};
+	apRigidBody->aAccel.Set( { 0, 0, 0 } );
 
 	float moveScale = 1.0f;
 
 	apMove->aPrevPlayerFlags = apMove->aPlayerFlags;
-	apMove->aPlayerFlags = PlyNone;
+	PlayerFlags newFlags     = PlyNone;
 
 	if ( apUserCmd->aButtons & EBtnInput_Duck )
 	{
-		apMove->aPlayerFlags |= PlyInDuck;
+		newFlags |= PlyInDuck;
 		moveScale = sv_duck_mult;
 	}
 
 	else if ( apUserCmd->aButtons & EBtnInput_Sprint )
 	{
-		apMove->aPlayerFlags |= PlyInSprint;
+		newFlags |= PlyInSprint;
 		moveScale = sv_sprint_mult;
 	}
 
@@ -1211,29 +1242,17 @@ void PlayerMovement::UpdateInputs()
 	const float sideSpeed = side_speed * moveScale;
 	apMove->aMaxSpeed = max_speed * moveScale;
 
-	if ( apUserCmd->aButtons & EBtnInput_Forward ) apRigidBody->aAccel[ W_FORWARD ] = forwardSpeed;
-	if ( apUserCmd->aButtons & EBtnInput_Back )    apRigidBody->aAccel[ W_FORWARD ] += -forwardSpeed;
-	if ( apUserCmd->aButtons & EBtnInput_Left )    apRigidBody->aAccel[ W_RIGHT ] = -sideSpeed;
-	if ( apUserCmd->aButtons & EBtnInput_Right )   apRigidBody->aAccel[ W_RIGHT ] += sideSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Forward ) apRigidBody->aAccel.Edit()[ W_FORWARD ] = forwardSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Back )    apRigidBody->aAccel.Edit()[ W_FORWARD ] += -forwardSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Left )    apRigidBody->aAccel.Edit()[ W_RIGHT ] = -sideSpeed;
+	if ( apUserCmd->aButtons & EBtnInput_Right )   apRigidBody->aAccel.Edit()[ W_RIGHT ] += sideSpeed;
 
-	// kind of a hack
-	// this feels really stupid
-	// static bool wasJumpButtonPressed = false;
+	if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
+	{
+		apRigidBody->aVel.Edit()[ W_UP ] = jump_force;
+	}
 
-	if ( CalcOnGround() )
-	{
-		// if ( apUserCmd->aButtons & EBtnInput_Jump && !wasJumpButtonPressed )
-		if ( apUserCmd->aButtons & EBtnInput_Jump )
-		{
-			apRigidBody->aVel[W_UP] = jump_force;
-			// wasJumpButtonPressed = true;
-			// Log_Msg( "New Velocity After Jumping: %s", Vec2Str( apRigidBody->aVel ).c_str() );
-		}
-	}
-	else
-	{
-		// wasJumpButtonPressed = false;
-	}
+	apMove->aPlayerFlags.Set( newFlags );
 }
 
 
@@ -1301,7 +1320,7 @@ void PlayerMovement::UpdatePosition( Entity player )
 		//aTransform = apPhysObj->GetWorldTransform();
 	//transform.aPos = physObj->GetWorldTransform().aPos;
 	apTransform->aPos = apPhysObj->GetPos();
-	apTransform->aPos.z -= phys_player_offset;
+	apTransform->aPos.Edit().z -= phys_player_offset;
 
 	if ( apMove->aMoveType != PlayerMoveType::NoClip )
 	{
@@ -1321,7 +1340,6 @@ float Math_EaseInOutCubic( float x )
 {
 	return x < 0.5 ? 4 * x * x * x : 1 - pow( -2 * x + 2, 3 ) / 2;
 }
-
 
 
 // VERY BUGGY STILL
@@ -1364,7 +1382,7 @@ void PlayerMovement::DoSmoothDuck()
 		}
 	}
 
-	apCamera->aTransform.aPos[W_UP] = apMove->aOutViewHeight;
+	apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] = apMove->aOutViewHeight;
 }
 
 
@@ -1382,9 +1400,9 @@ bool PlayerMovement::CalcOnGround()
 	glm::vec3 up = -glm::normalize( GetPhysEnv()->GetGravity() );
 
 	if ( glm::dot(apMove->aGroundNormal, up) > maxSlopeAngle )
-		apMove->aPlayerFlags |= PlyOnGround;
+		apMove->aPlayerFlags.Edit() |= PlyOnGround;
 	else
-		apMove->aPlayerFlags &= ~PlyOnGround;
+		apMove->aPlayerFlags.Edit() &= ~PlyOnGround;
 
 	return apMove->aPlayerFlags & PlyOnGround;
 }
@@ -1409,7 +1427,7 @@ float PlayerMovement::GetMoveSpeed( glm::vec3 &wishdir, glm::vec3 &wishvel )
 
 	if ( wishspeed > apMove->aMaxSpeed )
 	{
-		wishvel = wishvel * apMove->aMaxSpeed/wishspeed;
+		wishvel = wishvel * apMove->aMaxSpeed.Get() / wishspeed;
 		wishspeed = apMove->aMaxSpeed;
 	}
 
@@ -1494,7 +1512,7 @@ void PlayerMovement::PlayStepSound()
 		return;
 
 	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
-	float vel = glm::length( glm::vec3(apRigidBody->aVel.x, apRigidBody->aVel.y, apRigidBody->aVel.z * cl_step_sound_gravity_scale) ); 
+	float vel         = glm::length( glm::vec3( apRigidBody->aVel.Get().x, apRigidBody->aVel.Get().y, apRigidBody->aVel.Get().z * cl_step_sound_gravity_scale ) ); 
 	float speedFactor = glm::min( glm::log( vel * cl_step_sound_speed_vol + cl_step_sound_speed_offset ), 1.f );
 	
 	if ( speedFactor < cl_step_sound_min_speed )
@@ -1532,7 +1550,7 @@ void PlayerMovement::PlayImpactSound()
 		return;
 
 	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
-	float vel = glm::length( glm::vec3( apRigidBody->aVel.x, apRigidBody->aVel.y, apRigidBody->aVel.z * cl_step_sound_gravity_scale ) );
+	float vel         = glm::length( glm::vec3( apRigidBody->aVel.Get().x, apRigidBody->aVel.Get().y, apRigidBody->aVel.Get().z * cl_step_sound_gravity_scale ) );
 	float speedFactor = glm::min( glm::log( vel * cl_step_sound_speed_vol + cl_step_sound_speed_offset ), 1.f );
 
 	if ( speedFactor < cl_step_sound_min_speed )
@@ -1562,7 +1580,7 @@ void PlayerMovement::BaseFlyMove()
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[ i ] = apCamera->aForward[ i ] * apRigidBody->aAccel.x + apCamera->aRight[ i ] * apRigidBody->aAccel[ W_RIGHT ];
+		wishvel[ i ] = apCamera->aForward.Get()[ i ] * apRigidBody->aAccel.Get().x + apCamera->aRight.Get()[ i ] * apRigidBody->aAccel.Get()[ W_RIGHT ];
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
@@ -1624,7 +1642,7 @@ class PlayerStairsCheck : public PhysCollisionCollector
 
 void PlayerMovement::WalkMove()
 {
-	glm::vec3 wishvel = apDir->aForward*apRigidBody->aAccel.x + apDir->aRight*apRigidBody->aAccel[W_RIGHT];
+	glm::vec3 wishvel = apDir->aForward * apRigidBody->aAccel.Get().x + apDir->aRight * apRigidBody->aAccel.Get()[ W_RIGHT ];
 	wishvel[W_UP] = 0.f;
 
 	glm::vec3 wishdir(0,0,0);
@@ -1692,7 +1710,7 @@ void PlayerMovement::WalkMovePostPhys()
 		PlayImpactSound();
 
 	if ( onGround )
-		apRigidBody->aVel[W_UP] = 0.f;
+		apRigidBody->aVel.Edit()[ W_UP ] = 0.f;
 }
 
 
@@ -1706,8 +1724,8 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
         // meh, works well enough with the current values for now
         if ( CalcOnGround() && !wasOnGround )
         // if ( CalcOnGround() && !WasOnGround() )
-        {
-			float baseLandVel = abs(apRigidBody->aVel[W_UP] * cl_land_vel_scale.GetFloat()) / cl_land_max_speed.GetFloat();
+		{
+			float baseLandVel = abs( apRigidBody->aVel.Get()[ W_UP ] * cl_land_vel_scale.GetFloat() ) / cl_land_max_speed.GetFloat();
 			float landVel = std::clamp( baseLandVel * M_PI, 0.0, M_PI );
 
 			landPower = (-cos( landVel ) + 1) / 2;
@@ -1719,7 +1737,7 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 
 		if ( landPower > 0.f )
 			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;
-			apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower) / exp(landTime / landPower)) * cl_land_power_scale;
+			apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += ( -landPower * sin( landTime / landPower ) / exp( landTime / landPower ) ) * cl_land_power_scale;
     }
     else
     {
@@ -1747,7 +1765,7 @@ void PlayerMovement::DoViewBob()
 		// lerp back to 0 to not snap view the offset (not good enough) and reset input
 		apMove->aWalkTime = 0.f;
 		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount, 0.f, cl_bob_exit_lerp.GetFloat() );
-		apCamera->aTransform.aPos[W_UP] += apMove->aBobOffsetAmount;
+		apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 		//inExit = aBobOffsetAmount > 0.01;
 		//prevMove = aMove;
 		return;
@@ -1755,7 +1773,7 @@ void PlayerMovement::DoViewBob()
 
 	static bool playedStepSound = false;
 
-	float vel = glm::length( glm::vec2(apRigidBody->aVel.x, apRigidBody->aVel.y) ); 
+	float       vel             = glm::length( glm::vec2( apRigidBody->aVel.Get().x, apRigidBody->aVel.Get().y ) ); 
 
 	float speedFactor = glm::log( vel * cl_bob_speed_scale + 1 );
 
@@ -1791,7 +1809,7 @@ void PlayerMovement::DoViewBob()
 		playedStepSound = false;
 	}
 
-	apCamera->aTransform.aPos[W_UP] += apMove->aBobOffsetAmount;
+	apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 	
 	if ( cl_bob_debug )
 	{
@@ -1821,7 +1839,7 @@ void PlayerMovement::DoViewTilt()
 
 	static float prevTilt = 0.f;
 
-	float output = glm::dot( apRigidBody->aVel, apDir->aRight );
+	float        output   = glm::dot( apRigidBody->aVel.Get(), apDir->aRight.Get() );
 	float side = output < 0 ? -1 : 1;
 
 	if ( cl_tilt_type == 1.f )
@@ -1839,7 +1857,7 @@ void PlayerMovement::DoViewTilt()
 		output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * gFrameTime );
 	}
 
-	apCamera->aTransform.aAng[ROLL] = output;
+	apCamera->aTransform.Edit().aAng.Edit()[ ROLL ] = output;
 
 	prevTilt = output;
 }
@@ -1890,9 +1908,9 @@ void PlayerMovement::AddFriction()
 	float idk = sv_friction_idk;
 
 	// if the leading edge is over a dropoff, increase friction
-	start.x = stop.x = GetPos().x + vel.x / speed*idk;
-	start[W_RIGHT] = stop[W_RIGHT] = GetPos()[W_RIGHT] + vel[W_RIGHT] / speed*idk;
-	start[W_UP] = stop[W_UP] = GetPos()[W_UP] + vel[W_UP] / speed*idk;
+	start.x = stop.x = GetPos().x + vel.x / speed * idk;
+	start[ W_RIGHT ] = stop[ W_RIGHT ] = GetPos()[ W_RIGHT ] + vel[ W_RIGHT ] / speed * idk;
+	start[ W_UP ] = stop[ W_UP ] = GetPos()[ W_UP ] + vel[ W_UP ] / speed * idk;
 	// start.z = GetPos().z + sv_player->v.mins.z;
 
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
@@ -1917,8 +1935,8 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 	//float baseWishSpeed = inAir ? glm::min( 30.f, vec3_norm( wishDir ) ) : wishSpeed;
 	float baseWishSpeed = inAir ? glm::min( accel_speed_air.GetFloat(), vec3_norm( wishDir ) ) : wishSpeed;
 
-	float currentspeed = glm::dot( apRigidBody->aVel, wishDir );
-	float addspeed = baseWishSpeed - currentspeed;
+	float currentspeed  = glm::dot( apRigidBody->aVel.Get(), wishDir );
+	float addspeed      = baseWishSpeed - currentspeed;
 
 	if ( addspeed <= 0.f )
 		return;
@@ -1926,6 +1944,6 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 	addspeed = glm::min( addspeed, accel_speed * gFrameTime * wishSpeed );
 
 	for ( int i = 0; i < 3; i++ )
-		apRigidBody->aVel[i] += addspeed * wishDir[i];
+		apRigidBody->aVel.Edit()[ i ] += addspeed * wishDir[ i ];
 }
 

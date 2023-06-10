@@ -40,11 +40,42 @@ void LightSystem::ComponentRemoved( Entity sEntity )
 }
 
 
+void LightSystem::ComponentUpdated( Entity sEntity )
+{
+	if ( Game_ProcessingServer() )
+		return;
+
+	auto light = Ent_GetComponent< CLight >( sEntity, "light" );
+
+	if ( !light )
+		return;
+
+	Assert( light->apLight );
+
+	if ( light->apLight )
+	{
+		light->apLight->aType     = light->aType;
+		light->apLight->aColor    = light->aColor;
+		light->apLight->aPos      = light->aPos;
+		light->apLight->aAng      = light->aAng;
+		light->apLight->aInnerFov = light->aInnerFov;
+		light->apLight->aOuterFov = light->aOuterFov;
+		light->apLight->aRadius   = light->aRadius;
+		light->apLight->aLength   = light->aLength;
+		light->apLight->aShadow   = light->aShadow;
+		light->apLight->aEnabled  = light->aEnabled;
+
+		Graphics_UpdateLight( light->apLight );
+	}
+}
+
+
 void LightSystem::Update()
 {
 	if ( Game_ProcessingServer() )
 		return;
 
+#if 0
 	for ( Entity entity : aEntities )
 	{
 		auto light = Ent_GetComponent< CLight >( entity, "light" );
@@ -61,6 +92,7 @@ void LightSystem::Update()
 			Graphics_UpdateLight( light->apLight );
 		}
 	}
+#endif
 }
 
 
@@ -100,6 +132,13 @@ void EntSys_ModelInfo::ComponentAdded( Entity sEntity )
 
 
 void EntSys_ModelInfo::ComponentRemoved( Entity sEntity )
+{
+	if ( Game_ProcessingServer() )
+		return;
+}
+
+
+void EntSys_ModelInfo::ComponentUpdated( Entity sEntity )
 {
 	if ( Game_ProcessingServer() )
 		return;

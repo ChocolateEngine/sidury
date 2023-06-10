@@ -178,8 +178,6 @@ void Game_Update( float frameTime )
 	// 	graphics->DrawLine( {0, 0, 0}, {0, 0, dbg_global_axis_size.GetFloat()}, {0, 0, 1} );
 	// }
 
-	LightEditor_Update();
-
 	gui->Update( frameTime );
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
