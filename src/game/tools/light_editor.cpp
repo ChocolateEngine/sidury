@@ -1,5 +1,8 @@
 #include "../graphics/graphics.h"
 #include "../main.h"
+#include "../cl_main.h"
+#include "../ent_light.h"
+#include "../player.h"
 #include "light_editor.h"
 
 #include "imgui/imgui.h"
@@ -18,18 +21,45 @@ extern Handle                                 gLocalPlayer;
 
 extern std::vector< Light_t* >                gLights;
 
-static Light_t*                               gpFlashlight = nullptr;
-
 
 CONVAR( r_light_line, 1 );
 CONVAR( r_light_line_dist, 64.f );
 CONVAR( r_light_line_dist2, 48.f );
 
 
+static bool IsFlashlight( Light_t* spLight )
+{
+	if ( !GetLightEntSys() )
+		return false;
+
+	for ( Entity entity : GetLightEntSys()->aEntities )
+	{
+		auto playerInfo = Ent_GetComponent< CPlayerInfo >( entity, "playerInfo" );
+		if ( !playerInfo )
+		{
+			// Not a player, so not a flashlight
+			continue;
+		}
+
+		auto lightComp = Ent_GetComponent< CLight >( entity, "light" );
+		if ( !lightComp )
+		{
+			Log_Warn( "?????????\n" );
+			continue;
+		}
+
+		if ( lightComp->apLight == spLight )
+			return true;
+	}
+
+	return false;
+}
+
+
 static Handle LightEditor_CreateRenderable( Light_t* spLight )
 {
 	// HACK
-	if ( gpFlashlight == spLight )
+	if ( IsFlashlight( spLight ) )
 		return InvalidHandle;
 
 	auto it = gDrawLights.find( spLight );
@@ -60,7 +90,7 @@ static Handle LightEditor_CreateRenderable( Light_t* spLight )
 static void LightEditor_DestroyRenderable( Light_t* spLight )
 {
 	// HACK
-	if ( gpFlashlight == spLight )
+	if ( IsFlashlight( spLight ) )
 		return;
 
 	auto it = gDrawLights.find( spLight );
@@ -89,7 +119,7 @@ static void LightEditor_DestroyRenderables()
 	for ( const auto& [light, renderable] : gDrawLights )
 	{
 		// HACK
-		if ( gpFlashlight == light )
+		if ( IsFlashlight( light ) )
 			continue;
 
 		// destroy this renderable
@@ -103,7 +133,7 @@ static void LightEditor_DestroyRenderables()
 void LightEditor_UpdateLightDraw( Light_t* spLight )
 {
 	// HACK
-	if ( gpFlashlight == spLight )
+	if ( IsFlashlight( spLight ) )
 		return;
 
 	Handle renderHandle = LightEditor_CreateRenderable( spLight );
@@ -199,15 +229,22 @@ void LightEditor_Shutdown()
 
 void LightEditor_DrawEditor()
 {
-#if 0  // bring back once networking is working
 	if ( !ImGui::Begin( "Light Editor" ) )
 	{
 		ImGui::End();
 		return;
 	}
 
-	auto& playerTransform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
-	auto& camTransform    = GetEntitySystem()->GetComponent< CCamera >( gLocalPlayer ).aTransform;
+	auto playerTransform = Ent_GetComponent< Transform >( gLocalPlayer, "transform" );
+	auto camera          = Ent_GetComponent< CCamera >( gLocalPlayer, "camera" );
+
+	if ( !playerTransform )
+		return;
+
+	if ( !camera )
+		return;
+
+	TransformSmall& camTransform = camera->aTransform;
 
 	if ( ImGui::Button( "Create Directional Light" ) )
 	{
@@ -219,11 +256,11 @@ void LightEditor_DrawEditor()
 
 	if ( ImGui::Button( "Create Point Light" ) )
 	{
-		Light_t* light      = Graphics_CreateLight( ELightType_Point );
+		Light_t* light = Graphics_CreateLight( ELightType_Point );
 
 		if ( light != nullptr )
 		{
-			light->aPos         = playerTransform.aPos + camTransform.aPos;
+			light->aPos         = playerTransform->aPos + camTransform.aPos;
 			// light->aColor       = { rand() % 1, rand() % 1, rand() % 1 };
 			light->aColor       = { 1, 1, 1, 1 };
 			light->aRadius      = 500;
@@ -238,7 +275,7 @@ void LightEditor_DrawEditor()
 
 		if ( light != nullptr )
 		{
-			light->aPos    = playerTransform.aPos + camTransform.aPos;
+			light->aPos    = playerTransform->aPos + camTransform.aPos;
 			light->aColor  = { 1, 1, 1, 10 };
 
 			// weird stuff to get the angle of the light correct from the player's view matrix stuff
@@ -361,7 +398,6 @@ void LightEditor_DrawEditor()
 
 	ImGui::EndChild();
 	ImGui::End();
-#endif
 }
 
 
@@ -376,20 +412,16 @@ void LightEditor_DrawLightModels()
 
 void LightEditor_Update()
 {
-#if 0
 	PROF_SCOPE();
-
-	gpFlashlight = GetEntitySystem()->GetComponent< Light_t* >( gLocalPlayer );
 
 	LightEditor_DrawLightModels();
 
 	if ( !gLightEditorEnabled )
 		return;
 
-	if ( !Game_IsPaused() )
+	if ( !CL_IsMenuShown() )
 		return;
 
 	LightEditor_DrawEditor();
-#endif
 }
 

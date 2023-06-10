@@ -15,6 +15,7 @@ class LightSystem : public IEntityComponentSystem
 };
 
 extern LightSystem* gLightEntSystems[ 2 ];
+LightSystem*        GetLightEntSys();
 
 
 // ------------------------------------------------------------
