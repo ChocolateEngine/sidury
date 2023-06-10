@@ -344,8 +344,8 @@ NetAddr_t Net_GetNetAddrFromString( std::string_view sString )
 
 	if ( sString == "127.0.0.1" || sString == "localhost" )
 	{
-		netAddr.aType = ENetType_Loopback;
-		netAddr.aPort = 27015;
+		netAddr.aType      = ENetType_Loopback;
+		netAddr.aPort      = 41628;
 		netAddr.aIPV4[ 0 ] = 127;
 		netAddr.aIPV4[ 1 ] = 0;
 		netAddr.aIPV4[ 2 ] = 0;
