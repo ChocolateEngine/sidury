@@ -119,8 +119,8 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 		// if the command is from the server and we are the client, make sure they can execute it
 		if ( sSource == ECommandSource_Server && Game_ProcessingClient() )
 		{
-			// The Convar must have this flag
-			if ( !(flags & CVARF_SV_EXEC) )
+			// The Convar must have one of these flags
+			if ( !(flags & CVARF_SV_EXEC) && !(flags & CVARF_SERVER) )
 			{
 				Log_WarnF( "Server Tried Executing Command without flag to allow it: \"%s\"\n", commandName );
 				continue;
@@ -128,7 +128,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 		}
 
 		// if the command is from the client and we are the server, make sure they can execute it
-		else if ( sSource == ECommandSource_Client && !Game_ProcessingClient() )
+		else if ( sSource == ECommandSource_Client && Game_ProcessingServer() )
 		{
 			// The Convar must have this flag
 			if ( !(flags & CVARF_CL_EXEC) )
