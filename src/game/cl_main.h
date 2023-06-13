@@ -60,5 +60,6 @@ bool                   CL_RecvServerInfo();
 void                   CL_UpdateUserCmd();
 void                   CL_BuildUserCmd( capnp::MessageBuilder& srBuilder );
 void                   CL_SendUserCmd();
+void                   CL_SendFullUpdateRequest();
 void                   CL_GetServerMessages();
 

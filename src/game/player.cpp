@@ -448,9 +448,6 @@ void PlayerManager::Create( Entity player )
 		auto playerInfo            = GetPlayerInfo( player );
 		playerInfo->aIsLocalPlayer = player == gLocalPlayer;
 
-		Light_t* flashlightReal    = Graphics_CreateLight( ELightType_Cone );
-		flashlight->apLight        = flashlightReal;
-
 		auto renderComp = Ent_AddComponent< CRenderable_t >( player, "renderable" );
 		
 		Assert( renderComp );
@@ -1076,6 +1073,9 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 	apPhysObj->SetFriction( phys_friction_player );
 
 	UpdateInputs();
+
+	// Needed before smooth duck
+	CalcOnGround();
 
 	// should be in WalkMove only, but i need this here when toggling noclip mid-duck
 	DoSmoothDuck();

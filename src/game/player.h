@@ -17,10 +17,10 @@ enum class SurfaceType
 
 enum PlayerFlags_
 {
-	PlyNone = (1 << 0),
-	PlyOnGround = (1 << 1),
-	PlyInSprint = (1 << 2),
-	PlyInDuck = (1 << 3),
+	PlyNone     = ( 1 << 0 ),
+	PlyOnGround = ( 1 << 1 ),
+	PlyInSprint = ( 1 << 2 ),
+	PlyInDuck   = ( 1 << 3 ),
 };
 
 typedef unsigned char PlayerFlags;

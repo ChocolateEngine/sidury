@@ -17,28 +17,20 @@
 
 LOG_REGISTER_CHANNEL2( Server, LogColor::Green );
 
-static const char* gTestServerIP   = Args_Register( "127.0.0.1", "Test Server IPv4", "-ip" );
-static const char* gTestServerPort = Args_Register( "41628", "Test Server Port", "-port" );
+static const char* gServerPort = Args_Register( "41628", "Test Server Port", "-port" );
 
 NEW_CVAR_FLAG( CVARF_SERVER );
 
 CONVAR( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
+CONVAR( sv_pause, 0, CVARF_SERVER, "Pauses the Server Code" );
 
 ServerData_t        gServerData;
 
 static Socket_t     gServerSocket   = CH_INVALID_SOCKET;
 
 static SV_Client_t* gpCommandClient = nullptr;
-
-struct SV_ClientCommand_t
-{
-	SV_Client_t* apClient = nullptr;
-	std::string  aCommands;
-};
-
-static std::vector< SV_ClientCommand_t > gClientCommandQueue;
 
 
 CONCMD( pause )
@@ -88,6 +80,9 @@ void SV_Shutdown()
 
 void SV_Update( float frameTime )
 {
+	if ( sv_pause )
+		return;
+
 	Game_SetClient( false );
 
 	// for ( auto& client : gServerData.aClients )
@@ -115,16 +110,6 @@ void SV_Update( float frameTime )
 	}
 
 	SV_ProcessSocketMsgs();
-
-	// Process console commands sent from clients
-	// for ( auto& clientCmd : gClientCommandQueue )
-	// {
-	// 	SV_SetCommandClient( clientCmd.apClient );
-	// 	Con_RunCommand( clientCmd.aCommands );
-	// 	SV_SetCommandClient( nullptr );  // Clear it
-	// }
-
-	gClientCommandQueue.clear();
 	
 	// Main game loop
 	SV_GameUpdate( frameTime );
@@ -132,30 +117,32 @@ void SV_Update( float frameTime )
 	// TODO: Sync Server Convars with clients
 
 	// Send updated data to clients
-	capnp::MallocMessageBuilder message;
-	SV_BuildUpdatedData( message );
-	auto array = capnp::messageToFlatArray( message );
+	std::vector< capnp::MallocMessageBuilder > messages( 2 );
+	std::vector< kj::Array< capnp::word > >    arrays( 2 );
 
-	int  writeSize = 0;
+	SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
+	SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
 
-	for ( auto& client : gServerData.aClients )
+	int writeSize = SV_BroadcastMsgs( messages );
+
+	// Check to see if anyone needs a full update
+	if ( gServerData.aClientsFullUpdate.size() )
 	{
-		if ( client.aState != ESV_ClientState_Connected )
-			continue;
+		// Build a Full Update and send it to all of them
+		std::vector< capnp::MallocMessageBuilder > messages( 2 );
+		std::vector< kj::Array< capnp::word > >    arrays( 2 );
 
-		int write = client.Write( array.asChars().begin(), array.size() * sizeof( capnp::word ) );
+		SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
+		SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
 
-		// If we failed to write, disconnect them?
-		if ( write == 0 )
-		{
-			Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
-			client.aState = ESV_ClientState_Disconnected;
-		}
-		else
-		{
-			writeSize = write;
-		}
+		int fullUpdateSize = SV_BroadcastMsgsToSpecificClients( messages, gServerData.aClientsFullUpdate );
+		Log_DevF( gLC_Server, 1, "Writing Full Update to Clients: %d bytes\n", fullUpdateSize );
+
+		gServerData.aClientsFullUpdate.clear();
 	}
+
+	// Update Entity and Component States after everything is processed
+	GetEntitySystem()->UpdateStates();
 
 	if ( Game_IsClient() )
 	{
@@ -198,7 +185,7 @@ bool SV_StartServer()
 
 	Phys_CreateEnv( false );
 
-	gServerSocket = Net_OpenSocket( gTestServerPort );
+	gServerSocket = Net_OpenSocket( gServerPort );
 
 	if ( gServerSocket == CH_INVALID_SOCKET )
 	{
@@ -239,32 +226,174 @@ void SV_StopServer()
 }
 
 
-void SV_BuildEntityList( capnp::MessageBuilder& srBuilder )
+// --------------------------------------------------------------------
+// Networking
+
+
+int SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients )
 {
-	GetEntitySystem()->WriteEntityUpdates( srBuilder );
+	std::vector< kj::Array< capnp::word > > arrays( srMessages.size() );
+	int                                     writeSize = 0;
+
+	for ( size_t i = 0; i < srMessages.size(); i++ )
+	{
+		arrays[ i ] = capnp::messageToFlatArray( srMessages[ i ] );
+		writeSize += arrays[ i ].size() * sizeof( capnp::word );
+	}
+
+	for ( auto client : srClients )
+	{
+		if ( !client )
+			continue;
+
+		if ( client->aState != ESV_ClientState_Connected )
+			continue;
+
+		for ( size_t arrayIndex = 0; arrayIndex < arrays.size(); arrayIndex++ )
+		{
+			int write = client->Write( arrays[ arrayIndex ].asChars().begin(), arrays[ arrayIndex ].size() * sizeof( capnp::word ) );
+
+			// If we failed to write, disconnect them?
+			if ( write == 0 )
+			{
+				Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
+				client->aState = ESV_ClientState_Disconnected;
+				break;
+			}
+		}
+	}
+
+	return writeSize;
 }
 
 
-void SV_BuildUpdatedData( capnp::MessageBuilder& srBuilder )
+int SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages )
 {
-	// if ( GetEntitySystem()->aEntityCount == 0 )
-	// 	return;
+	std::vector< kj::Array< capnp::word > > arrays( srMessages.size() );
+	int                                     writeSize = 0;
 
-	// TODO: do more than just entity list, allow a list of messages from the server in one go
+	for ( size_t i = 0; i < srMessages.size(); i++ )
+	{
+		arrays[ i ] = capnp::messageToFlatArray( srMessages[ i ] );
+		writeSize += arrays[ i ].size() * sizeof( capnp::word );
+	}
+
+	for ( auto& client : gServerData.aClients )
+	{
+		if ( client.aState != ESV_ClientState_Connected )
+			continue;
+
+		for ( size_t arrayIndex = 0; arrayIndex < arrays.size(); arrayIndex++ )
+		{
+			int write = client.Write( arrays[ arrayIndex ].asChars().begin(), arrays[ arrayIndex ].size() * sizeof( capnp::word ) );
+
+			// If we failed to write, disconnect them?
+			if ( write == 0 )
+			{
+				Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
+				client.aState = ESV_ClientState_Disconnected;
+				break;
+			}
+		}
+	}
+
+	return writeSize;
+}
+
+
+int SV_BroadcastMsg( capnp::MessageBuilder& srMessage )
+{
+	auto array = capnp::messageToFlatArray( srMessage );
+
+	for ( auto& client : gServerData.aClients )
+	{
+		if ( client.aState != ESV_ClientState_Connected )
+			continue;
+
+		int write = client.Write( array.asChars().begin(), array.size() * sizeof( capnp::word ) );
+
+		// If we failed to write, disconnect them?
+		if ( write == 0 )
+		{
+			Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
+			client.aState = ESV_ClientState_Disconnected;
+		}
+	}
+
+	return array.size() * sizeof( capnp::word );
+}
+
+
+void SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType, bool sFullUpdate )
+{
 	auto root = srBuilder.initRoot< MsgSrcServer >();
-	root.setType( EMsgSrcServer::ENTITY_LIST );
 
-	capnp::MallocMessageBuilder entListBuilder;
-	SV_BuildEntityList( entListBuilder );
+	capnp::MallocMessageBuilder messageBuilder;
 
-	auto array = capnp::messageToFlatArray( entListBuilder );
+	switch ( sSrcType )
+	{
+		case EMsgSrcServer::ENTITY_LIST:
+		{
+			root.setType( EMsgSrcServer::ENTITY_LIST );
+			GetEntitySystem()->WriteEntityUpdates( messageBuilder );
+			//Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
+			break;
+		}
+		case EMsgSrcServer::COMPONENT_LIST:
+		{
+			root.setType( EMsgSrcServer::COMPONENT_LIST );
+			GetEntitySystem()->WriteComponentUpdates( messageBuilder, sFullUpdate );
+			//Log_DevF( gLC_Server, 2, "Sending COMPONENT_LIST to Clients\n" );
+			break;
+		}
+	}
+
+	auto array = capnp::messageToFlatArray( messageBuilder );
 	auto data  = root.initData( array.size() * sizeof( capnp::word ) );
 
 	// This is probably awful and highly inefficent
 	// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
 	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+}
 
-	//Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
+
+void SV_BuildUpdatedData( bool sFullUpdate )
+{
+	// Send updated data to clients
+	std::vector< capnp::MallocMessageBuilder > messages( 2 );
+	std::vector< kj::Array< capnp::word > >    arrays( 2 );
+
+	SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, sFullUpdate );
+	SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, sFullUpdate );
+
+	arrays[ 0 ]   = capnp::messageToFlatArray( messages[ 0 ] );
+	arrays[ 1 ]   = capnp::messageToFlatArray( messages[ 1 ] );
+
+	int writeSize = 0;
+
+	for ( auto& client : gServerData.aClients )
+	{
+		if ( client.aState != ESV_ClientState_Connected )
+			continue;
+
+		writeSize = 0;
+
+		for ( size_t arrayIndex = 0; arrayIndex < arrays.size(); arrayIndex++ )
+		{
+			int write = client.Write( arrays[ arrayIndex ].asChars().begin(), arrays[ arrayIndex ].size() * sizeof( capnp::word ) );
+
+			// If we failed to write, disconnect them?
+			if ( write == 0 )
+			{
+				Log_ErrorF( gLC_Server, "Failed to write network data to client, marking client as disconnected: %s\n", Net_ErrorString() );
+				client.aState = ESV_ClientState_Disconnected;
+			}
+			else
+			{
+				writeSize += write;
+			}
+		}
+	}
 }
 
 
@@ -316,55 +445,6 @@ void SV_SendDisconnect( SV_Client_t& srClient )
 }
 
 
-void SV_SetCommandClient( SV_Client_t* spClient )
-{
-	gpCommandClient = spClient;
-}
-
-
-SV_Client_t* SV_GetCommandClient()
-{
-	return gpCommandClient;
-}
-
-
-Entity SV_GetCommandClientEntity()
-{
-	SV_Client_t* client = SV_GetCommandClient();
-
-	if ( !client )
-	{
-		Log_Error( gLC_Server, "SV_GetCommandClientEntity(): No Command Client currently set!\n" );
-		return CH_ENT_INVALID;
-	}
-
-	return client->aEntity;
-}
-
-
-SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
-{
-	// oh boy
-	for ( SV_Client_t& client : gServerData.aClients )
-	{
-		if ( client.aEntity == sEntity )
-			return &client;
-	}
-
-	Log_ErrorF( gLC_Server, "SV_GetClientFromEntity(): Failed to find entity attached to a client! (Entity %zd)\n", sEntity );
-	return nullptr;
-}
-
-
-Entity SV_GetPlayerEntFromIndex( size_t sIndex )
-{
-	if ( gServerData.aClients.empty() || sIndex > gServerData.aClients.size() + 1 )
-		return CH_ENT_INVALID;
-
-	return gServerData.aClients[ sIndex ].aEntity;
-}
-
-
 void SV_ProcessCommands( SV_Client_t& srClient )
 {
 }
@@ -383,6 +463,51 @@ void SV_HandleMsg_UserCmd( SV_Client_t& srClient, NetMsgUserCmd::Reader& srReade
 	srClient.aUserCmd.aButtons    = srReader.getButtons();
 	srClient.aUserCmd.aFlashlight = srReader.getFlashlight();
 	srClient.aUserCmd.aMoveType   = static_cast< PlayerMoveType >( srReader.getMoveType() );
+}
+
+
+SV_Client_t* SV_GetClientFromAddr( ch_sockaddr& srAddr )
+{
+	for ( auto& client : gServerData.aClients )
+	{
+		// if ( client.aAddr.sa_data == clientAddr.sa_data && client.aAddr.sa_family == clientAddr.sa_family )
+		// if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data ) == 0 && client.aAddr.sa_family == clientAddr.sa_family )
+		if ( memcmp( client.aAddr.sa_data, srAddr.sa_data, sizeof( client.aAddr.sa_data ) ) == 0 )
+		{
+			return &client;
+		}
+	}
+
+	return nullptr;
+}
+
+
+void SV_ProcessSocketMsgs()
+{
+	while ( true )
+	{
+		ChVector< char > data( 8192 );
+		ch_sockaddr      clientAddr;
+		int              len = Net_Read( gServerSocket, data.data(), data.size(), &clientAddr );
+
+		if ( len <= 0 )
+			return;
+
+		SV_Client_t* client = SV_GetClientFromAddr( clientAddr );
+
+		if ( !client )
+		{
+			SV_ConnectClient( clientAddr, data );
+			continue;
+		}
+
+		// Reset the connection timer
+		client->aTimeout = Game_GetCurTime() + sv_client_timeout;
+
+		// Read the message sent from the client
+		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+		SV_ProcessClientMsg( *client, reader );
+	}
 }
 
 
@@ -446,6 +571,13 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 			break;
 		}
 
+		case EMsgSrcClient::FULL_UPDATE:
+		{
+			// They want a full update, add them to the full update list
+			gServerData.aClientsFullUpdate.push_back( &srClient );
+			break;
+		}
+
 		default:
 			// TODO: have a message type to string function
 			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
@@ -454,56 +586,14 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 }
 
 
-SV_Client_t* SV_GetClientFromAddr( ch_sockaddr& srAddr )
-{
-	for ( auto& client : gServerData.aClients )
-	{
-		// if ( client.aAddr.sa_data == clientAddr.sa_data && client.aAddr.sa_family == clientAddr.sa_family )
-		// if ( memcmp( client.aAddr.sa_data, clientAddr.sa_data ) == 0 && client.aAddr.sa_family == clientAddr.sa_family )
-		if ( memcmp( client.aAddr.sa_data, srAddr.sa_data, sizeof( client.aAddr.sa_data ) ) == 0 )
-		{
-			return &client;
-		}
-	}
-
-	return nullptr;
-}
-
-
-void SV_ProcessSocketMsgs()
-{
-	while ( true )
-	{
-		ChVector< char > data( 8192 );
-		ch_sockaddr      clientAddr;
-		int              len = Net_Read( gServerSocket, data.data(), data.size(), &clientAddr );
-
-		if ( len <= 0 )
-			return;
-
-		SV_Client_t* client = SV_GetClientFromAddr( clientAddr );
-
-		if ( !client )
-		{
-			SV_ConnectClient( clientAddr, data );
-			continue;
-		}
-
-		// Reset the connection timer
-		client->aTimeout = Game_GetCurTime() + sv_client_timeout;
-
-		// Read the message sent from the client
-		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-		SV_ProcessClientMsg( *client, reader );
-	}
-}
-
-
 void SV_ConnectClientFinish( SV_Client_t& srClient )
 {
 	srClient.aState = ESV_ClientState_Connected;
 
-	vec_remove( gServerData.aClientsConnecting, &srClient );
+	gServerData.aClientsConnecting.erase( &srClient );
+	
+	// They just got here, so send them a full update
+	gServerData.aClientsFullUpdate.push_back( &srClient );
 
 	Log_MsgF( gLC_Server, "Client Connected: \"%s\"\n", srClient.aName.c_str() );
 
@@ -548,5 +638,58 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srAddr );
 
 	gServerData.aClientsConnecting.push_back( &client );
+}
+
+
+// --------------------------------------------------------------------
+// Helper Functions
+
+
+void SV_SetCommandClient( SV_Client_t* spClient )
+{
+	gpCommandClient = spClient;
+}
+
+
+SV_Client_t* SV_GetCommandClient()
+{
+	return gpCommandClient;
+}
+
+
+Entity SV_GetCommandClientEntity()
+{
+	SV_Client_t* client = SV_GetCommandClient();
+
+	if ( !client )
+	{
+		Log_Error( gLC_Server, "SV_GetCommandClientEntity(): No Command Client currently set!\n" );
+		return CH_ENT_INVALID;
+	}
+
+	return client->aEntity;
+}
+
+
+SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
+{
+	// oh boy
+	for ( SV_Client_t& client : gServerData.aClients )
+	{
+		if ( client.aEntity == sEntity )
+			return &client;
+	}
+
+	Log_ErrorF( gLC_Server, "SV_GetClientFromEntity(): Failed to find entity attached to a client! (Entity %zd)\n", sEntity );
+	return nullptr;
+}
+
+
+Entity SV_GetPlayerEntFromIndex( size_t sIndex )
+{
+	if ( gServerData.aClients.empty() || sIndex > gServerData.aClients.size() + 1 )
+		return CH_ENT_INVALID;
+
+	return gServerData.aClients[ sIndex ].aEntity;
 }
 

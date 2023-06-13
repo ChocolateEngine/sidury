@@ -78,6 +78,12 @@ CONVAR_CMD_EX( cl_username, "greg", CVARF_ARCHIVE, "Your Username" )
 }
 
 
+CONCMD_VA( cl_request_full_update )
+{
+	CL_SendFullUpdateRequest();
+}
+
+
 CONCMD( connect )
 {
 	if ( args.empty() )
@@ -202,6 +208,9 @@ void CL_Update( float frameTime )
 			// Send UserCmd
 			CL_SendUserCmd();
 
+			// Update Entity and Component States after everything is processed
+			GetEntitySystem()->UpdateStates();
+
 			break;
 		}
 	}
@@ -216,7 +225,7 @@ void CL_GameUpdate( float frameTime )
 
 	// Check connection timeout
 	// if ( ( cl_timeout_duration - cl_timeout_threshold ) < gClientTimeout )
-	if ( cl_timeout_duration < ( gClientTimeout - cl_timeout_threshold ) )
+	if ( cl_timeout_threshold < ( gClientTimeout - cl_timeout_duration ) )
 	{
 		// Show Connection Warning
 		// flood console lol
@@ -290,7 +299,9 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 
 	memset( &gClientAddr, 0, sizeof( gClientAddr ) );
 
-	Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
+	if ( gClientState != EClientState_Idle )
+		Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
+
 	gClientState          = EClientState_Idle;
 	gClientConnectTimeout = 0.f;
 
@@ -379,6 +390,9 @@ bool CL_RecvServerInfo()
 	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
 
 	CL_HandleMsg_ServerInfo( serverInfoMsg );
+
+	// Reset the connection timer
+	gClientTimeout = cl_timeout_duration;
 
 	return true;
 }
@@ -502,6 +516,15 @@ void CL_SendUserCmd()
 }
 
 
+void CL_SendFullUpdateRequest()
+{
+	capnp::MallocMessageBuilder builder;
+	auto                        root = builder.initRoot< MsgSrcClient >();
+	root.setType( EMsgSrcClient::FULL_UPDATE );
+	CL_WriteToServer( builder );
+}
+
+
 void CL_SendMessageToServer( EMsgSrcClient sSrcType )
 {
 }
@@ -517,6 +540,10 @@ void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
 }
 
 
+// IDEA: what if you had an internal translation list or whatever of server to client entity id's
+// The client entity ID's may be different thanks to client only entities
+// and having an internal system to convert the entity id to what we store it on the client
+// would completely resolve any potential entity id conflicts
 void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 {
 	PROF_SCOPE();
@@ -526,50 +553,111 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 		Entity entId  = entityUpdate.getId();
 		Entity entity = CH_ENT_INVALID;
 
-		if ( GetEntitySystem()->EntityExists( entId ) )
-		{
-			entity = entId;
-		}
-		else
+		/*if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
 		{
 			entity = GetEntitySystem()->CreateEntityFromServer( entId );
 
 			if ( entity == CH_ENT_INVALID )
+			{
+				Log_Warn( gLC_Client, "Failed to create client entity from server\n" );
 				continue;
+			}
 		}
-
-		if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
-		{
-			entity = GetEntitySystem()->CreateEntityFromServer( entId );
-		
-			if ( entity == CH_ENT_INVALID )
-				continue;
-		}
-		else if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+		else*/
+		if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
 		{
 			GetEntitySystem()->DeleteEntity( entId );
 			continue;
 		}
+		else
+		{
+			if ( !GetEntitySystem()->EntityExists( entId ) )
+			{
+				// Log_Warn( gLC_Client, "Missed message from server to create entity\n" );
 
-		if ( entity == CH_ENT_INVALID )
+				entity = GetEntitySystem()->CreateEntityFromServer( entId );
+
+				if ( entity == CH_ENT_INVALID )
+				{
+					Log_Warn( gLC_Client, "Failed to create client entity from server\n" );
+					continue;
+				}
+			}
+		}
+	}
+}
+
+
+void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
+{
+	PROF_SCOPE();
+
+	for ( const NetMsgComponentUpdate::Reader& componentUpdate : srReader.getUpdateList() )
+	{
+		if ( !componentUpdate.hasName() )
 			continue;
 
-		for ( const NetMsgEntityUpdate::Component::Reader& componentRead : entityUpdate.getComponents() )
+		const char* componentName = componentUpdate.getName().cStr();
+
+		EntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
+
+		AssertMsg( pool, "Failed to find component pool" );
+
+		if ( !pool )
 		{
-			const char* componentName = componentRead.getName().cStr();
-			void*       componentData   = nullptr;
+			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
+			continue;
+		}
 
-			// if ( componentRead.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+		EntComponentData_t* regData = pool->GetRegistryData();
+
+		AssertMsg( regData, "Failed to find component registry data" );
+		
+		for ( const NetMsgComponentUpdate::Component::Reader& componentRead : componentUpdate.getComponents() )
+		{
+			// Get the Entity and Make sure it exists
+			Entity entId         = componentRead.getId();
+			Entity entity        = CH_ENT_INVALID;
+			void*  componentData = nullptr;
+
+			if ( !GetEntitySystem()->EntityExists( entId ) )
+			{
+				Log_Error( gLC_Client, "Failed to find entity while updating components from server\n" );
+				continue;
+			}
+
+			entity = entId;
+
+			// Check the component state, do we need to remove it, or add it to the entity?
+			if ( componentRead.getState() == NetMsgComponentUpdate::EState::DESTROYED )
+			{
+				// We can just remove the component right now, no need to queue it,
+				// as this is before all client game processing
+				pool->Remove( entity );
+				continue;
+			}
+			// This is useless, we will only get this state if we are in the server when a component/entity is created
+			// So a bunch of pre-existing entities will miss this
+			// else if ( componentRead.getState() == NetMsgComponentUpdate::EState::CREATED )
 			// {
-			// 	GetEntitySystem()->RemoveComponent( entity, spComponentName );
-			// 	continue;
+			// 	// Create the component
+			// 	componentData = GetEntitySystem()->AddComponent( entity, componentName );
+			// 
+			// 	if ( componentData == nullptr )
+			// 	{
+			// 		Log_ErrorF( "Failed to create component\n" );
+			// 		continue;
+			// 	}
 			// }
+			// else
+			{
+				componentData = GetEntitySystem()->GetComponent( entity, componentName );
+			}
 
-			componentData               = GetEntitySystem()->GetComponent( entity, componentName );
-
-			// else if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
 			if ( !componentData )
 			{
+				// Log_WarnF( gLC_Client, "Didn't get component created message, creating now: \"%s\"\n", componentName );
+
 				// Create the component
 				componentData = GetEntitySystem()->AddComponent( entity, componentName );
 
@@ -580,20 +668,7 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 				}
 			}
 
-			EntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
-
-			if ( !pool )
-			{
-				Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
-				continue;
-			}
-
-			EntComponentData_t* regData = pool->GetRegistryData();
-
-			Assert( regData );
-
-			// Assert( regData->apRead );
-
+			// Now, update component data
 			if ( !regData->apRead )
 				continue;
 
@@ -602,7 +677,7 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 
 			if ( componentRead.hasValues() )
 			{
-				auto values = componentRead.getValues();
+				auto                          values = componentRead.getValues();
 
 				// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.data(), values.size() ) );
 				capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.begin(), values.size() ) );
@@ -618,19 +693,6 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 					system->ComponentUpdated( entity );
 				}
 			}
-
-
-			// NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
-			// 
-			// capnp::MallocMessageBuilder compMessageBuilder;
-			// regData->apRead( compMessageBuilder, data );
-			// auto array        = capnp::messageToFlatArray( compMessageBuilder );
-			// 
-			// auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
-			// // std::copy( array.begin(), array.end(), valueBuilder.begin() );
-			// memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
-			// 
-			// componentRead.getValues();
 		}
 	}
 }
@@ -652,7 +714,10 @@ void CL_GetServerMessages()
 
 			// The server hasn't sent anything in a while, so just disconnect
 			if ( gClientTimeout < 0.0 )
+			{
+				Log_Msg( gLC_Client, "Disconnecting From Server - Timeout period expired\n" );
 				CL_Disconnect();
+			}
 
 			return;
 		}
@@ -667,7 +732,7 @@ void CL_GetServerMessages()
 		auto                          msgType   = serverMsg.getType();
 		auto                          msgData   = serverMsg.getData();
 
-		Assert( msgType <= EMsgSrcServer::ENTITY_LIST );
+		Assert( msgType < EMsgSrcServer::COUNT );
 		Assert( msgType >= EMsgSrcServer::DISCONNECT );
 
 		capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), data.size() ) );
@@ -695,10 +760,17 @@ void CL_GetServerMessages()
 				break;
 			}
 
+			case EMsgSrcServer::COMPONENT_LIST:
+			{
+				auto msg = dataReader.getRoot< NetMsgComponentUpdates >();
+				CL_HandleMsg_ComponentList( msg );
+				break;
+			}
+
 			case EMsgSrcServer::ENTITY_LIST:
 			{
-				auto msgUserCmd = dataReader.getRoot< NetMsgEntityUpdates >();
-				CL_HandleMsg_EntityList( msgUserCmd );
+				auto msg = dataReader.getRoot< NetMsgEntityUpdates >();
+				CL_HandleMsg_EntityList( msg );
 				break;
 			}
 

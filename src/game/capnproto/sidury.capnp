@@ -71,6 +71,11 @@ struct NetMsgConVar
     command @0 :Text;
 }
 
+struct NetMsgPaused
+{
+    paused @0 :Bool;
+}
+
 # --------------------------------------------------------
 # Client Messages, Sent to the Server
 
@@ -80,6 +85,9 @@ enum EMsgSrcClient
 	clientInfo @1;
 	conVar     @2;
 	userCmd    @3;
+	fullUpdate @4;
+
+	count      @5;
 }
 
 struct MsgSrcClient
@@ -93,10 +101,14 @@ struct MsgSrcClient
 
 enum EMsgSrcServer
 {
-	disconnect @0;
-	serverInfo @1;
-	conVar     @2;
-	entityList @3;
+	disconnect    @0;
+	serverInfo    @1;
+	conVar        @2;
+	componentList @3;
+	entityList    @4;
+	paused        @5;
+
+    count         @6;
 }
 
 struct MsgSrcServer
@@ -106,14 +118,10 @@ struct MsgSrcServer
 }
 
 # --------------------------------------------------------
-# Entities
+# Entities and Components
 
-struct NetMsgEntity
-{
-    id @0 :UInt32;
-}
-
-struct NetMsgEntityUpdate
+# This contains component data
+struct NetMsgComponentUpdate
 {
     enum EState
     {
@@ -124,8 +132,36 @@ struct NetMsgEntityUpdate
 
     struct Component
     {
-        name   @0 :Text;    # Registered Component Name
-        values @1 :Data;    # Component Data
+        # Entity to update
+        id @0 :UInt32;
+
+        # Component State
+        state @1 :EState;
+
+        # Component Data
+        values @2 :Data;
+    }
+
+    # Registered Component Name
+    name @0 :Text;
+
+    # Entity State
+    # state @1 :EState;
+
+    # List of all component data
+    components @1 :List(Component);
+}
+
+# This only contains updates for entity id's
+# And stores whether they are created, destroyed, or unchanged
+# We do not network any information about components
+struct NetMsgEntityUpdate
+{
+    enum EState
+    {
+        none      @0;
+        created   @1;
+        destroyed @2;
     }
 
     # Entity to update
@@ -133,15 +169,18 @@ struct NetMsgEntityUpdate
 
     # Entity State
     state @1 :EState;
-
-    # List of all component data
-    components @2 :List(Component);
 }
 
 struct NetMsgEntityUpdates
 {
     # All Entities to update
     updateList  @0 :List(NetMsgEntityUpdate);
+}
+
+struct NetMsgComponentUpdates
+{
+    # All Entities to update
+    updateList  @0 :List(NetMsgComponentUpdate);
 }
 
 # --------------------------------------------------------

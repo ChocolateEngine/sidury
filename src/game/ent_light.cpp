@@ -14,6 +14,7 @@ LightSystem::~LightSystem()
 }
 
 
+// TODO: pass in component data as a 2nd argument void*??
 void LightSystem::ComponentAdded( Entity sEntity )
 {
 	// light->aType will not be initialized yet smh
@@ -24,7 +25,8 @@ void LightSystem::ComponentAdded( Entity sEntity )
 	// auto light = Ent_GetComponent< CLight >( sEntity, "light" );
 	// 
 	// if ( light )
-	// 	light->apLight = Graphics_CreateLight( light->aType );
+	// 	light->apLight = nullptr;
+	// 	// light->apLight = Graphics_CreateLight( light->aType );
 }
 
 
@@ -49,6 +51,14 @@ void LightSystem::ComponentUpdated( Entity sEntity )
 
 	if ( !light )
 		return;
+
+	if ( !light->apLight )
+	{
+		light->apLight = Graphics_CreateLight( light->aType );
+
+		if ( !light->apLight )
+			return;
+	}
 
 	Assert( light->apLight );
 

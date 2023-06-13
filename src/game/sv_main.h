@@ -12,6 +12,12 @@
 EXT_CVAR_FLAG( CVARF_SERVER );
 
 
+namespace capnp
+{
+	class MallocMessageBuilder;
+}
+
+
 struct UserCmd_t;
 
 
@@ -43,24 +49,48 @@ struct SV_Client_t
 
 struct ServerData_t
 {
-	bool                        aActive;
-	std::vector< SV_Client_t >  aClients;
-	std::vector< SV_Client_t* > aClientsConnecting;
+	bool                       aActive;
+	std::vector< SV_Client_t > aClients;
+
+	// Clients that are still connecting
+	ChVector< SV_Client_t* >   aClientsConnecting;
+
+	// Clients that want a full update
+	ChVector< SV_Client_t* >   aClientsFullUpdate;
 };
+
+// --------------------------------------------------------------------
 
 bool                SV_Init();
 void                SV_Shutdown();
 void                SV_Update( float frameTime );
-
 void                SV_GameUpdate( float frameTime );
-void                SV_BuildUpdatedData( capnp::MessageBuilder& srMessage );
 
 bool                SV_StartServer();
 void                SV_StopServer();
 
+// --------------------------------------------------------------------
+// Networking
+
+int                 SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients );
+int                 SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages );
+int                 SV_BroadcastMsg( capnp::MessageBuilder& srMessage );
+
 void                SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage );
 void                SV_SendServerInfo( SV_Client_t& srClient );
 void                SV_SendDisconnect( SV_Client_t& srClient );
+
+void                SV_BuildServerMsg( capnp::MessageBuilder& srMessage, EMsgSrcServer sSrcType, bool sFullUpdate );
+void                SV_BuildUpdatedData( bool sFullUpdate );
+
+void                SV_ProcessSocketMsgs();
+void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
+
+void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData );
+void                SV_ConnectClientFinish( SV_Client_t& srClient );
+
+// --------------------------------------------------------------------
+// Helper Functions
 
 void                SV_SetCommandClient( SV_Client_t* spClient );
 SV_Client_t*        SV_GetCommandClient();
@@ -70,10 +100,7 @@ SV_Client_t*        SV_GetClientFromEntity( Entity sEntity );
 
 Entity              SV_GetPlayerEntFromIndex( size_t sIndex );
 
-void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
-void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData );
-void                SV_ConnectClientFinish( SV_Client_t& srClient );
-void                SV_ProcessSocketMsgs();
+// --------------------------------------------------------------------
 
 extern ServerData_t gServerData;
 

@@ -348,9 +348,10 @@ EntityComponentPool::EntityComponentPool()
 
 EntityComponentPool::~EntityComponentPool()
 {
-	for ( auto& [ entity, component ] : aMapEntityToComponent )
+	while ( aMapEntityToComponent.size() )
 	{
-		Remove( entity );
+		auto it = aMapEntityToComponent.begin();
+		Remove( it->first );
 	}
 }
 
@@ -417,6 +418,8 @@ void* EntityComponentPool::Create( Entity entity )
 
 	void* data                      = aFuncNew();
 
+	aComponentStates[ aCount ]      = EEntityCreateState_Created;
+
 	aComponents[ aCount++ ]         = data;
 
 	// Add it to systems
@@ -458,12 +461,87 @@ void EntityComponentPool::Remove( Entity entity )
 	aMapComponentToEntity.erase( index );
 	aMapEntityToComponent.erase( it );
 
+	aComponentStates.erase( index );
+
 	void* data = aComponents[ index ];
 	Assert( data );
 
 	aFuncFree( data );
 
 	aCount--;
+}
+
+
+// Removes this component by index
+void EntityComponentPool::RemoveByIndex( size_t sIndex )
+{
+	auto it = aMapComponentToEntity.find( sIndex );
+
+	if ( it == aMapComponentToEntity.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to remove component from entity - \"%s\"\n", apName );
+		return;
+	}
+
+	Entity entity = it->second;
+
+	// Remove it from the system
+	if ( apComponentSystem )
+	{
+		apComponentSystem->ComponentRemoved( entity );
+		vec_remove( apComponentSystem->aEntities, entity );
+	}
+
+	aMapComponentToEntity.erase( it );
+	aMapEntityToComponent.erase( sIndex );
+
+	aComponentStates.erase( sIndex );
+
+	void* data = aComponents[ sIndex ];
+	Assert( data );
+
+	aFuncFree( data );
+
+	aCount--;
+}
+
+
+// Removes this component from the entity later
+void EntityComponentPool::RemoveQueued( Entity entity )
+{
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it == aMapEntityToComponent.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to remove component from entity - \"%s\"\n", apName );
+		return;
+	}
+
+	size_t index = it->second;
+
+	// Mark Component as Destroyed
+	aComponentStates[ index ] = EEntityCreateState_Destroyed;
+}
+
+
+// Removes components queued for deletion
+void EntityComponentPool::RemoveAllQueued()
+{
+	// for ( auto& [ index, state ] : aComponentStates )
+	// for ( size_t i = 0; i < aComponentStates.size(); i++ )
+	for ( auto it = aComponentStates.begin(); it != aComponentStates.end(); it++ )
+	{
+		if ( it->second == EEntityCreateState_Destroyed )
+		{
+			RemoveByIndex( it->first );
+			continue;
+		}
+
+		if ( it->second == EEntityCreateState_Created )
+		{
+			it->second = EEntityCreateState_None;
+		}
+	}
 }
 
 
@@ -638,6 +716,7 @@ void EntitySystem::Shutdown()
 		{
 			aComponentSystems.erase( typeid( pool->apComponentSystem ).hash_code() );
 			delete pool->apComponentSystem;
+			pool->apComponentSystem = nullptr;
 		}
 
 		delete pool;
@@ -655,6 +734,24 @@ void EntitySystem::UpdateSystems()
 	{
 		if ( pool->apComponentSystem )
 			pool->apComponentSystem->Update();
+	}
+}
+
+
+void EntitySystem::UpdateStates()
+{
+	// Remove Components Queued for Deletion
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		pool->RemoveAllQueued();
+	}
+
+	DeleteQueuedEntities();
+
+	for ( auto& [ id, state ] : aEntityStates )
+	{
+		if ( state == EEntityCreateState_Created )
+			aEntityStates[ id ] = EEntityCreateState_None;
 	}
 }
 
@@ -718,6 +815,8 @@ Entity EntitySystem::CreateEntity()
 
 	aUsedEntities.push_back( id );
 
+	aEntityStates[ id ] = EEntityCreateState_Created;
+
 	return id;
 }
 
@@ -726,22 +825,36 @@ void EntitySystem::DeleteEntity( Entity ent )
 {
 	AssertMsg( ent < CH_MAX_ENTITIES, "Entity out of range" );
 
-	// Invalidate the destroyed entity's signature
-	// aSignatures[ ent ].reset();
+	aDeleteEntities.emplace( ent );
+	aEntityStates[ ent ] = EEntityCreateState_Destroyed;
+}
 
-	// Put the destroyed ID at the back of the queue
-	// aEntityPool.push( ent );
-	// aEntityPool.push_back( ent );
-	aEntityPool.insert( aEntityPool.begin(), ent );
-	--aEntityCount;
 
-	vec_remove( aUsedEntities, ent );
-
-	// Tell each Component Pool that this entity was destroyed
-	for ( auto& [ name, pool ] : aComponentPools )
+void EntitySystem::DeleteQueuedEntities()
+{
+	for ( Entity entity : aDeleteEntities )
 	{
-		pool->EntityDestroyed( ent );
+		// Invalidate the destroyed entity's signature
+		// aSignatures[ ent ].reset();
+
+		// Put the destroyed ID at the back of the queue
+		// aEntityPool.push( ent );
+		// aEntityPool.push_back( ent );
+		aEntityPool.insert( aEntityPool.begin(), entity );
+		--aEntityCount;
+
+		vec_remove( aUsedEntities, entity );
+
+		// Tell each Component Pool that this entity was destroyed
+		for ( auto& [ name, pool ] : aComponentPools )
+		{
+			pool->EntityDestroyed( entity );
+		}
+
+		aEntityStates.erase( entity );
 	}
+
+	aDeleteEntities.clear();
 }
 
 
@@ -842,36 +955,76 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 
 		update.setId( entity );
 
-		// this is the worst thing ever
-		std::vector< EntityComponentPool* > pools;
-		pools.reserve( aComponentPools.size() );
+		// Get Entity State
+		update.setState( static_cast< NetMsgEntityUpdate::EState >( aEntityStates[ entity ] ) );
+	}
+}
 
-		// Find all component pools that contain this Entity
-		// That means the Entity has the type of component that pool is for
-		for ( auto& [ name, pool ] : aComponentPools )
+
+// Read and write from the network
+void EntitySystem::ReadComponentUpdates( capnp::MessageReader& srReader )
+{
+}
+
+
+// TODO: redo this by having it loop through component pools, and not entitys
+// right now, it's doing a lot of entirely unnecessary checks
+// we can avoid those if we loop through the pools instead
+void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool sFullUpdate )
+{
+	auto   root       = srBuilder.initRoot< NetMsgComponentUpdates >();
+
+	// Make a list of component pools with a component that need updating
+	std::vector< EntityComponentPool* > componentPools;
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		// If there are no components in existence, don't even bother to send anything here
+		if ( !pool->aMapComponentToEntity.size() )
+			continue;
+
+		componentPools.push_back( pool );
+	} 
+
+	if ( Game_IsClient() )
+	{
+		gui->DebugMessage( "Sending \"%zd\" Component Types", componentPools.size() );
+	}
+
+	auto   updateList = root.initUpdateList( componentPools.size() );
+
+	size_t i          = 0;
+
+	for ( auto pool : componentPools )
+	{
+		NetMsgComponentUpdate::Builder compUpdate = updateList[ i ];
+
+		// If there are no components in existence, don't even bother to send anything here
+		if ( !pool->aMapComponentToEntity.size() )
+			continue;
+
+		compUpdate.setName( pool->apName );
+
+		auto   regData   = pool->GetRegistryData();
+		auto   compList  = compUpdate.initComponents( pool->aMapComponentToEntity.size() );
+
+		size_t compListI = 0;
+		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			if ( pool->Contains( entity ) )
-				pools.push_back( pool );
-		}
+			NetMsgComponentUpdate::Component::Builder compBuilder = compList[ compListI ];
 
-		// Now init components with the correct size
-		auto componentsList = update.initComponents( pools.size() );
+			compBuilder.setId( entity );
 
-		for ( size_t i = 0; i < pools.size(); i++ )
-		{
-			auto compBuilder = componentsList[ i ];
-			auto pool        = pools[ i ];
-
-			auto data        = pool->GetData( entity );
-			auto regData     = pool->GetRegistryData();
-
-			compBuilder.setName( regData->apName );
-
-			if ( !regData->apWrite )
+			// Get State
+			compBuilder.setState( static_cast< NetMsgComponentUpdate::EState >( pool->aComponentStates[ index ] ) );
+			
+			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed || !regData->apWrite )
 			{
-				compBuilder.initValues( 0 );
+				// Don't bother sending data if we're about to be destroyed or we have no write function
+				compListI++;
 				continue;
 			}
+
+			auto data = pool->GetData( entity );
 
 			capnp::MallocMessageBuilder compMessageBuilder;
 			if ( regData->apWrite( compMessageBuilder, data ) )
@@ -904,18 +1057,12 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 					*aIsDirty      = false;
 				}
 			}
+
+			compListI++;
 		}
+
+		i++;
 	}
-}
-
-
-void EntitySystem::ReadComponents( Entity sEnt, capnp::MessageReader& srReader )
-{
-}
-
-
-void EntitySystem::WriteComponents( Entity sEnt, capnp::MessageBuilder& srBuilder )
-{
 }
 
 
@@ -972,7 +1119,7 @@ void EntitySystem::RemoveComponent( Entity entity, const char* spName )
 		return;
 	}
 
-	pool->Remove( entity );
+	pool->RemoveQueued( entity );
 }
 
 

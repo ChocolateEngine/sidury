@@ -257,66 +257,79 @@ class EntityComponentPool
 	~EntityComponentPool();
 
 	// Called whenever an entity is destroyed on all Component Pools
-	bool                                 Init( const char* spName );
+	bool                                             Init( const char* spName );
 
 	// Get Component Registry Data
-	EntComponentData_t*                  GetRegistryData();
+	EntComponentData_t*                              GetRegistryData();
 
 	// Does this pool contain a component for this entity?
-	bool                                 Contains( Entity entity );
+	bool                                             Contains( Entity entity );
 
 	// Called whenever an entity is destroyed on all Component Pools
-	void                                 EntityDestroyed( Entity entity );
+	void                                             EntityDestroyed( Entity entity );
 
 	// Adds This component to the entity
-	void*                                Create( Entity entity );
+	void*                                            Create( Entity entity );
 
 	// Removes this component from the entity
-	void                                 Remove( Entity entity );
+	void                                             Remove( Entity entity );
+
+	// Removes this component by index
+	void                                             RemoveByIndex( size_t sIndex );
+
+	// Removes this component from the entity later
+	void                                             RemoveQueued( Entity entity );
+
+	// Removes components queued for deletion
+	void                                             RemoveAllQueued();
 
 	// Gets the data for this component
-	void*                                GetData( Entity entity );
+	void*                                            GetData( Entity entity );
 
 	// Marks this component as predicted
-	void                                 SetPredicted( Entity entity, bool sPredicted );
+	void                                             SetPredicted( Entity entity, bool sPredicted );
 
 	// Is this component predicted for this Entity?
-	bool                                 IsPredicted( Entity entity );
+	bool                                             IsPredicted( Entity entity );
 
 	// How Many Components are in this Pool?
-	size_t                               GetCount();
+	size_t                                           GetCount();
 
 	// ------------------------------------------------------------------
 
 	// Map Component Index to Entity
-	std::unordered_map< size_t, Entity > aMapComponentToEntity;
+	std::unordered_map< size_t, Entity >             aMapComponentToEntity;
 
 	// Map Entity to Component Index
-	std::unordered_map< Entity, size_t > aMapEntityToComponent;
+	std::unordered_map< Entity, size_t >             aMapEntityToComponent;
 
 	// Memory Pool of Components
 	// This is an std::array so that when a component is freed, it does not changes the index of each component
-	std::array< void*, CH_MAX_ENTITIES > aComponents{};
+	std::array< void*, CH_MAX_ENTITIES >             aComponents{};
+
+	// Component States, will store if an entity is just created or deleted for one frame
+	// Key is an index into aComponents
+	std::unordered_map< size_t, EEntityCreateState > aComponentStates;
 
 	// Entity's that are in here will have this component type predicted for it
-	std::set< Entity >                   aPredicted{};
+	std::set< Entity >                               aPredicted{};
 
 	// Amount of Components we have allocated
-	size_t                               aCount;
+	size_t                                           aCount;
 
 	// Component Name
-	const char*                          apName;
+	const char*                                      apName;
 
 	// Component Creation and Free Func
-	FEntComp_New                         aFuncNew;
-	FEntComp_Free                        aFuncFree;
+	FEntComp_New                                     aFuncNew;
+	FEntComp_Free                                    aFuncFree;
 
-	EntComponentData_t*                  apData;
+	EntComponentData_t*                              apData;
 
 	// Component Systems that manage this component
 	// NOTE: This may always just be one
 	// std::set< IEntityComponentSystem* >  aComponentSystems;
-	IEntityComponentSystem*              apComponentSystem = nullptr;
+	IEntityComponentSystem*                          apComponentSystem = nullptr;
 };
 
 
@@ -514,6 +527,9 @@ class EntitySystem
 
 	void                                                          UpdateSystems();
 
+	// Update Entity and Component States, and Delete Queued Entities
+	void                                                          UpdateStates();
+
 	void                                                          CreateComponentPools();
 	void                                                          CreateComponentPool( const char* spName );
 
@@ -538,8 +554,8 @@ class EntitySystem
 	void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
 	void                                                          WriteEntityUpdates( capnp::MessageBuilder& srBuilder );
 
-	void                                                          ReadComponents( Entity ent, capnp::MessageReader& srReader );
-	void                                                          WriteComponents( Entity ent, capnp::MessageBuilder& srBuilder );
+	void                                                          ReadComponentUpdates( capnp::MessageReader& srReader );
+	void                                                          WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool sFullUpdate );
 
 	// void                                                          SetComponentNetworked( Entity ent, const char* spName );
 
@@ -608,7 +624,7 @@ class EntitySystem
 	std::unordered_map< size_t, IEntityComponentSystem* >         aComponentSystems;
 
 	// Entity States, will store if an entity is just created or deleted for one frame
-	// std::unordered_map< Entity, EntityComponentPool* >            aEntityStates;
+	std::unordered_map< Entity, EEntityCreateState >              aEntityStates;
 };
 
 
@@ -654,7 +670,7 @@ inline T* Ent_GetSystem()
 template< typename T >
 struct ComponentNetVar
 {
-	T    aValue;
+	T    aValue{};
 	bool aIsDirty = true;
 
 	ComponentNetVar() :
@@ -1067,7 +1083,7 @@ struct CLight
 	ComponentNetVar< bool >       aShadow   = true;
 	ComponentNetVar< bool >       aEnabled  = true;
 
-	Light_t* apLight;  // var not registered
+	Light_t*                      apLight   = nullptr;  // var not registered
 };
 
 
