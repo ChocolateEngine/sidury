@@ -8,6 +8,13 @@
 // --------------------------------------------------------------------------------------
 // Lighting
 
+// IDEA:
+// For the applying the lights in the shader code
+// Don't pass in a count of lights, when you delete lights
+// instead, just mark them disabled
+// and use a fixed array of lights instead?
+// 
+
 UniformBufferArray_t                               gUniformLightInfo;
 UniformBufferArray_t                               gUniformLights[ ELightType_Count ];
 UniformBufferArray_t                               gUniformShadows;
@@ -138,7 +145,6 @@ bool Graphics_CreateShadowRenderPass()
 }
 
 
-
 void Graphics_AddShadowMap( Light_t* spLight )
 {
 	ShadowMap_t& shadowMap   = gLightShadows[ spLight ];
@@ -212,6 +218,26 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 }
 
 
+void Graphics_UpdateLightDescSets( ELightType sLightType )
+{
+	// update the descriptor sets
+	UpdateVariableDescSet_t update{};
+	update.aType = EDescriptorType_UniformBuffer;
+
+	for ( size_t i = 0; i < gUniformLights[ sLightType ].aSets.size(); i++ )
+		update.aDescSets.push_back( gUniformLights[ sLightType ].aSets[ i ] );
+
+	for ( const auto& [ light, bufferHandle ] : gLightBuffers )
+	{
+		if ( light->aType == sLightType )
+			update.aBuffers.push_back( bufferHandle );
+	}
+
+	// Update all light indexes for the shaders
+	render->UpdateVariableDescSet( update );
+}
+
+
 Handle Graphics_AddLightBuffer( const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
 	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
@@ -237,6 +263,7 @@ Handle Graphics_AddLightBuffer( const char* spBufferName, size_t sBufferSize, Li
 			update.aBuffers.push_back( bufferHandle );
 	}
 
+	// Update all light indexes for the shaders
 	render->UpdateVariableDescSet( update );
 
 	// if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
@@ -370,10 +397,9 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.z = spLight->aColor.z;
 			light.aColor.w = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
-			Transform temp{};
-			temp.aPos = spLight->aPos;
-			temp.aAng = spLight->aAng;
-			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
+			glm::mat4 matrix;
+			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
 
 			// glm::mat4 matrix;
 			// ToMatrix( matrix, spLight->aPos, spLight->aAng );
@@ -462,7 +488,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 			glm::mat4 matrix;
 			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
-			Util_GetMatrixDirection( matrix, nullptr, nullptr, &light.aDir );
+			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
 #if 1
 			// update shadow map view info
 			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
@@ -517,10 +543,9 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aLength    = spLight->aLength;
 			light.aThickness = spLight->aRadius;
 
-			Transform temp{};
-			temp.aPos = spLight->aPos;
-			temp.aAng = spLight->aAng;
-			Util_GetMatrixDirection( temp.ToMatrix( false ), nullptr, nullptr, &light.aDir );
+			glm::mat4 matrix;
+			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
 
 			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
 			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
@@ -532,6 +557,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 }
 
 
+// TODO: this should be returning Handle's
 Light_t* Graphics_CreateLight( ELightType sType )
 {
 	Light_t* light = new Light_t;

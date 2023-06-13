@@ -234,6 +234,8 @@ struct ModelBuffers_t : public RefCounted
 };
 
 
+// A Mesh is a simple struct that only contains vertex/index counts, offsets, and a material
+// It is intended to be part of a Model struct, where the buffers and vertex data are
 struct Mesh
 {
 	u32    aVertexOffset;
@@ -251,6 +253,8 @@ struct Mesh
 // and then every time a model or scene is loaded, just up that internal ref count
 // and lower it when a model or scene is freed
 // they will never free themselves, only the system managing it will free it
+
+// A Model contains vertex and index buffers, vertex data, and a vector of meshes the model contains
 struct Model
 {
 	ModelBuffers_t*  apBuffers    = nullptr;
@@ -267,6 +271,8 @@ struct ModelBBox_t
 };
 
 
+// A Renderable contains a model handle, a model matrix
+// It also contains an AABB, and bools for testing vis, casting a shadow, and whether it's visible or not
 struct Renderable_t
 {
 	// used in actual drawing
@@ -281,6 +287,8 @@ struct Renderable_t
 };
 
 
+// Surface Draw contains drawing information on how to draw parts of a renderable
+// It contains draw data and a mesh surface index
 struct SurfaceDraw_t
 {
 	Handle aDrawData;

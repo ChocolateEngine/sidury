@@ -10,8 +10,6 @@ struct Skybox_Push
 };
 
 
-extern IRender*                                               render;
-
 static std::unordered_map< SurfaceDraw_t*, Skybox_Push > gSkyboxPushData;
 
 

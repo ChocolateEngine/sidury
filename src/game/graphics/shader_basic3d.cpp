@@ -3,18 +3,16 @@
 #include "graphics.h"
 
 
-extern IRender*                             render;
+static Handle               gFallbackAO            = InvalidHandle;
+static Handle               gFallbackEmissive      = InvalidHandle;
 
-static Handle                               gFallbackAO            = InvalidHandle;
-static Handle                               gFallbackEmissive      = InvalidHandle;
-
-constexpr const char*                       gpFallbackAOPath       = "materials/base/white.ktx";
-constexpr const char*                       gpFallbackEmissivePath = "materials/base/black.ktx";
+constexpr const char*       gpFallbackAOPath       = "materials/base/white.ktx";
+constexpr const char*       gpFallbackEmissivePath = "materials/base/black.ktx";
 
 // descriptor set layouts
-extern UniformBufferArray_t                 gUniformMaterialBasic3D;
+extern UniformBufferArray_t gUniformMaterialBasic3D;
 
-constexpr EShaderFlags                      gShaderFlags =
+constexpr EShaderFlags      gShaderFlags =
   EShaderFlags_Sampler |
   EShaderFlags_ViewInfo |
   EShaderFlags_PushConstant |

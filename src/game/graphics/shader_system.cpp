@@ -3,8 +3,6 @@
 #include "graphics.h"
 
 
-extern IRender*                                         render;
-
 static std::unordered_map< std::string_view, Handle >   gShaderNames;
 
 static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point

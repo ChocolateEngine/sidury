@@ -11,10 +11,8 @@ struct ShadowMap_Push
 };
 
 
-extern IRender*                                                  render;
-
 static std::unordered_map< SurfaceDraw_t*, ShadowMap_Push > gPushData;
-static int                                                       gShadowViewInfoIndex = 0;
+static int                                                  gShadowViewInfoIndex = 0;
 
 
 static void Shader_ShadowMap_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )

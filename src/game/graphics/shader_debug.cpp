@@ -3,14 +3,12 @@
 #include "graphics.h"
 
 
-extern IRender*                             render;
-
-constexpr const char*                       gpVertColShader        = "shaders/debug_col.vert.spv";
-constexpr const char*                       gpVertShader           = "shaders/debug.vert.spv";
-constexpr const char*                       gpFragShader           = "shaders/debug.frag.spv";
+constexpr const char*       gpVertColShader = "shaders/debug_col.vert.spv";
+constexpr const char*       gpVertShader    = "shaders/debug.vert.spv";
+constexpr const char*       gpFragShader    = "shaders/debug.frag.spv";
 
 // descriptor set layouts
-extern UniformBufferArray_t                 gUniformViewInfo;
+extern UniformBufferArray_t gUniformViewInfo;
 
 
 struct Debug_Push
