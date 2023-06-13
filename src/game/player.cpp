@@ -785,6 +785,8 @@ void PlayerManager::DoMouseLook( Entity player )
 }
 
 
+// TODO: Move this to some generel math file or whatever
+
 float Lerp_GetDuration( float max, float min, float current )
 {
 	return (current - min) / (max - min);

@@ -19,7 +19,9 @@ CONVAR( proto_look, 1 );
 CONVAR( proto_follow, 0 );
 CONVAR( proto_follow_speed, 400 );
 CONVAR( proto_swap_target_sec_min, 1.0 );
-CONVAR( proto_swap_target_sec_max, 60.0 );
+CONVAR( proto_swap_target_sec_max, 10.0 );
+CONVAR( proto_swap_turn_time_min, 0.2 );
+CONVAR( proto_swap_turn_time_max, 3.0 );
 
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
@@ -35,17 +37,41 @@ Model*                        g_streamModel = nullptr;
 
 ConVar                        snd_cube_scale( "snd_cube_scale", "0.05" );
 
+
+// Was for an old multithreading test
+#if 0
 struct ProtoLookData_t
 {
 	std::vector< Entity > aProtos;
 	Transform*            aPlayerTransform;
 };
+#endif
 
 
 // Protogen Component
 // This acts a tag to put all entities here in a list automatically
 struct CProtogen
 {
+};
+
+
+// funny temp
+struct ProtoTurn_t
+{
+	double aNextTime;
+	float  aLastRand;
+	float  aRand;
+};
+
+
+// Information for protogen smooth turning to look toward targets
+struct ProtoLookData_t
+{
+	glm::vec3 aStartAng{};
+	glm::vec3 aGoalAng{};
+
+	float     aTurnCurTime = 0.f;
+	float     aTurnEndTime = 0.f;
 };
 
 
@@ -91,6 +117,9 @@ class ProtogenSystem : public IEntityComponentSystem
 
 		Graphics_FreeRenderable( renderComp->aHandle );
 
+		aTurnMap.erase( sEntity );
+		aLookMap.erase( sEntity );
+
 		// GetEntitySystem()->RemoveComponent( sEntity, "renderable" );
 	}
 
@@ -104,7 +133,10 @@ class ProtogenSystem : public IEntityComponentSystem
 	{
 	}
 
-	std::vector< Entity > aUpdated;
+	std::vector< Entity >                         aUpdated;
+
+	std::unordered_map< Entity, ProtoTurn_t >     aTurnMap;
+	std::unordered_map< Entity, ProtoLookData_t > aLookMap;
 };
 
 
@@ -537,22 +569,37 @@ void TEST_CL_UpdateProtos( float frameTime )
 }
 
 
+extern float Lerp_GetDuration( float max, float min, float current );
+extern float Lerp_GetDuration( float max, float min, float current, float mult );
+
+// inverted version of it
+extern float Lerp_GetDurationIn( float max, float min, float current );
+extern float Lerp_GetDurationIn( float max, float min, float current, float mult );
+
+extern float Math_EaseOutExpo( float x );
+extern float Math_EaseOutQuart( float x );
+extern float Math_EaseInOutCubic( float x );
+
+
 void TEST_SV_UpdateProtos( float frameTime )
 {
 #if 1
 	PROF_SCOPE();
 
-	static float timeToDuel = 0.f;
-	static size_t playerID = 0;
+	static float  timeToDuel    = 0.f;
+	static size_t playerID      = 0;
+	bool          targetChanged = false;
 
 	if ( timeToDuel == 0.f )
 	{
-		timeToDuel = gCurTime + proto_swap_target_sec_min;
+		timeToDuel    = gCurTime + proto_swap_target_sec_min;
+		targetChanged = true;
 	}
 	else if ( gCurTime > timeToDuel )
 	{
-		playerID = RandomInt( 0, gServerData.aClients.size() - 1 );
-		timeToDuel = gCurTime + RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+		playerID      = RandomInt( 0, gServerData.aClients.size() - 1 );
+		timeToDuel    = gCurTime + RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+		targetChanged = true;
 	}
 
 	// just use the first player for now
@@ -561,22 +608,12 @@ void TEST_SV_UpdateProtos( float frameTime )
 	if ( player == CH_ENT_INVALID )
 		return;
 
-	auto   playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
+	auto playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
 
 	Assert( playerTransform );
 
 	// ?????
 	float protoScale = vrcmdl_scale;
-
-	// funny temp
-	struct ProtoTurn_t
-	{
-		double aNextTime;
-		float  aLastRand;
-		float  aRand;
-	};
-
-	static std::unordered_map< Entity, ProtoTurn_t > protoTurnMap;
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
@@ -606,41 +643,48 @@ void TEST_SV_UpdateProtos( float frameTime )
 			//protoView.z += cl_view_height;
 
 			glm::vec3 direction    = ( protoView - playerTransform->aPos.Get() );
-			// glm::vec3 rotationAxis = Util_VectorToAngles( direction );
 			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
 
 			glm::mat4 protoViewMat = glm::lookAt( protoView, playerTransform->aPos.Get(), up );
 
 			glm::vec3 vForward, vRight, vUp;
 			Util_GetViewMatrixZDirection( protoViewMat, vForward, vRight, vUp );
-
-			glm::quat protoQuat   = protoViewMat;
-
-			// glm::mat4 modelMatrix = glm::translate( protoTransform->aPos );
-			// 
-			// modelMatrix           = glm::scale( modelMatrix, glm::vec3( protoScale ) );
-			// 
-			// modelMatrix *= glm::toMat4( protoQuat );
-			// 
-			// renderable->aModelMatrix = modelMatrix;
 		}
 		else if ( proto_look.GetBool() && !Game_IsPaused() )
 		{
-			// matrixChanged = true;
+			glm::vec3 up;
+			Util_GetDirectionVectors( playerTransform->aAng, nullptr, nullptr, &up );
 
-			glm::vec3 forward, right, up;
-			Util_GetDirectionVectors( playerTransform->aAng, &forward, &right, &up );
+			ProtoLookData_t& protoLook           = GetProtogenSys()->aLookMap[ proto ];
 
-			glm::vec3 protoView          = protoTransform->aPos;
-			//protoView.z += cl_view_height;
+			glm::vec3        protoView           = protoTransform->aPos;
+			glm::vec3        direction           = protoView - playerTransform->aPos.Get();
+			glm::vec3        rotationAxis        = Util_VectorToAngles( direction, up );
 
-			glm::vec3 direction          = ( protoView - playerTransform->aPos.Get() );
-			glm::vec3 rotationAxis       = Util_VectorToAngles( direction, up );
+			if ( targetChanged )
+			{
+				protoLook.aStartAng    = protoTransform->aAng;
+				protoLook.aTurnEndTime = RandomFloat( proto_swap_turn_time_min, proto_swap_turn_time_max );
+				protoLook.aTurnCurTime  = 0.f;
+			}
 
-			protoTransform->aAng          = rotationAxis;
-			protoTransform->aAng.Edit()[ PITCH ] = 0.f;
-			protoTransform->aAng.Edit()[ YAW ] -= 90.f;
-			protoTransform->aAng.Edit()[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
+			protoLook.aGoalAng          = rotationAxis;
+			protoLook.aGoalAng[ PITCH ] = 0.f;
+			protoLook.aGoalAng[ YAW ] -= 90.f;
+			protoLook.aGoalAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
+
+			protoLook.aTurnCurTime += frameTime;
+
+			if ( protoLook.aTurnEndTime >= protoLook.aTurnCurTime )
+			{
+				float time           = protoLook.aTurnCurTime / protoLook.aTurnEndTime;
+				float timeCurve      = Math_EaseOutQuart( time );
+				protoTransform->aAng = glm::mix( protoLook.aStartAng, protoLook.aGoalAng, timeCurve );
+			}
+			else
+			{
+				protoTransform->aAng = protoLook.aGoalAng;
+			}
 		}
 
 		if ( protoTransform->aScale.Get().x != protoScale )
@@ -659,7 +703,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 			Util_GetMatrixDirection( protoMatrix, &modelForward, &modelRight, &modelUp );
 		
-			ProtoTurn_t& protoTurn = protoTurnMap[ proto ];
+			ProtoTurn_t& protoTurn = GetProtogenSys()->aTurnMap[ proto ];
 		
 			if ( protoTurn.aNextTime <= gCurTime )
 			{
