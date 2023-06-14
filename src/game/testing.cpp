@@ -22,6 +22,7 @@ CONVAR( proto_swap_target_sec_min, 1.0 );
 CONVAR( proto_swap_target_sec_max, 10.0 );
 CONVAR( proto_swap_turn_time_min, 0.2 );
 CONVAR( proto_swap_turn_time_max, 3.0 );
+CONVAR( proto_look_at_entities, 1 );
 
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
@@ -70,8 +71,13 @@ struct ProtoLookData_t
 	glm::vec3 aStartAng{};
 	glm::vec3 aGoalAng{};
 
-	float     aTurnCurTime = 0.f;
-	float     aTurnEndTime = 0.f;
+	float     aTurnCurTime   = 0.f;
+	float     aTurnEndTime   = 0.f;
+
+	float     aTimeToDuel    = 0.f;
+	float     aTimeToDuelCur = 0.f;
+
+	Entity    aLookTarget    = CH_ENT_INVALID;
 };
 
 
@@ -586,31 +592,10 @@ void TEST_SV_UpdateProtos( float frameTime )
 #if 1
 	PROF_SCOPE();
 
-	static float  timeToDuel    = 0.f;
-	static size_t playerID      = 0;
-	bool          targetChanged = false;
-
-	if ( timeToDuel == 0.f )
-	{
-		timeToDuel    = gCurTime + proto_swap_target_sec_min;
-		targetChanged = true;
-	}
-	else if ( gCurTime > timeToDuel )
-	{
-		playerID      = RandomInt( 0, gServerData.aClients.size() - 1 );
-		timeToDuel    = gCurTime + RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
-		targetChanged = true;
-	}
-
-	// just use the first player for now
-	Entity player = SV_GetPlayerEntFromIndex( playerID );
-
-	if ( player == CH_ENT_INVALID )
+	// Protogens have to have look targets, if there are no players, don't bother executing this code
+	// As no player will even see the protogens looking around
+	if ( gServerData.aClients.empty() )
 		return;
-
-	auto playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
-
-	Assert( playerTransform );
 
 	// ?????
 	float protoScale = vrcmdl_scale;
@@ -619,6 +604,50 @@ void TEST_SV_UpdateProtos( float frameTime )
 	// also could thread this as a test
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
+		ProtoLookData_t& protoLook     = GetProtogenSys()->aLookMap[ proto ];
+		bool             targetChanged = false;
+
+		protoLook.aTimeToDuelCur += frameTime;
+
+		if ( protoLook.aTimeToDuelCur > protoLook.aTimeToDuel )
+		{
+			if ( proto_look_at_entities )
+			{
+				// Reset it back to 0 to enter the while loop of not picking the world or itself
+				protoLook.aLookTarget = 0;
+
+				// Don't look at yourself or the world, only pick the world if there are no other entities to pick
+				if ( GetEntitySystem()->aEntityCount > 2 )
+				{
+					while ( protoLook.aLookTarget == 0 || protoLook.aLookTarget == proto )
+						protoLook.aLookTarget = RandomInt( 0, GetEntitySystem()->aEntityCount - 1 );
+				}
+			}
+			else
+			{
+				size_t playerID       = RandomInt( 0, gServerData.aClients.size() - 1 );
+				protoLook.aLookTarget = SV_GetPlayerEntFromIndex( playerID );
+
+				if ( protoLook.aLookTarget == CH_ENT_INVALID )
+					continue;
+			}
+
+			protoLook.aTimeToDuel    = RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+			protoLook.aTimeToDuelCur = 0.f;
+			targetChanged            = true;
+		}
+
+		auto playerTransform = Ent_GetComponent< CTransform >( protoLook.aLookTarget, "transform" );
+
+		// Assert( playerTransform );
+
+		if ( !playerTransform )
+		{
+			// Find something else to try to look at
+			protoLook.aTimeToDuel = 0.f;
+			continue;
+		}
+
 		auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
 
 		Assert( protoTransform );
@@ -655,8 +684,6 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 up;
 			Util_GetDirectionVectors( playerTransform->aAng, nullptr, nullptr, &up );
 
-			ProtoLookData_t& protoLook           = GetProtogenSys()->aLookMap[ proto ];
-
 			glm::vec3        protoView           = protoTransform->aPos;
 			glm::vec3        direction           = protoView - playerTransform->aPos.Get();
 			glm::vec3        rotationAxis        = Util_VectorToAngles( direction, up );
@@ -665,7 +692,12 @@ void TEST_SV_UpdateProtos( float frameTime )
 			{
 				protoLook.aStartAng    = protoTransform->aAng;
 				protoLook.aTurnEndTime = RandomFloat( proto_swap_turn_time_min, proto_swap_turn_time_max );
-				protoLook.aTurnCurTime  = 0.f;
+				protoLook.aTurnCurTime = 0.f;
+
+				// Make sure we don't suddenly want to look at something else while midway through turning to look at something
+				// Though if you want this behavior, you would need to have them slow down looking, and slowly start to look at that
+				// Like a turn velocity or something lol
+				protoLook.aTurnEndTime = std::min( protoLook.aTurnEndTime, protoLook.aTimeToDuel );
 			}
 
 			protoLook.aGoalAng          = rotationAxis;
@@ -678,7 +710,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 			if ( protoLook.aTurnEndTime >= protoLook.aTurnCurTime )
 			{
 				float time           = protoLook.aTurnCurTime / protoLook.aTurnEndTime;
-				float timeCurve      = Math_EaseOutQuart( time );
+				float timeCurve      = Math_EaseInOutCubic( time );
 				protoTransform->aAng = glm::mix( protoLook.aStartAng, protoLook.aGoalAng, timeCurve );
 			}
 			else
@@ -694,8 +726,6 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 		if ( proto_follow.GetBool() && !Game_IsPaused() )
 		{
-			// matrixChanged = true;
-		
 			glm::vec3 modelUp, modelRight, modelForward;
 
 			glm::mat4 protoMatrix;

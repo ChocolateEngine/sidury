@@ -574,6 +574,8 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 			break;
 	}
 
+	// Next, check messages that are expected to have message data
+
 	auto msgData = clientMsg.getData();
 
 	Assert( msgData.size() );
@@ -653,7 +655,7 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", client.aName.c_str() );
 
 	// Make an entity for them
-	client.aEntity      = GetEntitySystem()->CreateEntity();
+	client.aEntity = GetEntitySystem()->CreateEntity();
 
 	// Add the playerInfo Component
 	GetEntitySystem()->AddComponent( client.aEntity, "playerInfo" );
@@ -719,7 +721,7 @@ SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
 
 Entity SV_GetPlayerEntFromIndex( size_t sIndex )
 {
-	if ( gServerData.aClients.empty() || sIndex < gServerData.aClients.size() )
+	if ( gServerData.aClients.empty() || sIndex > gServerData.aClients.size() )
 		return CH_ENT_INVALID;
 
 	return gServerData.aClients[ sIndex ].aEntity;
