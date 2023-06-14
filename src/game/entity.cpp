@@ -1326,6 +1326,9 @@ CONCMD( ent_dump )
 	}
 
 
+#define CH_VAR_DIRTY( var ) var.aIsDirty || sFullUpdate
+
+
 // TODO: try this instead for all these
 void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
 {
@@ -1356,7 +1359,7 @@ bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData, 
 
 	auto builder = srMessage.initRoot< NetCompTransform >();
 
-	if ( spTransform->aPos.aIsDirty )
+	if ( CH_VAR_DIRTY( spTransform->aPos ) )
 	{
 		auto pos = builder.initPos();
 		NetHelper_WriteVec3( &pos, spTransform->aPos );
@@ -1406,13 +1409,13 @@ CH_COMPONENT_WRITE_DEF( CTransformSmall )
 
 	auto builder     = srMessage.initRoot< NetCompTransformSmall >();
 
-	if ( spTransform->aPos.aIsDirty )
+	if ( spTransform->aPos.aIsDirty || sFullUpdate )
 	{
 		auto pos = builder.initPos();
 		NetHelper_WriteVec3( &pos, spTransform->aPos );
 	}
 
-	if ( spTransform->aAng.aIsDirty )
+	if ( spTransform->aAng.aIsDirty || sFullUpdate )
 	{
 		auto ang = builder.initAng();
 		NetHelper_WriteVec3( &ang, spTransform->aAng );
@@ -1534,7 +1537,7 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 
 	auto builder  = srMessage.initRoot< NetCompCamera >();
 
-	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty )
+	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty || sFullUpdate )
 	{
 		auto dir = builder.initDirection();
 		NetComp_WriteDirection( &dir, *spCamera, sFullUpdate );
@@ -1543,7 +1546,7 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 	// if ( spCamera->aFov.aIsDirty )
 		builder.setFov( spCamera->aFov );
 
-	if ( spCamera->aTransform.Get().aPos.aIsDirty )
+	if ( spCamera->aTransform.Get().aPos.aIsDirty || sFullUpdate )
 	{
 		Vec3::Builder pos = builder.getTransform().initPos();
 		pos.setX( spCamera->aTransform.Get().aPos.Get().x );
@@ -1551,7 +1554,7 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 		pos.setZ( spCamera->aTransform.Get().aPos.Get().z );
 	}
 
-	if ( spCamera->aTransform.Get().aAng.aIsDirty )
+	if ( spCamera->aTransform.Get().aAng.aIsDirty || sFullUpdate )
 	{
 		Vec3::Builder ang = builder.getTransform().initAng();
 		ang.setX( spCamera->aTransform.Get().aAng.Get().x );
