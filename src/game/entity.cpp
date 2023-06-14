@@ -27,6 +27,7 @@ EntitySystem*          sv_entities                                     = nullptr
 
 
 CONVAR( ent_write_all_data, 0, "Ignore whether a component var is dirty, and write all the data anyway" );
+CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
 
 
 // void* EntComponentRegistry_Create( std::string_view sName )
@@ -972,7 +973,7 @@ void EntitySystem::ReadComponentUpdates( capnp::MessageReader& srReader )
 // we can avoid those if we loop through the pools instead
 void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool sFullUpdate )
 {
-	auto   root       = srBuilder.initRoot< NetMsgComponentUpdates >();
+	auto                                root = srBuilder.initRoot< NetMsgComponentUpdates >();
 
 	// Make a list of component pools with a component that need updating
 	std::vector< EntityComponentPool* > componentPools;
@@ -985,7 +986,7 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 		componentPools.push_back( pool );
 	} 
 
-	if ( Game_IsClient() )
+	if ( Game_IsClient() && ent_show_component_net_updates )
 	{
 		gui->DebugMessage( "Sending \"%zd\" Component Types", componentPools.size() );
 	}
@@ -1027,18 +1028,19 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 			auto data = pool->GetData( entity );
 
 			capnp::MallocMessageBuilder compMessageBuilder;
-			if ( regData->apWrite( compMessageBuilder, data ) )
+			if ( regData->apWrite( compMessageBuilder, data, sFullUpdate ) )
 			{
-				auto array = capnp::messageToFlatArray( compMessageBuilder );
+				NetOutputStream outputStream;
+				capnp::writePackedMessage( outputStream, compMessageBuilder );
 
-				if ( Game_IsClient() )
+				if ( Game_IsClient() && ent_show_component_net_updates )
 				{
-					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, array.size() * sizeof( capnp::word ) );
+					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
 				}
 
-				auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
+				auto valueBuilder = compBuilder.initValues( outputStream.aBuffer.size_bytes() );
 				// std::copy( array.begin(), array.end(), valueBuilder.begin() );
-				memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+				memcpy( valueBuilder.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
 			}
 			else
 			{
@@ -1299,26 +1301,26 @@ CONCMD( ent_dump )
 
 
 #define CH_NET_WRITE_VEC2( varFunc, var ) \
-	if ( var.aIsDirty ) { \
+	if ( var.aIsDirty || sFullUpdate ) { \
 		auto builderVar = builder.init##varFunc(); \
 		NetHelper_WriteVec2( &builderVar, var ); \
 	}
 
 #define CH_NET_WRITE_VEC3( varFunc, var ) \
-	if ( var.aIsDirty ) { \
+	if ( var.aIsDirty || sFullUpdate ) { \
 		auto builderVar = builder.init##varFunc(); \
 		NetHelper_WriteVec3( &builderVar, var ); \
 	}
 
 #define CH_NET_WRITE_VEC4( varFunc, var ) \
-	if ( var.aIsDirty ) { \
+	if ( var.aIsDirty || sFullUpdate ) { \
 		auto builderVar = builder.init##varFunc(); \
 		NetHelper_WriteVec4( &builderVar, var ); \
 	}
 
 
 #define CH_NET_WRITE_VEC3_PTR( varFunc, var ) \
-	if ( var.aIsDirty ) { \
+	if ( var.aIsDirty || sFullUpdate ) { \
 		auto builderVar = builder->init##varFunc(); \
 		NetHelper_WriteVec3( &builderVar, var ); \
 	}
@@ -1340,10 +1342,10 @@ void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
 		NetHelper_ReadVec3( message.getScale(), spTransform->aScale.Edit() );
 }
 
-bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData )
+bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate )
 {
 	const CTransform* spTransform = static_cast< const CTransform* >( spData );
-	bool              isDirty     = false;
+	bool              isDirty     = sFullUpdate;
 
 	isDirty |= spTransform->aPos.aIsDirty;
 	isDirty |= spTransform->aAng.aIsDirty;
@@ -1394,7 +1396,7 @@ CH_COMPONENT_READ_DEF( CTransformSmall )
 CH_COMPONENT_WRITE_DEF( CTransformSmall )
 {
 	const CTransformSmall* spTransform = static_cast< const CTransformSmall* >( spData );
-	bool                   isDirty     = false;
+	bool                   isDirty     = sFullUpdate;
 
 	isDirty |= spTransform->aPos.aIsDirty;
 	isDirty |= spTransform->aAng.aIsDirty;
@@ -1435,7 +1437,7 @@ CH_COMPONENT_READ_DEF( CRigidBody )
 CH_COMPONENT_WRITE_DEF( CRigidBody )
 {
 	const CRigidBody* spRigidBody = static_cast< const CRigidBody* >( spData );
-	bool              isDirty     = false;
+	bool              isDirty     = sFullUpdate;
 
 	isDirty |= spRigidBody->aVel.aIsDirty;
 	isDirty |= spRigidBody->aAccel.aIsDirty;
@@ -1464,7 +1466,7 @@ void NetComp_ReadDirection( const NetCompDirection::Reader& srReader, CDirection
 		NetHelper_ReadVec3( srReader.getRight(), srData.aRight.Edit() );
 }
 
-void NetComp_WriteDirection( NetCompDirection::Builder* builder, const CDirection& srData )
+void NetComp_WriteDirection( NetCompDirection::Builder* builder, const CDirection& srData, bool sFullUpdate )
 {
 	CH_NET_WRITE_VEC3_PTR( Forward, srData.aForward );
 	CH_NET_WRITE_VEC3_PTR( Up, srData.aUp );
@@ -1482,7 +1484,7 @@ CH_COMPONENT_READ_DEF( CDirection )
 CH_COMPONENT_WRITE_DEF( CDirection )
 {
 	const CDirection* spDirection = static_cast< const CDirection* >( spData );
-	bool              isDirty     = false;
+	bool              isDirty     = sFullUpdate;
 
 	isDirty |= spDirection->aForward.aIsDirty;
 	isDirty |= spDirection->aRight.aIsDirty;
@@ -1492,7 +1494,7 @@ CH_COMPONENT_WRITE_DEF( CDirection )
 		return false;
 
 	auto builder = srMessage.initRoot< NetCompDirection >();
-	NetComp_WriteDirection( &builder, *spDirection );
+	NetComp_WriteDirection( &builder, *spDirection, sFullUpdate );
 }
 
 
@@ -1519,8 +1521,8 @@ CH_COMPONENT_READ_DEF( CCamera )
 CH_COMPONENT_WRITE_DEF( CCamera )
 {
 	const CCamera* spCamera = static_cast< const CCamera* >( spData );
+	bool           isDirty  = sFullUpdate;
 
-	bool           isDirty  = false;
 	isDirty |= spCamera->aFov.aIsDirty;
 	isDirty |= spCamera->aTransform.aIsDirty;
 	isDirty |= spCamera->aForward.aIsDirty;
@@ -1535,7 +1537,7 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty )
 	{
 		auto dir = builder.initDirection();
-		NetComp_WriteDirection( &dir, *spCamera );
+		NetComp_WriteDirection( &dir, *spCamera, sFullUpdate );
 	}
 
 	// if ( spCamera->aFov.aIsDirty )
@@ -1573,7 +1575,7 @@ CH_COMPONENT_READ_DEF( CGravity )
 CH_COMPONENT_WRITE_DEF( CGravity )
 {
 	const CGravity* spGravity = static_cast< const CGravity* >( spData );
-	bool            isDirty   = false;
+	bool            isDirty   = sFullUpdate;
 
 	isDirty |= spGravity->aForce.aIsDirty;
 
@@ -1599,7 +1601,7 @@ CH_COMPONENT_WRITE_DEF( CModelInfo )
 {
 	const auto* spModelInfo = static_cast< const CModelInfo* >( spData );
 
-	bool        isDirty     = false;
+	bool        isDirty     = sFullUpdate;
 	isDirty |= spModelInfo->aPath.aIsDirty;
 
 	if ( !isDirty )
@@ -1648,7 +1650,7 @@ CH_COMPONENT_WRITE_DEF( CLight )
 	// if ( !spLight->aEnabled && !spLight->aEnabled.aIsDirty )
 	// 	return false;
 
-	bool  isDirty = false;
+	bool  isDirty = sFullUpdate;
 	isDirty |= spLight->aColor.aIsDirty;
 	isDirty |= spLight->aAng.aIsDirty;
 	isDirty |= spLight->aPos.aIsDirty;

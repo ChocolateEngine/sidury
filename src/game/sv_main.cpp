@@ -54,6 +54,18 @@ int SV_Client_t::Write( const char* spData, int sLen )
 }
 
 
+int SV_Client_t::Write( const ChVector< char >& srData )
+{
+	return Net_Write( gServerSocket, srData.begin(), srData.size_bytes(), &aAddr );
+}
+
+
+int SV_Client_t::WritePacked( capnp::MessageBuilder& srBuilder )
+{
+	return Net_WritePacked( gServerSocket, aAddr, srBuilder );
+}
+
+
 // capnp::FlatArrayMessageReader& SV_GetReader( Socket_t sSocket, ChVector< char >& srData, ch_sockaddr& srAddr )
 // {
 // 	int len = Net_Read( sSocket, srData.data(), srData.size(), &srAddr );
@@ -118,7 +130,6 @@ void SV_Update( float frameTime )
 
 	// Send updated data to clients
 	std::vector< capnp::MallocMessageBuilder > messages( 2 );
-	std::vector< kj::Array< capnp::word > >    arrays( 2 );
 
 	SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
 	SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
@@ -130,7 +141,6 @@ void SV_Update( float frameTime )
 	{
 		// Build a Full Update and send it to all of them
 		std::vector< capnp::MallocMessageBuilder > messages( 2 );
-		std::vector< kj::Array< capnp::word > >    arrays( 2 );
 
 		SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
 		SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
@@ -232,13 +242,13 @@ void SV_StopServer()
 
 int SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients )
 {
-	std::vector< kj::Array< capnp::word > > arrays( srMessages.size() );
-	int                                     writeSize = 0;
+	std::vector< NetOutputStream > outStreams( srMessages.size() );
+	int                            writeSize = 0;
 
 	for ( size_t i = 0; i < srMessages.size(); i++ )
 	{
-		arrays[ i ] = capnp::messageToFlatArray( srMessages[ i ] );
-		writeSize += arrays[ i ].size() * sizeof( capnp::word );
+		capnp::writePackedMessage( outStreams[ i ], srMessages[ i ] );
+		writeSize += outStreams[ i ].aBuffer.size_bytes();
 	}
 
 	for ( auto client : srClients )
@@ -249,9 +259,9 @@ int SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder 
 		if ( client->aState != ESV_ClientState_Connected )
 			continue;
 
-		for ( size_t arrayIndex = 0; arrayIndex < arrays.size(); arrayIndex++ )
+		for ( size_t arrayIndex = 0; arrayIndex < outStreams.size(); arrayIndex++ )
 		{
-			int write = client->Write( arrays[ arrayIndex ].asChars().begin(), arrays[ arrayIndex ].size() * sizeof( capnp::word ) );
+			int write = client->Write( outStreams[ arrayIndex ].aBuffer );
 
 			// If we failed to write, disconnect them?
 			if ( write == 0 )
@@ -269,13 +279,13 @@ int SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder 
 
 int SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages )
 {
-	std::vector< kj::Array< capnp::word > > arrays( srMessages.size() );
-	int                                     writeSize = 0;
+	std::vector< NetOutputStream > outStreams( srMessages.size() );
+	int                            writeSize = 0;
 
 	for ( size_t i = 0; i < srMessages.size(); i++ )
 	{
-		arrays[ i ] = capnp::messageToFlatArray( srMessages[ i ] );
-		writeSize += arrays[ i ].size() * sizeof( capnp::word );
+		capnp::writePackedMessage( outStreams[ i ], srMessages[ i ] );
+		writeSize += outStreams[ i ].aBuffer.size_bytes();
 	}
 
 	for ( auto& client : gServerData.aClients )
@@ -283,9 +293,9 @@ int SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages )
 		if ( client.aState != ESV_ClientState_Connected )
 			continue;
 
-		for ( size_t arrayIndex = 0; arrayIndex < arrays.size(); arrayIndex++ )
+		for ( size_t arrayIndex = 0; arrayIndex < outStreams.size(); arrayIndex++ )
 		{
-			int write = client.Write( arrays[ arrayIndex ].asChars().begin(), arrays[ arrayIndex ].size() * sizeof( capnp::word ) );
+			int write = client.Write( outStreams[ arrayIndex ].aBuffer );
 
 			// If we failed to write, disconnect them?
 			if ( write == 0 )
@@ -303,14 +313,15 @@ int SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages )
 
 int SV_BroadcastMsg( capnp::MessageBuilder& srMessage )
 {
-	auto array = capnp::messageToFlatArray( srMessage );
+	NetOutputStream outputStream;
+	capnp::writePackedMessage( outputStream, srMessage );
 
 	for ( auto& client : gServerData.aClients )
 	{
 		if ( client.aState != ESV_ClientState_Connected )
 			continue;
 
-		int write = client.Write( array.asChars().begin(), array.size() * sizeof( capnp::word ) );
+		int write = client.Write( outputStream.aBuffer );
 
 		// If we failed to write, disconnect them?
 		if ( write == 0 )
@@ -320,7 +331,7 @@ int SV_BroadcastMsg( capnp::MessageBuilder& srMessage )
 		}
 	}
 
-	return array.size() * sizeof( capnp::word );
+	return outputStream.aBuffer.size_bytes();
 }
 
 
@@ -347,16 +358,16 @@ void SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType
 			break;
 		}
 	}
+	
+	NetOutputStream outputStream;
+	capnp::writePackedMessage( outputStream, messageBuilder );
 
-	auto array = capnp::messageToFlatArray( messageBuilder );
-	auto data  = root.initData( array.size() * sizeof( capnp::word ) );
-
-	// This is probably awful and highly inefficent
-	// std::copy( array.begin(), array.end(), (capnp::word*)data.begin() );
-	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+	auto data = root.initData( outputStream.aBuffer.size_bytes() );
+	memcpy( data.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
 }
 
 
+#if 0
 void SV_BuildUpdatedData( bool sFullUpdate )
 {
 	// Send updated data to clients
@@ -395,12 +406,12 @@ void SV_BuildUpdatedData( bool sFullUpdate )
 		}
 	}
 }
+#endif
 
 
 void SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage )
 {
-	auto array = capnp::messageToFlatArray( srMessage );
-	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srClient.aAddr );
+	int write = Net_WritePacked( gServerSocket, srClient.aAddr, srMessage );
 }
 
 
@@ -493,6 +504,8 @@ void SV_ProcessSocketMsgs()
 		if ( len <= 0 )
 			return;
 
+		data.resize( len );
+
 		SV_Client_t* client = SV_GetClientFromAddr( clientAddr );
 
 		if ( !client )
@@ -505,7 +518,10 @@ void SV_ProcessSocketMsgs()
 		client->aTimeout = Game_GetCurTime() + sv_client_timeout;
 
 		// Read the message sent from the client
-		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+		NetBufferedInputStream        inputStream( data.data(), data.size() );
+		capnp::PackedMessageReader    reader( inputStream );
+
+		// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
 		SV_ProcessClientMsg( *client, reader );
 	}
 }
@@ -533,13 +549,11 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
 
 	// Read the message sent from the client
-	auto                          clientMsg = srReader.getRoot< MsgSrcClient >();
+	auto                       clientMsg = srReader.getRoot< MsgSrcClient >();
 
-	EMsgSrcClient                 msgType   = clientMsg.getType();
-	auto                          msgData   = clientMsg.getData();
+	EMsgSrcClient              msgType   = clientMsg.getType();
 
-	capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), msgData.size() ) );
-
+	// First, check types without any data attached to them
 	switch ( msgType )
 	{
 		// Client is Disconnecting
@@ -549,6 +563,32 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 			return;
 		}
 
+		case EMsgSrcClient::FULL_UPDATE:
+		{
+			// They want a full update, add them to the full update list
+			gServerData.aClientsFullUpdate.push_back( &srClient );
+			return;
+		}
+
+		default:
+			break;
+	}
+
+	auto msgData = clientMsg.getData();
+
+	Assert( msgData.size() );
+
+	if ( !msgData.size() )
+	{
+		Log_ErrorF( gLC_Server, "Invalid Message with no data attached - %ud\n", msgType );
+		return;
+	}
+
+	NetBufferedInputStream     inputStream( (char*)msgData.begin(), msgData.size() );
+	capnp::PackedMessageReader dataReader( inputStream );
+
+	switch ( msgType )
+	{
 		case EMsgSrcClient::CLIENT_INFO:
 		{
 			SV_HandleMsg_ClientInfo();
@@ -571,16 +611,9 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 			break;
 		}
 
-		case EMsgSrcClient::FULL_UPDATE:
-		{
-			// They want a full update, add them to the full update list
-			gServerData.aClientsFullUpdate.push_back( &srClient );
-			break;
-		}
-
 		default:
 			// TODO: have a message type to string function
-			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", msgType );
+			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %ud\n", msgType );
 			break;
 	}
 }
@@ -608,13 +641,14 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 {
 	// Get Client Info
-	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)srData.data(), srData.size() ) );
-	NetMsgClientInfo::Reader      clientInfoRead = reader.getRoot< NetMsgClientInfo >();
+	NetBufferedInputStream     inputStream( srData.data(), srData.size() );
+	capnp::PackedMessageReader reader( inputStream );
+	NetMsgClientInfo::Reader   clientInfoRead = reader.getRoot< NetMsgClientInfo >();
 
-	SV_Client_t&                  client         = gServerData.aClients.emplace_back();
-	client.aName                                 = clientInfoRead.getName();
-	client.aAddr                                 = srAddr;
-	client.aState                                = ESV_ClientState_Connecting;
+	SV_Client_t&               client         = gServerData.aClients.emplace_back();
+	client.aName                              = clientInfoRead.getName();
+	client.aAddr                              = srAddr;
+	client.aState                             = ESV_ClientState_Connecting;
 
 	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", client.aName.c_str() );
 
@@ -632,10 +666,8 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 
 	serverInfo.setPlayerEntityId( client.aEntity );
 
-	auto array = capnp::messageToFlatArray( message );
-
 	// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
-	int  write = Net_Write( gServerSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &srAddr );
+	int write = Net_WritePacked( gServerSocket, srAddr, message );
 
 	gServerData.aClientsConnecting.push_back( &client );
 }
@@ -687,7 +719,7 @@ SV_Client_t* SV_GetClientFromEntity( Entity sEntity )
 
 Entity SV_GetPlayerEntFromIndex( size_t sIndex )
 {
-	if ( gServerData.aClients.empty() || sIndex > gServerData.aClients.size() + 1 )
+	if ( gServerData.aClients.empty() || sIndex < gServerData.aClients.size() )
 		return CH_ENT_INVALID;
 
 	return gServerData.aClients[ sIndex ].aEntity;

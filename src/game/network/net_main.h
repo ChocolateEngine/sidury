@@ -1,5 +1,27 @@
 #pragma once
 
+#include <capnp/message.h>
+#include <capnp/serialize-packed.h>
+
+namespace kj
+{
+template< typename T >
+class Array;
+
+template< typename T >
+class ArrayPtr;
+
+class BufferedInputStream;
+}
+
+
+namespace capnp
+{
+class MessageBuilder;
+class MallocMessageBuilder;
+typedef unsigned char byte;
+}
+
 
 enum ENetType : char
 {
@@ -37,9 +59,67 @@ struct NetChannel_t
 
 };
 
+#ifdef _WIN32
 
 using Socket_t = void*;
-#define CH_INVALID_SOCKET ( Socket_t )( ~0 )
+  #define CH_INVALID_SOCKET ( Socket_t )( ~0 )
+
+#elif __unix__
+
+using Socket_t = int;
+  #define CH_INVALID_SOCKET -1
+
+#else
+
+  #error "Need to Define Socket_t for this platform"
+
+#endif
+
+
+// ---------------------------------------------------------------------------
+// Cap'N Proto Wrappers
+
+
+class NetBufferedInputStream : public kj::BufferedInputStream
+{
+  public:
+	NetBufferedInputStream( char* spData, int sLen );
+	NetBufferedInputStream( const ChVector< char >& srData );
+	~NetBufferedInputStream();
+
+	size_t                            tryRead( void* spBuffer, size_t sMinBytes, size_t sMaxBytes ) override;
+	kj::ArrayPtr< const capnp::byte > tryGetReadBuffer() override;
+
+	void                              skip( size_t bytes ) override;
+
+	// char*                             apData   = nullptr;
+	// int                               aLen     = 0;
+	size_t                            aReadPos = 0;
+	kj::Array< capnp::byte >          aReadBuffer;
+};
+
+
+class NetOutputStream : public kj::OutputStream
+{
+  public:
+	~NetOutputStream()
+	{
+	}
+
+	void write( const void* buffer, size_t size ) override
+	{
+		size_t oldSize = aBuffer.size();
+		aBuffer.resize( aBuffer.size() + size );
+
+		memcpy( aBuffer.data() + oldSize, buffer, size );
+	}
+
+	ChVector< char > aBuffer{};
+};
+
+
+// ---------------------------------------------------------------------------
+// General Network Functions
 
 
 const char* Net_ErrorString();
@@ -62,6 +142,7 @@ int         Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spF
 
 // Write Data to a Socket
 int         Net_Write( Socket_t sSocket, const char* spData, int sLen, ch_sockaddr* spAddr );
+int         Net_WritePacked( Socket_t sSocket, ch_sockaddr& spAddr, capnp::MessageBuilder& srBuilder );
 
 int         Net_MakeSocketBroadcastCapable( Socket_t sSocket );
 

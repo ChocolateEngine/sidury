@@ -82,7 +82,7 @@ using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
 
 // Functions for serializing and deserializing Components with Cap'n Proto
 using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
-using FEntComp_WriteFunc = bool( capnp::MessageBuilder& srMessage, const void* spData );
+using FEntComp_WriteFunc = bool( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate );
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
@@ -1120,7 +1120,7 @@ struct CLight
   static void __EntCompFunc_Read_##type( capnp::MessageReader& srReader, void* spData )
 
 #define CH_COMPONENT_WRITE_DEF( type ) \
-  static bool __EntCompFunc_Write_##type( capnp::MessageBuilder& srMessage, const void* spData )
+  static bool __EntCompFunc_Write_##type( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate )
 
 #define CH_COMPONENT_RW( type )    __EntCompFunc_Read_##type, __EntCompFunc_Write_##type
 #define CH_COMPONENT_READ( type )  __EntCompFunc_Read_##type

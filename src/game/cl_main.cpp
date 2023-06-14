@@ -137,11 +137,11 @@ void CL_Shutdown()
 
 void CL_WriteMsgData( MsgSrcClient::Builder& srBuilder, capnp::MessageBuilder& srBuilderData )
 {
-	auto array = capnp::messageToFlatArray( srBuilderData );
-	auto data  = srBuilder.initData( array.size() * sizeof( capnp::word ) );
+	NetOutputStream outputStream;
+	capnp::writePackedMessage( outputStream, srBuilderData );
 
-	// This is probably awful and highly inefficent
-	memcpy( data.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
+	auto data = srBuilder.initData( outputStream.aBuffer.size_bytes() );
+	memcpy( data.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
 }
 
 
@@ -326,8 +326,8 @@ void CL_Connect( const char* spAddress )
 
 	Log_MsgF( gLC_Client, "Connecting to \"%s\"\n", spAddress );
 
-	::capnp::MallocMessageBuilder message;
-	NetMsgClientInfo::Builder     clientInfoBuild = message.initRoot< NetMsgClientInfo >();
+	capnp::MallocMessageBuilder message;
+	NetMsgClientInfo::Builder   clientInfoBuild = message.initRoot< NetMsgClientInfo >();
 
 	clientInfoBuild.setName( cl_username.GetValue().data() );
 
@@ -341,13 +341,7 @@ void CL_Connect( const char* spAddress )
 	if ( connectRet != 0 )
 		return;
 
-	// kj::HandleOutputStream out( (HANDLE)gClientSocket );
-	// capnp::writeMessage( out, message );
-
-	auto array = capnp::messageToFlatArray( message );
-
-	int  write = Net_Write( gClientSocket, array.asChars().begin(), array.size() * sizeof( capnp::word ), &gClientAddr );
-	// int  write = Net_Write( gClientSocket, cl_username.GetValue().data(), cl_username.GetValue().size() * sizeof( char ), &sockAddr );
+	int write             = Net_WritePacked( gClientSocket, gClientAddr, message );
 
 	// Continue connecting in CL_Update()
 	gClientState          = EClientState_RecvServerInfo;
@@ -357,8 +351,7 @@ void CL_Connect( const char* spAddress )
 
 int CL_WriteToServer( capnp::MessageBuilder& srBuilder )
 {
-	auto finalMessage = capnp::messageToFlatArray( srBuilder );
-	return Net_Write( gClientSocket, finalMessage.asChars().begin(), finalMessage.size() * sizeof( capnp::word ), &gClientAddr );
+	return Net_WritePacked( gClientSocket, gClientAddr, srBuilder );
 }
 
 
@@ -386,7 +379,9 @@ bool CL_RecvServerInfo()
 
 	Log_Msg( gLC_Client, "Receiving Server Info\n" );
 
-	capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+	NetBufferedInputStream        inputStream( (char*)data.begin(), len );
+	capnp::PackedMessageReader    reader( inputStream );
+
 	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
 
 	CL_HandleMsg_ServerInfo( serverInfoMsg );
@@ -677,10 +672,10 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 
 			if ( componentRead.hasValues() )
 			{
-				auto                          values = componentRead.getValues();
+				auto                       values = componentRead.getValues();
+				NetBufferedInputStream     inputStream( (char*)values.begin(), values.size() );
+				capnp::PackedMessageReader reader( inputStream );
 
-				// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.data(), values.size() ) );
-				capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)values.begin(), values.size() ) );
 				regData->apRead( reader, componentData );
 
 				Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
@@ -722,11 +717,15 @@ void CL_GetServerMessages()
 			return;
 		}
 
+		data.resize( len );
+
 		// Reset the connection timer
 		gClientTimeout = cl_timeout_duration;
 
 		// Read the message sent from the client
-		capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
+		NetBufferedInputStream        inputStream( (char*)data.begin(), data.size() );
+		capnp::PackedMessageReader    reader( inputStream );
+
 		auto                          serverMsg = reader.getRoot< MsgSrcServer >();
 
 		auto                          msgType   = serverMsg.getType();
@@ -735,7 +734,8 @@ void CL_GetServerMessages()
 		Assert( msgType < EMsgSrcServer::COUNT );
 		Assert( msgType >= EMsgSrcServer::DISCONNECT );
 
-		capnp::FlatArrayMessageReader dataReader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)msgData.begin(), data.size() ) );
+		NetBufferedInputStream     inputStreamMsg( (char*)msgData.begin(), msgData.size() );
+		capnp::PackedMessageReader dataReader( inputStreamMsg );
 
 		switch ( msgType )
 		{

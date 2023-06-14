@@ -43,7 +43,10 @@ struct SV_Client_t
 	UserCmd_t      aUserCmd;
 
 	int            Read( char* spData, int sLen );
+
 	int            Write( const char* spData, int sLen );
+	int            Write( const ChVector< char >& srData );
+	int            WritePacked( capnp::MessageBuilder& srBuilder );
 };
 
 
@@ -81,7 +84,7 @@ void                SV_SendServerInfo( SV_Client_t& srClient );
 void                SV_SendDisconnect( SV_Client_t& srClient );
 
 void                SV_BuildServerMsg( capnp::MessageBuilder& srMessage, EMsgSrcServer sSrcType, bool sFullUpdate );
-void                SV_BuildUpdatedData( bool sFullUpdate );
+// void                SV_BuildUpdatedData( bool sFullUpdate );
 
 void                SV_ProcessSocketMsgs();
 void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
