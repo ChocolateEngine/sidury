@@ -58,14 +58,24 @@ CONCMD_DROP( map, map_dropdown )
 	bool old = Game_ProcessingClient();
 	Game_SetClient( false );
 
+	if ( !MapManager_FindMap( args[ 0 ] ) )
+	{
+		Log_Error( "Failed to Find map - Failed to Start Server\n" );
+		return;
+	}
+
 	if ( !SV_StartServer() )
 	{
-		Log_Error( "Failed to Load map - Failed to Start Server\n" );
 		Game_SetClient( old );
 		return;
 	}
 
-	MapManager_LoadMap( args[0] );
+	if ( !MapManager_LoadMap( args[ 0 ] ) )
+	{
+		Log_Error( "Failed to Load map - Failed to Start Server\n" );
+		SV_StopServer();
+		return;
+	}
 
 	Game_SetClient( old );
 
