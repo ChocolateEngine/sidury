@@ -839,14 +839,20 @@ void PlayerManager::UpdateLocalPlayer()
 			if ( !renderData )
 				continue;
 
-			renderData->aVisible    = true;
+			renderData->aVisible = true;
 
 			if ( cl_playermodel_shadow )
 				renderData->aCastShadow = cl_playermodel_shadow_local ? true : player != gLocalPlayer;
 			else
 				renderData->aCastShadow = false;
+
+			float     scaleBase = player_model_scale.GetFloat();
+
+			// This is to squish the model when the player crouches
+			float     scaleMult = playerMove->aOutViewHeight / sv_view_height;
 			
-			glm::vec3 scale( player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat() );
+			glm::vec3 scale( scaleBase, scaleBase, scaleBase );
+			scale.y *= scaleMult;
 
 			// HACK HACK
 			glm::vec3 ang{};
@@ -867,8 +873,21 @@ void PlayerManager::UpdateLocalPlayer()
 				ang[ YAW ] += 180;
 			}
 
-			// Util_ToMatrix( renderData->aModelMatrix, transform->aPos, camera->aTransform.Get().aAng, scale );
-			Util_ToMatrix( renderData->aModelMatrix, transform->aPos, ang, scale );
+			// Util_ToMatrix( renderData->aModelMatrix, transform->aPos, ang, scale );
+
+			// Is something wrong with my Util_ToMatrix function?
+			// Do i have applying scale and rotation in the wrong order?
+			// If so, why is everything else using it seemingly working fine so far?
+
+			renderData->aModelMatrix = glm::translate( transform->aPos.Get() );
+
+			renderData->aModelMatrix *= glm::eulerAngleYZX(
+			  glm::radians( ang.x ),
+			  glm::radians( ang.y ),
+			  glm::radians( ang.z ) );
+
+			renderData->aModelMatrix = glm::scale( renderData->aModelMatrix, scale );
+
 			Graphics_UpdateRenderableAABB( renderComp->aHandle );
 		}
 		else
