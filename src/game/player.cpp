@@ -65,10 +65,13 @@ CONVAR( cl_view_height, 67 );  // 67
 CONVAR( cl_view_height_duck, 36 );  // 36
 CONVAR( cl_view_height_lerp, 15 );  // 0.015
 
-CONVAR( player_model_scale, 25 );
+CONVAR( player_model_scale, 40 );
 
 CONVAR( cl_thirdperson, 0 );
-CONVAR( cl_playermodel_enable, 0 );
+CONVAR( cl_playermodel_enable, 1 );
+CONVAR( cl_playermodel_shadow_local, 1 );
+CONVAR( cl_playermodel_shadow, 0 );
+CONVAR( cl_playermodel_cam_ang, 1 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
 CONVAR( cl_cam_z, -150 );
@@ -105,7 +108,9 @@ CONVAR( cl_bob_debug, 0 );
 
 CONVAR( r_flashlight_brightness, 10.f );
 CONVAR( r_flashlight_lock, 0.f );
-CONVAR( r_flashlight_offset, -4.f );
+CONVAR( r_flashlight_offset_x, -4.f );
+CONVAR( r_flashlight_offset_y, -4.f );
+CONVAR( r_flashlight_offset_z, -4.f );
 
 extern ConVar   m_yaw, m_pitch;
 
@@ -585,7 +590,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 		flashlight->aPos   = transform->aPos.Get() + camera->aTransform.Get().aPos.Get();
 
-		glm::vec3 offset( r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat(), r_flashlight_offset.GetFloat() );
+		glm::vec3 offset( r_flashlight_offset_x.GetFloat(), r_flashlight_offset_y.GetFloat(), r_flashlight_offset_z.GetFloat() );
 
 		flashlight->aPos += offset * camera->aUp.Get();
 	};
@@ -673,21 +678,6 @@ void PlayerManager::Update( float frameTime )
 			Player_UpdateFlashlight( player, userCmd.aFlashlight );
 		}
 
-		if ( (cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool()) || !playerInfo->aIsLocalPlayer )
-		{
-			// CRenderable_t* renderable = GetEntitySystem()->GetComponent< CRenderable_t* >( player );
-			// 
-			// auto          model      = GetEntitySystem()->GetComponent< HModel >( player );
-			// Transform     transform  = GetEntitySystem()->GetComponent< Transform >( player );
-			// 
-			// transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
-			// 
-			// renderable->aModelMatrix = transform.ToMatrix();
-			// renderable->aModel = model.handle;
-
-			// Graphics_DrawModel( renderable );
-		}
-
 		UpdateView( playerInfo, player );
 	}
 }
@@ -718,11 +708,13 @@ void PlayerManager::UpdateLocalPlayer()
 		auto     playerMove = GetPlayerMoveData( player );
 		auto     playerInfo = GetPlayerInfo( player );
 		auto     camera     = GetCamera( player );
+		auto     transform  = GetTransform( player );
 		CLight*  flashlight = Ent_GetComponent< CLight >( player, "light" );
 
 		Assert( playerMove );
 		Assert( playerInfo );
 		Assert( camera );
+		Assert( transform );
 		Assert( flashlight );
 
 		// apMove->MovePlayer( gLocalPlayer, &userCmd );
@@ -734,19 +726,80 @@ void PlayerManager::UpdateLocalPlayer()
 	
 		UpdateView( playerInfo, player );
 
-		if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
+		// if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
+		if ( cl_playermodel_enable && ( cl_thirdperson.GetBool() || !playerInfo->aIsLocalPlayer ) )
 		{
-			// CRenderable_t* renderable = GetEntitySystem()->GetComponent< CRenderable_t* >( player );
-			//
-			// auto          model      = GetEntitySystem()->GetComponent< HModel >( player );
-			// Transform     transform  = GetEntitySystem()->GetComponent< Transform >( player );
-			//
-			// transform.aScale = glm::vec3(player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat());
-			//
-			// renderable->aModelMatrix = transform.ToMatrix();
-			// renderable->aModel = model.handle;
+			auto renderComp = Ent_GetComponent< CRenderable_t >( player, "renderable" );
 
-			// Graphics_DrawModel( renderable );
+			// I hate this so much
+			if ( renderComp->aHandle == InvalidHandle )
+			{
+				auto modelInfo = Ent_GetComponent< CModelInfo >( player, "modelInfo" );
+				if ( !modelInfo )
+				{
+					// Log_Msg( "Failed to get modelInfo, Turning off playermodels for now\n" );
+					// cl_playermodel_enable.SetValue( 0 );
+					continue;
+				}
+
+				Handle model = Graphics_LoadModel( modelInfo->aPath );
+				if ( model == InvalidHandle )
+					continue;
+
+				renderComp->aHandle = Graphics_CreateRenderable( model );
+				if ( renderComp->aHandle == InvalidHandle )
+					continue;
+			}
+			
+			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+
+			if ( !renderData )
+				continue;
+
+			renderData->aVisible    = true;
+
+			if ( cl_playermodel_shadow )
+				renderData->aCastShadow = cl_playermodel_shadow_local ? true : player != gLocalPlayer;
+			else
+				renderData->aCastShadow = false;
+			
+			glm::vec3 scale( player_model_scale.GetFloat(), player_model_scale.GetFloat(), player_model_scale.GetFloat() );
+
+			// HACK HACK
+			glm::vec3 ang{};
+
+			if ( cl_playermodel_cam_ang )
+			{
+				ang = camera->aTransform.Get().aAng;
+				ang[ YAW ] *= -1;
+				ang[ YAW ] += 180;
+				ang[ ROLL ]  = ang[ PITCH ] + 90;
+				ang[ PITCH ] = 0;
+			}
+			else
+			{
+				ang = transform->aAng;
+				ang[ ROLL ] += 90;
+				ang[ YAW ] *= -1;
+				ang[ YAW ] += 180;
+			}
+
+			// Util_ToMatrix( renderData->aModelMatrix, transform->aPos, camera->aTransform.Get().aAng, scale );
+			Util_ToMatrix( renderData->aModelMatrix, transform->aPos, ang, scale );
+			Graphics_UpdateRenderableAABB( renderComp->aHandle );
+		}
+		else
+		{
+			// Make sure this thing is hidden
+			auto renderComp = Ent_GetComponent< CRenderable_t >( player, "renderable" );
+			if ( renderComp->aHandle == InvalidHandle )
+				continue;
+
+			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+			if ( !renderData )
+				continue;
+
+			renderData->aVisible = false;
 		}
 	}
 }

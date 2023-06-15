@@ -648,7 +648,8 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 			if ( !regData->apRead )
 				continue;
 
-			if ( !regData->aOverrideClient )
+			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
+			if ( !regData->aOverrideClient && entity == gLocalPlayer )
 				continue;
 
 			if ( componentRead.hasValues() )
