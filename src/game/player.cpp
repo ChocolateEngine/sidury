@@ -1565,7 +1565,7 @@ void PlayerMovement::DoSmoothDuck()
 CONVAR( phys_player_max_slope_ang, 40, 0, "The maximum angle of slope that character can still walk on" );
 
 
-bool PlayerMovement::CalcOnGround()
+bool PlayerMovement::CalcOnGround( bool sSetFlag )
 {
 	if ( apMove->aMoveType != PlayerMoveType::Walk )
 		return false;
@@ -1578,14 +1578,19 @@ bool PlayerMovement::CalcOnGround()
 	if ( apMove->apGroundObj == nullptr )
 		return false;
 
-	glm::vec3 up = -glm::normalize( GetPhysEnv()->GetGravity() );
+	glm::vec3 up       = -glm::normalize( GetPhysEnv()->GetGravity() );
 
-	if ( glm::dot(apMove->aGroundNormal, up) > maxSlopeAngle )
-		apMove->aPlayerFlags.Edit() |= PlyOnGround;
-	else
-		apMove->aPlayerFlags.Edit() &= ~PlyOnGround;
+	bool      onGround = ( glm::dot( apMove->aGroundNormal, up ) > maxSlopeAngle );
 
-	return apMove->aPlayerFlags & PlyOnGround;
+	if ( sSetFlag )
+	{
+		if ( onGround )
+			apMove->aPlayerFlags.Edit() |= PlyOnGround;
+		else
+			apMove->aPlayerFlags.Edit() &= ~PlyOnGround;
+	}
+
+	return onGround;
 }
 
 
@@ -1829,8 +1834,7 @@ void PlayerMovement::WalkMove()
 	glm::vec3 wishdir(0,0,0);
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
-	// man
-	static bool wasOnGround = IsOnGround();
+	bool wasOnGround = WasOnGround();
 	bool onGround = CalcOnGround();
 
 	if ( onGround )
@@ -1886,7 +1890,7 @@ void PlayerMovement::WalkMove()
 void PlayerMovement::WalkMovePostPhys()
 {
 	bool onGroundPrev = IsOnGround();
-	bool onGround = CalcOnGround();
+	bool onGround = CalcOnGround( false );
 
 	if ( onGround && !onGroundPrev )
 		PlayImpactSound();

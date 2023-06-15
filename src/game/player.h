@@ -144,7 +144,7 @@ class PlayerMovement // : public ComponentSystem
 	void             PlayImpactSound();
 	void             StopImpactSound();  // Temp Hack for sound system
 
-	bool             CalcOnGround();
+	bool             CalcOnGround( bool sSetFlag = true );
 	bool             IsOnGround();
 	bool             WasOnGround();
 
