@@ -16,6 +16,7 @@ CAPNP_BEGIN_HEADER
 namespace capnp {
 namespace schemas {
 
+CAPNP_DECLARE_SCHEMA(d0cece14fee978aa);
 CAPNP_DECLARE_SCHEMA(a3f644954f616311);
 CAPNP_DECLARE_SCHEMA(db96b20698895089);
 CAPNP_DECLARE_SCHEMA(bed97c2c982935b8);
@@ -56,22 +57,8 @@ enum class EMsgSrcServer_ea451e6b28d0dc02: uint16_t {
 CAPNP_DECLARE_ENUM(EMsgSrcServer, ea451e6b28d0dc02);
 CAPNP_DECLARE_SCHEMA(ee117230db68b1d9);
 CAPNP_DECLARE_SCHEMA(bbc101a848b78bef);
-CAPNP_DECLARE_SCHEMA(89a3850d521deba7);
-enum class EState_89a3850d521deba7: uint16_t {
-  NONE,
-  CREATED,
-  DESTROYED,
-};
-CAPNP_DECLARE_ENUM(EState, 89a3850d521deba7);
 CAPNP_DECLARE_SCHEMA(ce10ffcbf8eb7500);
 CAPNP_DECLARE_SCHEMA(fa1f12e74ca2b119);
-CAPNP_DECLARE_SCHEMA(a48992305167c2fe);
-enum class EState_a48992305167c2fe: uint16_t {
-  NONE,
-  CREATED,
-  DESTROYED,
-};
-CAPNP_DECLARE_ENUM(EState, a48992305167c2fe);
 CAPNP_DECLARE_SCHEMA(b33008f4d574b2a3);
 CAPNP_DECLARE_SCHEMA(f874dd608e01ae82);
 CAPNP_DECLARE_SCHEMA(9a1eafaa73282c37);
@@ -88,6 +75,7 @@ CAPNP_DECLARE_SCHEMA(adc97680de0560d0);
 }  // namespace capnp
 
 
+static constexpr  ::uint16_t CH_SIDURY_PROTOCOL = 2u;
 struct Vec2 {
   Vec2() = delete;
 
@@ -158,7 +146,7 @@ struct NetMsgServerInfo {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(ca1f635170315467, 2, 3)
+    CAPNP_DECLARE_STRUCT_HEADER(ca1f635170315467, 1, 3)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -173,7 +161,7 @@ struct NetMsgClientInfo {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(b83fc6b03806aa47, 0, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(b83fc6b03806aa47, 1, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -265,8 +253,6 @@ struct NetMsgComponentUpdate {
   class Reader;
   class Builder;
   class Pipeline;
-  typedef ::capnp::schemas::EState_89a3850d521deba7 EState;
-
   struct Component;
 
   struct _capnpPrivate {
@@ -298,8 +284,6 @@ struct NetMsgEntityUpdate {
   class Reader;
   class Builder;
   class Pipeline;
-  typedef ::capnp::schemas::EState_a48992305167c2fe EState;
-
 
   struct _capnpPrivate {
     CAPNP_DECLARE_STRUCT_HEADER(fa1f12e74ca2b119, 1, 0)
@@ -848,14 +832,12 @@ public:
   }
 #endif  // !CAPNP_LITE
 
-  inline  ::int32_t getNewPort() const;
-
-  inline  ::uint8_t getProtocol() const;
-
   inline bool hasName() const;
   inline  ::capnp::Text::Reader getName() const;
 
-  inline  ::uint8_t getPlayerCount() const;
+  inline  ::uint8_t getClientCount() const;
+
+  inline  ::uint8_t getMaxClients() const;
 
   inline bool hasMapName() const;
   inline  ::capnp::Text::Reader getMapName() const;
@@ -863,7 +845,7 @@ public:
   inline bool hasMapHash() const;
   inline  ::capnp::Text::Reader getMapHash() const;
 
-  inline  ::uint32_t getPlayerEntityId() const;
+  inline  ::uint32_t getClientEntityId() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -893,12 +875,6 @@ public:
   inline ::kj::StringTree toString() const { return asReader().toString(); }
 #endif  // !CAPNP_LITE
 
-  inline  ::int32_t getNewPort();
-  inline void setNewPort( ::int32_t value);
-
-  inline  ::uint8_t getProtocol();
-  inline void setProtocol( ::uint8_t value);
-
   inline bool hasName();
   inline  ::capnp::Text::Builder getName();
   inline void setName( ::capnp::Text::Reader value);
@@ -906,8 +882,11 @@ public:
   inline void adoptName(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownName();
 
-  inline  ::uint8_t getPlayerCount();
-  inline void setPlayerCount( ::uint8_t value);
+  inline  ::uint8_t getClientCount();
+  inline void setClientCount( ::uint8_t value);
+
+  inline  ::uint8_t getMaxClients();
+  inline void setMaxClients( ::uint8_t value);
 
   inline bool hasMapName();
   inline  ::capnp::Text::Builder getMapName();
@@ -923,8 +902,8 @@ public:
   inline void adoptMapHash(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownMapHash();
 
-  inline  ::uint32_t getPlayerEntityId();
-  inline void setPlayerEntityId( ::uint32_t value);
+  inline  ::uint32_t getClientEntityId();
+  inline void setClientEntityId( ::uint32_t value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -969,6 +948,8 @@ public:
   }
 #endif  // !CAPNP_LITE
 
+  inline  ::uint16_t getProtocol() const;
+
   inline bool hasName() const;
   inline  ::capnp::Text::Reader getName() const;
 
@@ -999,6 +980,9 @@ public:
 #if !CAPNP_LITE
   inline ::kj::StringTree toString() const { return asReader().toString(); }
 #endif  // !CAPNP_LITE
+
+  inline  ::uint16_t getProtocol();
+  inline void setProtocol( ::uint16_t value);
 
   inline bool hasName();
   inline  ::capnp::Text::Builder getName();
@@ -1553,7 +1537,7 @@ public:
 
   inline  ::uint32_t getId() const;
 
-  inline  ::NetMsgComponentUpdate::EState getState() const;
+  inline bool getDestroyed() const;
 
   inline bool hasValues() const;
   inline  ::capnp::Data::Reader getValues() const;
@@ -1589,8 +1573,8 @@ public:
   inline  ::uint32_t getId();
   inline void setId( ::uint32_t value);
 
-  inline  ::NetMsgComponentUpdate::EState getState();
-  inline void setState( ::NetMsgComponentUpdate::EState value);
+  inline bool getDestroyed();
+  inline void setDestroyed(bool value);
 
   inline bool hasValues();
   inline  ::capnp::Data::Builder getValues();
@@ -1644,7 +1628,7 @@ public:
 
   inline  ::uint32_t getId() const;
 
-  inline  ::NetMsgEntityUpdate::EState getState() const;
+  inline bool getDestroyed() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -1677,8 +1661,8 @@ public:
   inline  ::uint32_t getId();
   inline void setId( ::uint32_t value);
 
-  inline  ::NetMsgEntityUpdate::EState getState();
-  inline void setState( ::NetMsgEntityUpdate::EState value);
+  inline bool getDestroyed();
+  inline void setDestroyed(bool value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -2987,34 +2971,6 @@ inline void NetMsgUserCmd::Builder::setFlashlight(bool value) {
       ::capnp::bounded<48>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::int32_t NetMsgServerInfo::Reader::getNewPort() const {
-  return _reader.getDataField< ::int32_t>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
-}
-
-inline  ::int32_t NetMsgServerInfo::Builder::getNewPort() {
-  return _builder.getDataField< ::int32_t>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
-}
-inline void NetMsgServerInfo::Builder::setNewPort( ::int32_t value) {
-  _builder.setDataField< ::int32_t>(
-      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
-}
-
-inline  ::uint8_t NetMsgServerInfo::Reader::getProtocol() const {
-  return _reader.getDataField< ::uint8_t>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
-}
-
-inline  ::uint8_t NetMsgServerInfo::Builder::getProtocol() {
-  return _builder.getDataField< ::uint8_t>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
-}
-inline void NetMsgServerInfo::Builder::setProtocol( ::uint8_t value) {
-  _builder.setDataField< ::uint8_t>(
-      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
-}
-
 inline bool NetMsgServerInfo::Reader::hasName() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -3049,18 +3005,32 @@ inline ::capnp::Orphan< ::capnp::Text> NetMsgServerInfo::Builder::disownName() {
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 
-inline  ::uint8_t NetMsgServerInfo::Reader::getPlayerCount() const {
+inline  ::uint8_t NetMsgServerInfo::Reader::getClientCount() const {
   return _reader.getDataField< ::uint8_t>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
 
-inline  ::uint8_t NetMsgServerInfo::Builder::getPlayerCount() {
+inline  ::uint8_t NetMsgServerInfo::Builder::getClientCount() {
   return _builder.getDataField< ::uint8_t>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
-inline void NetMsgServerInfo::Builder::setPlayerCount( ::uint8_t value) {
+inline void NetMsgServerInfo::Builder::setClientCount( ::uint8_t value) {
   _builder.setDataField< ::uint8_t>(
-      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint8_t NetMsgServerInfo::Reader::getMaxClients() const {
+  return _reader.getDataField< ::uint8_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint8_t NetMsgServerInfo::Builder::getMaxClients() {
+  return _builder.getDataField< ::uint8_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgServerInfo::Builder::setMaxClients( ::uint8_t value) {
+  _builder.setDataField< ::uint8_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgServerInfo::Reader::hasMapName() const {
@@ -3131,18 +3101,32 @@ inline ::capnp::Orphan< ::capnp::Text> NetMsgServerInfo::Builder::disownMapHash(
       ::capnp::bounded<2>() * ::capnp::POINTERS));
 }
 
-inline  ::uint32_t NetMsgServerInfo::Reader::getPlayerEntityId() const {
+inline  ::uint32_t NetMsgServerInfo::Reader::getClientEntityId() const {
   return _reader.getDataField< ::uint32_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 
-inline  ::uint32_t NetMsgServerInfo::Builder::getPlayerEntityId() {
+inline  ::uint32_t NetMsgServerInfo::Builder::getClientEntityId() {
   return _builder.getDataField< ::uint32_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
-inline void NetMsgServerInfo::Builder::setPlayerEntityId( ::uint32_t value) {
+inline void NetMsgServerInfo::Builder::setClientEntityId( ::uint32_t value) {
   _builder.setDataField< ::uint32_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint16_t NetMsgClientInfo::Reader::getProtocol() const {
+  return _reader.getDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint16_t NetMsgClientInfo::Builder::getProtocol() {
+  return _builder.getDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgClientInfo::Builder::setProtocol( ::uint16_t value) {
+  _builder.setDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgClientInfo::Reader::hasName() const {
@@ -3439,18 +3423,18 @@ inline void NetMsgComponentUpdate::Component::Builder::setId( ::uint32_t value) 
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::NetMsgComponentUpdate::EState NetMsgComponentUpdate::Component::Reader::getState() const {
-  return _reader.getDataField< ::NetMsgComponentUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+inline bool NetMsgComponentUpdate::Component::Reader::getDestroyed() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
 }
 
-inline  ::NetMsgComponentUpdate::EState NetMsgComponentUpdate::Component::Builder::getState() {
-  return _builder.getDataField< ::NetMsgComponentUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+inline bool NetMsgComponentUpdate::Component::Builder::getDestroyed() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
 }
-inline void NetMsgComponentUpdate::Component::Builder::setState( ::NetMsgComponentUpdate::EState value) {
-  _builder.setDataField< ::NetMsgComponentUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+inline void NetMsgComponentUpdate::Component::Builder::setDestroyed(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgComponentUpdate::Component::Reader::hasValues() const {
@@ -3501,18 +3485,18 @@ inline void NetMsgEntityUpdate::Builder::setId( ::uint32_t value) {
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Reader::getState() const {
-  return _reader.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+inline bool NetMsgEntityUpdate::Reader::getDestroyed() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
 }
 
-inline  ::NetMsgEntityUpdate::EState NetMsgEntityUpdate::Builder::getState() {
-  return _builder.getDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+inline bool NetMsgEntityUpdate::Builder::getDestroyed() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS);
 }
-inline void NetMsgEntityUpdate::Builder::setState( ::NetMsgEntityUpdate::EState value) {
-  _builder.setDataField< ::NetMsgEntityUpdate::EState>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+inline void NetMsgEntityUpdate::Builder::setDestroyed(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<32>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgEntityUpdates::Reader::hasUpdateList() const {

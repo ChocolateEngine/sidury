@@ -153,6 +153,7 @@ bool MapManager_LoadMap( const std::string &path )
 		return false;
 
 	gpMap = new SiduryMap;
+	gpMap->aMapPath = path;
 	gpMap->aMapInfo = mapInfo;
 
 	Skybox_SetMaterial( mapInfo->skybox );
@@ -221,6 +222,15 @@ std::string_view MapManager_GetMapName()
 		return "";
 
 	return gpMap->aMapInfo->mapName;
+}
+
+
+std::string_view MapManager_GetMapPath()
+{
+	if ( !gpMap )
+		return "";
+
+	return gpMap->aMapPath;
 }
 
 

@@ -228,7 +228,11 @@ void Game_UpdateGame( float frameTime )
 	// when do i call these lol
 	CL_Update( gFrameTime );
 
-	GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
+	// TEMP TEMP
+	if ( ImGui::Button( "connect localhost" ) )
+	{
+		Con_QueueCommand( "connect localhost" );
+	}
 
 	Game_SetupModels( gFrameTime );
 	Game_UpdateAudio();

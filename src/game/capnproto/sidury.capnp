@@ -1,5 +1,7 @@
 @0xf878a6742b4fd338;
 
+const chSiduryProtocol :UInt16 = 2;
+
 # Base Types
 struct Vec2
 {
@@ -44,21 +46,20 @@ struct NetMsgUserCmd
 # General Messages
 struct NetMsgServerInfo
 {
-    # GET THIS OUT OF HERE
-    newPort        @0 :Int32;
+    name           @0 :Text;
+    clientCount    @1 :UInt8;
+    maxClients     @2 :UInt8;  # TODO: make this obsolete with convar syncing?
+    mapName        @3 :Text;
+    mapHash        @4 :Text;
 
-    protocol       @1 :UInt8;
-    name           @2 :Text;
-    playerCount    @3 :UInt8;
-    mapName        @4 :Text;
-    mapHash        @5 :Text;
-
-    playerEntityId @6 :UInt32;
+    # This should probably be a separate message
+    clientEntityId @5 :UInt32;
 }
 
 struct NetMsgClientInfo
 {
-    name @0 :Text;
+    protocol @0 :UInt16;
+    name     @1 :Text;
 }
 
 struct NetMsgDisconnect
@@ -123,20 +124,13 @@ struct MsgSrcServer
 # This contains component data
 struct NetMsgComponentUpdate
 {
-    enum EState
-    {
-        none      @0;
-        created   @1;
-        destroyed @2;
-    }
-
     struct Component
     {
         # Entity to update
         id @0 :UInt32;
 
-        # Component State
-        state @1 :EState;
+        # Is Component Destroyed
+        destroyed @1 :Bool;
 
         # Component Data
         values @2 :Data;
@@ -157,18 +151,11 @@ struct NetMsgComponentUpdate
 # We do not network any information about components
 struct NetMsgEntityUpdate
 {
-    enum EState
-    {
-        none      @0;
-        created   @1;
-        destroyed @2;
-    }
-
     # Entity to update
     id @0 :UInt32;
 
-    # Entity State
-    state @1 :EState;
+    # Is Entity Destroyed
+    destroyed @1 :Bool;
 }
 
 struct NetMsgEntityUpdates

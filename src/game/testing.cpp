@@ -258,16 +258,6 @@ CONCMD_VA( create_proto, CVARF( CL_EXEC ) )
 }
 
 
-CONCMD_VA( create_gltf_proto, CVARF( CL_EXEC ) )
-{
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_gltf_proto" ) )
-		return;
-
-	CreateProtogen_f( "materials/models/protogen_wip_25d/protogen_25d.glb" );
-}
-
-
 static void model_dropdown(
   const std::vector< std::string >& args,  // arguments currently typed in by the user
   std::vector< std::string >&       results )    // results to populate the dropdown list with
@@ -625,8 +615,8 @@ void TEST_SV_UpdateProtos( float frameTime )
 			}
 			else
 			{
-				size_t playerID       = RandomInt( 0, gServerData.aClients.size() - 1 );
-				protoLook.aLookTarget = SV_GetPlayerEntFromIndex( playerID );
+				auto randIt           = std::next( std::begin( gServerData.aClientIDs ), RandomInt( 0, gServerData.aClientIDs.size() - 1 ) );
+				protoLook.aLookTarget = SV_GetPlayerEnt( randIt->first );
 
 				if ( protoLook.aLookTarget == CH_ENT_INVALID )
 					continue;

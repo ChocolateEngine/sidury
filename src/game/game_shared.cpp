@@ -3,6 +3,7 @@
 #include "sv_main.h"
 #include "entity.h"
 #include "player.h"
+#include "mapmanager.h"
 
 #include <capnp/message.h>
 #include <capnp/serialize-packed.h>
@@ -14,6 +15,9 @@ NEW_CVAR_FLAG( CVARF_SV_EXEC );
 
 static bool           gGameUseClient     = true;
 static ECommandSource gGameCommandSource = ECommandSource_Client;
+
+extern ch_sockaddr    gClientAddr;
+extern EClientState   gClientState;
 
 
 CONCMD( disconnect )
@@ -29,18 +33,63 @@ CONCMD( disconnect )
 
 CONCMD( status )
 {
-	size_t playerCount = GetPlayers()->aEntities.size();
+	if ( Game_IsHosting() )
+	{
+		SV_PrintStatus();
+	}
+	else if ( Game_IsClient() )
+	{
+		CL_PrintStatus();
+	}
 
-	// if ( Game_IsHosting() )
-	// {
-	// 	playerCount = gServerData.aClients.size();
-	// }
-	// else
-	// {
-	// 	playerCount = gClientServerData.aPlayerCount;
-	// }
+	// List Player Information
+}
 
-	Log_MsgF( "%zd Players Currently on Server\n", playerCount );
+
+static const char* gMsgSrcClientStr[] = {
+	"Disconnect",
+	"Client Info",
+	"ConVar",
+	"User Command",
+	"Full Update",
+};
+
+
+static const char* gMsgSrcServerStr[] = {
+	"Disconnect",
+	"Server Info",
+	"ConVar",
+	"Component List",
+	"Entity List",
+	"Paused",
+};
+
+
+static_assert( ARR_SIZE( gMsgSrcClientStr ) == static_cast< uint16_t >( EMsgSrcClient::COUNT ) );
+static_assert( ARR_SIZE( gMsgSrcServerStr ) == static_cast< uint16_t >( EMsgSrcServer::COUNT ) );
+
+
+// Convert a Client Source Message to String
+const char* CL_MsgToString( EMsgSrcClient sMsg )
+{
+	Assert( sMsg < EMsgSrcClient::COUNT );
+
+	if ( sMsg >= EMsgSrcClient::COUNT )
+		return "INVALID";
+
+	return gMsgSrcClientStr[ static_cast< uint16_t >( sMsg ) ];
+}
+
+
+// Convert a Server Source Message to String
+const char* SV_MsgToString( EMsgSrcServer sMsg )
+{
+	Assert( sMsg < EMsgSrcServer::COUNT );
+
+	if ( sMsg >= EMsgSrcServer::COUNT )
+		return "INVALID";
+
+	return gMsgSrcClientStr[ static_cast< uint16_t >( sMsg ) ];
 }
 
 
@@ -122,7 +171,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 			// The Convar must have one of these flags
 			if ( !(flags & CVARF_SV_EXEC) && !(flags & CVARF_SERVER) )
 			{
-				Log_WarnF( "Server Tried Executing Command without flag to allow it: \"%s\"\n", commandName );
+				Log_WarnF( "Server Tried Executing Command without flag to allow it: \"%s\"\n", commandName.c_str() );
 				continue;
 			}
 		}
@@ -133,7 +182,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 			// The Convar must have this flag
 			if ( !(flags & CVARF_CL_EXEC) )
 			{
-				Log_WarnF( "Client Tried Executing Command without flag to allow it: \"%s\"\n", commandName );
+				Log_WarnF( "Client Tried Executing Command without flag to allow it: \"%s\"\n", commandName.c_str() );
 				continue;
 			}
 		}

@@ -9,22 +9,24 @@ struct MapInfo
 {
 	unsigned int version = 0;
 
-	std::string mapName;
-	std::string modelPath;
+	std::string  mapName;
+	std::string  modelPath;
 
-	glm::vec3 ang;
-	glm::vec3 physAng;
+	glm::vec3    ang;
+	glm::vec3    physAng;
 
-	glm::vec3 spawnPos;
-	glm::vec3 spawnAng;
+	glm::vec3    spawnPos;
+	glm::vec3    spawnAng;
 
 	// unused
-	std::string skybox;
+	std::string  skybox;
 };
 
 
 struct SiduryMap
 {
+	std::string                    aMapPath    = "";
+
 	MapInfo*                       aMapInfo    = nullptr;
 	SceneDraw_t*                   aRenderable = nullptr;
 	Handle                         aScene      = InvalidHandle;
@@ -39,6 +41,7 @@ bool             MapManager_LoadMap( const std::string& path );
 void             MapManager_CloseMap();
 bool             MapManager_HasMap();
 std::string_view MapManager_GetMapName();
+std::string_view MapManager_GetMapPath();
 
 void             MapManager_Update();
 

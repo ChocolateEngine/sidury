@@ -26,7 +26,7 @@ EntitySystem*          cl_entities                                     = nullptr
 EntitySystem*          sv_entities                                     = nullptr;
 
 
-CONVAR( ent_write_all_data, 0, "Ignore whether a component var is dirty, and write all the data anyway" );
+CONVAR( ent_always_full_update, 0, "For debugging, always send a full update" );
 CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
 
 
@@ -72,7 +72,7 @@ const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType )
 }
 
 
-static const char* gEntVarTypeStr[ EEntComponentVarType_Count ] = {
+static const char* gEntVarTypeStr[] = {
 	"INVALID",
 
 	"bool",
@@ -108,6 +108,9 @@ static const char* gEntVarTypeStr[ EEntComponentVarType_Count ] = {
 	"glm::vec3",
 	"glm::vec4",
 };
+
+
+static_assert( ARR_SIZE( gEntVarTypeStr ) == EEntComponentVarType_Count );
 
 
 const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType )
@@ -957,7 +960,7 @@ void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
 		update.setId( entity );
 
 		// Get Entity State
-		update.setState( static_cast< NetMsgEntityUpdate::EState >( aEntityStates[ entity ] ) );
+		update.setDestroyed( aEntityStates[ entity ] == EEntityCreateState_Destroyed );
 	}
 }
 
@@ -1015,8 +1018,8 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 
 			compBuilder.setId( entity );
 
-			// Get State
-			compBuilder.setState( static_cast< NetMsgComponentUpdate::EState >( pool->aComponentStates[ index ] ) );
+			// Set Destroyed
+			compBuilder.setDestroyed( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed );
 			
 			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed || !regData->apWrite )
 			{
@@ -1028,7 +1031,7 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 			auto data = pool->GetData( entity );
 
 			capnp::MallocMessageBuilder compMessageBuilder;
-			if ( regData->apWrite( compMessageBuilder, data, sFullUpdate ) )
+			if ( regData->apWrite( compMessageBuilder, data, ent_always_full_update ? true : sFullUpdate ) )
 			{
 				NetOutputStream outputStream;
 				capnp::writePackedMessage( outputStream, compMessageBuilder );
@@ -1048,7 +1051,7 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 			}
 
 			// Reset Component Var Dirty Values
-			if ( !ent_write_all_data )
+			if ( !ent_always_full_update )
 			{
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
@@ -1404,7 +1407,7 @@ CH_COMPONENT_WRITE_DEF( CTransformSmall )
 	isDirty |= spTransform->aPos.aIsDirty;
 	isDirty |= spTransform->aAng.aIsDirty;
 
-	if ( !isDirty && !ent_write_all_data )
+	if ( !isDirty )
 		return false;
 
 	auto builder     = srMessage.initRoot< NetCompTransformSmall >();
@@ -1445,7 +1448,7 @@ CH_COMPONENT_WRITE_DEF( CRigidBody )
 	isDirty |= spRigidBody->aVel.aIsDirty;
 	isDirty |= spRigidBody->aAccel.aIsDirty;
 
-	if ( !isDirty && !ent_write_all_data )
+	if ( !isDirty )
 		return false;
 
 	auto builder  = srMessage.initRoot< NetCompRigidBody >();
@@ -1493,11 +1496,13 @@ CH_COMPONENT_WRITE_DEF( CDirection )
 	isDirty |= spDirection->aRight.aIsDirty;
 	isDirty |= spDirection->aUp.aIsDirty;
 
-	if ( !isDirty && !ent_write_all_data )
+	if ( !isDirty )
 		return false;
 
 	auto builder = srMessage.initRoot< NetCompDirection >();
 	NetComp_WriteDirection( &builder, *spDirection, sFullUpdate );
+
+	return true;
 }
 
 
@@ -1613,6 +1618,8 @@ CH_COMPONENT_WRITE_DEF( CModelInfo )
 	auto builder = srMessage.initRoot< NetCompModelPath >();
 
 	builder.setPath( spModelInfo->aPath.Get() );
+
+	return true;
 }
 
 
@@ -1682,6 +1689,8 @@ CH_COMPONENT_WRITE_DEF( CLight )
 
 	builder.setShadow( spLight->aShadow );
 	builder.setEnabled( spLight->aEnabled );
+
+	return true;
 }
 
 

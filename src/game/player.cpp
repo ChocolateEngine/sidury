@@ -224,10 +224,10 @@ CH_COMPONENT_READ_DEF( CPlayerMoveData )
 
 	switch ( moveType )
 	{
+		default:
 		case EPlayerMoveType::WALK:
 			spMoveData->aMoveType = PlayerMoveType::Walk;
 
-		default:
 		case EPlayerMoveType::NO_CLIP:
 			spMoveData->aMoveType = PlayerMoveType::NoClip;
 
@@ -271,10 +271,10 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 
 	switch ( spMoveData->aMoveType )
 	{
+		default:
 		case PlayerMoveType::Walk:
 			builder.setMoveType( EPlayerMoveType::WALK );
 
-		default:
 		case PlayerMoveType::NoClip:
 			builder.setMoveType( EPlayerMoveType::NO_CLIP );
 
@@ -458,6 +458,9 @@ void PlayerManager::Create( Entity player )
 	else
 	{
 		SV_Client_t* client = SV_GetClientFromEntity( player );
+
+		Assert( client );
+
 		if ( !client )
 			return;
 
@@ -650,11 +653,12 @@ void PlayerManager::Update( float frameTime )
 
 		if ( !Game_IsPaused() )
 		{
-			// DoMouseLook( player );
-
 			// Update Client UserCmd
 			auto            transform = GetTransform( player );
 			auto            camera    = GetCamera( player );
+
+			Assert( transform );
+			Assert( camera );
 
 			// transform.aAng[PITCH] = -mouse.y;
 			camera->aTransform.Edit().aAng.Edit()[ PITCH ] = userCmd.aAng[ PITCH ];
@@ -701,29 +705,10 @@ void PlayerManager::UpdateLocalPlayer()
 
 	auto userCmd = gClientUserCmd;
 
-	auto     playerMove = GetPlayerMoveData( gLocalPlayer );
-	auto     playerInfo = GetPlayerInfo( gLocalPlayer );
-	auto     camera     = GetCamera( gLocalPlayer );
-	CLight*  flashlight = Ent_GetComponent< CLight >( gLocalPlayer, "light" );
-
-	Assert( playerMove );
-	Assert( playerInfo );
-	Assert( camera );
-	Assert( flashlight );
-
 	if ( !Game_IsPaused() )
 	{
 		if ( input->WindowHasFocus() && !CL_IsMenuShown() )
 			DoMouseLook( gLocalPlayer );
-
-		// apMove->MovePlayer( gLocalPlayer, &userCmd );
-		// Player_UpdateFlashlight( gLocalPlayer, &userCmd );
-		// Graphics_UpdateLight( flashlight );
-
-		// TEMP
-		// camera->aTransform.aPos[ W_UP ] = playerMove->aOutViewHeight;
-
-		// UpdateView( playerInfo, gLocalPlayer );
 	}
 
 	// We still need to do client updating of players actually, so
@@ -1192,7 +1177,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody->aVel).c_str() );
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
-	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov );
+	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov.Get() );
 	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.Get().aPos).c_str() );
 	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.Get().aAng).c_str() );
 }

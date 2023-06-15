@@ -34,9 +34,9 @@ enum ENetType : char
 
 struct NetAddr_t
 {
-	ENetType aType   = ENetType_Invalid;
-	bool     aIsIPV6 = false;
-	short    aPort;
+	ENetType       aType   = ENetType_Invalid;
+	bool           aIsIPV6 = false;
+	unsigned short aPort   = 0;
 
 	union
 	{

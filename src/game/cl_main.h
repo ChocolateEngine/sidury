@@ -27,7 +27,8 @@ struct CL_ServerData_t
 {
 	std::string aName;
 	std::string aMapName;
-	int         aPlayerCount;
+	u8          aClientCount;
+	u8          aMaxClients;
 };
 
 
@@ -62,4 +63,6 @@ void                   CL_BuildUserCmd( capnp::MessageBuilder& srBuilder );
 void                   CL_SendUserCmd();
 void                   CL_SendFullUpdateRequest();
 void                   CL_GetServerMessages();
+
+void                   CL_PrintStatus();
 

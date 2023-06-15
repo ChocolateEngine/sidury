@@ -26,6 +26,25 @@ CONVAR( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_pause, 0, CVARF_SERVER, "Pauses the Server Code" );
 
+CONVAR_CMD_EX( sv_max_clients, 32, CVARF_SERVER, "Max Clients the Server Allows" )
+{
+	if ( sv_max_clients.GetInt() > CH_MAX_CLIENTS )
+	{
+		Log_WarnF( gLC_Server, "Can't go over max internal client limit of %d\n", CH_MAX_CLIENTS );
+		sv_max_clients.SetValue( CH_MAX_CLIENTS );
+	}
+	else if ( sv_max_clients < gServerData.aClients.size() )
+	{
+		Log_WarnF( gLC_Server, "Can't reduce max client limit less than the amount of clients connected (%zd connected)\n", gServerData.aClients.size() );
+		sv_max_clients.SetValue( gServerData.aClients.size() );
+	}
+	else if ( sv_max_clients < 1 )
+	{
+		Log_WarnF( gLC_Server, "Can't set max clients less than 1\n" );
+		sv_max_clients.SetValue( 1 );
+	}
+}
+
 ServerData_t        gServerData;
 
 static Socket_t     gServerSocket   = CH_INVALID_SOCKET;
@@ -115,7 +134,7 @@ void SV_Update( float frameTime )
 			GetEntitySystem()->DeleteEntity( client.aEntity );
 
 			// Remove this client from the list
-			vec_remove_index( gServerData.aClients, i );
+			SV_FreeClient( client );
 			i--;
 			continue;
 		}
@@ -131,10 +150,14 @@ void SV_Update( float frameTime )
 	// Send updated data to clients
 	std::vector< capnp::MallocMessageBuilder > messages( 2 );
 
-	SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
-	SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
+	bool msgFailed = false;
+	msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
+	msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
 
-	int writeSize = SV_BroadcastMsgs( messages );
+	int writeSize = 0;
+
+	if ( !msgFailed )
+		writeSize = SV_BroadcastMsgs( messages );
 
 	// Check to see if anyone needs a full update
 	if ( gServerData.aClientsFullUpdate.size() )
@@ -142,10 +165,15 @@ void SV_Update( float frameTime )
 		// Build a Full Update and send it to all of them
 		std::vector< capnp::MallocMessageBuilder > messages( 2 );
 
-		SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
-		SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
+		bool                                       msgFailed = false;
+		msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
+		msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
 
-		int fullUpdateSize = SV_BroadcastMsgsToSpecificClients( messages, gServerData.aClientsFullUpdate );
+		int fullUpdateSize = 0;
+
+		if ( !msgFailed )
+			fullUpdateSize = SV_BroadcastMsgsToSpecificClients( messages, gServerData.aClientsFullUpdate );
+
 		Log_DevF( gLC_Server, 1, "Writing Full Update to Clients: %d bytes\n", fullUpdateSize );
 
 		gServerData.aClientsFullUpdate.clear();
@@ -335,7 +363,22 @@ int SV_BroadcastMsg( capnp::MessageBuilder& srMessage )
 }
 
 
-void SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType, bool sFullUpdate )
+// hi im a server here's a taco - agrimar
+void SV_BuildServerInfo( capnp::MessageBuilder& srMessage )
+{
+	NetMsgServerInfo::Builder serverInfo = srMessage.initRoot< NetMsgServerInfo >();
+
+	serverInfo.setMapName( MapManager_GetMapPath().data() );
+	serverInfo.setMapHash( "todo" );
+	serverInfo.setName( sv_server_name.GetValue().data() );
+	serverInfo.setClientCount( gServerData.aClients.size() );
+	serverInfo.setMaxClients( sv_max_clients );
+
+	Log_DevF( gLC_Server, 1, "Building Server Info\n" );
+}
+
+
+bool SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType, bool sFullUpdate )
 {
 	auto root = srBuilder.initRoot< MsgSrcServer >();
 
@@ -357,6 +400,17 @@ void SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType
 			//Log_DevF( gLC_Server, 2, "Sending COMPONENT_LIST to Clients\n" );
 			break;
 		}
+		case EMsgSrcServer::SERVER_INFO:
+		{
+			root.setType( EMsgSrcServer::SERVER_INFO );
+			SV_BuildServerInfo( messageBuilder );
+			break;
+		}
+		default:
+		{
+			Log_ErrorF( gLC_Server, "Invalid Server Source Message Type: %zd\n", sSrcType );
+			return false;
+		}
 	}
 	
 	NetOutputStream outputStream;
@@ -364,6 +418,8 @@ void SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType
 
 	auto data = root.initData( outputStream.aBuffer.size_bytes() );
 	memcpy( data.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
+
+	return true;
 }
 
 
@@ -409,35 +465,19 @@ void SV_BuildUpdatedData( bool sFullUpdate )
 #endif
 
 
-void SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage )
+bool SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage )
 {
 	int write = Net_WritePacked( gServerSocket, srClient.aAddr, srMessage );
-}
 
+	if ( write < 1 )
+	{
+		// Failed to write to client, disconnect them
+		srClient.aState = ESV_ClientState_Disconnected;
+		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
+		return false;
+	}
 
-// hi im a server here's a taco - agrimar
-void SV_BuildServerInfo( capnp::MessageBuilder& srMessage )
-{
-	NetMsgServerInfo::Builder serverInfo = srMessage.initRoot< NetMsgServerInfo >();
-
-	serverInfo.setProtocol( CH_SERVER_PROTOCOL_VER );
-	serverInfo.setMapName( MapManager_GetMapName().data() );
-	serverInfo.setMapHash( "todo" );
-	serverInfo.setName( sv_server_name.GetValue().data() );
-	serverInfo.setPlayerCount( gServerData.aClients.size() );
-
-	// hack
-	serverInfo.setNewPort( -1 );
-
-	Log_DevF( gLC_Server, 1, "Building Server Info\n" );
-}
-
-
-void SV_SendServerInfo( SV_Client_t& srClient )
-{
-	capnp::MallocMessageBuilder message;
-	SV_BuildServerInfo( message );
-	SV_SendMessageToClient( srClient, message );
+	return true;
 }
 
 
@@ -448,16 +488,11 @@ void SV_SendDisconnect( SV_Client_t& srClient )
 
 	disconnectMsg.setReason( "Saving chunks." );
 
-	SV_SendMessageToClient( srClient, message );
-
-	srClient.aState = ESV_ClientState_Disconnected;
-
-	Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
-}
-
-
-void SV_ProcessCommands( SV_Client_t& srClient )
-{
+	if ( SV_SendMessageToClient( srClient, message ) )
+	{
+		srClient.aState = ESV_ClientState_Disconnected;
+		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
+	}
 }
 
 
@@ -468,7 +503,7 @@ void SV_HandleMsg_ClientInfo()
 
 void SV_HandleMsg_UserCmd( SV_Client_t& srClient, NetMsgUserCmd::Reader& srReader )
 {
-	Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.aName.c_str() );
+	//Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.aName.c_str() );
 
 	NetHelper_ReadVec3( srReader.getAngles(), srClient.aUserCmd.aAng );
 	srClient.aUserCmd.aButtons    = srReader.getButtons();
@@ -549,9 +584,9 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
 
 	// Read the message sent from the client
-	auto                       clientMsg = srReader.getRoot< MsgSrcClient >();
+	auto          clientMsg = srReader.getRoot< MsgSrcClient >();
 
-	EMsgSrcClient              msgType   = clientMsg.getType();
+	EMsgSrcClient msgType   = clientMsg.getType();
 
 	// First, check types without any data attached to them
 	switch ( msgType )
@@ -582,7 +617,7 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 
 	if ( !msgData.size() )
 	{
-		Log_ErrorF( gLC_Server, "Invalid Message with no data attached - %ud\n", msgType );
+		Log_ErrorF( gLC_Server, "Invalid Message with no data attached - %s\n", CL_MsgToString( msgType ) );
 		return;
 	}
 
@@ -614,9 +649,60 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader 
 		}
 
 		default:
-			// TODO: have a message type to string function
-			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %ud\n", msgType );
+			Log_WarnF( gLC_Server, "Unknown Message Type from Client: %s\n", CL_MsgToString( msgType ) );
 			break;
+	}
+}
+
+
+SV_Client_t* SV_AllocateClient()
+{
+	if ( gServerData.aClients.size() >= sv_max_clients )
+		return nullptr;
+
+	// Allocate a new client
+	SV_Client_t&   client = gServerData.aClients.emplace_back();
+
+	// Generate a random number to use as a Handle
+	ClientHandle_t handle = CH_INVALID_CLIENT;
+
+	while ( true )
+	{
+		handle  = ( rand() % 0xFFFFFFFE ) + 1;
+	
+		auto it = gServerData.aClientIDs.find( handle );
+		if ( it == gServerData.aClientIDs.end() )
+			break;
+	}
+
+	// Add it to the resource list to allow for changing indexes and max clients
+	gServerData.aClientIDs[ handle ]    = &client;
+	gServerData.aClientToIDs[ &client ] = handle;
+
+	return &client;
+}
+
+
+void SV_FreeClient( SV_Client_t& srClient )
+{
+	auto it = gServerData.aClientToIDs.find( &srClient );
+	
+	if ( it == gServerData.aClientToIDs.end() )
+		return;
+
+	gServerData.aClientIDs.erase( it->second );
+	gServerData.aClientToIDs.erase( it );
+
+	// Remove this client from the list
+	auto clientIT = std::find( gServerData.aClients.begin(), gServerData.aClients.end(), srClient );
+	if ( clientIT != gServerData.aClients.end() )
+	{
+		size_t index = clientIT - gServerData.aClients.begin();
+
+		if ( index != SIZE_MAX )
+			vec_remove_index( gServerData.aClients, index );
+		else
+			Log_Msg( "um\n" );
 	}
 }
 
@@ -635,6 +721,11 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 	// Spawn the player in!
 	GetPlayers()->Spawn( srClient.aEntity );
 
+	// Tell the clients someone else connected
+	capnp::MallocMessageBuilder message;
+	SV_BuildServerMsg( message, EMsgSrcServer::SERVER_INFO );
+	SV_BroadcastMsg( message );
+
 	// Reset the connection timer
 	srClient.aTimeout = Game_GetCurTime() + sv_client_timeout;
 }
@@ -643,40 +734,108 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 {
 	// Get Client Info
-	NetBufferedInputStream     inputStream( srData.data(), srData.size() );
-	capnp::PackedMessageReader reader( inputStream );
-	NetMsgClientInfo::Reader   clientInfoRead = reader.getRoot< NetMsgClientInfo >();
+	try
+	{
+		NetBufferedInputStream     inputStream( srData.data(), srData.size() );
+		capnp::PackedMessageReader reader( inputStream );
+		NetMsgClientInfo::Reader   clientInfoRead = reader.getRoot< NetMsgClientInfo >();
 
-	SV_Client_t&               client         = gServerData.aClients.emplace_back();
-	client.aName                              = clientInfoRead.getName();
-	client.aAddr                              = srAddr;
-	client.aState                             = ESV_ClientState_Connecting;
+		// First thing's first, make sure our protocol is the same
+		if ( clientInfoRead.getProtocol() != CH_SIDURY_PROTOCOL )
+		{
+			Log_ErrorF( gLC_Server, "Failed to start Connecting Client - Protocol Difference: %zd, Expected %zd\n", clientInfoRead.getProtocol(), CH_SIDURY_PROTOCOL );
 
-	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", client.aName.c_str() );
+			// Try to tell them
+			capnp::MallocMessageBuilder message;
+			NetMsgDisconnect::Builder   disconnectMsg = message.initRoot< NetMsgDisconnect >();
 
-	// Make an entity for them
-	client.aEntity = GetEntitySystem()->CreateEntity();
+			disconnectMsg.setReason( vstring( "Invalid Protocol, Got %zd, Exptected %zd", clientInfoRead.getProtocol(), CH_SIDURY_PROTOCOL ) );
 
-	// Add the playerInfo Component
-	GetEntitySystem()->AddComponent( client.aEntity, "playerInfo" );
+			// We don't care if it fails
+			Net_WritePacked( gServerSocket, srAddr, message );
+			return;
+		}
 
-	// Send them the server info and new port
-	capnp::MallocMessageBuilder message;
-	SV_BuildServerInfo( message );
+		// Make an entity for them
+		Entity entity = GetEntitySystem()->CreateEntity();
+		auto   name   = clientInfoRead.getName();
 
-	NetMsgServerInfo::Builder serverInfo = message.getRoot< NetMsgServerInfo >();
+		if ( entity == CH_ENT_INVALID )
+		{
+			Log_ErrorF( gLC_Server, "Failed to start Connecting Client - Failed to create an entity for them: \"%s\"\n", name.cStr() );
+			return;
+		}
 
-	serverInfo.setPlayerEntityId( client.aEntity );
+		// Add them to the client list for the playerInfo component
+		SV_Client_t* client = SV_AllocateClient();
 
-	// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
-	int write = Net_WritePacked( gServerSocket, srAddr, message );
+		if ( !client )
+		{
+			Log_ErrorF( gLC_Server, "Failed to Connect Client - At Max Players Limit: \"%s\"\n", name.cStr() );
+			GetEntitySystem()->DeleteEntity( entity );
+			return;
+		}
 
-	gServerData.aClientsConnecting.push_back( &client );
+		client->aName   = name;
+		client->aAddr   = srAddr;
+		client->aState  = ESV_ClientState_Connecting;
+		client->aEntity = entity;
+
+		Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", name.cStr() );
+
+		// Add the playerInfo Component
+		void* playerInfo = GetEntitySystem()->AddComponent( entity, "playerInfo" );
+
+		if ( playerInfo == nullptr )
+		{
+			Log_MsgF( gLC_Server, "Failed to Connect Client - Failed to create a playerInfo component: \"%s\"\n", name.cStr() );
+			GetEntitySystem()->DeleteEntity( entity );
+			client->aState = ESV_ClientState_Disconnected;
+			return;
+		}
+
+		// Send them the server info and new port
+		capnp::MallocMessageBuilder message;
+		SV_BuildServerInfo( message );
+
+		NetMsgServerInfo::Builder serverInfo = message.getRoot< NetMsgServerInfo >();
+
+		serverInfo.setClientEntityId( entity );
+
+		// send them this information on the listen socket, and with the port, the client and switch to that one for their connection
+		int write = Net_WritePacked( gServerSocket, srAddr, message );
+
+		if ( write > 0 )
+		{
+			gServerData.aClientsConnecting.push_back( client );
+		}
+		else
+		{
+			// drop (kick) them if we failed to write a message to them
+			client->aState = ESV_ClientState_Disconnected;
+			Log_ErrorF( gLC_Server, "Failed to Connect Client - Failed to send server info to them: \"%s\"\n", name.cStr() );
+		}
+	}
+	catch ( kj::Exception )
+	{
+		// amazing
+		Log_ErrorF( gLC_Server, "Failed to Connect Client - Caught Exception While Parsing Message: \"%s\"\n", Net_AddrToString( srAddr ) );
+	}
 }
 
 
 // --------------------------------------------------------------------
 // Helper Functions
+
+
+SV_Client_t* SV_GetClient( ClientHandle_t sClient )
+{
+	auto it = gServerData.aClientIDs.find( sClient );
+	if ( it == gServerData.aClientIDs.end() )
+		return nullptr;
+	
+	return it->second;
+}
 
 
 void SV_SetCommandClient( SV_Client_t* spClient )
@@ -725,5 +884,26 @@ Entity SV_GetPlayerEntFromIndex( size_t sIndex )
 		return CH_ENT_INVALID;
 
 	return gServerData.aClients[ sIndex ].aEntity;
+}
+
+
+Entity SV_GetPlayerEnt( ClientHandle_t sClient )
+{
+	if ( gServerData.aClientIDs.empty() )
+		return CH_ENT_INVALID;
+	
+	auto it = gServerData.aClientIDs.find( sClient );
+	if ( it == gServerData.aClientIDs.end() )
+		return CH_ENT_INVALID;
+	
+	return it->second->aEntity;
+}
+
+
+void SV_PrintStatus()
+{
+	Log_MsgF( "Hosting on Port %s\n", gServerPort );
+	Log_MsgF( "Map: %s\n", MapManager_GetMapPath().data() );
+	Log_MsgF( "%zd Players Currently on Server\n", gServerData.aClients.size() );
 }
 

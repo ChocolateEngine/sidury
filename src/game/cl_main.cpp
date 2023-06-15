@@ -33,9 +33,9 @@
 LOG_REGISTER_CHANNEL2( Client, LogColor::White );
 
 static Socket_t                   gClientSocket = CH_INVALID_SOCKET;
-static ch_sockaddr                gClientAddr;
+ch_sockaddr                       gClientAddr;
 
-static EClientState               gClientState = EClientState_Idle;
+EClientState                      gClientState = EClientState_Idle;
 CL_ServerData_t                   gClientServerData;
 
 // How much time we have until we give up connecting if the server doesn't respond anymore
@@ -174,14 +174,14 @@ void CL_Update( float frameTime )
 				if ( !MapManager_FindMap( gClientServerData.aMapName ) )
 				{
 					// Maybe one day we can download the map from the server
-					CL_Disconnect( "Missing Map" );
+					CL_Disconnect( true, "Missing Map" );
 					break;
 				}
 
 				// Load Map (MAKE THIS ASYNC)
 				if ( !MapManager_LoadMap( gClientServerData.aMapName ) )
 				{
-					CL_Disconnect( "Failed to Load Map" );
+					CL_Disconnect( true, "Failed to Load Map" );
 					break;
 				}
 			}
@@ -196,8 +196,6 @@ void CL_Update( float frameTime )
 			// Process Stuff from server
 			CL_GetServerMessages();
 
-			// CL_ExecServerCommands();
-
 			CL_UpdateUserCmd();
 
 			CL_GameUpdate( frameTime );
@@ -207,6 +205,8 @@ void CL_Update( float frameTime )
 
 			// Send UserCmd
 			CL_SendUserCmd();
+
+			GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
 
 			// Update Entity and Component States after everything is processed
 			GetEntitySystem()->UpdateStates();
@@ -329,6 +329,7 @@ void CL_Connect( const char* spAddress )
 	capnp::MallocMessageBuilder message;
 	NetMsgClientInfo::Builder   clientInfoBuild = message.initRoot< NetMsgClientInfo >();
 
+	clientInfoBuild.setProtocol( CH_SIDURY_PROTOCOL );
 	clientInfoBuild.setName( cl_username.GetValue().data() );
 
 	gClientSocket     = Net_OpenSocket( "0" );
@@ -341,11 +342,18 @@ void CL_Connect( const char* spAddress )
 	if ( connectRet != 0 )
 		return;
 
-	int write             = Net_WritePacked( gClientSocket, gClientAddr, message );
+	int write = Net_WritePacked( gClientSocket, gClientAddr, message );
 
-	// Continue connecting in CL_Update()
-	gClientState          = EClientState_RecvServerInfo;
-	gClientConnectTimeout = Game_GetCurTime() + cl_connect_timeout_duration;
+	if ( write > 0 )
+	{
+		// Continue connecting in CL_Update()
+		gClientState          = EClientState_RecvServerInfo;
+		gClientConnectTimeout = Game_GetCurTime() + cl_connect_timeout_duration;
+	}
+	else
+	{
+		CL_Disconnect();
+	}
 }
 
 
@@ -385,6 +393,8 @@ bool CL_RecvServerInfo()
 	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
 
 	CL_HandleMsg_ServerInfo( serverInfoMsg );
+	gLocalPlayer   = serverInfoMsg.getClientEntityId();
+	gClientState   = EClientState_Connecting;
 
 	// Reset the connection timer
 	gClientTimeout = cl_timeout_duration;
@@ -460,7 +470,8 @@ void CL_UpdateUserCmd()
 	gClientUserCmd.aButtons    = 0;
 	gClientUserCmd.aFlashlight = false;
 
-	gClientUserCmd.aAng     = camera->aTransform.Get().aAng;
+	if ( camera )
+		gClientUserCmd.aAng = camera->aTransform.Get().aAng;
 
 	// Don't update buttons if the menu is shown
 	if ( CL_IsMenuShown() )
@@ -527,11 +538,10 @@ void CL_SendMessageToServer( EMsgSrcClient sSrcType )
 
 void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
 {
-	gClientServerData.aName    = srReader.getName();
-	gClientServerData.aMapName = srReader.getMapName();
-	gClientState               = EClientState_Connecting;
-
-	gLocalPlayer               = srReader.getPlayerEntityId();
+	gClientServerData.aName        = srReader.getName();
+	gClientServerData.aMapName     = srReader.getMapName();
+	gClientServerData.aClientCount = srReader.getClientCount();
+	gClientServerData.aMaxClients  = srReader.getMaxClients();
 }
 
 
@@ -548,18 +558,7 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 		Entity entId  = entityUpdate.getId();
 		Entity entity = CH_ENT_INVALID;
 
-		/*if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::CREATED )
-		{
-			entity = GetEntitySystem()->CreateEntityFromServer( entId );
-
-			if ( entity == CH_ENT_INVALID )
-			{
-				Log_Warn( gLC_Client, "Failed to create client entity from server\n" );
-				continue;
-			}
-		}
-		else*/
-		if ( entityUpdate.getState() == NetMsgEntityUpdate::EState::DESTROYED )
+		if ( entityUpdate.getDestroyed() )
 		{
 			GetEntitySystem()->DeleteEntity( entId );
 			continue;
@@ -613,7 +612,6 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 			// Get the Entity and Make sure it exists
 			Entity entId         = componentRead.getId();
 			Entity entity        = CH_ENT_INVALID;
-			void*  componentData = nullptr;
 
 			if ( !GetEntitySystem()->EntityExists( entId ) )
 			{
@@ -624,35 +622,18 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 			entity = entId;
 
 			// Check the component state, do we need to remove it, or add it to the entity?
-			if ( componentRead.getState() == NetMsgComponentUpdate::EState::DESTROYED )
+			if ( componentRead.getDestroyed() )
 			{
 				// We can just remove the component right now, no need to queue it,
 				// as this is before all client game processing
 				pool->Remove( entity );
 				continue;
 			}
-			// This is useless, we will only get this state if we are in the server when a component/entity is created
-			// So a bunch of pre-existing entities will miss this
-			// else if ( componentRead.getState() == NetMsgComponentUpdate::EState::CREATED )
-			// {
-			// 	// Create the component
-			// 	componentData = GetEntitySystem()->AddComponent( entity, componentName );
-			// 
-			// 	if ( componentData == nullptr )
-			// 	{
-			// 		Log_ErrorF( "Failed to create component\n" );
-			// 		continue;
-			// 	}
-			// }
-			// else
-			{
-				componentData = GetEntitySystem()->GetComponent( entity, componentName );
-			}
+
+			void* componentData = GetEntitySystem()->GetComponent( entity, componentName );
 
 			if ( !componentData )
 			{
-				// Log_WarnF( gLC_Client, "Didn't get component created message, creating now: \"%s\"\n", componentName );
-
 				// Create the component
 				componentData = GetEntitySystem()->AddComponent( entity, componentName );
 
@@ -723,20 +704,22 @@ void CL_GetServerMessages()
 		gClientTimeout = cl_timeout_duration;
 
 		// Read the message sent from the client
-		NetBufferedInputStream        inputStream( (char*)data.begin(), data.size() );
-		capnp::PackedMessageReader    reader( inputStream );
+		NetBufferedInputStream     inputStream( (char*)data.begin(), data.size() );
+		capnp::PackedMessageReader reader( inputStream );
 
-		auto                          serverMsg = reader.getRoot< MsgSrcServer >();
-
-		auto                          msgType   = serverMsg.getType();
-		auto                          msgData   = serverMsg.getData();
+		auto                       serverMsg = reader.getRoot< MsgSrcServer >();
+		auto                       msgType   = serverMsg.getType();
 
 		Assert( msgType < EMsgSrcServer::COUNT );
 		Assert( msgType >= EMsgSrcServer::DISCONNECT );
 
-		NetBufferedInputStream     inputStreamMsg( (char*)msgData.begin(), msgData.size() );
-		capnp::PackedMessageReader dataReader( inputStreamMsg );
+		if ( msgType >= EMsgSrcServer::COUNT )
+		{
+			Log_WarnF( gLC_Client, "Unknown Message Type from Server: %zd\n", msgType );
+			continue;
+		}
 
+		// Check Messages without message data first
 		switch ( msgType )
 		{
 			// Client is Disconnecting
@@ -746,6 +729,26 @@ void CL_GetServerMessages()
 				return;
 			}
 
+			default:
+				break;
+		}
+
+		// Now check messages with message data
+		auto                       msgData = serverMsg.getData();
+
+		Assert( msgData.size() );
+
+		if ( !msgData.size() )
+		{
+			Log_WarnF( gLC_Client, "Received Server Message Without Data: %s\n", SV_MsgToString( msgType ) );
+			continue;
+		}
+
+		NetBufferedInputStream     inputStreamMsg( (char*)msgData.begin(), msgData.size() );
+		capnp::PackedMessageReader dataReader( inputStreamMsg );
+
+		switch ( msgType )
+		{
 			case EMsgSrcServer::SERVER_INFO:
 			{
 				auto msgServerInfo = dataReader.getRoot< NetMsgServerInfo >();
@@ -775,10 +778,33 @@ void CL_GetServerMessages()
 			}
 
 			default:
-				// TODO: have a message type to string function
-				Log_WarnF( gLC_Client, "Unknown Message Type from Server: %s\n", msgType );
+				Log_WarnF( gLC_Client, "Unknown Message Type from Server: %s\n", SV_MsgToString( msgType ) );
 				break;
 		}
 	}
+}
+
+
+void CL_PrintStatus()
+{
+	if ( gClientState == EClientState_Connected )
+	{
+		size_t playerCount = GetPlayers()->aEntities.size();
+
+		Log_MsgF( "Connected To %s\n", Net_AddrToString( gClientAddr ) );
+
+		Log_MsgF( "Map: %s\n", MapManager_GetMapPath().data() );
+		Log_MsgF( "%zd Players Currently on Server\n", playerCount );
+	}
+	else
+	{
+		Log_Msg( "Not Connected to or is Hosting any Server\n" );
+	}
+}
+
+
+CONCMD( status_cl )
+{
+	CL_PrintStatus();
 }
 

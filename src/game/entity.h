@@ -1113,8 +1113,8 @@ struct CLight
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
   EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
 
-#define CH_REGISTER_COMPONENT_RW_EX( type, read, write ) \
-  EntComp_RegisterComponentReadWrite< type >( read, write )
+// #define CH_REGISTER_COMPONENT_RW_EX( type, read, write ) \
+//   EntComp_RegisterComponentReadWrite< type >( read, write )
 
 #define CH_COMPONENT_READ_DEF( type ) \
   static void __EntCompFunc_Read_##type( capnp::MessageReader& srReader, void* spData )

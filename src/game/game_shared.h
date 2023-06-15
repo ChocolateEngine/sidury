@@ -9,7 +9,6 @@ struct CCamera;
 struct CPlayerMoveData;
 enum class PlayerMoveType;
 
-constexpr int CH_SERVER_PROTOCOL_VER = 1;
 
 EXT_CVAR_FLAG( CVARF_CL_EXEC );
 EXT_CVAR_FLAG( CVARF_SV_EXEC );
@@ -33,6 +32,15 @@ struct UserCmd_t
 	PlayerMoveType aMoveType;
 	bool           aFlashlight;  // Temp, toggles the flashlight on/off
 };
+
+
+// Utility Functions
+
+// Convert a Client Source Message to String
+const char*           CL_MsgToString( EMsgSrcClient sMsg );
+
+// Convert a Server Source Message to String
+const char*           SV_MsgToString( EMsgSrcServer sMsg );
 
 
 // Are we hosting the server from our client?
