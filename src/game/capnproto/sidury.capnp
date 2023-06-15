@@ -52,10 +52,11 @@ struct NetMsgServerInfo
     mapName        @3 :Text;
     mapHash        @4 :Text;
 
-    # This should probably be a separate message
+    # This should be a separate message
     clientEntityId @5 :UInt32;
 }
 
+# TODO: Make a NetMsgClientConnect, and morph this into client information that each client will recieve
 struct NetMsgClientInfo
 {
     protocol @0 :UInt16;
@@ -240,16 +241,34 @@ struct NetCompLight
 # only some stuff in here is actually networked
 struct NetCompPlayerMoveData
 {
-    moveType        @0 :EPlayerMoveType;
-    playerFlags     @1 :UInt8;
-    prevPlayerFlags @2 :UInt8;
-    maxSpeed        @3 :Float32;
+    moveType         @0 :EPlayerMoveType;
+    playerFlags      @1 :UInt8;
+    prevPlayerFlags  @2 :UInt8;
+    maxSpeed         @3 :Float32;
+
+    # View Bobbing
+    walkTime         @4 :Float32;
+    bobOffsetAmount  @5 :Float32;
+    prevViewTilt     @6 :Float32;
+
+    # Smooth Land
+    landPower        @7 :Float32;
+    landTime         @8 :Float32;
 
     # Smooth Duck
-    prevViewHeight   @4 :Float32;
-    targetViewHeight @5 :Float32;
-    outViewHeight    @6 :Float32;
-    duckDuration     @7 :Float32;
-    duckTime         @8 :Float32;
+    prevViewHeight   @9 :Float32;
+    targetViewHeight @10 :Float32;
+    outViewHeight    @11 :Float32;
+    duckDuration     @12 :Float32;
+    duckTime         @13 :Float32;
+
+    # lastStepTime      @14 :Float32;
+}
+
+
+struct NetCompPlayerZoom
+{
+    origFov @0 :Float32;
+    newFov  @1 :Float32;
 }
 

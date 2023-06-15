@@ -70,6 +70,7 @@ CAPNP_DECLARE_SCHEMA(a1a4c4fabcd5b477);
 CAPNP_DECLARE_SCHEMA(bb66ad8408c8ace8);
 CAPNP_DECLARE_SCHEMA(f360e1373ce69ffa);
 CAPNP_DECLARE_SCHEMA(adc97680de0560d0);
+CAPNP_DECLARE_SCHEMA(f7fd113c448a226f);
 
 }  // namespace schemas
 }  // namespace capnp
@@ -451,7 +452,22 @@ struct NetCompPlayerMoveData {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(adc97680de0560d0, 4, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(adc97680de0560d0, 6, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetCompPlayerZoom {
+  NetCompPlayerZoom() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(f7fd113c448a226f, 1, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -2671,6 +2687,16 @@ public:
 
   inline float getMaxSpeed() const;
 
+  inline float getWalkTime() const;
+
+  inline float getBobOffsetAmount() const;
+
+  inline float getPrevViewTilt() const;
+
+  inline float getLandPower() const;
+
+  inline float getLandTime() const;
+
   inline float getPrevViewHeight() const;
 
   inline float getTargetViewHeight() const;
@@ -2721,6 +2747,21 @@ public:
   inline float getMaxSpeed();
   inline void setMaxSpeed(float value);
 
+  inline float getWalkTime();
+  inline void setWalkTime(float value);
+
+  inline float getBobOffsetAmount();
+  inline void setBobOffsetAmount(float value);
+
+  inline float getPrevViewTilt();
+  inline void setPrevViewTilt(float value);
+
+  inline float getLandPower();
+  inline void setLandPower(float value);
+
+  inline float getLandTime();
+  inline void setLandTime(float value);
+
   inline float getPrevViewHeight();
   inline void setPrevViewHeight(float value);
 
@@ -2749,6 +2790,87 @@ private:
 class NetCompPlayerMoveData::Pipeline {
 public:
   typedef NetCompPlayerMoveData Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetCompPlayerZoom::Reader {
+public:
+  typedef NetCompPlayerZoom Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline float getOrigFov() const;
+
+  inline float getNewFov() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetCompPlayerZoom::Builder {
+public:
+  typedef NetCompPlayerZoom Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline float getOrigFov();
+  inline void setOrigFov(float value);
+
+  inline float getNewFov();
+  inline void setNewFov(float value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetCompPlayerZoom::Pipeline {
+public:
+  typedef NetCompPlayerZoom Pipelines;
 
   inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
   inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
@@ -4393,74 +4515,172 @@ inline void NetCompPlayerMoveData::Builder::setMaxSpeed(float value) {
       ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
-inline float NetCompPlayerMoveData::Reader::getPrevViewHeight() const {
+inline float NetCompPlayerMoveData::Reader::getWalkTime() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
 
-inline float NetCompPlayerMoveData::Builder::getPrevViewHeight() {
+inline float NetCompPlayerMoveData::Builder::getWalkTime() {
   return _builder.getDataField<float>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setPrevViewHeight(float value) {
+inline void NetCompPlayerMoveData::Builder::setWalkTime(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
 }
 
-inline float NetCompPlayerMoveData::Reader::getTargetViewHeight() const {
+inline float NetCompPlayerMoveData::Reader::getBobOffsetAmount() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<3>() * ::capnp::ELEMENTS);
 }
 
-inline float NetCompPlayerMoveData::Builder::getTargetViewHeight() {
+inline float NetCompPlayerMoveData::Builder::getBobOffsetAmount() {
   return _builder.getDataField<float>(
       ::capnp::bounded<3>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setTargetViewHeight(float value) {
+inline void NetCompPlayerMoveData::Builder::setBobOffsetAmount(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
 }
 
-inline float NetCompPlayerMoveData::Reader::getOutViewHeight() const {
+inline float NetCompPlayerMoveData::Reader::getPrevViewTilt() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<4>() * ::capnp::ELEMENTS);
 }
 
-inline float NetCompPlayerMoveData::Builder::getOutViewHeight() {
+inline float NetCompPlayerMoveData::Builder::getPrevViewTilt() {
   return _builder.getDataField<float>(
       ::capnp::bounded<4>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setOutViewHeight(float value) {
+inline void NetCompPlayerMoveData::Builder::setPrevViewTilt(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
 }
 
-inline float NetCompPlayerMoveData::Reader::getDuckDuration() const {
+inline float NetCompPlayerMoveData::Reader::getLandPower() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<5>() * ::capnp::ELEMENTS);
 }
 
-inline float NetCompPlayerMoveData::Builder::getDuckDuration() {
+inline float NetCompPlayerMoveData::Builder::getLandPower() {
   return _builder.getDataField<float>(
       ::capnp::bounded<5>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setDuckDuration(float value) {
+inline void NetCompPlayerMoveData::Builder::setLandPower(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
 }
 
-inline float NetCompPlayerMoveData::Reader::getDuckTime() const {
+inline float NetCompPlayerMoveData::Reader::getLandTime() const {
   return _reader.getDataField<float>(
       ::capnp::bounded<6>() * ::capnp::ELEMENTS);
 }
 
-inline float NetCompPlayerMoveData::Builder::getDuckTime() {
+inline float NetCompPlayerMoveData::Builder::getLandTime() {
   return _builder.getDataField<float>(
       ::capnp::bounded<6>() * ::capnp::ELEMENTS);
 }
-inline void NetCompPlayerMoveData::Builder::setDuckTime(float value) {
+inline void NetCompPlayerMoveData::Builder::setLandTime(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<6>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerMoveData::Reader::getPrevViewHeight() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerMoveData::Builder::getPrevViewHeight() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setPrevViewHeight(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerMoveData::Reader::getTargetViewHeight() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerMoveData::Builder::getTargetViewHeight() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setTargetViewHeight(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerMoveData::Reader::getOutViewHeight() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerMoveData::Builder::getOutViewHeight() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setOutViewHeight(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerMoveData::Reader::getDuckDuration() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerMoveData::Builder::getDuckDuration() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setDuckDuration(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerMoveData::Reader::getDuckTime() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<11>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerMoveData::Builder::getDuckTime() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<11>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerMoveData::Builder::setDuckTime(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<11>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerZoom::Reader::getOrigFov() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerZoom::Builder::getOrigFov() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerZoom::Builder::setOrigFov(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline float NetCompPlayerZoom::Reader::getNewFov() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline float NetCompPlayerZoom::Builder::getNewFov() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void NetCompPlayerZoom::Builder::setNewFov(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 

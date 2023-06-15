@@ -61,9 +61,9 @@ CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
-CONVAR( cl_view_height, 67 );  // 67
-CONVAR( cl_view_height_duck, 36 );  // 36
-CONVAR( cl_view_height_lerp, 15 );  // 0.015
+CONVAR( sv_view_height, 67 );  // 67
+CONVAR( sv_view_height_duck, 36 );  // 36
+CONVAR( sv_view_height_lerp, 15 );  // 0.015
 
 CONVAR( player_model_scale, 40 );
 
@@ -88,12 +88,11 @@ CONVAR( cl_zoom_duration, 0.4 );
 
 CONVAR( cl_duck_time, 0.4 );
 
-CONVAR( cl_land_smoothing, 1 );
-CONVAR( cl_land_max_speed, 1000 );
-CONVAR( cl_land_power, 1 );          // 2
-CONVAR( cl_land_vel_scale, 1 );      // 0.01
-CONVAR( cl_land_power_scale, 100 );  // 0.01
-CONVAR( cl_land_timevar, 2 );
+CONVAR( sv_land_smoothing, 1 );
+CONVAR( sv_land_max_speed, 1000 );
+CONVAR( sv_land_vel_scale, 1 );      // 0.01
+CONVAR( sv_land_power_scale, 100 );  // 0.01
+CONVAR( sv_land_time_scale, 2 );
 
 CONVAR( cl_bob_enabled, 1 );
 CONVAR( cl_bob_magnitude, 2 );
@@ -232,17 +231,28 @@ CH_COMPONENT_READ_DEF( CPlayerMoveData )
 		default:
 		case EPlayerMoveType::WALK:
 			spMoveData->aMoveType = PlayerMoveType::Walk;
+			break;
 
 		case EPlayerMoveType::NO_CLIP:
 			spMoveData->aMoveType = PlayerMoveType::NoClip;
+			break;
 
 		case EPlayerMoveType::FLY:
 			spMoveData->aMoveType = PlayerMoveType::Fly;
+			break;
 	}
 
 	spMoveData->aPlayerFlags      = message.getPlayerFlags();
 	spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
 	spMoveData->aMaxSpeed         = message.getMaxSpeed();
+
+	// View Bobbing
+	//spMoveData->aWalkTime         = message.getWalkTime();
+	//spMoveData->aBobOffsetAmount  = message.getBobOffsetAmount();
+	//spMoveData->aPrevViewTilt     = message.getPrevViewTilt();
+
+	spMoveData->aLandPower        = message.getLandPower();
+	spMoveData->aLandTime         = message.getLandTime();
 
 	// Smooth Duck
 	spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
@@ -256,12 +266,19 @@ CH_COMPONENT_READ_DEF( CPlayerMoveData )
 CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 {
 	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
+	bool  isDirty    = sFullUpdate;
 
-	bool  isDirty    = false;
 	isDirty |= spMoveData->aMoveType.aIsDirty;
 	isDirty |= spMoveData->aPlayerFlags.aIsDirty;
 	isDirty |= spMoveData->aPrevPlayerFlags.aIsDirty;
 	isDirty |= spMoveData->aMaxSpeed.aIsDirty;
+
+	// isDirty |= spMoveData->aWalkTime.aIsDirty;
+	// isDirty |= spMoveData->aBobOffsetAmount.aIsDirty;
+	// isDirty |= spMoveData->aPrevViewTilt.aIsDirty;
+
+	isDirty |= spMoveData->aLandPower.aIsDirty;
+	isDirty |= spMoveData->aLandTime.aIsDirty;
 
 	isDirty |= spMoveData->aPrevViewHeight.aIsDirty;
 	isDirty |= spMoveData->aTargetViewHeight.aIsDirty;
@@ -279,17 +296,27 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 		default:
 		case PlayerMoveType::Walk:
 			builder.setMoveType( EPlayerMoveType::WALK );
+			break;
 
 		case PlayerMoveType::NoClip:
 			builder.setMoveType( EPlayerMoveType::NO_CLIP );
+			break;
 
 		case PlayerMoveType::Fly:
 			builder.setMoveType( EPlayerMoveType::FLY );
+			break;
 	}
 
 	builder.setPlayerFlags( spMoveData->aPlayerFlags );
 	builder.setPrevPlayerFlags( spMoveData->aPrevPlayerFlags );
 	builder.setMaxSpeed( spMoveData->aMaxSpeed );
+
+	//builder.setWalkTime( spMoveData->aWalkTime );
+	//builder.setBobOffsetAmount( spMoveData->aBobOffsetAmount );
+	//builder.setPrevViewTilt( spMoveData->aPrevViewTilt );
+
+	builder.setLandPower( spMoveData->aLandPower );
+	builder.setLandTime( spMoveData->aLandTime );
 
 	// Smooth Duck
 	builder.setPrevViewHeight( spMoveData->aPrevViewHeight );
@@ -297,6 +324,35 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 	builder.setOutViewHeight( spMoveData->aOutViewHeight );
 	builder.setDuckDuration( spMoveData->aDuckDuration );
 	builder.setDuckTime( spMoveData->aDuckTime );
+
+	return true;
+}
+
+
+CH_COMPONENT_READ_DEF( CPlayerZoom )
+{
+	auto* spZoom    = static_cast< CPlayerZoom* >( spData );
+	auto  message   = srReader.getRoot< NetCompPlayerZoom >();
+
+	spZoom->aOrigFov = message.getOrigFov();
+	spZoom->aNewFov = message.getNewFov();
+}
+
+
+CH_COMPONENT_WRITE_DEF( CPlayerZoom )
+{
+	auto* spZoom  = static_cast< const CPlayerZoom* >( spData );
+	bool  isDirty = sFullUpdate;
+
+	isDirty |= spZoom->aNewFov.aIsDirty;
+
+	if ( !isDirty )
+		return false;
+
+	auto builder = srMessage.initRoot< NetCompPlayerZoom >();
+
+	builder.setOrigFov( spZoom->aOrigFov );
+	builder.setNewFov( spZoom->aNewFov );
 
 	return true;
 }
@@ -322,6 +378,7 @@ PlayerManager* GetPlayers()
 
 PlayerManager::PlayerManager()
 {
+	apMove = new PlayerMovement;
 }
 
 PlayerManager::~PlayerManager()
@@ -341,18 +398,31 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
 
+	// View Bobbing
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aWalkTime, walkTime );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aBobOffsetAmount, bobOffsetAmount );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewTilt, prevViewTilt );
+
+	// Smooth Land
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLandPower, landPower );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLandTime, landTime );
+
+	// Smooth Duck
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewHeight, prevViewHeight );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aTargetViewHeight, targetViewHeight );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aOutViewHeight, outViewHeight );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckDuration, duckDuration );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckTime, duckTime );
 
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLastStepTime, lastStepTime );
+
+
 	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
-	CH_REGISTER_COMPONENT( CPlayerZoom, playerZoom, false, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, true );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
@@ -427,7 +497,6 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 void PlayerManager::Init()
 {
 	// apMove = GetEntitySystem()->RegisterSystem<PlayerMovement>();
-	apMove = new PlayerMovement;
 }
 
 
@@ -686,6 +755,7 @@ void PlayerManager::Update( float frameTime )
 void PlayerManager::UpdateLocalPlayer()
 {
 	Assert( Game_ProcessingClient() );
+	Assert( apMove );
 
 	if ( !Game_IsPaused() )
 	{
@@ -717,13 +787,26 @@ void PlayerManager::UpdateLocalPlayer()
 		Assert( transform );
 		Assert( flashlight );
 
+		apMove->SetPlayer( player );
+
+		// TODO: prediction
 		// apMove->MovePlayer( gLocalPlayer, &userCmd );
 	
 		// Player_UpdateFlashlight( player, &userCmd );
 	
 		// TEMP
 		camera->aTransform.Edit().aPos.Edit()[ W_UP ] = playerMove->aOutViewHeight;
-	
+
+		// bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround && !( playerMove->aPlayerFlags & PlyOnGround );
+		bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround;
+
+		if ( playerMove->aMoveType == PlayerMoveType::Walk )
+		{
+			apMove->DoSmoothLand( wasOnGround );
+			apMove->DoViewBob();
+			apMove->DoViewTilt();
+		}
+
 		UpdateView( playerInfo, player );
 
 		// if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
@@ -860,80 +943,97 @@ float Math_EaseOutQuart( float x )
 
 void CalcZoom( CCamera* camera, Entity player )
 {
+	UserCmd_t* userCmd = nullptr;
+
+	if ( Game_ProcessingClient() )
+	{
+		if ( player == gLocalPlayer )
+			userCmd = &gClientUserCmd;
+	}
+	else
+	{
+		SV_Client_t* client = SV_GetClientFromEntity( player );
+
+		if ( !client )
+			return;
+
+		userCmd = &client->aUserCmd;
+
+		Assert( userCmd );
+	}
+
 	CPlayerZoom* zoom = GetPlayerZoom( player );
 
 	Assert( zoom );
 
-#if 0
-	if ( zoom->aOrigFov != r_fov )
+	// If we have a usercmd to process on either client or server, process it
+	if ( userCmd )
 	{
-		zoom->aZoomTime = 0.f;  // idk lol
-		zoom->aOrigFov = r_fov;
-	}
-
-	if ( Game_IsPaused() )
-	{
-		camera->aFov = zoom->aNewFov;
-		return;
-	}
-
-	float lerpTarget = 0.f;
-
-	// HACK HACK
-	static bool wasZoomedIn = false;
-
-	if ( in_zoom->GetBool() )
-	{
-		if ( !wasZoomedIn )
+		if ( zoom->aOrigFov != r_fov.GetFloat() )
 		{
-			zoom->aZoomChangeFov = camera->aFov;
-
-			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom->aZoomDuration  = Lerp_GetDurationIn( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
-			zoom->aZoomTime      = 0.f;
-			wasZoomedIn         = true;
+			zoom->aZoomTime = 0.f;  // idk lol
+			zoom->aOrigFov  = r_fov.GetFloat();
 		}
 
-		lerpTarget = cl_zoom_fov;
-	}
-	else
-	{
-		if ( wasZoomedIn )
+		if ( Game_IsPaused() )
 		{
-			zoom->aZoomChangeFov = camera->aFov;
-
-			// scale duration by how far zoomed in we are compared to the target zoom level
-			zoom->aZoomDuration  = Lerp_GetDuration( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
-			zoom->aZoomTime      = 0.f;
-			wasZoomedIn         = false;
+			camera->aFov = zoom->aNewFov;
+			return;
 		}
 
-		lerpTarget = zoom->aOrigFov;
+		float lerpTarget = 0.f;
+
+		if ( userCmd && userCmd->aButtons & EBtnInput_Zoom )
+		{
+			if ( !zoom->aWasZoomed )
+			{
+				zoom->aZoomChangeFov = camera->aFov;
+
+				// scale duration by how far zoomed in we are compared to the target zoom level
+				zoom->aZoomDuration  = Lerp_GetDurationIn( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
+				zoom->aZoomTime      = 0.f;
+				zoom->aWasZoomed     = true;
+			}
+
+			lerpTarget = cl_zoom_fov;
+		}
+		else
+		{
+			if ( zoom->aWasZoomed )
+			{
+				zoom->aZoomChangeFov = camera->aFov;
+
+				// scale duration by how far zoomed in we are compared to the target zoom level
+				zoom->aZoomDuration  = Lerp_GetDuration( cl_zoom_fov, zoom->aOrigFov, camera->aFov, cl_zoom_duration );
+				zoom->aZoomTime      = 0.f;
+				zoom->aWasZoomed     = false;
+			}
+
+			lerpTarget = zoom->aOrigFov;
+		}
+
+		zoom->aZoomTime += gFrameTime;
+
+		if ( zoom->aZoomDuration >= zoom->aZoomTime )
+		{
+			float time = (zoom->aZoomTime / zoom->aZoomDuration);
+
+			// smooth cosine lerp
+			// float timeCurve = (( cos((zoomLerp * M_PI) - M_PI) ) + 1) * 0.5;
+			float timeCurve = Math_EaseOutQuart( time );
+
+			zoom->aNewFov = std::lerp( zoom->aZoomChangeFov, lerpTarget, timeCurve );
+		}
 	}
 
-	zoom->aZoomTime += gFrameTime;
-
-	if ( zoom->aZoomDuration >= zoom->aZoomTime )
+	if ( Game_ProcessingClient() && player == gLocalPlayer )
 	{
-		float time = (zoom->aZoomTime / zoom->aZoomDuration);
-
-		// smooth cosine lerp
-		// float timeCurve = (( cos((zoomLerp * M_PI) - M_PI) ) + 1) * 0.5;
-		float timeCurve = Math_EaseOutQuart( time );
-
-		zoom->aNewFov = std::lerp( zoom->aZoomChangeFov, lerpTarget, timeCurve );
+		// scale mouse delta
+		float fovScale = (zoom->aNewFov / zoom->aOrigFov);
+		Input_SetMouseDeltaScale( { fovScale, fovScale } );
 	}
-
-	// scale mouse delta
-	float fovScale = (zoom->aNewFov / zoom->aOrigFov);
-	Input_SetMouseDeltaScale( {fovScale, fovScale} );
 
 	camera->aFov = zoom->aNewFov;
-#else
-	// disable zooming until networking is working
-	camera->aFov  = r_fov.GetFloat();
-	zoom->aNewFov = r_fov.GetFloat();
-#endif
 }
 
 
@@ -1033,13 +1133,42 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 void PlayerMovement::EnsureUserCmd( Entity player )
 {
-	apUserCmd           = nullptr;
-	SV_Client_t* client = SV_GetClientFromEntity( player );
+	if ( Game_ProcessingClient() )
+	{
+		apUserCmd = &gClientUserCmd;
+	}
+	else
+	{
+		apUserCmd           = nullptr;
+		SV_Client_t* client = SV_GetClientFromEntity( player );
 
-	if ( !client )
-		return;
+		if ( !client )
+			return;
 
-	apUserCmd = &client->aUserCmd;
+		apUserCmd = &client->aUserCmd;
+	}
+
+	Assert( apUserCmd );
+}
+
+
+void PlayerMovement::SetPlayer( Entity player )
+{
+	aPlayer     = player;
+
+	apMove      = GetPlayerMoveData( player );
+	apRigidBody = GetRigidBody( player );
+	apTransform = GetTransform( player );
+	apCamera    = GetCamera( player );
+	apDir       = Ent_GetComponent< CDirection >( player, "direction" );
+	apPhysObj   = GetComp_PhysObjectPtr( player );
+
+	Assert( apMove );
+	Assert( apRigidBody );
+	Assert( apTransform );
+	Assert( apCamera );
+	Assert( apDir );
+	Assert( apPhysObj );
 }
 
 
@@ -1056,7 +1185,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	// SetMoveType( *move, PlayerMoveType::Walk );
 	SetMoveType( *move, PlayerMoveType::NoClip );
 
-	camera->aTransform.Edit().aPos.Edit() = { 0, 0, cl_view_height.GetFloat() };
+	camera->aTransform.Edit().aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
 }
 
 
@@ -1085,22 +1214,9 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 
 void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 {
-	aPlayer     = player;
+	SetPlayer( player );
+
 	apUserCmd   = spUserCmd;
-
-	apMove      = GetPlayerMoveData( player );
-	apRigidBody = GetRigidBody( player );
-	apTransform = GetTransform( player );
-	apCamera    = GetCamera( player );
-	apDir       = Ent_GetComponent< CDirection >( player, "direction" );
-	apPhysObj   = GetComp_PhysObjectPtr( player );
-
-	Assert( apMove );
-	Assert( apRigidBody );
-	Assert( apTransform );
-	Assert( apCamera );
-	Assert( apDir );
-	Assert( apPhysObj );
 
 	apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
 
@@ -1146,9 +1262,9 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 float PlayerMovement::GetViewHeight()
 {
 	if ( !apUserCmd )
-		return cl_view_height;
+		return sv_view_height;
 
-	return ( apUserCmd->aButtons & EBtnInput_Duck ) ? cl_view_height_duck : cl_view_height;
+	return ( apUserCmd->aButtons & EBtnInput_Duck ) ? sv_view_height_duck : sv_view_height;
 }
 
 
@@ -1395,10 +1511,10 @@ void PlayerMovement::DoSmoothDuck()
 				apMove->aTargetViewHeight = GetViewHeight();
 				apMove->aDuckTime = 0.f;
 
-				apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight );
+				apMove->aDuckDuration = Lerp_GetDuration( sv_view_height, sv_view_height_duck, apMove->aPrevViewHeight );
 
 				// this is stupid
-				if ( apMove->aTargetViewHeight == cl_view_height.GetFloat() )
+				if ( apMove->aTargetViewHeight == sv_view_height.GetFloat() )
 					apMove->aDuckDuration = 1 - apMove->aDuckDuration;
 
 				apMove->aDuckDuration *= cl_duck_time;
@@ -1407,7 +1523,7 @@ void PlayerMovement::DoSmoothDuck()
 		else if ( WasOnGround() )
 		{
 			apMove->aPrevViewHeight = apMove->aOutViewHeight;
-			apMove->aDuckDuration = Lerp_GetDuration( cl_view_height, cl_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
+			apMove->aDuckDuration = Lerp_GetDuration( sv_view_height, sv_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
 			apMove->aDuckTime = 0.f;
 		}
 
@@ -1426,12 +1542,18 @@ void PlayerMovement::DoSmoothDuck()
 }
 
 
-CONVAR( phys_player_max_slope_ang, 40 );
+// The maximum angle of slope that character can still walk on
+CONVAR( phys_player_max_slope_ang, 40, 0, "The maximum angle of slope that character can still walk on" );
 
 
 bool PlayerMovement::CalcOnGround()
 {
+	if ( apMove->aMoveType != PlayerMoveType::Walk )
+		return false;
+
 	// static float maxSlopeAngle = cos( apMove->aMaxSlopeAngle );
+	
+	// The maximum angle of slope that character can still walk on (radians and put in cos())
 	float maxSlopeAngle = cos( phys_player_max_slope_ang * (M_PI / 180.f) );
 
 	if ( apMove->apGroundObj == nullptr )
@@ -1733,9 +1855,10 @@ void PlayerMovement::WalkMove()
 		//	PlayStepSound();
 	}
 
+	// CalcOnGround();
 	DoSmoothLand( wasOnGround );
-	DoViewBob();
-	DoViewTilt();
+	// DoViewBob();
+	// DoViewTilt();
 
 	wasOnGround = IsOnGround();
 }
@@ -1756,34 +1879,39 @@ void PlayerMovement::WalkMovePostPhys()
 
 void PlayerMovement::DoSmoothLand( bool wasOnGround )
 {
-	static float landPower = 0.f, landTime = 0.f;
-
-    if ( cl_land_smoothing )
-    {
-        // NOTE: this doesn't work properly when jumping mid duck and landing
-        // meh, works well enough with the current values for now
-        if ( CalcOnGround() && !wasOnGround )
-        // if ( CalcOnGround() && !WasOnGround() )
+	if ( Game_ProcessingServer() )
+	{
+		if ( sv_land_smoothing )
 		{
-			float baseLandVel = abs( apRigidBody->aVel.Get()[ W_UP ] * cl_land_vel_scale.GetFloat() ) / cl_land_max_speed.GetFloat();
-			float landVel = std::clamp( baseLandVel * M_PI, 0.0, M_PI );
+			// NOTE: this doesn't work properly when jumping mid duck and landing
+			// meh, works well enough with the current values for now
+			if ( CalcOnGround() && !wasOnGround )
+			// if ( CalcOnGround() && !WasOnGround() )
+			{
+				float baseLandVel  = abs( apRigidBody->aVel.Get()[ W_UP ] * sv_land_vel_scale.GetFloat() ) / sv_land_max_speed.GetFloat();
+				float landVel      = std::clamp( baseLandVel * M_PI, 0.0, M_PI );
 
-			landPower = (-cos( landVel ) + 1) / 2;
+				apMove->aLandPower = ( -cos( landVel ) + 1 ) / 2;
 
-			landTime = 0.f;
-        }
+				apMove->aLandTime  = 0.f;
+			}
 
-		landTime += gFrameTime * cl_land_timevar;
+			apMove->aLandTime += gFrameTime * sv_land_time_scale;
+		}
+		else
+		{
+			apMove->aLandPower = 0.f;
+			apMove->aLandTime  = 0.f;
+		}
+	}
 
-		if ( landPower > 0.f )
+	if ( sv_land_smoothing && apMove->aMoveType == PlayerMoveType::Walk )
+	{
+		if ( apMove->aLandPower > 0.f )
 			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;
-			apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += ( -landPower * sin( landTime / landPower ) / exp( landTime / landPower ) ) * cl_land_power_scale;
-    }
-    else
-    {
-		landPower = 0.f;
-        landTime = 0.f;
-    }
+			apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += ( -apMove->aLandPower * sin( apMove->aLandTime / apMove->aLandPower ) / exp( apMove->aLandTime / apMove->aLandPower ) ) * sv_land_power_scale;
+
+	}
 }
 
 
@@ -1803,8 +1931,8 @@ void PlayerMovement::DoViewBob()
 	if ( !IsOnGround() /*|| aMove != prevMove || inExit*/ )
 	{
 		// lerp back to 0 to not snap view the offset (not good enough) and reset input
-		apMove->aWalkTime = 0.f;
-		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount, 0.f, cl_bob_exit_lerp.GetFloat() );
+		apMove->aWalkTime        = 0.f;
+		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount.Get(), 0.f, cl_bob_exit_lerp.GetFloat() );
 		apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 		//inExit = aBobOffsetAmount > 0.01;
 		//prevMove = aMove;
@@ -1853,8 +1981,8 @@ void PlayerMovement::DoViewBob()
 	
 	if ( cl_bob_debug )
 	{
-		gui->DebugMessage( "Walk Time * Speed:  %.8f", apMove->aWalkTime );
-		gui->DebugMessage( "View Bob Offset:    %.4f", apMove->aBobOffsetAmount );
+		gui->DebugMessage( "Walk Time * Speed:  %.8f", apMove->aWalkTime.Get() );
+		gui->DebugMessage( "View Bob Offset:    %.4f", apMove->aBobOffsetAmount.Get() );
 		gui->DebugMessage( "View Bob Speed:     %.6f", speedFactor );
 	}
 }
@@ -1877,8 +2005,6 @@ void PlayerMovement::DoViewTilt()
 	if ( cl_tilt == false )
 		return;
 
-	static float prevTilt = 0.f;
-
 	float        output   = glm::dot( apRigidBody->aVel.Get(), apDir->aRight.Get() );
 	float side = output < 0 ? -1 : 1;
 
@@ -1887,19 +2013,18 @@ void PlayerMovement::DoViewTilt()
 		float speedFactor = glm::max(0.f, glm::log( glm::max(0.f, (fabs(output) * cl_tilt_speed_scale + 1) - cl_tilt_threshold_new) ));
 
 		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
-		output = glm::mix( prevTilt, speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * gFrameTime );
+		output = glm::mix( apMove->aPrevViewTilt.Get(), speedFactor * side * cl_tilt_scale, cl_tilt_lerp_new * gFrameTime );
 	}
 	else // type 0
 	{
 		output = glm::clamp( glm::max(0.f, fabs(output) - cl_tilt_threshold) / GetMaxSprintSpeed(), 0.f, 1.f ) * side;
 
 		/* Now Lerp the tilt angle with the previous angle to make a smoother transition. */
-		output = glm::mix( prevTilt, output * cl_tilt, cl_tilt_lerp * gFrameTime );
+		output = glm::mix( apMove->aPrevViewTilt.Get(), output * cl_tilt, cl_tilt_lerp * gFrameTime );
 	}
 
 	apCamera->aTransform.Edit().aAng.Edit()[ ROLL ] = output;
-
-	prevTilt = output;
+	apMove->aPrevViewTilt.Edit()                    = output;
 }
 
 

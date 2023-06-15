@@ -1721,19 +1721,6 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponent< CTransform >( "transform", true, EEntComponentNetType_Both,
 		[ & ]() { return new CTransform; }, [ & ]( void* spData ) { delete (CTransform*)spData; } );
 
-	// {
-	// 	size_t typeHashVar  = typeid( CTransform::aPos ).hash_code();
-	// 	size_t typeHashTest = typeid( ComponentNetVar< glm::vec3 > ).hash_code();
-	// 
-	// 	Assert( typeHashVar != typeid( ComponentNetVar< glm::vec3 > ).hash_code() );
-	// 
-	// 	if ( typeHashVar != typeid( ComponentNetVar< glm::vec3 > ).hash_code() )
-	// 	{
-	// 		Log_ErrorF( "Not Registering Component Var, is not a ComponentNetVar Type: \"%s\" - \"%s\"\n", typeid( glm::vec3 ).name(), "test" );
-	// 		return;
-	// 	}
-	// }
-
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aPos", "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );

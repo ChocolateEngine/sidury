@@ -51,9 +51,14 @@ struct CPlayerMoveData
 	ComponentNetVar< float >          aMaxSpeed         = 0.f;
 
 	// View Bobbing
-	float                             aWalkTime         = 0.f;
-	float                             aBobOffsetAmount  = 0.f;
+	ComponentNetVar< float >          aWalkTime         = 0.f;
+	ComponentNetVar< float >          aBobOffsetAmount  = 0.f;
+	ComponentNetVar< float >          aPrevViewTilt     = 0.f;
 
+	// Smooth Land
+	ComponentNetVar< float >          aLandPower        = 0.f;
+	ComponentNetVar< float >          aLandTime         = 0.f;
+	
 	// Smooth Duck
 	ComponentNetVar< float >          aPrevViewHeight   = 0.f;
 	ComponentNetVar< float >          aTargetViewHeight = 0.f;
@@ -62,22 +67,19 @@ struct CPlayerMoveData
 	ComponentNetVar< float >          aDuckTime         = 0.f;
 
 	// Sound Effects
-	double                  aLastStepTime = 0.f;
+	ComponentNetVar< double >         aLastStepTime     = 0.f;
 
-	std::vector< Handle >   aStepSounds;
-	std::vector< Handle >   aImpactSounds;
+	std::vector< Handle >             aStepSounds;
+	std::vector< Handle >             aImpactSounds;
 
 	// Physics
 
-	// The maximum angle of slope that character can still walk on (radians and put in cos())
-	float                   aMaxSlopeAngle = 45.f * (M_PI / 180.f);
+	IPhysicsShape*                    apPhysShape = nullptr;
+	IPhysicsObject*                   apPhysObj   = nullptr;
 
-	IPhysicsShape*          apPhysShape = nullptr;
-	IPhysicsObject*         apPhysObj   = nullptr;
-	
-	IPhysicsObject*         apGroundObj = nullptr;
-	glm::vec3               aGroundPosition{};
-	glm::vec3               aGroundNormal{};
+	IPhysicsObject*                   apGroundObj = nullptr;
+	glm::vec3                         aGroundPosition{};
+	glm::vec3                         aGroundNormal{};
 	// glm::vec3               aGroundVelocity{};
 	// Handle                  aGroundMaterial;
 };
@@ -110,6 +112,8 @@ class PlayerMovement // : public ComponentSystem
 {
   public:
 	void             EnsureUserCmd( Entity player );
+
+	void             SetPlayer( Entity player );
 
 	void             OnPlayerSpawn( Entity player );
 	void             OnPlayerRespawn( Entity player );

@@ -1148,3 +1148,72 @@ struct CLight
 #define CH_REGISTER_COMPT_VAR_FL( type, varName, varStr ) \
   CH_REGISTER_COMPONENT_VAR( type, float, varName, varStr )
 
+
+// Helper Functions
+inline Handle Ent_GetRenderableHandle( Entity sEntity )
+{
+	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+
+	if ( !renderComp )
+	{
+		Log_Error( "Failed to get renderable component\n" );
+		return InvalidHandle;
+	}
+
+	return renderComp->aHandle;
+}
+
+
+inline Renderable_t* Ent_GetRenderable( Entity sEntity )
+{
+	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+
+	if ( !renderComp )
+	{
+		Log_Error( "Failed to get renderable component\n" );
+		return nullptr;
+	}
+
+	return Graphics_GetRenderableData( renderComp->aHandle );
+}
+
+
+// Requires the entity to have renderable component and modelInfo component with a model path set
+inline Renderable_t* Ent_CreateRenderable( Entity sEntity )
+{
+	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+
+	if ( !renderComp )
+	{
+		Log_Error( "Failed to get renderable component\n" );
+		return nullptr;
+	}
+
+	// I hate this so much
+	if ( renderComp->aHandle == InvalidHandle )
+	{
+		auto modelInfo = Ent_GetComponent< CModelInfo >( sEntity, "modelInfo" );
+		if ( !modelInfo )
+		{
+			Log_Error( "Failed to get modelInfo to create renderable\n" );
+			return nullptr;
+		}
+
+		Handle model = Graphics_LoadModel( modelInfo->aPath );
+		if ( model == InvalidHandle )
+		{
+			Log_Error( "Failed to load model for renderable\n" );
+			return nullptr;
+		}
+
+		renderComp->aHandle = Graphics_CreateRenderable( model );
+		if ( renderComp->aHandle == InvalidHandle )
+		{
+			Log_Error( "Failed to create renderable\n" );
+			return nullptr;
+		}
+	}
+
+	return Graphics_GetRenderableData( renderComp->aHandle );
+}
+
