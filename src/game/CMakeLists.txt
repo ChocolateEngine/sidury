@@ -51,12 +51,19 @@ set(
 
 include_directories( "${CH_THIRDPARTY}/capnproto/c++/src" )
 
-link_directories( "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug" )
+set( CAPNPROTO_DIR_DEBUG "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug" )
+set( CAPNPROTO_DIR_RELEASE "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Release" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Release" )
+
+link_directories(
+	"$<$<CONFIG:Debug>:${CAPNPROTO_DIR_DEBUG}>"
+	"$<$<CONFIG:Release>:${CAPNPROTO_DIR_RELEASE}>"
+	"$<$<CONFIG:RelWithDebInfo>:${CAPNPROTO_DIR_RELEASE}>"
+)
 
 link_libraries(
-	${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug/capnp.lib
-	${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug/capnpc.lib
-	${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug/kj.lib
+	capnp
+	capnpc
+	kj
 )
 
 add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
