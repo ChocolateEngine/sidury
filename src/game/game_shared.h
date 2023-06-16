@@ -16,11 +16,14 @@ EXT_CVAR_FLAG( CVARF_SV_EXEC );
 
 enum ECommandSource
 {
-	// Console Command Came from the client
+	// Console Command was sent to us from the Client
 	ECommandSource_Client,
 
-	// Console Command Came from the server
+	// Console Command was sent to us from the Server
 	ECommandSource_Server,
+
+	// Console Command came from the Console
+	ECommandSource_Console,
 };
 
 

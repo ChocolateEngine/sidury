@@ -21,6 +21,9 @@ static const char* gServerPort = Args_Register( "41628", "Test Server Port", "-p
 
 NEW_CVAR_FLAG( CVARF_SERVER );
 
+// ConVar value is enforced on clients
+NEW_CVAR_FLAG( CVARF_REPLICATED );
+
 CONVAR( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
 CONVAR( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
@@ -43,6 +46,36 @@ CONVAR_CMD_EX( sv_max_clients, 32, CVARF_SERVER, "Max Clients the Server Allows"
 		Log_WarnF( gLC_Server, "Can't set max clients less than 1\n" );
 		sv_max_clients.SetValue( 1 );
 	}
+}
+
+static std::set< ConVarBase* > gReplicatedCmds;
+
+bool CvarFReplicatedCallback( ConVarBase* spBase, const std::vector< std::string >& args )
+{
+	if ( args.empty() )
+		return true;
+
+	if ( typeid( *spBase ) != typeid( ConVar ) )
+	{
+		Log_ErrorF( gLC_Server, "ConCommand or ConVarRef found using CVARF_REPLICATED: \"%s\"\n", spBase->aName );
+		return true;
+	}
+
+	// If were hosting a server, the message has to be from the console
+	if ( Game_IsHosting() && Game_GetCommandSource() == ECommandSource_Console )
+	{
+		// Add this to a vector of convars to send values to the client
+		gReplicatedCmds.emplace( spBase );
+		return true;
+	}
+	// The Message Has to be from the server otherwise
+	else if ( Game_GetCommandSource() == ECommandSource_Server )
+	{
+		return true;
+	}
+
+	Log_ErrorF( gLC_Server, "Can't change Server Replicated ConVar if you're not the host! - \"%s\"\n", spBase->aName );
+	return false;
 }
 
 ServerData_t        gServerData;
@@ -99,6 +132,8 @@ int SV_Client_t::WritePacked( capnp::MessageBuilder& srBuilder )
 
 bool SV_Init()
 {
+	Con_SetCvarFlagCallback( CVARF_REPLICATED, CvarFReplicatedCallback );
+
 	return true;
 }
 
@@ -115,6 +150,7 @@ void SV_Update( float frameTime )
 		return;
 
 	Game_SetClient( false );
+	Game_SetCommandSource( ECommandSource_Client );
 
 	// for ( auto& client : gServerData.aClients )
 	for ( size_t i = 0; i < gServerData.aClients.size(); i++ )
@@ -154,6 +190,8 @@ void SV_Update( float frameTime )
 	msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
 	msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
 
+	// TODO: SEND REPLICATED CONVARS
+
 	int writeSize = 0;
 
 	if ( !msgFailed )
@@ -168,6 +206,8 @@ void SV_Update( float frameTime )
 		bool                                       msgFailed = false;
 		msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
 		msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
+
+		// TODO: SEND REPLICATED CONVARS
 
 		int fullUpdateSize = 0;
 
@@ -186,6 +226,10 @@ void SV_Update( float frameTime )
 	{
 		gui->DebugMessage( "Data Written to Each Client: %d bytes", writeSize );
 	}
+
+	gReplicatedCmds.clear();
+
+	Game_SetCommandSource( ECommandSource_Console );
 }
 
 

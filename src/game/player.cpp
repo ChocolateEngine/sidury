@@ -30,40 +30,39 @@
 #include <capnp/serialize-packed.h>
 
 
-CONVAR( sv_sprint_mult, 2.4 );
-//CONVAR( sv_sprint_mult, 4 );  // Temp until physics works
-CONVAR( sv_duck_mult, 0.5 );
-
 constexpr float DEFAULT_SPEED = 250.f;
 
-ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED );
-ConVar side_speed( "sv_side_speed", DEFAULT_SPEED );  // 350.f
-ConVar max_speed( "sv_max_speed", DEFAULT_SPEED );  // 320.f
+CONVAR( sv_sprint_mult, 2.4, CVARF_DEF_SERVER_REPLICATED );
+CONVAR( sv_duck_mult, 0.5, CVARF_DEF_SERVER_REPLICATED );
 
-ConVar accel_speed( "sv_accel_speed", 10 );
-ConVar accel_speed_air( "sv_accel_speed_air", 30 );
-ConVar jump_force( "sv_jump_force", 250 );
-ConVar stop_speed( "sv_stop_speed", 25 );
+ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );
+ConVar side_speed( "sv_side_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );  // 350.f
+ConVar max_speed( "sv_max_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );    // 320.f
 
-CONVAR( sv_friction, 8 );  // 4.f
-CONVAR( sv_friction_enable, 1 );
+ConVar accel_speed( "sv_accel_speed", 10, CVARF_DEF_SERVER_REPLICATED );
+ConVar accel_speed_air( "sv_accel_speed_air", 30, CVARF_DEF_SERVER_REPLICATED );
+ConVar jump_force( "sv_jump_force", 250, CVARF_DEF_SERVER_REPLICATED );
+ConVar stop_speed( "sv_stop_speed", 25, CVARF_DEF_SERVER_REPLICATED );
 
-CONVAR( phys_friction_player, 0.01 );
-CONVAR( phys_player_offset, 40 );
+CONVAR( sv_friction, 8, CVARF_DEF_SERVER_REPLICATED );  // 4.f
+CONVAR( sv_friction_enable, 1, CVARF_DEF_SERVER_REPLICATED );
+
+CONVAR( phys_friction_player, 0.01, CVARF_DEF_SERVER_REPLICATED );
+CONVAR( phys_player_offset, 40, CVARF_DEF_SERVER_REPLICATED );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
 //CONVAR( sv_friction_new, 8 );  // 4.f
 
-CONVAR( sv_gravity, 800 );
+CONVAR( sv_gravity, 800, CVARF_DEF_SERVER_REPLICATED );
 
 CONVAR( cl_stepspeed, 200 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
-CONVAR( sv_view_height, 67 );  // 67
-CONVAR( sv_view_height_duck, 36 );  // 36
-CONVAR( sv_view_height_lerp, 15 );  // 0.015
+CONVAR( sv_view_height, 67, CVARF_DEF_SERVER_REPLICATED );  // 67
+CONVAR( sv_view_height_duck, 36, CVARF_DEF_SERVER_REPLICATED );  // 36
+CONVAR( sv_view_height_lerp, 15, CVARF_DEF_SERVER_REPLICATED );  // 0.015
 
 CONVAR( player_model_scale, 40 );
 

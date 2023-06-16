@@ -215,7 +215,7 @@ void CL_Update( float frameTime )
 		}
 	}
 
-	Game_SetCommandSource( ECommandSource_Client );
+	Game_SetCommandSource( ECommandSource_Console );
 }
 
 

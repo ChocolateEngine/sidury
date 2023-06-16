@@ -169,7 +169,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 		if ( sSource == ECommandSource_Server && Game_ProcessingClient() )
 		{
 			// The Convar must have one of these flags
-			if ( !(flags & CVARF_SV_EXEC) && !(flags & CVARF_SERVER) )
+			if ( !(flags & CVARF_SV_EXEC) && !(flags & CVARF_SERVER) && !(flags & CVARF_REPLICATED) )
 			{
 				Log_WarnF( "Server Tried Executing Command without flag to allow it: \"%s\"\n", commandName.c_str() );
 				continue;

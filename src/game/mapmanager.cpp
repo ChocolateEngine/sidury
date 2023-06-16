@@ -79,7 +79,7 @@ CONCMD_DROP( map, map_dropdown )
 
 	Game_SetClient( old );
 
-	if ( Game_GetCommandSource() == ECommandSource_Client )
+	if ( Game_GetCommandSource() == ECommandSource_Console )
 	{
 		Con_RunCommandArgs( "connect", { "localhost" } );
 	}
