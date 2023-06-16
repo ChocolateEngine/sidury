@@ -181,16 +181,15 @@ void SV_Update( float frameTime )
 	// Main game loop
 	SV_GameUpdate( frameTime );
 
-	// TODO: Sync Server Convars with clients
-
 	// Send updated data to clients
-	std::vector< capnp::MallocMessageBuilder > messages( 2 );
+	std::vector< capnp::MallocMessageBuilder > messages( gReplicatedCmds.size() ? 3 : 2 );
 
 	bool msgFailed = false;
 	msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, false );
 	msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, false );
 
-	// TODO: SEND REPLICATED CONVARS
+	if ( gReplicatedCmds.size() )
+		msgFailed |= !SV_BuildServerMsg( messages[ 2 ], EMsgSrcServer::CON_VAR, false );
 
 	int writeSize = 0;
 
@@ -201,13 +200,12 @@ void SV_Update( float frameTime )
 	if ( gServerData.aClientsFullUpdate.size() )
 	{
 		// Build a Full Update and send it to all of them
-		std::vector< capnp::MallocMessageBuilder > messages( 2 );
+		std::vector< capnp::MallocMessageBuilder > messages( 3 );
 
 		bool                                       msgFailed = false;
 		msgFailed |= !SV_BuildServerMsg( messages[ 0 ], EMsgSrcServer::ENTITY_LIST, true );
 		msgFailed |= !SV_BuildServerMsg( messages[ 1 ], EMsgSrcServer::COMPONENT_LIST, true );
-
-		// TODO: SEND REPLICATED CONVARS
+		msgFailed |= !SV_BuildServerMsg( messages[ 2 ], EMsgSrcServer::CON_VAR, true );
 
 		int fullUpdateSize = 0;
 
@@ -448,6 +446,12 @@ bool SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType
 		{
 			root.setType( EMsgSrcServer::SERVER_INFO );
 			SV_BuildServerInfo( messageBuilder );
+			break;
+		}
+		case EMsgSrcServer::CON_VAR:
+		{
+			root.setType( EMsgSrcServer::CON_VAR );
+			SV_BuildConVarMsg( messageBuilder );
 			break;
 		}
 		default:
@@ -865,6 +869,69 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 		// amazing
 		Log_ErrorF( gLC_Server, "Failed to Connect Client - Caught Exception While Parsing Message: \"%s\"\n", Net_AddrToString( srAddr ) );
 	}
+}
+
+
+// void SV_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs )
+// {
+// 	// We have to rebuild this command to a normal string, fun
+// 	// Allocate a command to send with the command name
+// 	std::string& newCmd = gSvCommandsToSend.emplace_back( sName.data() );
+// 
+// 	// Add the command arguments
+// 	for ( const std::string& arg : srArgs )
+// 	{
+// 		newCmd += " " + arg;
+// 	}
+// }
+
+
+void SV_SendConVar( ConVarBase* spConVar )
+{
+	gReplicatedCmds.emplace( spConVar );
+}
+
+
+void SV_BuildConVarMsg( capnp::MessageBuilder& srMessage, bool sFullUpdate )
+{
+	NetMsgConVar::Builder cvarRoot = srMessage.initRoot< NetMsgConVar >();
+
+	// We have to send EVERY ConVar with CVARF_REPLICATED in a Full Update
+	if ( sFullUpdate )
+	{
+		for ( uint32_t i = 0; i < Con_GetConVarCount(); i++ )
+		{
+			ConVarBase* cvarBase = Con_GetConVar( i );
+			if ( !cvarBase )
+				continue;
+
+			// Only ConVars here, no ConCommands, that will be in another tab
+			if ( typeid( *cvarBase ) != typeid( ConVar ) && cvarBase->aFlags & CVARF_REPLICATED )
+				continue;
+
+			gReplicatedCmds.emplace( cvarBase );
+		}
+	}
+	
+	// Only send if we actually have commands to send
+	if ( gReplicatedCmds.empty() )
+		return;
+
+	std::string command;
+
+	// Join it all into one string
+	for ( auto& cmd : gReplicatedCmds )
+	{
+		ConVar* cvar = static_cast< ConVar* >( cmd );
+
+		command += cvar->aName;
+		command += " " + cvar->aValue + ";";
+	}
+
+	// Clear it
+	gReplicatedCmds.clear();
+
+	cvarRoot.setCommand( command );
 }
 
 

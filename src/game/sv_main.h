@@ -140,6 +140,10 @@ void                SV_FreeClient( SV_Client_t& srClient );
 void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData );
 void                SV_ConnectClientFinish( SV_Client_t& srClient );
 
+// void                SV_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs );
+void                SV_SendConVar( ConVarBase* spConVar );
+void                SV_BuildConVarMsg( capnp::MessageBuilder& srMessage, bool sFullUpdate = false );
+
 // --------------------------------------------------------------------
 // Helper Functions
 
