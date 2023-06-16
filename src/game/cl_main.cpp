@@ -667,7 +667,7 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 
 				if ( system )
 				{
-					system->ComponentUpdated( entity );
+					system->ComponentUpdated( entity, componentData );
 				}
 			}
 		}

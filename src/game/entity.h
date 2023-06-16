@@ -494,15 +494,15 @@ class IEntityComponentSystem
 	virtual ~IEntityComponentSystem()                        = default;
 
 	// Called when the component is added to this entity
-	virtual void          ComponentAdded( Entity sEntity )   = 0;
+	virtual void          ComponentAdded( Entity sEntity, void* spData ){};
 
 	// Called when the component is removed from this entity
-	virtual void          ComponentRemoved( Entity sEntity ) = 0;
+	virtual void          ComponentRemoved( Entity sEntity, void* spData ){};
 
-	// Called when the component data has been updated
-	virtual void          ComponentUpdated( Entity sEntity ) = 0;
+	// Called when the component data has been updated (ONLY ON CLIENT RIGHT NOW)
+	virtual void          ComponentUpdated( Entity sEntity, void* spData ){};
 
-	virtual void          Update() {};
+	virtual void          Update(){};
 
 	std::vector< Entity > aEntities;
 };

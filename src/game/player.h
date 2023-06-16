@@ -212,15 +212,7 @@ public:
 	// so we don't need to add these functions and call them manually
 	static void             RegisterComponents();
 
-	// static void             CreateClient();
-	// static void             CreateServer();
-	// 
-	// static void             DestroyClient();
-	// static void             DestroyServer();
-
-	void                    ComponentAdded( Entity sEntity ) override;
-	void                    ComponentRemoved( Entity sEntity ) override;
-	void                    ComponentUpdated( Entity sEntity ) override;
+	void                    ComponentAdded( Entity sEntity, void* spData ) override;
 
 	// Set's current player to manage, and prepares all components for use
 	bool                    SetCurrentPlayer( Entity player );

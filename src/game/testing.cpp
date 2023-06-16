@@ -96,7 +96,7 @@ class ProtogenSystem : public IEntityComponentSystem
 	{
 	}
 
-	void ComponentAdded( Entity sEntity ) override
+	void ComponentAdded( Entity sEntity, void* spData ) override
 	{
 		if ( !Game_ProcessingClient() )
 			return;
@@ -106,22 +106,10 @@ class ProtogenSystem : public IEntityComponentSystem
 		renderable->aHandle = InvalidHandle;
 	}
 
-	void ComponentRemoved( Entity sEntity ) override
+	void ComponentRemoved( Entity sEntity, void* spData ) override
 	{
 		if ( !Game_ProcessingClient() )
 			return;
-
-		auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
-
-		if ( !renderComp )
-			return;
-
-		Renderable_t* renderable = Graphics_GetRenderableData( renderComp->aHandle );
-
-		if ( renderable )
-			Graphics_FreeModel( renderable->aModel );
-
-		Graphics_FreeRenderable( renderComp->aHandle );
 
 		aTurnMap.erase( sEntity );
 		aLookMap.erase( sEntity );
@@ -129,7 +117,7 @@ class ProtogenSystem : public IEntityComponentSystem
 		// GetEntitySystem()->RemoveComponent( sEntity, "renderable" );
 	}
 
-	void ComponentUpdated( Entity sEntity ) override
+	void ComponentUpdated( Entity sEntity, void* spData ) override
 	{
 		if ( Game_ProcessingClient() )
 			aUpdated.push_back( sEntity );

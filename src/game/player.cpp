@@ -433,6 +433,7 @@ void PlayerManager::RegisterComponents()
 	// what the fuck
 	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT( CRenderable_t, renderable, false, EEntComponentNetType_Client );
+	CH_REGISTER_COMPONENT_SYS( CRenderable_t, EntSys_Renderable, gEntSys_Renderable );
 	// CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
 
 	// GetEntitySystem()->RegisterComponent< Model* >();
@@ -441,19 +442,9 @@ void PlayerManager::RegisterComponents()
 }
 
 
-void PlayerManager::ComponentAdded( Entity sEntity )
+void PlayerManager::ComponentAdded( Entity sEntity, void* spData )
 {
 	Create( sEntity );
-}
-
-
-void PlayerManager::ComponentRemoved( Entity sEntity )
-{
-}
-
-
-void PlayerManager::ComponentUpdated( Entity sEntity )
-{
 }
 
 

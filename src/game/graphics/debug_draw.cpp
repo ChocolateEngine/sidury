@@ -273,13 +273,21 @@ void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec
 }
 
 
-#if 0
+CONVAR( r_debug_axis_scale, 1 );
+
+
 void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )
 {
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
+
+	glm::vec3 forward, right, up;
+	Util_GetDirectionVectors( sAng, &forward, &right, &up );
+
+	Graphics_DrawLine( sPos, sPos + ( forward * sScale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
+	Graphics_DrawLine( sPos, sPos + ( right * sScale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
+	Graphics_DrawLine( sPos, sPos + ( up * sScale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
 }
-#endif
 
 
 void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )

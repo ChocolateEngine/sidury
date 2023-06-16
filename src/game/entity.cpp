@@ -431,7 +431,7 @@ void* EntityComponentPool::Create( Entity entity )
 	if ( apComponentSystem )
 	{
 		apComponentSystem->aEntities.push_back( entity );
-		apComponentSystem->ComponentAdded( entity );
+		apComponentSystem->ComponentAdded( entity, data );
 	}
 
 	// TODO: use malloc and use that pointer in the constructor for this
@@ -453,22 +453,22 @@ void EntityComponentPool::Remove( Entity entity )
 		return;
 	}
 
+	size_t index = it->second;
+	void* data = aComponents[ index ];
+	Assert( data );
+
 	// Remove it from systems
 	// for ( auto system : aComponentSystems )
 	if ( apComponentSystem )
 	{
-		apComponentSystem->ComponentRemoved( entity );
+		apComponentSystem->ComponentRemoved( entity, data );
 		vec_remove( apComponentSystem->aEntities, entity );
 	}
 
-	size_t index = it->second;
 	aMapComponentToEntity.erase( index );
 	aMapEntityToComponent.erase( it );
 
 	aComponentStates.erase( index );
-
-	void* data = aComponents[ index ];
-	Assert( data );
 
 	aFuncFree( data );
 
@@ -489,10 +489,13 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 
 	Entity entity = it->second;
 
+	void*  data   = aComponents[ sIndex ];
+	Assert( data );
+
 	// Remove it from the system
 	if ( apComponentSystem )
 	{
-		apComponentSystem->ComponentRemoved( entity );
+		apComponentSystem->ComponentRemoved( entity, data );
 		vec_remove( apComponentSystem->aEntities, entity );
 	}
 
@@ -500,9 +503,6 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 	aMapEntityToComponent.erase( sIndex );
 
 	aComponentStates.erase( sIndex );
-
-	void* data = aComponents[ sIndex ];
-	Assert( data );
 
 	aFuncFree( data );
 
@@ -1725,6 +1725,7 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
 	EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
+	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
 	CH_REGISTER_COMPONENT_RW( CTransformSmall, transformSmall, true );
 	CH_REGISTER_COMPONENT_VAR( CTransformSmall, glm::vec3, aPos, pos );

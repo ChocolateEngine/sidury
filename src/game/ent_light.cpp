@@ -4,18 +4,10 @@
 #include "graphics/lighting.h"
 
 
-LightSystem::LightSystem()
-{
-}
+CONVAR( r_debug_draw_transforms, 0 );
 
 
-LightSystem::~LightSystem()
-{
-}
-
-
-// TODO: pass in component data as a 2nd argument void*??
-void LightSystem::ComponentAdded( Entity sEntity )
+void LightSystem::ComponentAdded( Entity sEntity, void* spData )
 {
 	// light->aType will not be initialized yet smh
 
@@ -30,24 +22,24 @@ void LightSystem::ComponentAdded( Entity sEntity )
 }
 
 
-void LightSystem::ComponentRemoved( Entity sEntity )
+void LightSystem::ComponentRemoved( Entity sEntity, void* spData )
 {
 	if ( Game_ProcessingServer() )
 		return;
 
-	auto light = Ent_GetComponent< CLight >( sEntity, "light" );
+	auto light = static_cast< CLight* >( spData );
 
 	if ( light )
 		Graphics_DestroyLight( light->apLight );
 }
 
 
-void LightSystem::ComponentUpdated( Entity sEntity )
+void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 {
 	if ( Game_ProcessingServer() )
 		return;
 
-	auto light = Ent_GetComponent< CLight >( sEntity, "light" );
+	auto light = static_cast< CLight* >( spData );
 
 	if ( !light )
 		return;
@@ -120,17 +112,7 @@ LightSystem* GetLightEntSys()
 // ------------------------------------------------------------
 
 
-EntSys_ModelInfo::EntSys_ModelInfo()
-{
-}
-
-
-EntSys_ModelInfo::~EntSys_ModelInfo()
-{
-}
-
-
-void EntSys_ModelInfo::ComponentAdded( Entity sEntity )
+void EntSys_ModelInfo::ComponentAdded( Entity sEntity, void* spData )
 {
 	// darn, modelInfo->aPath will not be initialized, bruh this sucks
 	// i will have to do it in the Update function
@@ -141,14 +123,14 @@ void EntSys_ModelInfo::ComponentAdded( Entity sEntity )
 }
 
 
-void EntSys_ModelInfo::ComponentRemoved( Entity sEntity )
+void EntSys_ModelInfo::ComponentRemoved( Entity sEntity, void* spData )
 {
 	if ( Game_ProcessingServer() )
 		return;
 }
 
 
-void EntSys_ModelInfo::ComponentUpdated( Entity sEntity )
+void EntSys_ModelInfo::ComponentUpdated( Entity sEntity, void* spData )
 {
 	if ( Game_ProcessingServer() )
 		return;
@@ -163,4 +145,59 @@ void EntSys_ModelInfo::Update()
 
 
 EntSys_ModelInfo* gEntSys_ModelInfo[ 2 ] = { 0, 0 };
+
+
+// ------------------------------------------------------------
+
+
+void EntSys_Transform::Update()
+{
+	if ( Game_ProcessingServer() )
+		return;
+
+	if ( r_debug_draw_transforms )
+	{
+		for ( Entity entity : aEntities )
+		{
+			auto transform = Ent_GetComponent< CTransform >( entity, "transform" );
+
+			if ( !transform )
+				continue;
+
+			Graphics_DrawAxis( transform->aPos, transform->aAng, transform->aScale );
+		}
+	}
+}
+
+
+EntSys_Transform* gEntSys_Transform[ 2 ] = { 0, 0 };
+
+
+// ------------------------------------------------------------
+
+
+void EntSys_Renderable::ComponentRemoved( Entity sEntity, void* spData )
+{
+	// This shouldn't even be on the server
+	if ( Game_ProcessingServer() )
+		return;
+
+	auto          renderComp = static_cast< CRenderable_t* >( spData );
+
+	// Auto Delete the renderable and free the model
+	Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+
+	if ( !renderData )
+		return;
+
+	if ( renderData->aModel )
+	{
+		Graphics_FreeModel( renderData->aModel );
+	}
+
+	Graphics_FreeRenderable( renderComp->aHandle );
+}
+
+
+EntSys_Renderable* gEntSys_Renderable[ 2 ] = { 0, 0 };
 

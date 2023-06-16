@@ -651,6 +651,7 @@ ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBo
 // Debug Rendering
 
 void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
+void               Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale );
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
