@@ -19,7 +19,7 @@ EXT_CVAR_FLAG( CVARF_REPLICATED );
 using ClientHandle_t = unsigned int;
 
 // Absolute Max Client Limit
-constexpr int            CH_MAX_CLIENTS    = 32;
+constexpr ClientHandle_t CH_MAX_CLIENTS    = 32;
 
 // Invalid ClientHandle_t
 constexpr ClientHandle_t CH_INVALID_CLIENT = 0;

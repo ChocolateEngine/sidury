@@ -233,15 +233,13 @@ void SV_Update( float frameTime )
 
 void SV_GameUpdate( float frameTime )
 {
-	GetEntitySystem()->UpdateSystems();
-
 	MapManager_Update();
 
 	GetPlayers()->Update( frameTime );
 
 	Phys_Simulate( GetPhysEnv(), frameTime );
 
-	TEST_SV_UpdateProtos( frameTime );
+	GetEntitySystem()->UpdateSystems();
 
 	// Update player positions after physics simulation
 	// NOTE: This probably needs to be done for everything with physics
@@ -425,37 +423,47 @@ bool SV_BuildServerMsg( capnp::MessageBuilder& srBuilder, EMsgSrcServer sSrcType
 	auto root = srBuilder.initRoot< MsgSrcServer >();
 
 	capnp::MallocMessageBuilder messageBuilder;
+	root.setType( sSrcType );
 
 	switch ( sSrcType )
 	{
+		case EMsgSrcServer::DISCONNECT:
+		{
+			NetMsgDisconnect::Builder disconnectMsg = srBuilder.initRoot< NetMsgDisconnect >();
+			disconnectMsg.setReason( "Saving chunks." );
+			break;
+		}
 		case EMsgSrcServer::ENTITY_LIST:
 		{
-			root.setType( EMsgSrcServer::ENTITY_LIST );
 			GetEntitySystem()->WriteEntityUpdates( messageBuilder );
 			//Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
 			break;
 		}
 		case EMsgSrcServer::COMPONENT_LIST:
 		{
-			root.setType( EMsgSrcServer::COMPONENT_LIST );
 			GetEntitySystem()->WriteComponentUpdates( messageBuilder, sFullUpdate );
 			//Log_DevF( gLC_Server, 2, "Sending COMPONENT_LIST to Clients\n" );
 			break;
 		}
 		case EMsgSrcServer::SERVER_INFO:
 		{
-			root.setType( EMsgSrcServer::SERVER_INFO );
 			SV_BuildServerInfo( messageBuilder );
 			break;
 		}
 		case EMsgSrcServer::CON_VAR:
 		{
-			root.setType( EMsgSrcServer::CON_VAR );
 			SV_BuildConVarMsg( messageBuilder );
+			break;
+		}
+		case EMsgSrcServer::PAUSED:
+		{
+			NetMsgPaused::Builder pauseMsg = srBuilder.initRoot< NetMsgPaused >();
+			pauseMsg.setPaused( Game_IsPaused() );
 			break;
 		}
 		default:
 		{
+			root.setType( EMsgSrcServer::COUNT );
 			Log_ErrorF( gLC_Server, "Invalid Server Source Message Type: %zd\n", sSrcType );
 			return false;
 		}

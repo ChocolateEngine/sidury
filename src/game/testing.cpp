@@ -125,6 +125,10 @@ class ProtogenSystem : public IEntityComponentSystem
 
 	void Update() override
 	{
+		if ( Game_ProcessingClient() )
+			TEST_CL_UpdateProtos( gFrameTime );
+		else
+			TEST_SV_UpdateProtos( gFrameTime );
 	}
 
 	std::vector< Entity >                         aUpdated;

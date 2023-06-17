@@ -224,19 +224,15 @@ void CL_GameUpdate( float frameTime )
 	CL_UpdateMenuShown();
 
 	// Check connection timeout
-	// if ( ( cl_timeout_duration - cl_timeout_threshold ) < gClientTimeout )
-	if ( cl_timeout_threshold < ( gClientTimeout - cl_timeout_duration ) )
+	if ( ( cl_timeout_duration - cl_timeout_threshold ) > ( gClientTimeout ) )
 	{
 		// Show Connection Warning
-		// flood console lol
-		Log_WarnF( gLC_Client, "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
+		gui->DebugMessage( "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
 	}
 
 	GetEntitySystem()->UpdateSystems();
 
 	GetPlayers()->UpdateLocalPlayer();
-
-	TEST_CL_UpdateProtos( frameTime );
 
 	if ( input->WindowHasFocus() && !CL_IsMenuShown() )
 	{
@@ -721,21 +717,22 @@ void CL_GetServerMessages()
 		}
 
 		// Check Messages without message data first
-		switch ( msgType )
-		{
-			// Client is Disconnecting
-			case EMsgSrcServer::DISCONNECT:
-			{
-				CL_Disconnect();
-				return;
-			}
-
-			default:
-				break;
-		}
+		// switch ( msgType )
+		// {
+		// 	// Server is Disconnecting Us, either because it's shutting down or we are kicked, etc.
+		// 	// TODO:
+		// 	case EMsgSrcServer::DISCONNECT:
+		// 	{
+		// 		CL_Disconnect();
+		// 		return;
+		// 	}
+		// 
+		// 	default:
+		// 		break;
+		// }
 
 		// Now check messages with message data
-		auto                       msgData = serverMsg.getData();
+		auto msgData = serverMsg.getData();
 
 		Assert( msgData.size() );
 
@@ -750,6 +747,14 @@ void CL_GetServerMessages()
 
 		switch ( msgType )
 		{
+			case EMsgSrcServer::DISCONNECT:
+			{
+				auto msgDisconnect = dataReader.getRoot< NetMsgDisconnect >();
+				Log_MsgF( gLC_Client, "Disconnected from server: %s\n", msgDisconnect.getReason().cStr() );
+				CL_Disconnect( false );
+				return;
+			}
+
 			case EMsgSrcServer::SERVER_INFO:
 			{
 				auto msgServerInfo = dataReader.getRoot< NetMsgServerInfo >();
