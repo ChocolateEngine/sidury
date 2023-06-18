@@ -1,5 +1,6 @@
 #pragma once
 
+#include "main.h"
 #include "game_shared.h"
 #include "entity.h"
 #include "network/net_main.h"
@@ -29,6 +30,7 @@ namespace capnp
 	class MallocMessageBuilder;
 }
 
+using SteamID64_t = u64;
 
 struct UserCmd_t;
 
@@ -45,7 +47,9 @@ struct SV_Client_t
 {
 	ch_sockaddr    aAddr;
 
-	std::string    aName = "[unnamed]";
+	SteamID64_t    aSteamID = 0;
+
+	std::string    aName    = "[unnamed]";
 	ESVClientState aState;
 
 	double         aTimeout;

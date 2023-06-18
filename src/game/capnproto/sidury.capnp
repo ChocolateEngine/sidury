@@ -46,7 +46,7 @@ struct NetMsgUserCmd
 # General Messages
 struct NetMsgServerInfo
 {
-    name           @0 :Text;
+    name           @0 :Text;  # Server Name
     clientCount    @1 :UInt8;
     maxClients     @2 :UInt8;  # TODO: make this obsolete with convar syncing?
     mapName        @3 :Text;
@@ -56,11 +56,23 @@ struct NetMsgServerInfo
     clientEntityId @5 :UInt32;
 }
 
+# The Server Sends this when it recieves a NetMsgClientConnect
+struct NetMsgServerConnectResponse
+{
+    clientEntityId @0 :UInt32;
+}
+
+struct NetMsgClientConnect
+{
+    protocol @0 :UInt16;
+}
+
 # TODO: Make a NetMsgClientConnect, and morph this into client information that each client will recieve
 struct NetMsgClientInfo
 {
     protocol @0 :UInt16;
     name     @1 :Text;
+    steamID  @2 :UInt64;
 }
 
 struct NetMsgDisconnect
@@ -103,14 +115,15 @@ struct MsgSrcClient
 
 enum EMsgSrcServer
 {
-	disconnect    @0;
-	serverInfo    @1;
-	conVar        @2;
-	componentList @3;
-	entityList    @4;
-	paused        @5;
+	disconnect            @0;
+	serverInfo            @1;
+	conVar                @2;
+	componentList         @3;
+	entityList            @4;
+	paused                @5;
+	componentRegistryInfo @6;
 
-    count         @6;
+    count                 @7;
 }
 
 struct MsgSrcServer

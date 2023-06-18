@@ -4,6 +4,8 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 project( Sidury )
 
+option( STEAM "Build the steam abstraction" OFF )
+
 # Add Chocolate Framework DLLs
 # add_subdirectory( ../chocolate ${CMAKE_CURRENT_LIST_DIR} )
 add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../chocolate ${CMAKE_CURRENT_LIST_DIR}/../chocolate )
@@ -22,4 +24,8 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CH_ROOT}/obj/sidury/Release )
 # Now Add Sidury Projects
 add_subdirectory( src/launcher )
 add_subdirectory( src/game )
+
+if( STEAM )
+	add_subdirectory( src/steam )
+endif( STEAM)
 

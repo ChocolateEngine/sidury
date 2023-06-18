@@ -25,17 +25,21 @@ class IGuiSystem;
 class IRender;
 class IInputSystem;
 class IAudioSystem;
+class ISteamSystem;
 
 extern IGuiSystem*      gui;
 extern IRender*         render;
 extern IInputSystem*    input;
 extern IAudioSystem*    audio;
+extern ISteamSystem*    steam;
+extern bool             gSteamLoaded;
 
 extern ViewportCamera_t gView;
 extern float            gFrameTime;
 extern double           gCurTime;
 
 constexpr int           CH_MAX_USERNAME_LEN = 256;
+
 
 enum class GameState
 {

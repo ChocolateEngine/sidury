@@ -7,6 +7,7 @@
 #include "igui.h"
 #include "iaudio.h"
 #include "physics/iphysics.h"
+#include "steam.h"
 
 #include "imgui/imgui.h"
 
@@ -19,6 +20,7 @@
 #endif
 
 static bool gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
+static bool gArgNoSteam = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
 static bool gRunning   = true;
 
 CONVAR( host_max_frametime, 0.1 );
@@ -64,6 +66,29 @@ static AppModules_t gAppModules[] =
 };
 
 
+// We load this separately because all modules loaded through Mod_AddSystems() are required and shuts down on failure,
+// and this is not required.
+static void LoadSteamAbstraction()
+{
+	if ( !Mod_Load( "ch_steam" ) )
+	{
+		Log_Error( "Failed to load module: ch_steam\n" );
+		return;
+	}
+
+	// add system we want from module
+	void* system = Mod_GetInterface( ISTEAM_NAME, ISTEAM_VER );
+	if ( system == nullptr )
+	{
+		Log_ErrorF( "Failed to load system from module: ch_steam - %s\n", ISTEAM_NAME );
+		return;
+	}
+
+	steam = static_cast< ISteamSystem* >( system );
+	Mod_AddLoadedSystem( steam );
+}
+
+
 extern "C"
 {
 	void DLL_EXPORT game_init()
@@ -84,6 +109,9 @@ extern "C"
 			Log_Error( "Failed to Load Systems\n" );
 			return;
 		}
+
+		if ( !gArgNoSteam )
+			LoadSteamAbstraction();
 
 		Mod_InitSystems();
 

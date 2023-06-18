@@ -40,6 +40,8 @@ void                   CL_Shutdown();
 void                   CL_Update( float frameTime );
 void                   CL_GameUpdate( float frameTime );
 
+const char*            CL_GetUserName();
+
 bool                   CL_IsMenuShown();
 void                   CL_UpdateMenuShown();
 

@@ -29,6 +29,8 @@ enum class EPlayerMoveType_ffb0c0aaac42d441: uint16_t {
 CAPNP_DECLARE_ENUM(EPlayerMoveType, ffb0c0aaac42d441);
 CAPNP_DECLARE_SCHEMA(a5501e058754ad06);
 CAPNP_DECLARE_SCHEMA(ca1f635170315467);
+CAPNP_DECLARE_SCHEMA(bbb8370daa394a79);
+CAPNP_DECLARE_SCHEMA(fc8c135ba0bd9d02);
 CAPNP_DECLARE_SCHEMA(b83fc6b03806aa47);
 CAPNP_DECLARE_SCHEMA(d2195344bb147ee5);
 CAPNP_DECLARE_SCHEMA(d38eab74e58db8fe);
@@ -52,6 +54,7 @@ enum class EMsgSrcServer_ea451e6b28d0dc02: uint16_t {
   COMPONENT_LIST,
   ENTITY_LIST,
   PAUSED,
+  COMPONENT_REGISTRY_INFO,
   COUNT,
 };
 CAPNP_DECLARE_ENUM(EMsgSrcServer, ea451e6b28d0dc02);
@@ -154,6 +157,36 @@ struct NetMsgServerInfo {
   };
 };
 
+struct NetMsgServerConnectResponse {
+  NetMsgServerConnectResponse() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(bbb8370daa394a79, 1, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct NetMsgClientConnect {
+  NetMsgClientConnect() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(fc8c135ba0bd9d02, 1, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
 struct NetMsgClientInfo {
   NetMsgClientInfo() = delete;
 
@@ -162,7 +195,7 @@ struct NetMsgClientInfo {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(b83fc6b03806aa47, 1, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(b83fc6b03806aa47, 2, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -947,6 +980,158 @@ private:
 };
 #endif  // !CAPNP_LITE
 
+class NetMsgServerConnectResponse::Reader {
+public:
+  typedef NetMsgServerConnectResponse Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint32_t getClientEntityId() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgServerConnectResponse::Builder {
+public:
+  typedef NetMsgServerConnectResponse Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint32_t getClientEntityId();
+  inline void setClientEntityId( ::uint32_t value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgServerConnectResponse::Pipeline {
+public:
+  typedef NetMsgServerConnectResponse Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class NetMsgClientConnect::Reader {
+public:
+  typedef NetMsgClientConnect Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint16_t getProtocol() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class NetMsgClientConnect::Builder {
+public:
+  typedef NetMsgClientConnect Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline  ::uint16_t getProtocol();
+  inline void setProtocol( ::uint16_t value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class NetMsgClientConnect::Pipeline {
+public:
+  typedef NetMsgClientConnect Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
 class NetMsgClientInfo::Reader {
 public:
   typedef NetMsgClientInfo Reads;
@@ -968,6 +1153,8 @@ public:
 
   inline bool hasName() const;
   inline  ::capnp::Text::Reader getName() const;
+
+  inline  ::uint64_t getSteamID() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -1006,6 +1193,9 @@ public:
   inline  ::capnp::Text::Builder initName(unsigned int size);
   inline void adoptName(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownName();
+
+  inline  ::uint64_t getSteamID();
+  inline void setSteamID( ::uint64_t value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -3237,6 +3427,34 @@ inline void NetMsgServerInfo::Builder::setClientEntityId( ::uint32_t value) {
       ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
+inline  ::uint32_t NetMsgServerConnectResponse::Reader::getClientEntityId() const {
+  return _reader.getDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint32_t NetMsgServerConnectResponse::Builder::getClientEntityId() {
+  return _builder.getDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgServerConnectResponse::Builder::setClientEntityId( ::uint32_t value) {
+  _builder.setDataField< ::uint32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint16_t NetMsgClientConnect::Reader::getProtocol() const {
+  return _reader.getDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint16_t NetMsgClientConnect::Builder::getProtocol() {
+  return _builder.getDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgClientConnect::Builder::setProtocol( ::uint16_t value) {
+  _builder.setDataField< ::uint16_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
 inline  ::uint16_t NetMsgClientInfo::Reader::getProtocol() const {
   return _reader.getDataField< ::uint16_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
@@ -3283,6 +3501,20 @@ inline void NetMsgClientInfo::Builder::adoptName(
 inline ::capnp::Orphan< ::capnp::Text> NetMsgClientInfo::Builder::disownName() {
   return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
+}
+
+inline  ::uint64_t NetMsgClientInfo::Reader::getSteamID() const {
+  return _reader.getDataField< ::uint64_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint64_t NetMsgClientInfo::Builder::getSteamID() {
+  return _builder.getDataField< ::uint64_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void NetMsgClientInfo::Builder::setSteamID( ::uint64_t value) {
+  _builder.setDataField< ::uint64_t>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool NetMsgDisconnect::Reader::hasReason() const {

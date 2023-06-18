@@ -4,6 +4,7 @@
 #include "mapmanager.h"
 #include "entity.h"
 #include "player.h"
+#include "steam.h"
 
 #include "testing.h"
 #include "igui.h"
@@ -813,8 +814,14 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 		}
 
 		// Make an entity for them
-		Entity entity = GetEntitySystem()->CreateEntity();
-		auto   name   = clientInfoRead.getName();
+		Entity      entity  = GetEntitySystem()->CreateEntity();
+		auto        name    = clientInfoRead.getName();
+		SteamID64_t steamID = clientInfoRead.getSteamID();
+
+		if ( steamID && IsSteamLoaded() )
+		{
+			steam->RequestProfileName( steamID );
+		}
 
 		if ( entity == CH_ENT_INVALID )
 		{
@@ -832,10 +839,11 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 			return;
 		}
 
-		client->aName   = name;
-		client->aAddr   = srAddr;
-		client->aState  = ESV_ClientState_Connecting;
-		client->aEntity = entity;
+		client->aName    = name;
+		client->aSteamID = clientInfoRead.getSteamID();
+		client->aAddr    = srAddr;
+		client->aState   = ESV_ClientState_Connecting;
+		client->aEntity  = entity;
 
 		Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", name.cStr() );
 

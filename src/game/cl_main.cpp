@@ -4,6 +4,7 @@
 #include "inputsystem.h"
 #include "mapmanager.h"
 #include "player.h"
+#include "steam.h"
 #include "network/net_main.h"
 
 #include "igui.h"
@@ -28,6 +29,7 @@
 //   - how many different maps you loaded
 //   - how many bytes you've downloaded from servers in total
 //   - how many times you've launched the game
+//   - how many workshop addons you've subscribed to in total
 //   
 
 LOG_REGISTER_CHANNEL2( Client, LogColor::White );
@@ -78,6 +80,12 @@ CONVAR_CMD_EX( cl_username, "greg", CVARF_ARCHIVE, "Your Username" )
 }
 
 
+CONVAR_CMD_EX( cl_username_use_steam, 1, CVARF_ARCHIVE, "Use username from steam instead of what cl_username contains" )
+{
+	// TODO: callback to send a username change to a server if we are connected to one
+}
+
+
 CONCMD_VA( cl_request_full_update )
 {
 	CL_SendFullUpdateRequest();
@@ -120,6 +128,12 @@ bool CL_Init()
 		return false;
 
 	Phys_CreateEnv( true );
+
+	// Load Our Avatar
+	if ( IsSteamLoaded() )
+	{
+		steam->RequestAvatarImage( ESteamAvatarSize_Large, steam->GetSteamID() );
+	}
 
 	return true;
 }
@@ -241,6 +255,20 @@ void CL_GameUpdate( float frameTime )
 }
 
 
+const char* CL_GetUserName()
+{
+	if ( cl_username_use_steam && IsSteamLoaded() )
+	{
+		const char* steamProfileName = steam->GetPersonaName();
+
+		if ( steamProfileName )
+			return steamProfileName;
+	}
+
+	return cl_username;
+}
+
+
 bool CL_IsMenuShown()
 {
 	return gClientMenuShown;
@@ -326,7 +354,8 @@ void CL_Connect( const char* spAddress )
 	NetMsgClientInfo::Builder   clientInfoBuild = message.initRoot< NetMsgClientInfo >();
 
 	clientInfoBuild.setProtocol( CH_SIDURY_PROTOCOL );
-	clientInfoBuild.setName( cl_username.GetValue().data() );
+	clientInfoBuild.setName( CL_GetUserName() );
+	clientInfoBuild.setSteamID( IsSteamLoaded() ? steam->GetSteamID() : 0 );
 
 	gClientSocket     = Net_OpenSocket( "0" );
 	NetAddr_t netAddr = Net_GetNetAddrFromString( spAddress );

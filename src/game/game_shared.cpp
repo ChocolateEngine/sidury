@@ -62,6 +62,7 @@ static const char* gMsgSrcServerStr[] = {
 	"Component List",
 	"Entity List",
 	"Paused",
+	"Component Registry Info",
 };
 
 

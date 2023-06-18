@@ -18,6 +18,7 @@
 #include "inputsystem.h"
 #include "skybox.h"
 #include "testing.h"
+#include "steam.h"
 #include "network/net_main.h"
 
 #include "cl_main.h"
@@ -35,6 +36,7 @@ IGuiSystem*      gui          = nullptr;
 IRender*         render       = nullptr;
 IInputSystem*    input        = nullptr;
 IAudioSystem*    audio        = nullptr;
+ISteamSystem*    steam        = nullptr;
 
 static bool      gPaused      = false;
 float            gFrameTime   = 0.f;
@@ -70,6 +72,8 @@ void Game_Shutdown()
 	Skybox_Destroy();
 	Phys_Shutdown();
 	Net_Shutdown();
+
+	Steam_Shutdown();
 }
 
 
@@ -107,6 +111,8 @@ bool Game_Init()
 {
 	// Startup the Game Input System
 	Input_Init();
+
+	Steam_Init();
 
 	Game_UpdateProjection();
 
@@ -167,6 +173,8 @@ void Game_Update( float frameTime )
 	}
 
 	Graphics_NewFrame();
+
+	CH_STEAM_CALL( Update( frameTime ) );
 
 	Game_UpdateGame( frameTime );
 

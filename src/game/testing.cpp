@@ -2,6 +2,7 @@
 #include "main.h"
 #include "inputsystem.h"
 #include "graphics/graphics.h"
+#include "steam.h"
 
 #include "cl_main.h"
 #include "sv_main.h"
@@ -333,6 +334,11 @@ void TEST_Init()
 {
 	CH_REGISTER_COMPONENT( CProtogen, protogen, false, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CProtogen, ProtogenSystem, gProtoSystems );
+
+	if ( IsSteamLoaded() )
+	{
+		steam->RequestAvatarImage( ESteamAvatarSize_Large, steam->GetSteamID() );
+	}
 }
 
 

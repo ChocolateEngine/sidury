@@ -29,7 +29,7 @@ endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 # Set as startup project in visual studio
 set_property( DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT SiduryLauncher )
 
-if (WIN32)
+if (MSVC)
 	# Copy a pre-built manifest file to the output directory for DPI Scaling
 	add_custom_command(
 		TARGET SiduryLauncher POST_BUILD
@@ -37,5 +37,5 @@ if (WIN32)
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying ${SIDURY_LAUNCHER_NAME}.exe.manifest to launcher directory"
     )
-endif(WIN32)
+endif(MSVC)
 
