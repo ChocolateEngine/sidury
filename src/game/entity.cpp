@@ -942,11 +942,10 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
+void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
 {
 	// Make a list of component pools with a component that need updating
 	std::vector< EntityComponentPool* >                 componentPools;
-	std::vector< NetMsg_ComponentUpdateBuilder >        componentBuilders;
 	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
 
 	for ( auto& [ name, pool ] : aComponentPools )
@@ -973,7 +972,7 @@ void EntitySystem::WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srRoot
 
 		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
 
-		auto                                                    regData = pool->GetRegistryData();
+		EntComponentData_t*                                     regData = pool->GetRegistryData();
 
 		std::vector< NetMsg_ComponentUpdateDataBuilder >        componentDataBuilders;
 
@@ -1068,7 +1067,7 @@ void EntitySystem::WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srRoot
 
 			auto                           compNameOffset = srRootBuilder.CreateString( pool->apName );
 
-			NetMsg_ComponentUpdateBuilder& compUpdate = componentBuilders.emplace_back( srRootBuilder );
+			NetMsg_ComponentUpdateBuilder compUpdate( srRootBuilder );
 			compUpdate.add_name( compNameOffset );
 
 			if ( wroteData )
