@@ -23,7 +23,7 @@ enum ESteamAvatarSize
 class ISteamToGame
 {
   public:
-	virtual void OnRequestAvatarImage( SteamID64_t sSteamID, Handle sAvatar ) = 0;
+	virtual void OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar ) = 0;
 	virtual void OnRequestProfileName( SteamID64_t sSteamID, const char* spName ) = 0;
 };
 

@@ -25,10 +25,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "capnproto/sidury.capnp.h"
-#include <capnp/message.h>
-#include <capnp/serialize-packed.h>
-
 
 constexpr float DEFAULT_SPEED = 250.f;
 
@@ -220,51 +216,53 @@ float vec3_norm(glm::vec3& v)
 
 CH_COMPONENT_READ_DEF( CPlayerMoveData )
 {
-	auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
-	auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
-
-	auto  moveType   = message.getMoveType();
-
-	switch ( moveType )
-	{
-		default:
-		case EPlayerMoveType::WALK:
-			spMoveData->aMoveType = PlayerMoveType::Walk;
-			break;
-
-		case EPlayerMoveType::NO_CLIP:
-			spMoveData->aMoveType = PlayerMoveType::NoClip;
-			break;
-
-		case EPlayerMoveType::FLY:
-			spMoveData->aMoveType = PlayerMoveType::Fly;
-			break;
-	}
-
-	spMoveData->aPlayerFlags      = message.getPlayerFlags();
-	spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
-	spMoveData->aMaxSpeed         = message.getMaxSpeed();
-
-	// View Bobbing
-	//spMoveData->aWalkTime         = message.getWalkTime();
-	//spMoveData->aBobOffsetAmount  = message.getBobOffsetAmount();
-	//spMoveData->aPrevViewTilt     = message.getPrevViewTilt();
-
-	spMoveData->aLandPower        = message.getLandPower();
-	spMoveData->aLandTime         = message.getLandTime();
-
-	// Smooth Duck
-	spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
-	spMoveData->aTargetViewHeight = message.getTargetViewHeight();
-	spMoveData->aOutViewHeight    = message.getOutViewHeight();
-	spMoveData->aDuckDuration     = message.getDuckDuration();
-	spMoveData->aDuckTime         = message.getDuckTime();
+	//auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
+	//auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
+	//
+	//auto  moveType   = message.getMoveType();
+	//
+	//switch ( moveType )
+	//{
+	//	default:
+	//	case EPlayerMoveType::WALK:
+	//		spMoveData->aMoveType = PlayerMoveType::Walk;
+	//		break;
+	//
+	//	case EPlayerMoveType::NO_CLIP:
+	//		spMoveData->aMoveType = PlayerMoveType::NoClip;
+	//		break;
+	//
+	//	case EPlayerMoveType::FLY:
+	//		spMoveData->aMoveType = PlayerMoveType::Fly;
+	//		break;
+	//}
+	//
+	//spMoveData->aPlayerFlags      = message.getPlayerFlags();
+	//spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
+	//spMoveData->aMaxSpeed         = message.getMaxSpeed();
+	//
+	//// View Bobbing
+	////spMoveData->aWalkTime         = message.getWalkTime();
+	////spMoveData->aBobOffsetAmount  = message.getBobOffsetAmount();
+	////spMoveData->aPrevViewTilt     = message.getPrevViewTilt();
+	//
+	//spMoveData->aLandPower        = message.getLandPower();
+	//spMoveData->aLandTime         = message.getLandTime();
+	//
+	//// Smooth Duck
+	//spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
+	//spMoveData->aTargetViewHeight = message.getTargetViewHeight();
+	//spMoveData->aOutViewHeight    = message.getOutViewHeight();
+	//spMoveData->aDuckDuration     = message.getDuckDuration();
+	//spMoveData->aDuckTime         = message.getDuckTime();
 }
 
 
 CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 {
-	auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
+	return false;
+
+	/*auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
 	bool  isDirty    = sFullUpdate;
 
 	isDirty |= spMoveData->aMoveType.aIsDirty;
@@ -324,36 +322,38 @@ CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
 	builder.setDuckDuration( spMoveData->aDuckDuration );
 	builder.setDuckTime( spMoveData->aDuckTime );
 
-	return true;
+	return true;*/
 }
 
 
 CH_COMPONENT_READ_DEF( CPlayerZoom )
 {
-	auto* spZoom    = static_cast< CPlayerZoom* >( spData );
-	auto  message   = srReader.getRoot< NetCompPlayerZoom >();
-
-	spZoom->aOrigFov = message.getOrigFov();
-	spZoom->aNewFov = message.getNewFov();
+	// auto* spZoom    = static_cast< CPlayerZoom* >( spData );
+	// auto  message   = srReader.getRoot< NetCompPlayerZoom >();
+	// 
+	// spZoom->aOrigFov = message.getOrigFov();
+	// spZoom->aNewFov = message.getNewFov();
 }
 
 
 CH_COMPONENT_WRITE_DEF( CPlayerZoom )
 {
-	auto* spZoom  = static_cast< const CPlayerZoom* >( spData );
-	bool  isDirty = sFullUpdate;
+	return false;
 
-	isDirty |= spZoom->aNewFov.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto builder = srMessage.initRoot< NetCompPlayerZoom >();
-
-	builder.setOrigFov( spZoom->aOrigFov );
-	builder.setNewFov( spZoom->aNewFov );
-
-	return true;
+	// auto* spZoom  = static_cast< const CPlayerZoom* >( spData );
+	// bool  isDirty = sFullUpdate;
+	// 
+	// isDirty |= spZoom->aNewFov.aIsDirty;
+	// 
+	// if ( !isDirty )
+	// 	return false;
+	// 
+	// auto builder = srMessage.initRoot< NetCompPlayerZoom >();
+	// 
+	// builder.setOrigFov( spZoom->aOrigFov );
+	// builder.setNewFov( spZoom->aNewFov );
+	// 
+	// return true;
 }
 
 

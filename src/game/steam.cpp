@@ -15,9 +15,13 @@ SteamToGame gSteamToGame;
 bool        gSteamLoaded = false;
 
 
-// MOVE ME !!!!!!!!!!!!!!!
-void SteamToGame::OnRequestAvatarImage( SteamID64_t sSteamID, Handle sAvatar )
+void SteamToGame::OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar )
 {
+	if ( Game_IsClient() )
+	{
+		CL_SetClientSteamAvatar( sSteamID, sSize, sAvatar );
+	}
+
 	Log_Msg( "cool we got steam avatar\n" );
 }
 

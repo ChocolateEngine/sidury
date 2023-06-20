@@ -24,7 +24,7 @@ inline bool IsSteamLoaded()
 class SteamToGame : public ISteamToGame
 {
   public:
-	void OnRequestAvatarImage( SteamID64_t sSteamID, Handle sAvatar ) override;
+	void OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar ) override;
 	void OnRequestProfileName( SteamID64_t sSteamID, const char* spName ) override;
 };
 

@@ -4,7 +4,6 @@
 #include "game_shared.h"
 #include "entity.h"
 #include "network/net_main.h"
-#include "capnproto/sidury.capnp.h"
 
 // 
 // The Server, only runs if the engine is a dedicated server, or hosting on the client
@@ -25,10 +24,6 @@ constexpr ClientHandle_t CH_MAX_CLIENTS    = 32;
 // Invalid ClientHandle_t
 constexpr ClientHandle_t CH_INVALID_CLIENT = 0;
 
-namespace capnp
-{
-	class MallocMessageBuilder;
-}
 
 using SteamID64_t = u64;
 
@@ -38,7 +33,8 @@ struct UserCmd_t;
 enum ESVClientState
 {
 	ESV_ClientState_Disconnected,
-	ESV_ClientState_Connecting,
+	ESV_ClientState_WaitForClientInfo,  // We sent the client NetMsg_ServerConnectResponse, and we are waiting for their client info
+	ESV_ClientState_Connecting,         // We send them a full update and server info, so we are now waiting for them to finish loading
 	ESV_ClientState_Connected,
 };
 
@@ -62,7 +58,7 @@ struct SV_Client_t
 
 	int            Write( const char* spData, int sLen );
 	int            Write( const ChVector< char >& srData );
-	int            WritePacked( capnp::MessageBuilder& srBuilder );
+	int            WriteFlatBuffer( flatbuffers::FlatBufferBuilder& srBuilder );
 
 	bool           operator==( const SV_Client_t& srOther )
 	{
@@ -126,17 +122,17 @@ void                SV_StopServer();
 // --------------------------------------------------------------------
 // Networking
 
-int                 SV_BroadcastMsgsToSpecificClients( std::vector< capnp::MallocMessageBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients );
-int                 SV_BroadcastMsgs( std::vector< capnp::MallocMessageBuilder >& srMessages );
-int                 SV_BroadcastMsg( capnp::MessageBuilder& srMessage );
+int                 SV_BroadcastMsgsToSpecificClients( std::vector< flatbuffers::FlatBufferBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients );
+int                 SV_BroadcastMsgs( std::vector< flatbuffers::FlatBufferBuilder >& srMessages );
+int                 SV_BroadcastMsg( flatbuffers::FlatBufferBuilder& srMessage );
 
-bool                SV_SendMessageToClient( SV_Client_t& srClient, capnp::MessageBuilder& srMessage );
+bool                SV_SendMessageToClient( SV_Client_t& srClient, flatbuffers::FlatBufferBuilder& srMessage );
 void                SV_SendDisconnect( SV_Client_t& srClient );
 
-bool                SV_BuildServerMsg( capnp::MessageBuilder& srMessage, EMsgSrcServer sSrcType, bool sFullUpdate = false );
+bool                SV_BuildServerMsg( flatbuffers::FlatBufferBuilder& srMessage, EMsgSrc_Server sSrcType, bool sFullUpdate = false );
 
 void                SV_ProcessSocketMsgs();
-void                SV_ProcessClientMsg( SV_Client_t& srClient, capnp::MessageReader& srReader );
+void                SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage );
 
 SV_Client_t*        SV_AllocateClient();
 void                SV_FreeClient( SV_Client_t& srClient );
@@ -146,7 +142,7 @@ void                SV_ConnectClientFinish( SV_Client_t& srClient );
 
 // void                SV_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs );
 void                SV_SendConVar( ConVarBase* spConVar );
-void                SV_BuildConVarMsg( capnp::MessageBuilder& srMessage, bool sFullUpdate = false );
+bool                SV_BuildConVarMsg( flatbuffers::FlatBufferBuilder& srMessage, bool sFullUpdate = false );
 
 // --------------------------------------------------------------------
 // Helper Functions

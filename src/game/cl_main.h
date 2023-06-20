@@ -1,14 +1,17 @@
 #pragma once
 
-#include "capnproto/sidury.capnp.h"
 
 //
 // The Client, always running unless a dedicated server
 // 
 
 
+using SteamID64_t = u64;
+using Entity = size_t;
+
 struct UserCmd_t;
 
+enum ESteamAvatarSize;
 
 extern UserCmd_t gClientUserCmd;
 
@@ -16,7 +19,8 @@ extern UserCmd_t gClientUserCmd;
 enum EClientState
 {
 	EClientState_Idle,
-	EClientState_RecvServerInfo,
+	EClientState_WaitForAccept,
+	EClientState_WaitForFullUpdate,
 	EClientState_Connecting,
 	EClientState_Connected,
 	EClientState_Count
@@ -32,6 +36,19 @@ struct CL_ServerData_t
 };
 
 
+// Information about each client that our client knows
+struct CL_Client_t
+{
+	std::string aName         = "[unnamed]";
+	SteamID64_t aSteamID      = 0;
+	Entity      aEntity       = CH_ENT_INVALID;
+
+	Handle      aAvatarLarge  = InvalidHandle;
+	Handle      aAvatarMedium = InvalidHandle;
+	Handle      aAvatarSmall  = InvalidHandle;
+};
+
+
 extern CL_ServerData_t gClientServerData;
 
 
@@ -41,6 +58,15 @@ void                   CL_Update( float frameTime );
 void                   CL_GameUpdate( float frameTime );
 
 const char*            CL_GetUserName();
+void                   CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar );
+
+// NOTE: Will only work when the avatar is already loaded
+// though, maybe we can somehow pre-allocate that handle to a missing texture or something
+// and then when we have downloaded the avatar from steam, we update the texture data without replacing the handle?
+Handle                 CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize );
+
+// Pick the best available steam avatar based on width
+Handle                 CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth );
 
 bool                   CL_IsMenuShown();
 void                   CL_UpdateMenuShown();
@@ -54,17 +80,22 @@ bool                   CL_SendConVarIfClient( std::string_view sName, const std:
 void                   CL_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs = {} );
 void                   CL_SendConVars();
 
-int                    CL_WriteToServer( capnp::MessageBuilder& srBuilder );
+int                    CL_WriteToServer( flatbuffers::FlatBufferBuilder& srBuilder );
 
-void                   CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader );
-void                   CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader );
+void                   CL_HandleMsg_ClientInfo( const NetMsg_ServerClientInfo* spMessage );
+void                   CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spReader );
+void                   CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spReader );
 
-bool                   CL_RecvServerInfo();
+bool                   CL_WaitForAccept();
 void                   CL_UpdateUserCmd();
-void                   CL_BuildUserCmd( capnp::MessageBuilder& srBuilder );
+void                   CL_BuildUserCmd( flatbuffers::FlatBufferBuilder& srBuilder );
 void                   CL_SendUserCmd();
 void                   CL_SendFullUpdateRequest();
 void                   CL_GetServerMessages();
 
 void                   CL_PrintStatus();
+
+// --------------------------------------------------
+
+void                   CL_DrawMainMenu();
 

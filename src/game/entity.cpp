@@ -1,6 +1,3 @@
-#include <capnp/message.h>
-#include <capnp/serialize-packed.h>
-
 #include "main.h"
 #include "game_shared.h"
 #include "entity.h"
@@ -14,7 +11,6 @@
 #include "graphics/graphics.h"
 
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
-#include "capnproto/sidury.capnp.h"
 
 
 LOG_REGISTER_CHANNEL2( Entity, LogColor::White );
@@ -806,7 +802,7 @@ IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
 }
 
 
-Entity EntitySystem::CreateEntity()
+Entity EntitySystem::CreateEntity( bool sLocal )
 {
 	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
 
@@ -898,88 +894,61 @@ bool EntitySystem::EntityExists( Entity desiredId )
 
 
 // Read and write from the network
-void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
-{
-	// NetEntityUpdates
-	// NetEntityUpdate
-
-	// const char* spComponentName = componentRead.getName().cStr();
-	// void*       componentData   = nullptr;
-	// 
-	// // if ( componentRead.getState() == NetMsgEntityUpdate::EState::DESTROYED )
-	// // {
-	// // 	GetEntitySystem()->RemoveComponent( entity, spComponentName );
-	// // 	continue;
-	// // }
-	// 
-	// componentData               = GetEntitySystem()->GetComponent( entity, spComponentName );
-	// 
-	// // else if ( componentRead.getState() == NetMsgEntityUpdate::EState::CREATED )
-	// if ( !componentData )
-	// {
-	// 	// Create the component
-	// 	componentData = GetEntitySystem()->AddComponent( entity, spComponentName );
-	// 
-	// 	if ( componentData == nullptr )
-	// 	{
-	// 		Log_ErrorF( "Failed to create component\n" );
-	// 		continue;
-	// 	}
-	// }
-	// 
-	// capnp::FlatArrayMessageReader reader( kj::ArrayPtr< const capnp::word >( (const capnp::word*)data.data(), data.size() ) );
-	// NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
-	// 
-	// capnp::MallocMessageBuilder   compMessageBuilder;
-	// regData->apWrite( compMessageBuilder, data );
-	// auto array        = capnp::messageToFlatArray( compMessageBuilder );
-	// 
-	// auto valueBuilder = compBuilder.initValues( array.size() * sizeof( capnp::word ) );
-	// // std::copy( array.begin(), array.end(), valueBuilder.begin() );
-	// memcpy( valueBuilder.begin(), array.begin(), array.size() * sizeof( capnp::word ) );
-	// 
-	// componentRead.getValues();
-}
+//void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
+//{
+//}
 
 
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteEntityUpdates( capnp::MessageBuilder& srBuilder )
+void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder )
 {
 	Assert( aEntityCount == aUsedEntities.size() );
 
-	auto root       = srBuilder.initRoot< NetMsgEntityUpdates >();
-	auto updateList = root.initUpdateList( aEntityCount );
+	std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
+	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
 
 	for ( size_t i = 0; i < aEntityCount; i++ )
 	{
 		Entity entity = aUsedEntities[ i ];
-		auto   update = updateList[ i ];
+		auto&  update = updateBuilderList.emplace_back( srBuilder );
 
-		update.setId( entity );
+		update.add_id( entity );
 
 		// Get Entity State
-		update.setDestroyed( aEntityStates[ entity ] == EEntityCreateState_Destroyed );
+		if ( aEntityStates[ entity ] == EEntityCreateState_Destroyed )
+			update.add_destroyed( true );
+
+		updateOut.push_back( update.Finish() );
+		// srBuilder.Finish( update.Finish() );
 	}
+
+	auto                        vec = srBuilder.CreateVector( updateOut );
+
+	NetMsg_EntityUpdatesBuilder updatesBuilder( srBuilder );
+	updatesBuilder.add_update_list( vec );
+
+	srBuilder.Finish( updatesBuilder.Finish() );
 }
 
 
 // Read and write from the network
-void EntitySystem::ReadComponentUpdates( capnp::MessageReader& srReader )
-{
-}
+//void EntitySystem::ReadComponentUpdates( capnp::MessageReader& srReader )
+//{
+//}
 
 
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool sFullUpdate )
+void EntitySystem::WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
 {
-	auto                                root = srBuilder.initRoot< NetMsgComponentUpdates >();
-
 	// Make a list of component pools with a component that need updating
-	std::vector< EntityComponentPool* > componentPools;
+	std::vector< EntityComponentPool* >                 componentPools;
+	std::vector< NetMsg_ComponentUpdateBuilder >        componentBuilders;
+	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
+
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
 		// If there are no components in existence, don't even bother to send anything here
@@ -994,61 +963,82 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 		gui->DebugMessage( "Sending \"%zd\" Component Types", componentPools.size() );
 	}
 
-	auto   updateList = root.initUpdateList( componentPools.size() );
-
-	size_t i          = 0;
+	size_t i = 0;
 
 	for ( auto pool : componentPools )
 	{
-		NetMsgComponentUpdate::Builder compUpdate = updateList[ i ];
-
 		// If there are no components in existence, don't even bother to send anything here
 		if ( !pool->aMapComponentToEntity.size() )
 			continue;
 
-		compUpdate.setName( pool->apName );
+		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
 
-		auto   regData   = pool->GetRegistryData();
-		auto   compList  = compUpdate.initComponents( pool->aMapComponentToEntity.size() );
+		auto                                                    regData = pool->GetRegistryData();
+
+		std::vector< NetMsg_ComponentUpdateDataBuilder >        componentDataBuilders;
+
+		// auto                                                             compNameOffset = srRootBuilder.CreateString( pool->apName );
+
+		bool                                                    builtUpdateList = false;
+		bool                                                    wroteData       = false;
 
 		size_t compListI = 0;
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			NetMsgComponentUpdate::Component::Builder compBuilder = compList[ compListI ];
-
-			compBuilder.setId( entity );
-
-			// Set Destroyed
-			compBuilder.setDestroyed( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed );
-			
-			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed || !regData->apWrite )
+			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed || (!regData->apWrite && !sFullUpdate) )
 			{
 				// Don't bother sending data if we're about to be destroyed or we have no write function
+				// srRootBuilder.Finish( compDataBuilder.Finish() );
 				compListI++;
 				continue;
 			}
 
-			auto data = pool->GetData( entity );
+			void*                 data = pool->GetData( entity );
 
-			capnp::MallocMessageBuilder compMessageBuilder;
-			if ( regData->apWrite( compMessageBuilder, data, ent_always_full_update ? true : sFullUpdate ) )
+			// Write Component Data
+			fb::FlatBufferBuilder componentBuffer;
+
+			if ( regData->apWrite )
+				wroteData = regData->apWrite( componentBuffer, data, ent_always_full_update ? true : sFullUpdate );
+
+			// If no data is written and this isn't a full update, don't send this component over
+			if ( regData->apWrite && !sFullUpdate && !wroteData )
 			{
-				NetOutputStream outputStream;
-				capnp::writePackedMessage( outputStream, compMessageBuilder );
+				compListI++;
+				continue;
+			}
 
+			fb::Offset< flatbuffers::Vector< u8 > > dataVector{};
+
+			if ( wroteData )
+			{
+				auto size  = componentBuffer.GetSize();
+				dataVector = srRootBuilder.CreateVector( componentBuffer.GetBufferPointer(), componentBuffer.GetSize() );
+			}
+
+			// Now after creating the data vector, we can make the update data builder
+
+			NetMsg_ComponentUpdateDataBuilder& compDataBuilder = componentDataBuilders.emplace_back( srRootBuilder );
+
+			compDataBuilder.add_id( entity );
+
+			// Set Destroyed
+			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed )
+				compDataBuilder.add_destroyed( true );
+
+			if ( wroteData )
+			{
 				if ( Game_IsClient() && ent_show_component_net_updates )
 				{
-					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
+					// gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
+					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, componentBuffer.GetSize() );
 				}
 
-				auto valueBuilder = compBuilder.initValues( outputStream.aBuffer.size_bytes() );
-				// std::copy( array.begin(), array.end(), valueBuilder.begin() );
-				memcpy( valueBuilder.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
+				compDataBuilder.add_values( dataVector );
 			}
-			else
-			{
-				// compBuilder.initValues( 0 );
-			}
+
+			builtUpdateList = true;
+			componentDataBuilt.push_back( compDataBuilder.Finish() );
 
 			// Reset Component Var Dirty Values
 			if ( !ent_always_full_update )
@@ -1066,7 +1056,55 @@ void EntitySystem::WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool
 			compListI++;
 		}
 
+		// srRootBuilder.Finish();
+
+		if ( componentDataBuilt.size() && builtUpdateList )
+		{
+			// oh my god
+			fb::Offset< fb::Vector< fb::Offset< NetMsg_ComponentUpdateData > > > compVector{};
+
+			if ( wroteData )
+				compVector = srRootBuilder.CreateVector( componentDataBuilt.data(), componentDataBuilt.size() );
+
+			auto                           compNameOffset = srRootBuilder.CreateString( pool->apName );
+
+			NetMsg_ComponentUpdateBuilder& compUpdate = componentBuilders.emplace_back( srRootBuilder );
+			compUpdate.add_name( compNameOffset );
+
+			if ( wroteData )
+				compUpdate.add_components( compVector );
+
+			componentsBuilt.push_back( compUpdate.Finish() );
+
+			if ( Game_IsClient() && ent_show_component_net_updates )
+			{
+				gui->DebugMessage( "Size of Component Write Update for \"%s\": %zd bytes", pool->apName, srRootBuilder.GetSize() );
+			}
+		}
+		else
+		{
+			// NetMsg_ComponentUpdateBuilder& compUpdate = componentBuilders.emplace_back( srRootBuilder );
+			// componentsBuilt.push_back( compUpdate.Finish() );
+		}
+
+		// if ( Game_IsClient() && ent_show_component_net_updates )
+		// {
+		// 	gui->DebugMessage( "Full Component Write Update: \"%s\" - %zd bytes", regData->apName, componentDataBuilt.size() * sizeof( flatbuffers::Offset< NetMsg_ComponentUpdateData > ) );
+		// }
+
 		i++;
+	}
+
+	auto                           updateListOut = srRootBuilder.CreateVector( componentsBuilt.data(), componentsBuilt.size() );
+
+	NetMsg_ComponentUpdatesBuilder root( srRootBuilder );
+	root.add_update_list( updateListOut );
+
+	srRootBuilder.Finish( root.Finish() );
+
+	if ( Game_IsClient() && ent_show_component_net_updates )
+	{
+		gui->DebugMessage( "Total Size of Component Write Update: %zd bytes", srRootBuilder.GetSize() );
 	}
 }
 
@@ -1303,52 +1341,21 @@ CONCMD( ent_dump )
 // ====================================================================================================
 
 
-#define CH_NET_WRITE_VEC2( varFunc, var ) \
-	if ( var.aIsDirty || sFullUpdate ) { \
-		auto builderVar = builder.init##varFunc(); \
-		NetHelper_WriteVec2( &builderVar, var ); \
-	}
-
-#define CH_NET_WRITE_VEC3( varFunc, var ) \
-	if ( var.aIsDirty || sFullUpdate ) { \
-		auto builderVar = builder.init##varFunc(); \
-		NetHelper_WriteVec3( &builderVar, var ); \
-	}
-
-#define CH_NET_WRITE_VEC4( varFunc, var ) \
-	if ( var.aIsDirty || sFullUpdate ) { \
-		auto builderVar = builder.init##varFunc(); \
-		NetHelper_WriteVec4( &builderVar, var ); \
-	}
-
-
-#define CH_NET_WRITE_VEC3_PTR( varFunc, var ) \
-	if ( var.aIsDirty || sFullUpdate ) { \
-		auto builderVar = builder->init##varFunc(); \
-		NetHelper_WriteVec3( &builderVar, var ); \
-	}
-
-
-#define CH_VAR_DIRTY( var ) var.aIsDirty || sFullUpdate
-
-
 // TODO: try this instead for all these
-void TEMP_TransformRead( capnp::MessageReader& srReader, void* spData )
+void TEMP_TransformRead( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData )
 {
 	CTransform* spTransform = static_cast< CTransform* >( spData );
-	auto       message     = srReader.getRoot< NetCompTransform >();
+	auto        message     = flatbuffers::GetRoot< NetComp_Transform >( spSerialized );
 
-	if ( message.hasPos() )
-		NetHelper_ReadVec3( message.getPos(), spTransform->aPos.Edit() );
+	if ( !message || !message->Verify( srVerifier ) )
+		return;
 
-	if ( message.hasAng() )
-		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );
-
-	if ( message.hasScale() )
-		NetHelper_ReadVec3( message.getScale(), spTransform->aScale.Edit() );
+	NetHelper_ReadVec3( message->pos(), spTransform->aPos.Edit() );
+	NetHelper_ReadVec3( message->ang(), spTransform->aAng.Edit() );
+	NetHelper_ReadVec3( message->scale(), spTransform->aScale.Edit() );
 }
 
-bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate )
+bool TEMP_TransformWrite( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate )
 {
 	const CTransform* spTransform = static_cast< const CTransform* >( spData );
 	bool              isDirty     = sFullUpdate;
@@ -1360,28 +1367,40 @@ bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData, 
 	if ( !isDirty )
 		return false;
 
-	auto builder = srMessage.initRoot< NetCompTransform >();
+#if 0
+	flatbuffers::Offset< Vec3 > posOffset{};
+	flatbuffers::Offset< Vec3 > angOffset{};
+	flatbuffers::Offset< Vec3 > scaleOffset{};
 
 	if ( CH_VAR_DIRTY( spTransform->aPos ) )
 	{
-		auto pos = builder.initPos();
-		NetHelper_WriteVec3( &pos, spTransform->aPos );
+		Vec3Builder vecBuild( srBuilder );
+		NetHelper_WriteVec3( vecBuild, spTransform->aPos );
+		posOffset = vecBuild.Finish();
 	}
 
-	CH_NET_WRITE_VEC3( Ang, spTransform->aAng );
-	CH_NET_WRITE_VEC3( Scale, spTransform->aScale );
+	CH_NET_WRITE_VEC3( ang, spTransform->aAng );
+	CH_NET_WRITE_VEC3( scale, spTransform->aScale );
+#endif
 
-	// if ( spTransform->aAng.aIsDirty )
-	// {
-	// 	auto ang = builder.initAng();
-	// 	NetHelper_WriteVec3( &ang, spTransform->aAng );
-	// }
-	// 
-	// if ( spTransform->aScale.aIsDirty )
-	// {
-	// 	auto scale = builder.initScale();
-	// 	NetHelper_WriteVec3( &scale, spTransform->aScale );
-	// }
+	NetComp_TransformBuilder transformBuilder( srBuilder );
+
+#if 1
+	Vec3 posVec( spTransform->aPos.Get().x, spTransform->aPos.Get().y, spTransform->aPos.Get().z );
+	transformBuilder.add_pos( &posVec );
+
+	CH_NET_WRITE_VEC3( transformBuilder, ang, spTransform->aAng );
+	CH_NET_WRITE_VEC3( transformBuilder, scale, spTransform->aScale );
+#else
+	if ( !posOffset.IsNull() )
+		transformBuilder.add_pos( posOffset );
+
+	CH_NET_WRITE_OFFSET( transformBuilder, ang );
+	CH_NET_WRITE_OFFSET( transformBuilder, scale );
+#endif
+
+	auto builtTransform = transformBuilder.Finish();
+	srBuilder.Finish( builtTransform );
 
 	return true;
 }
@@ -1389,19 +1408,21 @@ bool TEMP_TransformWrite( capnp::MessageBuilder& srMessage, const void* spData, 
 
 CH_COMPONENT_READ_DEF( CTransformSmall )
 {
-	CTransformSmall* spTransform = static_cast< CTransformSmall* >( spData );
+	/*CTransformSmall* spTransform = static_cast< CTransformSmall* >( spData );
 	auto             message     = srReader.getRoot< NetCompTransformSmall >();
 
 	if ( message.hasPos() )
 		NetHelper_ReadVec3( message.getPos(), spTransform->aPos.Edit() );
 
 	if ( message.hasAng() )
-		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );
+		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );*/
 }
 
 CH_COMPONENT_WRITE_DEF( CTransformSmall )
 {
-	const CTransformSmall* spTransform = static_cast< const CTransformSmall* >( spData );
+	return false;
+
+	/*const CTransformSmall* spTransform = static_cast< const CTransformSmall* >( spData );
 	bool                   isDirty     = sFullUpdate;
 
 	isDirty |= spTransform->aPos.aIsDirty;
@@ -1424,20 +1445,20 @@ CH_COMPONENT_WRITE_DEF( CTransformSmall )
 		NetHelper_WriteVec3( &ang, spTransform->aAng );
 	}
 
-	return true;
+	return true;*/
 }
 
 
 CH_COMPONENT_READ_DEF( CRigidBody )
 {
 	CRigidBody* spRigidBody = static_cast< CRigidBody* >( spData );
-	auto        message     = srReader.getRoot< NetCompRigidBody >();
+	auto        message     = flatbuffers::GetRoot< NetComp_RigidBody >( spSerialized );
 
-	if ( message.hasVel() )
-		NetHelper_ReadVec3( message.getVel(), spRigidBody->aVel.Edit() );
+	if ( !message || !message->Verify( srVerifier ) )
+		return;
 
-	if ( message.hasAccel() )
-		NetHelper_ReadVec3( message.getAccel(), spRigidBody->aAccel.Edit() );
+	NetHelper_ReadVec3( message->vel(), spRigidBody->aVel.Edit() );
+	NetHelper_ReadVec3( message->accel(), spRigidBody->aAccel.Edit() );
 }
 
 CH_COMPONENT_WRITE_DEF( CRigidBody )
@@ -1451,40 +1472,54 @@ CH_COMPONENT_WRITE_DEF( CRigidBody )
 	if ( !isDirty )
 		return false;
 
-	auto builder  = srMessage.initRoot< NetCompRigidBody >();
+	flatbuffers::Offset< Vec3 > velOffset{};
+	flatbuffers::Offset< Vec3 > accelOffset{};
 
-	CH_NET_WRITE_VEC3( Vel, spRigidBody->aVel );
-	CH_NET_WRITE_VEC3( Accel, spRigidBody->aAccel );
+	NetComp_RigidBodyBuilder compBuilder( srBuilder );
+
+	CH_NET_WRITE_VEC3( compBuilder, vel, spRigidBody->aVel );
+	CH_NET_WRITE_VEC3( compBuilder, accel, spRigidBody->aAccel );
+
+	CH_NET_WRITE_OFFSET( compBuilder, vel );
+	CH_NET_WRITE_OFFSET( compBuilder, accel );
+
+	srBuilder.Finish( compBuilder.Finish() );
 
 	return true;
 }
 
-// TEMP, USE THESE PRIMARILY IN THE FUTURE
-void NetComp_ReadDirection( const NetCompDirection::Reader& srReader, CDirection& srData )
+// TEMP
+void NetComp_ReadDirection( const NetComp_Direction* spReader, CDirection& srData )
 {
-	if ( srReader.hasForward() )
-		NetHelper_ReadVec3( srReader.getForward(), srData.aForward.Edit() );
+	if ( spReader->forward() )
+		NetHelper_ReadVec3( spReader->forward(), srData.aForward.Edit() );
 
-	if ( srReader.hasUp() )
-		NetHelper_ReadVec3( srReader.getUp(), srData.aUp.Edit() );
+	if ( spReader->up() )
+		NetHelper_ReadVec3( spReader->up(), srData.aUp.Edit() );
 
-	if ( srReader.hasRight() )
-		NetHelper_ReadVec3( srReader.getRight(), srData.aRight.Edit() );
+	if ( spReader->right() )
+		NetHelper_ReadVec3( spReader->right(), srData.aRight.Edit() );
 }
 
-void NetComp_WriteDirection( NetCompDirection::Builder* builder, const CDirection& srData, bool sFullUpdate )
-{
-	CH_NET_WRITE_VEC3_PTR( Forward, srData.aForward );
-	CH_NET_WRITE_VEC3_PTR( Up, srData.aUp );
-	CH_NET_WRITE_VEC3_PTR( Right, srData.aRight );
-}
+// void NetComp_WriteDirection( flatbuffers::FlatBufferBuilder& srBuilder, NetComp_DirectionBuilder& builder, const CDirection& srData, bool sFullUpdate )
+// {
+// 	CH_NET_WRITE_VEC3( builder, forward, srData.aForward );
+// 	CH_NET_WRITE_VEC3( builder, up, srData.aUp );
+// 	CH_NET_WRITE_VEC3( builder, right, srData.aRight );
+// }
 
 CH_COMPONENT_READ_DEF( CDirection )
 {
 	CDirection* spDirection = static_cast< CDirection* >( spData );
-	auto        message     = srReader.getRoot< NetCompDirection >();
+	auto        message     = flatbuffers::GetRoot< NetComp_Direction >( spSerialized );
 
-	NetComp_ReadDirection( message, *spDirection );
+	if ( !message )
+		return;
+
+	bool valid = message->Verify( srVerifier );
+	
+	if ( valid )
+		NetComp_ReadDirection( message, *spDirection );
 }
 
 CH_COMPONENT_WRITE_DEF( CDirection )
@@ -1499,8 +1534,21 @@ CH_COMPONENT_WRITE_DEF( CDirection )
 	if ( !isDirty )
 		return false;
 
-	auto builder = srMessage.initRoot< NetCompDirection >();
-	NetComp_WriteDirection( &builder, *spDirection, sFullUpdate );
+	flatbuffers::Offset< Vec3 > forwardOffset{};
+	flatbuffers::Offset< Vec3 > upOffset{};
+	flatbuffers::Offset< Vec3 > rightOffset{};
+
+	NetComp_DirectionBuilder    dirBuilder( srBuilder );
+
+	CH_NET_WRITE_VEC3( dirBuilder, forward, spDirection->aForward );
+	CH_NET_WRITE_VEC3( dirBuilder, up, spDirection->aUp );
+	CH_NET_WRITE_VEC3( dirBuilder, right, spDirection->aRight );
+
+	CH_NET_WRITE_OFFSET( dirBuilder, forward );
+	CH_NET_WRITE_OFFSET( dirBuilder, up );
+	CH_NET_WRITE_OFFSET( dirBuilder, right );
+
+	srBuilder.Finish( dirBuilder.Finish() );
 
 	return true;
 }
@@ -1509,20 +1557,20 @@ CH_COMPONENT_WRITE_DEF( CDirection )
 CH_COMPONENT_READ_DEF( CCamera )
 {
 	CCamera* spCamera = static_cast< CCamera* >( spData );
-	auto     message  = srReader.getRoot< NetCompCamera >();
+	auto     message  = flatbuffers::GetRoot< NetComp_Camera >( spSerialized );
 
-	if ( message.hasDirection() )
-		NetComp_ReadDirection( message.getDirection(), *spCamera );
+	if ( !message || !message->Verify( srVerifier ) )
+		return;
 
-	spCamera->aFov = message.getFov();
+	if ( message->direction() )
+		NetComp_ReadDirection( message->direction(), *spCamera );
 
-	if ( message.hasTransform() )
+	spCamera->aFov = message->fov();
+
+	if ( message->transform() )
 	{
-		if ( message.getTransform().hasPos() )
-			NetHelper_ReadVec3( message.getTransform().getPos(), spCamera->aTransform.Edit().aPos.Edit() );
-
-		if ( message.getTransform().hasAng() )
-			NetHelper_ReadVec3( message.getTransform().getAng(), spCamera->aTransform.Edit().aAng.Edit() );
+		NetHelper_ReadVec3( message->transform()->pos(), spCamera->aTransform.Edit().aPos.Edit() );
+		NetHelper_ReadVec3( message->transform()->ang(), spCamera->aTransform.Edit().aAng.Edit() );
 	}
 }
 
@@ -1540,32 +1588,53 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 	if ( !isDirty )
 		return false;
 
-	auto builder  = srMessage.initRoot< NetCompCamera >();
+	flatbuffers::Offset< NetComp_Direction > dirOffset{};
 
+	// this is stupid
 	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty || sFullUpdate )
 	{
-		auto dir = builder.initDirection();
-		NetComp_WriteDirection( &dir, *spCamera, sFullUpdate );
+		flatbuffers::Offset< Vec3 > forwardOffset{};
+		flatbuffers::Offset< Vec3 > upOffset{};
+		flatbuffers::Offset< Vec3 > rightOffset{};
+
+		NetComp_DirectionBuilder    dirBuilder( srBuilder );
+
+		CH_NET_WRITE_VEC3( dirBuilder, forward, spCamera->aForward );
+		CH_NET_WRITE_VEC3( dirBuilder, up, spCamera->aUp );
+		CH_NET_WRITE_VEC3( dirBuilder, right, spCamera->aRight );
+
+		CH_NET_WRITE_OFFSET( dirBuilder, forward );
+		CH_NET_WRITE_OFFSET( dirBuilder, up );
+		CH_NET_WRITE_OFFSET( dirBuilder, right );
+
+		dirOffset = dirBuilder.Finish();
 	}
 
-	// if ( spCamera->aFov.aIsDirty )
-		builder.setFov( spCamera->aFov );
+	NetComp_CameraBuilder compBuilder( srBuilder );
 
-	if ( spCamera->aTransform.Get().aPos.aIsDirty || sFullUpdate )
-	{
-		Vec3::Builder pos = builder.getTransform().initPos();
-		pos.setX( spCamera->aTransform.Get().aPos.Get().x );
-		pos.setY( spCamera->aTransform.Get().aPos.Get().y );
-		pos.setZ( spCamera->aTransform.Get().aPos.Get().z );
-	}
+	if ( !dirOffset.IsNull() )
+		compBuilder.add_direction( dirOffset );
 
-	if ( spCamera->aTransform.Get().aAng.aIsDirty || sFullUpdate )
-	{
-		Vec3::Builder ang = builder.getTransform().initAng();
-		ang.setX( spCamera->aTransform.Get().aAng.Get().x );
-		ang.setY( spCamera->aTransform.Get().aAng.Get().y );
-		ang.setZ( spCamera->aTransform.Get().aAng.Get().z );
-	}
+	if ( spCamera->aFov.aIsDirty || sFullUpdate )
+		compBuilder.add_fov( spCamera->aFov );
+
+	srBuilder.Finish( compBuilder.Finish() );
+
+	// if ( spCamera->aTransform.Get().aPos.aIsDirty || sFullUpdate )
+	// {
+	// 	Vec3::Builder pos = builder.getTransform().initPos();
+	// 	pos.setX( spCamera->aTransform.Get().aPos.Get().x );
+	// 	pos.setY( spCamera->aTransform.Get().aPos.Get().y );
+	// 	pos.setZ( spCamera->aTransform.Get().aPos.Get().z );
+	// }
+	// 
+	// if ( spCamera->aTransform.Get().aAng.aIsDirty || sFullUpdate )
+	// {
+	// 	Vec3::Builder ang = builder.getTransform().initAng();
+	// 	ang.setX( spCamera->aTransform.Get().aAng.Get().x );
+	// 	ang.setY( spCamera->aTransform.Get().aAng.Get().y );
+	// 	ang.setZ( spCamera->aTransform.Get().aAng.Get().z );
+	// }
 
 	return true;
 }
@@ -1573,16 +1642,18 @@ CH_COMPONENT_WRITE_DEF( CCamera )
 
 CH_COMPONENT_READ_DEF( CGravity )
 {
-	CGravity* spGravity = static_cast< CGravity* >( spData );
-	auto      message  = srReader.getRoot< NetCompGravity >();
-
-	if ( message.hasForce() )
-		NetHelper_ReadVec3( message.getForce(), spGravity->aForce.Edit() );
+	// CGravity* spGravity = static_cast< CGravity* >( spData );
+	// auto      message  = srReader.getRoot< NetCompGravity >();
+	// 
+	// if ( message.hasForce() )
+	// 	NetHelper_ReadVec3( message.getForce(), spGravity->aForce.Edit() );
 }
 
 CH_COMPONENT_WRITE_DEF( CGravity )
 {
-	const CGravity* spGravity = static_cast< const CGravity* >( spData );
+	return false;
+
+	/*const CGravity* spGravity = static_cast< const CGravity* >( spData );
 	bool            isDirty   = sFullUpdate;
 
 	isDirty |= spGravity->aForce.aIsDirty;
@@ -1593,16 +1664,20 @@ CH_COMPONENT_WRITE_DEF( CGravity )
 	auto builder = srMessage.initRoot< NetCompGravity >();
 
 	CH_NET_WRITE_VEC3( Force, spGravity->aForce );
-	return true;
+	return true;*/
 }
 
 
 CH_COMPONENT_READ_DEF( CModelInfo )
 {
 	auto* spModelPath = static_cast< CModelInfo* >( spData );
-	auto  message     = srReader.getRoot< NetCompModelPath >();
+	auto  message     = flatbuffers::GetRoot< NetComp_ModelInfo >( spSerialized );
 
-	spModelPath->aPath = message.getPath();
+	if ( !message || !message->Verify( srVerifier ) )
+		return;
+
+	if ( message->path() )
+		spModelPath->aPath = message->path()->c_str();
 }
 
 CH_COMPONENT_WRITE_DEF( CModelInfo )
@@ -1615,9 +1690,11 @@ CH_COMPONENT_WRITE_DEF( CModelInfo )
 	if ( !isDirty )
 		return false;
 
-	auto builder = srMessage.initRoot< NetCompModelPath >();
+	auto                     path = srBuilder.CreateString( spModelInfo->aPath.Get() );
 
-	builder.setPath( spModelInfo->aPath.Get() );
+	NetComp_ModelInfoBuilder compBuilder( srBuilder );
+	compBuilder.add_path( path );
+	srBuilder.Finish( compBuilder.Finish() );
 
 	return true;
 }
@@ -1626,34 +1703,31 @@ CH_COMPONENT_WRITE_DEF( CModelInfo )
 CH_COMPONENT_READ_DEF( CLight )
 {
 	auto* spLight = static_cast< CLight* >( spData );
-	auto  message = srReader.getRoot< NetCompLight >();
+	auto  message = flatbuffers::GetRoot< NetComp_Light >( spSerialized );
 
-	if ( message.hasColor() )
-		NetHelper_ReadVec4( message.getColor(), spLight->aColor.Edit() );
+	if ( !message || !message->Verify( srVerifier ) )
+		return;
 
-	if ( message.hasPos() )
-		NetHelper_ReadVec3( message.getPos(), spLight->aPos.Edit() );
+	NetHelper_ReadVec4( message->color(), spLight->aColor.Edit() );
+	NetHelper_ReadVec3( message->pos(), spLight->aPos.Edit() );
+	NetHelper_ReadVec3( message->ang(), spLight->aAng.Edit() );
 
-	if ( message.hasAng() )
-		NetHelper_ReadVec3( message.getAng(), spLight->aAng.Edit() );
+	spLight->aType     = static_cast< ELightType >( message->type() );
+	spLight->aInnerFov = message->innerFov();
+	spLight->aOuterFov = message->outerFov();
+	spLight->aRadius   = message->radius();
+	spLight->aLength   = message->length();
 
-	spLight->aType     = static_cast< ELightType >( message.getType() );
-	spLight->aInnerFov = message.getInnerFov();
-	spLight->aOuterFov = message.getOuterFov();
-	spLight->aRadius   = message.getRadius();
-	spLight->aLength   = message.getLength();
-
-	spLight->aShadow   = message.getShadow();
-	spLight->aEnabled  = message.getEnabled();
-
-	//ADJIAWDI)JDAIW)D 
-	// Graphics_UpdateLight( spLight );
+	spLight->aShadow   = message->shadow();
+	spLight->aEnabled  = message->enabled();
 }
 
 
 CH_COMPONENT_WRITE_DEF( CLight )
 {
-	auto* spLight = static_cast< const CLight* >( spData );
+	return false;
+
+	/*auto* spLight = static_cast< const CLight* >( spData );
 
 	// Don't update anything else if the light isn't even enabled
 	// Actually, this may cause issues for a multiplayer map editor
@@ -1690,7 +1764,7 @@ CH_COMPONENT_WRITE_DEF( CLight )
 	builder.setShadow( spLight->aShadow );
 	builder.setEnabled( spLight->aEnabled );
 
-	return true;
+	return true;*/
 }
 
 

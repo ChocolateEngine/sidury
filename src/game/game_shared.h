@@ -1,7 +1,12 @@
 #pragma once
 
+#include "flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffer_builder.h"
+#include "flatbuffers/sidury_generated.h"
+
 #include "network/net_main.h"
-#include "capnproto/sidury.capnp.h"
+
+namespace fb = flatbuffers;
 
 struct Transform;
 struct TransformSmall;
@@ -40,10 +45,10 @@ struct UserCmd_t
 // Utility Functions
 
 // Convert a Client Source Message to String
-const char*           CL_MsgToString( EMsgSrcClient sMsg );
+const char*           CL_MsgToString( EMsgSrc_Client sMsg );
 
 // Convert a Server Source Message to String
-const char*           SV_MsgToString( EMsgSrcServer sMsg );
+const char*           SV_MsgToString( EMsgSrc_Server sMsg );
 
 
 // Are we hosting the server from our client?
@@ -61,11 +66,13 @@ void                  Game_SetCommandSource( ECommandSource sSource );
 void                  Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand );
 
 // Network Helper functions
-void                  NetHelper_ReadVec2( const Vec2::Reader& srReader, glm::vec2& srVec );
-void                  NetHelper_ReadVec3( const Vec3::Reader& srReader, glm::vec3& srVec );
-void                  NetHelper_ReadVec4( const Vec4::Reader& srReader, glm::vec4& srVec );
+void                  NetHelper_ReadVec2( const Vec2* spReader, glm::vec2& srVec );
+void                  NetHelper_ReadVec3( const Vec3* spReader, glm::vec3& srVec );
+void                  NetHelper_ReadVec4( const Vec4* spReader, glm::vec4& srVec );
 
-void                  NetHelper_WriteVec2( Vec2::Builder* spBuilder, const glm::vec2& srVec );
-void                  NetHelper_WriteVec3( Vec3::Builder* spBuilder, const glm::vec3& srVec );
-void                  NetHelper_WriteVec4( Vec4::Builder* spBuilder, const glm::vec4& srVec );
+#if 0
+void                  NetHelper_WriteVec2( Vec2Builder& srBuilder, const glm::vec2& srVec );
+void                  NetHelper_WriteVec3( Vec3Builder& srBuilder, const glm::vec3& srVec );
+void                  NetHelper_WriteVec4( Vec4Builder& srBuilder, const glm::vec4& srVec );
+#endif
 

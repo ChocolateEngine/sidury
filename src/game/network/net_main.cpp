@@ -1,97 +1,5 @@
+#include "flatbuffers/flatbuffers.h"
 #include "net_main.h"
-
-
-// ---------------------------------------------------------------------------
-// Cap'N Proto Wrappers
-
-
-class NetInputStream : public kj::InputStream
-{
-  public:
-	NetInputStream( char* spData, int sLen ) :
-		apData( spData ), aLen( sLen )
-	{
-	}
-
-	~NetInputStream()
-	{
-	}
-
-	size_t tryRead( void* buffer, size_t minBytes, size_t maxBytes ) override
-	{
-		return 0;
-	}
-
-	char* apData = nullptr;
-	int   aLen   = 0;
-};
-
-
-NetBufferedInputStream::NetBufferedInputStream( char* spData, int sLen )
-{
-	// kj::ArrayBuilder< kj::byte > builder = kj::heapArrayBuilder< kj::byte >( sLen * sizeof( char* ) );
-	kj::ArrayBuilder< kj::byte > builder = kj::heapArrayBuilder< kj::byte >( sLen );
-
-	// this is so stupid
-	ChVector< capnp::byte >      container( sLen );
-	memcpy( container.data(), spData, sLen );
-
-	builder.addAll( container );
-
-	aReadBuffer = builder.finish();
-}
-
-
-NetBufferedInputStream::NetBufferedInputStream( const ChVector< char >& srData )
-{
-	kj::ArrayBuilder< kj::byte > builder = kj::heapArrayBuilder< kj::byte >( srData.size_bytes() );
-
-	builder.addAll( srData );
-
-	aReadBuffer = builder.finish();
-}
-
-
-NetBufferedInputStream ::~NetBufferedInputStream()
-{
-}
-
-
-size_t NetBufferedInputStream::tryRead( void* spBuffer, size_t sMinBytes, size_t sMaxBytes )
-{
-	if ( aReadPos > aReadBuffer.size() )
-		return 0;
-
-	auto amount = std::min( sMaxBytes, aReadBuffer.size() - aReadPos );
-
-	memcpy( spBuffer, aReadBuffer.begin() + aReadPos, amount );
-	aReadPos += amount;
-
-	return amount;
-}
-
-
-kj::ArrayPtr< const capnp::byte > NetBufferedInputStream::tryGetReadBuffer()
-{
-	size_t amount = aReadBuffer.size() - aReadPos;
-	return kj::ArrayPtr( reinterpret_cast< const kj::byte* >( aReadBuffer.begin() + aReadPos ), amount );
-
-	// return aReadBuffer.asPtr();
-}
-
-
-void NetBufferedInputStream::skip( size_t bytes )
-{
-	AssertMsg( bytes <= aReadBuffer.size() - aReadPos, "Overran end of stream." );
-
-	if ( aReadPos > aReadBuffer.size() || !(bytes <= aReadBuffer.size() - aReadPos) )
-		return;
-
-	aReadPos += bytes;
-}
-
-
-// ---------------------------------------------------------------------------
 
 
 #if 0
@@ -112,11 +20,9 @@ int Net_ReadPacked( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFro
 #endif
 
 
-int Net_WritePacked( Socket_t sSocket, ch_sockaddr& spAddr, capnp::MessageBuilder& srBuilder )
+int Net_WriteFlatBuffer( Socket_t sSocket, ch_sockaddr& srAddr, flatbuffers::FlatBufferBuilder& srBuilder )
 {
-	NetOutputStream outputStream;
-	capnp::writePackedMessage( outputStream, srBuilder );
-	return Net_Write( sSocket, outputStream.aBuffer.data(), outputStream.aBuffer.size_bytes(), &spAddr );
+	return Net_Write( sSocket, srAddr, reinterpret_cast< const char* >( srBuilder.GetBufferPointer() ), srBuilder.GetSize() );
 }
 
 

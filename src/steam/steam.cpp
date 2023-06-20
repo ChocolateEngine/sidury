@@ -233,7 +233,7 @@ bool SteamAbstraction::RequestAvatarImage( ESteamAvatarSize sSize, SteamID64_t s
 	auto it = gSteamTextureHandles.find( avatarHandle );
 	if ( it != gSteamTextureHandles.end() )
 	{
-		gpSteamToGame->OnRequestAvatarImage( sSteamID, it->second );
+		gpSteamToGame->OnRequestAvatarImage( sSteamID, sSize, it->second );
 		return true;
 	}
 
@@ -350,13 +350,31 @@ void SteamAbstraction::LoadAvatarImage( AvatarImageLoaded_t* spParam )
 // ==================================================
 
 
+static ESteamAvatarSize GetAvatarSizeFromWidth( int sWidth )
+{
+	switch ( sWidth )
+	{
+		default:
+		case 32:
+			return ESteamAvatarSize_Small;
+
+		case 64:
+			return ESteamAvatarSize_Medium;
+
+		case 184:
+			return ESteamAvatarSize_Large;
+	}
+}
+
+
 void SteamAbstraction::OnAvatarImageLoaded( AvatarImageLoaded_t* spParam )
 {
 	// Before we do anything, check if we loaded this image already
 	auto it = gSteamTextureHandles.find( spParam->m_iImage );
 	if ( it != gSteamTextureHandles.end() )
 	{
-		gpSteamToGame->OnRequestAvatarImage( spParam->m_steamID.ConvertToUint64(), it->second );
+		ESteamAvatarSize size = GetAvatarSizeFromWidth( spParam->m_iWide );
+		gpSteamToGame->OnRequestAvatarImage( spParam->m_steamID.ConvertToUint64(), size, it->second );
 		return;
 	}
 
@@ -398,7 +416,8 @@ void SteamAbstraction::OnAvatarImageLoaded( AvatarImageLoaded_t* spParam )
 
 	gSteamTextureHandles[ spParam->m_iImage ] = texture;
 
-	gpSteamToGame->OnRequestAvatarImage( spParam->m_steamID.ConvertToUint64(), texture );
+	ESteamAvatarSize size                     = GetAvatarSizeFromWidth( spParam->m_iWide );
+	gpSteamToGame->OnRequestAvatarImage( spParam->m_steamID.ConvertToUint64(), size, texture );
 }
 
 

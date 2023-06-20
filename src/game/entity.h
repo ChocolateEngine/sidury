@@ -13,18 +13,25 @@
 #include "types/transform.h"
 #include "iaudio.h"
 
+// TODO: split in 2 parts
+// - A magic number to send across client and server, if this number is 0, it's local to client or server and not networked
+// - Client and Server give their own entity index to this,
+//     so we don't have client only and server only entity indexes conflict
+using Entity = size_t;
+
 // AAA
+#include "game_shared.h"
+#include "flatbuffers/sidury_generated.h"
 #include "graphics/graphics.h"
 
 #include "iaudio.h"
 
 
 // Forward Declarations
-namespace capnp 
-{
-	class MessageReader;
-	class MessageBuilder;
-}
+// namespace flatbuffers
+// {
+// class FlatBufferBuilder;
+// }
 
 template< typename T >
 struct ComponentNetVar;
@@ -32,7 +39,6 @@ struct ComponentNetVar;
 class EntitySystem;
 class IEntityComponentSystem;
 
-using Entity                            = size_t;
 using ComponentType                     = uint8_t;
 
 constexpr Entity        CH_MAX_ENTITIES = 8192;
@@ -81,8 +87,8 @@ using FEntComp_Free      = std::function< void( void* spData ) >;
 using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
 
 // Functions for serializing and deserializing Components with Cap'n Proto
-using FEntComp_ReadFunc  = void( capnp::MessageReader& srReader, void* spData );
-using FEntComp_WriteFunc = bool( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate );
+using FEntComp_ReadFunc  = void( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData );
+using FEntComp_WriteFunc = bool( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate );
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
@@ -504,6 +510,9 @@ class IEntityComponentSystem
 
 	virtual void          Update(){};
 
+	// What if we stored a pointer to the component pool here
+	// Or changed this std::vector of entities to an unordered_map, or a tuple
+
 	std::vector< Entity > aEntities;
 };
 
@@ -538,9 +547,10 @@ class EntitySystem
 
 	// Entity                                                        CreateEntityNetworked();
 
-	Entity                                                        CreateEntity();
+	// if sLocal is true, then the entity is only created on client or server, and is never networked
+	// Useful for client or server only entities, if we ever have those
+	Entity                                                        CreateEntity( bool sLocal = false );
 	void                                                          DeleteEntity( Entity ent );
-	void                                                          DeleteEntityQueued( Entity ent );
 	void                                                          DeleteQueuedEntities();
 	Entity                                                        GetEntityCount();
 
@@ -551,11 +561,11 @@ class EntitySystem
 	bool                                                          EntityExists( Entity desiredId );
 
 	// Read and write from the network
-	void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
-	void                                                          WriteEntityUpdates( capnp::MessageBuilder& srBuilder );
+	//void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
+	void                                                          WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
 
-	void                                                          ReadComponentUpdates( capnp::MessageReader& srReader );
-	void                                                          WriteComponentUpdates( capnp::MessageBuilder& srBuilder, bool sFullUpdate );
+	//void                                                          ReadComponentUpdates( capnp::MessageReader& srReader );
+	void                                                          WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
 
 	// void                                                          SetComponentNetworked( Entity ent, const char* spName );
 
@@ -897,8 +907,56 @@ struct ComponentNetVar
 };
 
 
+enum ENetFlagVec : char
+{
+	ENetFlagVec_None = 0,
+	ENetFlagVec_HasX = ( 1 << 0 ),
+	ENetFlagVec_HasY = ( 1 << 1 ),
+	ENetFlagVec_HasZ = ( 1 << 2 ),
+	ENetFlagVec_HasW = ( 1 << 3 ),
+};
+
+
+// TODO: copy stuff from ComponentNetVar
+template< typename T >
+struct ComponentNetVecBase
+{
+	T           aVec = {};
+	ENetFlagVec aDirty;
+};
+
+
+using ComponentNetVec2 = ComponentNetVecBase< glm::vec2 >;
+using ComponentNetVec3 = ComponentNetVecBase< glm::vec3 >;
+using ComponentNetVec4 = ComponentNetVecBase< glm::vec4 >;
+
+
 // ==========================================
 // Some Base Types here for now
+
+
+// idea for FlexBuffers
+enum ETransformNetFlag : short
+{
+	ETransformNetFlag_None      = 0,
+	ETransformNetFlag_HasPos    = ( 1 << 0 ),
+	ETransformNetFlag_HasAng    = ( 1 << 1 ),
+	ETransformNetFlag_HasScale  = ( 1 << 2 ),
+
+	ETransformNetFlag_HasPosX   = ( 1 << 3 ),
+	ETransformNetFlag_HasPosY   = ( 1 << 4 ),
+	ETransformNetFlag_HasPosZ   = ( 1 << 5 ),
+
+	ETransformNetFlag_HasAngX   = ( 1 << 6 ),
+	ETransformNetFlag_HasAngY   = ( 1 << 7 ),
+	ETransformNetFlag_HasAngZ   = ( 1 << 8 ),
+
+	ETransformNetFlag_HasScaleX = ( 1 << 9 ),
+	ETransformNetFlag_HasScaleY = ( 1 << 10 ),
+	ETransformNetFlag_HasScaleZ = ( 1 << 11 ),
+};
+
+
 
 
 struct CTransform
@@ -919,7 +977,7 @@ struct CTransform
 	}
 
 	// copying
-	void                         assign( const CTransform& other )
+	void assign( const CTransform& other )
 	{
 		aPos   = std::move( other.aPos );
 		aAng   = std::move( other.aAng );
@@ -1117,10 +1175,10 @@ struct CLight
 //   EntComp_RegisterComponentReadWrite< type >( read, write )
 
 #define CH_COMPONENT_READ_DEF( type ) \
-  static void __EntCompFunc_Read_##type( capnp::MessageReader& srReader, void* spData )
+  static void __EntCompFunc_Read_##type( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData )
 
 #define CH_COMPONENT_WRITE_DEF( type ) \
-  static bool __EntCompFunc_Write_##type( capnp::MessageBuilder& srMessage, const void* spData, bool sFullUpdate )
+  static bool __EntCompFunc_Write_##type( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate )
 
 #define CH_COMPONENT_RW( type )    __EntCompFunc_Read_##type, __EntCompFunc_Write_##type
 #define CH_COMPONENT_READ( type )  __EntCompFunc_Read_##type
@@ -1138,6 +1196,48 @@ struct CLight
 
 #define CH_REGISTER_COMPONENT_RW_SV( type, name, overrideClient ) \
   CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Server )
+
+
+
+#define CH_NET_WRITE_VEC2( varName, var ) \
+  if ( var.aIsDirty || sFullUpdate )                 \
+  {                                                  \
+	Vec2Builder vec2Build( srBuilder );              \
+	NetHelper_WriteVec2( vec2Build, var );           \
+	varName##Offset = vec2Build.Finish();                \
+  }
+
+//#define CH_NET_WRITE_VEC3( varName, var ) \
+//  if ( var.aIsDirty || sFullUpdate )                 \
+//  {                                                  \
+//	Vec3Builder vec3Build( srBuilder );              \
+//	NetHelper_WriteVec3( vec3Build, var );           \
+//	varName##Offset = vec3Build.Finish();                \
+//  }
+
+#define CH_NET_WRITE_VEC3( builder, varName, var ) \
+  if ( var.aIsDirty || sFullUpdate )                 \
+  {                                                  \
+	Vec3 vec( var.Get().x, var.Get().y, var.Get().z ); \
+	builder.add_##varName( &vec );               \
+  }
+
+#define CH_NET_WRITE_VEC4( varName, var ) \
+  if ( var.aIsDirty || sFullUpdate )                 \
+  {                                                  \
+	Vec4Builder vec4Build( srBuilder );              \
+	NetHelper_WriteVec4( vec4Build, var );           \
+	varName##Offset = vec4Build.Finish();                \
+  }
+
+// #define CH_NET_WRITE_OFFSET( builder, var ) \
+//   if ( !var##Offset.IsNull() )              \
+// 	builder.add_##var( var##Offset ) 
+
+#define CH_NET_WRITE_OFFSET( builder, var ) 
+
+
+#define CH_VAR_DIRTY( var ) var.aIsDirty || sFullUpdate
 
 
 // Helper Macros for Registering Standard Var Types
@@ -1207,6 +1307,31 @@ inline Renderable_t* Ent_CreateRenderable( Entity sEntity )
 		}
 
 		renderComp->aHandle = Graphics_CreateRenderable( model );
+		if ( renderComp->aHandle == InvalidHandle )
+		{
+			Log_Error( "Failed to create renderable\n" );
+			return nullptr;
+		}
+	}
+
+	return Graphics_GetRenderableData( renderComp->aHandle );
+}
+
+// This version has an option to enter a model handle
+inline Renderable_t* Ent_CreateRenderable( Entity sEntity, Handle sModel )
+{
+	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+
+	if ( !renderComp )
+	{
+		Log_Error( "Failed to get renderable component\n" );
+		return nullptr;
+	}
+
+	// I hate this so much
+	if ( renderComp->aHandle == InvalidHandle )
+	{
+		renderComp->aHandle = Graphics_CreateRenderable( sModel );
 		if ( renderComp->aHandle == InvalidHandle )
 		{
 			Log_Error( "Failed to create renderable\n" );

@@ -16,9 +16,9 @@ set(
 	network/net_main.cpp
 	network/net_main.h
 	
-	# capnproto
-	capnproto/sidury.capnp.c++
-	capnproto/sidury.capnp.h
+	# flatbuffers
+	flatbuffers/sidury.capnp.c++
+	flatbuffers/sidury.capnp.h
 	
 	# tools
 	tools/light_editor.cpp
@@ -49,21 +49,15 @@ set(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-include_directories( "${CH_THIRDPARTY}/capnproto/c++/src" )
+include_directories( "${CH_THIRDPARTY}/flatbuffers/include" )
 
-set( CAPNPROTO_DIR_DEBUG "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Debug" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Debug" )
-set( CAPNPROTO_DIR_RELEASE "${CH_THIRDPARTY}/capnproto/build/c++/src/capnp/Release" "${CH_THIRDPARTY}/capnproto/build/c++/src/kj/Release" )
+set( FLATBUFFERS_DIR_DEBUG "${CH_THIRDPARTY}/flatbuffers/build/Debug" )
+set( FLATBUFFERS_DIR_RELEASE "${CH_THIRDPARTY}/flatbuffers/build/Release" )
 
 link_directories(
-	"$<$<CONFIG:Debug>:${CAPNPROTO_DIR_DEBUG}>"
-	"$<$<CONFIG:Release>:${CAPNPROTO_DIR_RELEASE}>"
-	"$<$<CONFIG:RelWithDebInfo>:${CAPNPROTO_DIR_RELEASE}>"
-)
-
-link_libraries(
-	capnp
-	capnpc
-	kj
+	"$<$<CONFIG:Debug>:${FLATBUFFERS_DIR_DEBUG}>"
+	"$<$<CONFIG:Release>:${FLATBUFFERS_DIR_RELEASE}>"
+	"$<$<CONFIG:RelWithDebInfo>:${FLATBUFFERS_DIR_RELEASE}>"
 )
 
 add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
@@ -73,6 +67,7 @@ target_link_libraries(
 	PRIVATE
 	Core
 	ImGui
+	flatbuffers
 )
 
 if( WIN32 )

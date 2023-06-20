@@ -122,6 +122,8 @@ CONVAR( r_vis_lock, 0 );
 
 CONVAR( r_line_thickness, 2 );
 
+CONVAR( r_show_draw_calls, 0 );
+
 CONCMD( r_reload_textures )
 {
 	render->ReloadTextures();
@@ -1223,9 +1225,12 @@ void Graphics_PrepareDrawData()
 
 	render->PreRenderPass();
 
-	ImGui::Text( "Model Draw Calls: %zd", gModelDrawCalls );
-	ImGui::Text( "Verts Drawn: %zd", gVertsDrawn );
-	ImGui::Text( "Debug Line Verts: %zd", gDebugLineVertPos.size() );
+	if ( r_show_draw_calls )
+	{
+		gui->DebugMessage( "Model Draw Calls: %zd", gModelDrawCalls );
+		gui->DebugMessage( "Verts Drawn: %zd", gVertsDrawn );
+		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVertPos.size() );
+	}
 
 	{
 		PROF_SCOPE_NAMED( "Imgui Render" );

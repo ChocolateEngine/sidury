@@ -103,6 +103,12 @@ struct CPlayerInfo
 };
 
 
+// idk if we need any info here really
+struct CPlayerSpawn
+{
+};
+
+
 // =======================================================
 // Systems - Logic that operates on the components
 

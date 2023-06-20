@@ -1,22 +1,20 @@
 #include "main.h"
-#include "cl_main.h"
 #include "game_shared.h"
+#include "cl_main.h"
 #include "inputsystem.h"
 #include "mapmanager.h"
 #include "player.h"
 #include "steam.h"
 #include "network/net_main.h"
 
+#include "flatbuffers/sidury_generated.h"
+
+#include "imgui/imgui.h"
 #include "igui.h"
 #include "iinput.h"
 #include "render/irender.h"
 
 #include "testing.h"
-
-#include "capnproto/sidury.capnp.h"
-
-#include <capnp/message.h>
-#include <capnp/serialize-packed.h>
 
 //
 // The Client, always running unless a dedicated server
@@ -45,9 +43,17 @@ static double                     gClientConnectTimeout = 0.f;
 static float                      gClientTimeout        = 0.f;
 static bool                       gClientMenuShown      = true;
 
+// AAAAAAAAAAAAAA
+static bool                       gClientWait_EntityList            = false;
+static bool                       gClientWait_ComponentList         = false;
+static bool                       gClientWait_ServerInfo            = false;
+// static bool                       gClientWait_ComponentRegistryInfo = false;
+
 // Console Commands to send to the server to process, like noclip
 static std::vector< std::string > gCommandsToSend;
 UserCmd_t                         gClientUserCmd{};
+
+std::vector< CL_Client_t >        gClClients;
 
 extern Entity                     gLocalPlayer;
 
@@ -149,13 +155,29 @@ void CL_Shutdown()
 }
 
 
-void CL_WriteMsgData( MsgSrcClient::Builder& srBuilder, capnp::MessageBuilder& srBuilderData )
+void CL_WriteMsgData( flatbuffers::FlatBufferBuilder& srRootBuilder, flatbuffers::FlatBufferBuilder& srDataBuffer, EMsgSrc_Client sType )
 {
-	NetOutputStream outputStream;
-	capnp::writePackedMessage( outputStream, srBuilderData );
+	auto                           vector = srRootBuilder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
 
-	auto data = srBuilder.initData( outputStream.aBuffer.size_bytes() );
-	memcpy( data.begin(), outputStream.aBuffer.begin(), outputStream.aBuffer.size_bytes() );
+	MsgSrc_ClientBuilder           root( srRootBuilder );
+	root.add_type( sType );
+	root.add_data( vector );
+	srRootBuilder.Finish( root.Finish() );
+}
+
+
+// Same as CL_WriteMsgData, but also sends it to the server
+void CL_WriteMsgDataToServer( flatbuffers::FlatBufferBuilder& srDataBuffer, EMsgSrc_Client sType )
+{
+	flatbuffers::FlatBufferBuilder builder;
+	auto                           vector = builder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
+
+	MsgSrc_ClientBuilder           root( builder );
+	root.add_type( sType );
+	root.add_data( vector );
+	builder.Finish( root.Finish() );
+
+	CL_WriteToServer( builder );
 }
 
 
@@ -170,38 +192,54 @@ void CL_Update( float frameTime )
 		case EClientState_Idle:
 			break;
 
-		case EClientState_RecvServerInfo:
+		case EClientState_WaitForAccept:
 		{
 			// Recieve Server Info first
-			if ( !CL_RecvServerInfo() )
-				CL_Disconnect();
+			CL_GetServerMessages();
+			break;
+		}
 
+		case EClientState_WaitForFullUpdate:
+		{
+			CL_GetServerMessages();
+
+			// Recieve Server Info first
+			// if ( !CL_RecvServerInfo() )
+			// 	CL_Disconnect();
+		
 			break;
 		}
 
 		case EClientState_Connecting:
 		{
-			// Try to load the map if we aren't hosting the server
-			if ( !Game_IsHosting() )
+			CL_GetServerMessages();
+
+			// I HATE THIS
+			if ( gClientWait_EntityList && gClientWait_ComponentList && gClientWait_ServerInfo )
 			{
-				// Do we have the map?
-				if ( !MapManager_FindMap( gClientServerData.aMapName ) )
+				// Try to load the map if we aren't hosting the server
+				if ( !Game_IsHosting() )
 				{
-					// Maybe one day we can download the map from the server
-					CL_Disconnect( true, "Missing Map" );
-					break;
+					// Do we have the map?
+					if ( !MapManager_FindMap( gClientServerData.aMapName ) )
+					{
+						// Maybe one day we can download the map from the server
+						CL_Disconnect( true, "Missing Map" );
+						break;
+					}
+
+					// Load Map (MAKE THIS ASYNC)
+					if ( !MapManager_LoadMap( gClientServerData.aMapName ) )
+					{
+						CL_Disconnect( true, "Failed to Load Map" );
+						break;
+					}
 				}
 
-				// Load Map (MAKE THIS ASYNC)
-				if ( !MapManager_LoadMap( gClientServerData.aMapName ) )
-				{
-					CL_Disconnect( true, "Failed to Load Map" );
-					break;
-				}
+				gClientState = EClientState_Connected;
+				GetEntitySystem()->AddComponent( gLocalPlayer, "playerInfo" );
 			}
 
-			gClientState = EClientState_Connected;
-			GetEntitySystem()->AddComponent( gLocalPlayer, "playerInfo" );
 			break;
 		}
 
@@ -227,6 +265,11 @@ void CL_Update( float frameTime )
 
 			break;
 		}
+	}
+
+	if ( CL_IsMenuShown() )
+	{
+		CL_DrawMainMenu();
 	}
 
 	Game_SetCommandSource( ECommandSource_Console );
@@ -269,6 +312,78 @@ const char* CL_GetUserName()
 }
 
 
+void CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar )
+{
+	for ( CL_Client_t& client : gClClients )
+	{
+		if ( client.aSteamID != sSteamID )
+			continue;
+		
+		switch ( sSize )
+		{
+			case ESteamAvatarSize_Large:
+				client.aAvatarLarge = sAvatar;
+				break;
+
+			case ESteamAvatarSize_Medium:
+				client.aAvatarMedium = sAvatar;
+				break;
+
+			case ESteamAvatarSize_Small:
+				client.aAvatarSmall = sAvatar;
+				break;
+		}
+
+		break;
+	}
+}
+
+
+Handle CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize )
+{
+	for ( CL_Client_t& client : gClClients )
+	{
+		if ( client.aSteamID != sSteamID )
+			continue;
+		
+		switch ( sSize )
+		{
+			case ESteamAvatarSize_Large:
+				return client.aAvatarLarge;
+
+			case ESteamAvatarSize_Medium:
+				return client.aAvatarMedium;
+
+			case ESteamAvatarSize_Small:
+				return client.aAvatarSmall;
+		}
+	}
+
+	return InvalidHandle;
+}
+
+
+Handle CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth )
+{
+	for ( CL_Client_t& client : gClClients )
+	{
+		if ( client.aSteamID != sSteamID )
+			continue;
+
+		if ( sWidth < 64 )
+			return client.aAvatarSmall;
+
+		if ( sWidth < 184 )
+			return client.aAvatarMedium;
+
+		else
+			return client.aAvatarLarge;
+	}
+
+	return InvalidHandle;
+}
+
+
 bool CL_IsMenuShown()
 {
 	return gClientMenuShown;
@@ -301,21 +416,21 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 {
 	if ( gClientSocket != CH_INVALID_SOCKET )
 	{
-		if ( sSendReason )
-		{
-			// Tell the server we are disconnecting
-			capnp::MallocMessageBuilder builder;
-			auto                        root = builder.initRoot< MsgSrcClient >();
-			root.setType( EMsgSrcClient::DISCONNECT );
-
-			capnp::MallocMessageBuilder disconnectBuilder;
-			auto                        msgDisconnect = disconnectBuilder.initRoot< NetMsgDisconnect >();
-
-			msgDisconnect.setReason( spReason ? spReason : "Client Disconnect" );
-
-			CL_WriteMsgData( root, disconnectBuilder );
-			CL_WriteToServer( builder );
-		}
+		// if ( sSendReason )
+		// {
+		// 	// Tell the server we are disconnecting
+		// 	flatbuffers::FlatBufferBuilder builder;
+		// 	auto                        root = builder.initRoot< MsgSrcClient >();
+		// 	root.setType( EMsgSrcClient::DISCONNECT );
+		// 
+		// 	flatbuffers::FlatBufferBuilder disconnectBuilder;
+		// 	auto                        msgDisconnect = disconnectBuilder.initRoot< NetMsgDisconnect >();
+		// 
+		// 	msgDisconnect.setReason( spReason ? spReason : "Client Disconnect" );
+		// 
+		// 	CL_WriteMsgData( root, disconnectBuilder );
+		// 	CL_WriteToServer( builder );
+		// }
 
 		Net_CloseSocket( gClientSocket );
 		gClientSocket = CH_INVALID_SOCKET;
@@ -326,8 +441,12 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 	if ( gClientState != EClientState_Idle )
 		Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
 
-	gClientState          = EClientState_Idle;
-	gClientConnectTimeout = 0.f;
+	gClientState              = EClientState_Idle;
+	gClientConnectTimeout     = 0.f;
+
+	gClientWait_EntityList    = false;
+	gClientWait_ComponentList = false;
+	gClientWait_ServerInfo    = false;
 
 	GetEntitySystem()->Shutdown();
 }
@@ -350,12 +469,15 @@ void CL_Connect( const char* spAddress )
 
 	Log_MsgF( gLC_Client, "Connecting to \"%s\"\n", spAddress );
 
-	capnp::MallocMessageBuilder message;
-	NetMsgClientInfo::Builder   clientInfoBuild = message.initRoot< NetMsgClientInfo >();
+	flatbuffers::FlatBufferBuilder builder( 1024 );
+	auto                           msgClientConnect = CreateNetMsg_ClientConnect( builder, ESiduryProtocolVer_Value );
 
-	clientInfoBuild.setProtocol( CH_SIDURY_PROTOCOL );
-	clientInfoBuild.setName( CL_GetUserName() );
-	clientInfoBuild.setSteamID( IsSteamLoaded() ? steam->GetSteamID() : 0 );
+	// flatbuffers::FlatBufferBuilder message;
+	// NetMsgClientInfo::Builder   clientInfoBuild = message.initRoot< NetMsgClientInfo >();
+	// 
+	// clientInfoBuild.setProtocol( CH_SIDURY_PROTOCOL );
+	// clientInfoBuild.setName( CL_GetUserName() );
+	// clientInfoBuild.setSteamID( IsSteamLoaded() ? steam->GetSteamID() : 0 );
 
 	gClientSocket     = Net_OpenSocket( "0" );
 	NetAddr_t netAddr = Net_GetNetAddrFromString( spAddress );
@@ -367,12 +489,13 @@ void CL_Connect( const char* spAddress )
 	if ( connectRet != 0 )
 		return;
 
-	int write = Net_WritePacked( gClientSocket, gClientAddr, message );
+	builder.Finish( msgClientConnect );
+	int write = Net_WriteFlatBuffer( gClientSocket, gClientAddr, builder );
 
 	if ( write > 0 )
 	{
 		// Continue connecting in CL_Update()
-		gClientState          = EClientState_RecvServerInfo;
+		gClientState          = EClientState_WaitForAccept;
 		gClientConnectTimeout = Game_GetCurTime() + cl_connect_timeout_duration;
 	}
 	else
@@ -382,13 +505,14 @@ void CL_Connect( const char* spAddress )
 }
 
 
-int CL_WriteToServer( capnp::MessageBuilder& srBuilder )
+int CL_WriteToServer( flatbuffers::FlatBufferBuilder& srBuilder )
 {
-	return Net_WritePacked( gClientSocket, gClientAddr, srBuilder );
+	return Net_WriteFlatBuffer( gClientSocket, gClientAddr, srBuilder );
 }
 
 
-bool CL_RecvServerInfo()
+#if 0
+bool CL_WaitForAccept()
 {
 	ChVector< char > data( 8192 );
 	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
@@ -412,6 +536,10 @@ bool CL_RecvServerInfo()
 
 	Log_Msg( gLC_Client, "Receiving Server Info\n" );
 
+
+
+	MsgSrc_Server                 serverMsg;
+
 	NetBufferedInputStream        inputStream( (char*)data.begin(), len );
 	capnp::PackedMessageReader    reader( inputStream );
 
@@ -426,6 +554,7 @@ bool CL_RecvServerInfo()
 
 	return true;
 }
+#endif
 
 
 bool CL_SendConVarIfClient( std::string_view sName, const std::vector< std::string >& srArgs )
@@ -461,13 +590,6 @@ void CL_SendConVars()
 	if ( gCommandsToSend.empty() )
 		return;
 
-	capnp::MallocMessageBuilder builder;
-	auto                        root = builder.initRoot< MsgSrcClient >();
-	root.setType( EMsgSrcClient::CON_VAR );
-
-	capnp::MallocMessageBuilder convarBuilder;
-	auto                        convarMsg = convarBuilder.initRoot< NetMsgConVar >();
-
 	std::string command;
 
 	// Join it all into one string
@@ -477,10 +599,10 @@ void CL_SendConVars()
 	// Clear it
 	gCommandsToSend.clear();
 
-	convarMsg.setCommand( command );
-
-	CL_WriteMsgData( root, convarBuilder );
-	CL_WriteToServer( builder );
+	flatbuffers::FlatBufferBuilder convarBuffer;
+	auto msg = CreateNetMsg_ConVar( convarBuffer, convarBuffer.CreateString( command ) );
+	convarBuffer.Finish( msg );
+	CL_WriteMsgDataToServer( convarBuffer, EMsgSrc_Client_ConVar );
 }
 
 
@@ -520,53 +642,131 @@ void CL_UpdateUserCmd()
 }
 
 
-void CL_BuildUserCmd( capnp::MessageBuilder& srBuilder )
+void CL_BuildUserCmd( flatbuffers::FlatBufferBuilder& srBuilder )
 {
-	auto builder = srBuilder.initRoot< NetMsgUserCmd >();
-	
-	auto ang     = builder.initAngles();
-	NetHelper_WriteVec3( &ang, gClientUserCmd.aAng );
+	flatbuffers::Offset< Vec3 > anglesOffset{};
+	// CH_NET_WRITE_VEC3( angles, gClientUserCmd.aAng );
 
-	builder.setButtons( gClientUserCmd.aButtons );
-	builder.setFlashlight( gClientUserCmd.aFlashlight );
-	builder.setMoveType( static_cast< EPlayerMoveType >( gClientUserCmd.aMoveType ) );
+#if 0
+	Vec3Builder vec3Build( srBuilder );
+	NetHelper_WriteVec3( vec3Build, gClientUserCmd.aAng );
+	anglesOffset = vec3Build.Finish();
+#endif
+	
+	NetMsg_UserCmdBuilder builder( srBuilder );
+
+	Vec3                  posVec( gClientUserCmd.aAng.x, gClientUserCmd.aAng.y, gClientUserCmd.aAng.z );
+	builder.add_angles( &posVec );
+
+	CH_NET_WRITE_OFFSET( builder, angles );
+	builder.add_buttons( gClientUserCmd.aButtons );
+	builder.add_flashlight( gClientUserCmd.aFlashlight );
+	builder.add_move_type( static_cast< EPlayerMoveType >( gClientUserCmd.aMoveType ) );
+
+	srBuilder.Finish( builder.Finish() );
 }
 
 
 void CL_SendUserCmd()
 {
-	capnp::MallocMessageBuilder builder;
-	auto                        root = builder.initRoot< MsgSrcClient >();
-	root.setType( EMsgSrcClient::USER_CMD );
-
-	capnp::MallocMessageBuilder userCmdBuilder;
+	flatbuffers::FlatBufferBuilder userCmdBuilder;
 	CL_BuildUserCmd( userCmdBuilder );
-
-	CL_WriteMsgData( root, userCmdBuilder );
-	CL_WriteToServer( builder );
+	CL_WriteMsgDataToServer( userCmdBuilder, EMsgSrc_Client_UserCmd );
 }
 
 
 void CL_SendFullUpdateRequest()
 {
-	capnp::MallocMessageBuilder builder;
-	auto                        root = builder.initRoot< MsgSrcClient >();
-	root.setType( EMsgSrcClient::FULL_UPDATE );
+	flatbuffers::FlatBufferBuilder builder;
+	MsgSrc_ClientBuilder           root( builder );
+
+	root.add_type( EMsgSrc_Client_FullUpdate );
 	CL_WriteToServer( builder );
 }
 
 
-void CL_SendMessageToServer( EMsgSrcClient sSrcType )
+void CL_SendMessageToServer( EMsgSrc_Client sSrcType )
 {
 }
 
 
-void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
+void CL_HandleMsg_ClientInfo( const NetMsg_ServerClientInfo* spMessage )
 {
-	gClientServerData.aName        = srReader.getName();
-	gClientServerData.aMapName     = srReader.getMapName();
-	gClientServerData.aClientCount = srReader.getClientCount();
-	gClientServerData.aMaxClients  = srReader.getMaxClients();
+	if ( !spMessage )
+		return;
+
+	if ( spMessage->steam_id() == 0 )
+		return;
+
+	// Find the client by Entity ID
+	CL_Client_t* spClient = nullptr;
+
+	for ( auto client: gClClients )
+	{
+		if ( client.aEntity == spMessage->entity_id() )
+		{
+			spClient = &client;
+			break;
+		}
+	}
+
+	// If none is found, create one
+	if ( !spClient )
+		spClient = &gClClients.emplace_back();
+
+	if ( spMessage->name() )
+		spClient->aName = spMessage->name()->str();
+	
+	spClient->aSteamID = spMessage->steam_id();
+	spClient->aEntity  = spMessage->entity_id();
+}
+
+
+void CL_HandleMsg_ServerConnectResponse( const NetMsg_ServerConnectResponse* spMsg )
+{
+	if ( !spMsg )
+		return;
+
+	Entity entity = spMsg->client_entity_id();
+	
+	if ( entity == CH_ENT_INVALID )
+	{
+		CL_Disconnect( false );
+		return;
+	}
+
+	gLocalPlayer = entity;
+	gClientState = EClientState_Connecting;
+
+	// Send them our client info now
+	flatbuffers::FlatBufferBuilder dataBuilder;
+	auto                           name = dataBuilder.CreateString( CL_GetUserName() );
+
+	NetMsg_ClientInfoBuilder       clientInfo( dataBuilder );
+
+	clientInfo.add_name( name );
+	clientInfo.add_steam_id( IsSteamLoaded() ? steam->GetSteamID() : 0 );
+	dataBuilder.Finish( clientInfo.Finish() );
+
+	CL_WriteMsgDataToServer( dataBuilder, EMsgSrc_Client_ClientInfo );
+}
+
+
+void CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spMsg )
+{
+	if ( !spMsg )
+		return;
+
+	gClientWait_ServerInfo = true;
+
+	if ( spMsg->name() )
+		gClientServerData.aName = spMsg->name()->str();
+
+	if ( spMsg->map_name() )
+		gClientServerData.aMapName = spMsg->map_name()->str();
+
+	gClientServerData.aMapName    = spMsg->client_count();
+	gClientServerData.aMaxClients = spMsg->max_clients();
 }
 
 
@@ -574,16 +774,30 @@ void CL_HandleMsg_ServerInfo( NetMsgServerInfo::Reader& srReader )
 // The client entity ID's may be different thanks to client only entities
 // and having an internal system to convert the entity id to what we store it on the client
 // would completely resolve any potential entity id conflicts
-void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
+void CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spMsg )
 {
 	PROF_SCOPE();
 
-	for ( const NetMsgEntityUpdate::Reader& entityUpdate : srReader.getUpdateList() )
+	gClientWait_EntityList    = true;
+
+	auto entityUpdateList = spMsg->update_list();
+
+	if ( !entityUpdateList )
+		return;
+
+	for ( size_t i = 0; i < entityUpdateList->size(); i++ )
 	{
-		Entity entId  = entityUpdate.getId();
+		const NetMsg_EntityUpdate* entityUpdate = entityUpdateList->Get( i );
+
+		if ( !entityUpdate )
+			continue;
+
+		// NetMsg_EntityUpdate
+
+		Entity entId  = entityUpdate->id();
 		Entity entity = CH_ENT_INVALID;
 
-		if ( entityUpdate.getDestroyed() )
+		if ( entityUpdate->destroyed() )
 		{
 			GetEntitySystem()->DeleteEntity( entId );
 			continue;
@@ -607,16 +821,32 @@ void CL_HandleMsg_EntityList( NetMsgEntityUpdates::Reader& srReader )
 }
 
 
-void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
+void CL_HandleMsg_ComponentList( const NetMsg_ComponentUpdates* spReader )
 {
 	PROF_SCOPE();
 
-	for ( const NetMsgComponentUpdate::Reader& componentUpdate : srReader.getUpdateList() )
+	gClientWait_ComponentList = true;
+
+	auto componentUpdateList = spReader->update_list();
+
+	if ( !componentUpdateList )
+		return;
+
+	for ( size_t i = 0; i < componentUpdateList->size(); i++ )
 	{
-		if ( !componentUpdate.hasName() )
+		const NetMsg_ComponentUpdate* componentUpdate = componentUpdateList->Get( i );
+
+		if ( !componentUpdate )
 			continue;
 
-		const char* componentName = componentUpdate.getName().cStr();
+		if ( !componentUpdate->name() )
+			continue;
+
+		// This shouldn't even be networked if we don't have any components
+		if ( !componentUpdate->components() )
+			continue;
+
+		const char*          componentName = componentUpdate->name()->string_view().data();
 
 		EntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
 
@@ -631,12 +861,20 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 		EntComponentData_t* regData = pool->GetRegistryData();
 
 		AssertMsg( regData, "Failed to find component registry data" );
+
+		// Tell the Component System this entity's component updated
+		IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( regData->apName );
 		
-		for ( const NetMsgComponentUpdate::Component::Reader& componentRead : componentUpdate.getComponents() )
+		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
 		{
+			const NetMsg_ComponentUpdateData* componentUpdateData = componentUpdate->components()->Get( c );
+
+			if ( !componentUpdateData )
+				continue;
+
 			// Get the Entity and Make sure it exists
-			Entity entId         = componentRead.getId();
-			Entity entity        = CH_ENT_INVALID;
+			Entity entId  = componentUpdateData->id();
+			Entity entity = CH_ENT_INVALID;
 
 			if ( !GetEntitySystem()->EntityExists( entId ) )
 			{
@@ -647,7 +885,7 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 			entity = entId;
 
 			// Check the component state, do we need to remove it, or add it to the entity?
-			if ( componentRead.getDestroyed() )
+			if ( componentUpdateData->destroyed() )
 			{
 				// We can just remove the component right now, no need to queue it,
 				// as this is before all client game processing
@@ -677,18 +915,14 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 			if ( !regData->aOverrideClient && entity == gLocalPlayer )
 				continue;
 
-			if ( componentRead.hasValues() )
+			if ( componentUpdateData->values() )
 			{
-				auto                       values = componentRead.getValues();
-				NetBufferedInputStream     inputStream( (char*)values.begin(), values.size() );
-				capnp::PackedMessageReader reader( inputStream );
+				auto                  values = componentUpdateData->values();
 
-				regData->apRead( reader, componentData );
+				flatbuffers::Verifier componentVerifier( values->data(), values->size() );
+				regData->apRead( componentVerifier, values->data(), componentData );
 
 				Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
-
-				// Tell the Component System this entity's component updated
-				IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( regData->apName );
 
 				if ( system )
 				{
@@ -700,6 +934,33 @@ void CL_HandleMsg_ComponentList( NetMsgComponentUpdates::Reader& srReader )
 }
 
 
+template< typename T >
+inline bool CL_VerifyMsg( EMsgSrc_Server sMsgType, flatbuffers::Verifier& srVerifier, const T* spMsg )
+{
+	if ( !spMsg->Verify( srVerifier ) )
+	{
+		Log_WarnF( gLC_Client, "Message Data is not Valid: %s\n", SV_MsgToString( sMsgType ) );
+		return false;
+	}
+
+	return true;
+}
+
+template< typename T >
+inline const T* CL_ReadMsg( EMsgSrc_Server sMsgType, flatbuffers::Verifier& srVerifier, const flatbuffers::Vector< u8 >* srMsgData )
+{
+	auto msg = flatbuffers::GetRoot< T >( srMsgData->data() );
+
+	if ( !msg->Verify( srVerifier ) )
+	{
+		Log_WarnF( gLC_Client, "Message Data is not Valid: %s\n", SV_MsgToString( sMsgType ) );
+		return nullptr;
+	}
+
+	return msg;
+}
+
+
 void CL_GetServerMessages()
 {
 	PROF_SCOPE();
@@ -707,7 +968,7 @@ void CL_GetServerMessages()
 	while ( true )
 	{
 		// TODO: SETUP FRAGMENT COMPRESSION !!!!!!!!
-		ChVector< char > data( 819200 );
+		ChVector< char > data( 81920 );
 		int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
 
 		if ( len <= 0 )
@@ -729,17 +990,21 @@ void CL_GetServerMessages()
 		// Reset the connection timer
 		gClientTimeout = cl_timeout_duration;
 
-		// Read the message sent from the client
-		NetBufferedInputStream     inputStream( (char*)data.begin(), data.size() );
-		capnp::PackedMessageReader reader( inputStream );
+		// Read the message sent from the server
+		auto serverMsg = flatbuffers::GetRoot< MsgSrc_Server >( data.begin() );
 
-		auto                       serverMsg = reader.getRoot< MsgSrcServer >();
-		auto                       msgType   = serverMsg.getType();
+		if ( !serverMsg )
+		{
+			Log_Warn( gLC_Client, "Unknown Message from Server\n" );
+			continue;
+		}
 
-		Assert( msgType < EMsgSrcServer::COUNT );
-		Assert( msgType >= EMsgSrcServer::DISCONNECT );
+		EMsgSrc_Server msgType = serverMsg->type();
 
-		if ( msgType >= EMsgSrcServer::COUNT )
+		Assert( msgType < EMsgSrc_Server_MAX );
+		Assert( msgType >= EMsgSrc_Server_MIN );
+
+		if ( msgType >= EMsgSrc_Server_MAX )
 		{
 			Log_WarnF( gLC_Client, "Unknown Message Type from Server: %zd\n", msgType );
 			continue;
@@ -761,54 +1026,80 @@ void CL_GetServerMessages()
 		// }
 
 		// Now check messages with message data
-		auto msgData = serverMsg.getData();
+		auto msgData = serverMsg->data();
 
-		Assert( msgData.size() );
-
-		if ( !msgData.size() )
+		if ( !msgData || !msgData->size() )
 		{
-			Log_WarnF( gLC_Client, "Received Server Message Without Data: %s\n", SV_MsgToString( msgType ) );
+			// Must be one of these messages to have a chance to contain no data
+			switch ( msgType )
+			{
+				case EMsgSrc_Server_Disconnect:
+				case EMsgSrc_Server_ConVar:
+					continue;
+
+				default:
+					Log_WarnF( gLC_Client, "Received Server Message Without Data: %s\n", SV_MsgToString( msgType ) );
+					continue;
+			}
+
 			continue;
 		}
 
-		NetBufferedInputStream     inputStreamMsg( (char*)msgData.begin(), msgData.size() );
-		capnp::PackedMessageReader dataReader( inputStreamMsg );
+		flatbuffers::Verifier msgDataVerify( msgData->data(), msgData->size() );
 
 		switch ( msgType )
 		{
-			case EMsgSrcServer::DISCONNECT:
+			case EMsgSrc_Server_Disconnect:
 			{
-				auto msgDisconnect = dataReader.getRoot< NetMsgDisconnect >();
-				Log_MsgF( gLC_Client, "Disconnected from server: %s\n", msgDisconnect.getReason().cStr() );
+				//auto msgDisconnect = dataReader.getRoot< NetMsgDisconnect >();
+				//Log_MsgF( gLC_Client, "Disconnected from server: %s\n", msgDisconnect.getReason().cStr() );
+				Log_Msg( gLC_Client, "Disconnected from server: \n" );
 				CL_Disconnect( false );
 				return;
 			}
 
-			case EMsgSrcServer::SERVER_INFO:
+			case EMsgSrc_Server_ConnectResponse:
 			{
-				auto msgServerInfo = dataReader.getRoot< NetMsgServerInfo >();
-				CL_HandleMsg_ServerInfo( msgServerInfo );
+				if ( auto msg = CL_ReadMsg< NetMsg_ServerConnectResponse >( msgType, msgDataVerify, msgData ) )
+					CL_HandleMsg_ServerConnectResponse( msg );
 				break;
 			}
 
-			case EMsgSrcServer::CON_VAR:
+			case EMsgSrc_Server_ClientInfo:
 			{
-				auto msgConVar = dataReader.getRoot< NetMsgConVar >();
-				Game_ExecCommandsSafe( ECommandSource_Server, msgConVar.getCommand().cStr() );
+				if ( auto msg = CL_ReadMsg< NetMsg_ServerClientInfo >( msgType, msgDataVerify, msgData ) )
+					CL_HandleMsg_ClientInfo( msg );
+				break;
+			}
+			
+			case EMsgSrc_Server_ServerInfo:
+			{
+				if ( auto msg = CL_ReadMsg< NetMsg_ServerInfo >( msgType, msgDataVerify, msgData ) )
+					CL_HandleMsg_ServerInfo( msg );
 				break;
 			}
 
-			case EMsgSrcServer::COMPONENT_LIST:
+			case EMsgSrc_Server_ConVar:
 			{
-				auto msg = dataReader.getRoot< NetMsgComponentUpdates >();
-				CL_HandleMsg_ComponentList( msg );
+				auto msg = flatbuffers::GetRoot< NetMsg_ConVar >( msgData->data() );
+				if ( CL_VerifyMsg( msgType, msgDataVerify, msg ) && msg->command() )
+					Game_ExecCommandsSafe( ECommandSource_Server, msg->command()->str() );
+
 				break;
 			}
 
-			case EMsgSrcServer::ENTITY_LIST:
+			case EMsgSrc_Server_ComponentList:
 			{
-				auto msg = dataReader.getRoot< NetMsgEntityUpdates >();
-				CL_HandleMsg_EntityList( msg );
+				if ( auto msg = CL_ReadMsg< NetMsg_ComponentUpdates >( msgType, msgDataVerify, msgData ) )
+					CL_HandleMsg_ComponentList( msg );
+				break;
+			}
+
+			case EMsgSrc_Server_EntityList:
+			{
+				if ( auto msg = CL_ReadMsg< NetMsg_EntityUpdates >( msgType, msgDataVerify, msgData ) )
+					CL_HandleMsg_EntityList( msg );
+
 				break;
 			}
 
@@ -841,5 +1132,47 @@ void CL_PrintStatus()
 CONCMD( status_cl )
 {
 	CL_PrintStatus();
+}
+
+
+// --------------------------------------------------
+
+
+void CL_DrawMainMenu()
+{
+	if ( !ImGui::Begin( "MainMenu" ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	ImGui::Text( "Chocolate Engine - Sidury" );
+
+	ImGui::Separator();
+
+	if ( ImGui::Button( "connect localhost" ) )
+	{
+		Con_QueueCommand( "connect localhost" );
+	}
+
+	ImGui::Separator();
+
+	ImGui::Text( "Quick Map List" );
+
+	for ( const auto& file : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	{
+		if ( file.ends_with( ".." ) )
+			continue;
+
+		std::string mapName = FileSys_GetFileName( file );
+		std::string command = vstring( "map \"%s\"", mapName.c_str() );
+
+		if ( ImGui::Button( command.c_str() ) )
+		{
+			Con_QueueCommand( command );
+		}
+	}
+
+	ImGui::End();
 }
 
