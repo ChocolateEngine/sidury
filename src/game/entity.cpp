@@ -21,6 +21,7 @@ EntComponentRegistry_t gEntComponentRegistry;
 EntitySystem*          cl_entities                                     = nullptr;
 EntitySystem*          sv_entities                                     = nullptr;
 
+extern Entity          gLocalPlayer;
 
 CONVAR( ent_always_full_update, 0, "For debugging, always send a full update" );
 CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
@@ -118,14 +119,14 @@ const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType )
 }
 
 
-void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
+size_t EntComp_GetVarDirtyOffset( char* spData, EEntComponentVarType sVarType )
 {
 	size_t offset = 0;
 	switch ( sVarType )
 	{
 		default:
 		case EEntComponentVarType_Invalid:
-			return;
+			return 0;
 
 		case EEntComponentVarType_Bool:
 			offset = sizeof( bool );
@@ -191,6 +192,14 @@ void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
 			offset = sizeof( glm::vec4 );
 			break;
 	}
+
+	return offset;
+}
+
+
+void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
+{
+	size_t offset = EntComp_GetVarDirtyOffset( spData, sVarType );
 
 	if ( offset )
 	{
@@ -939,11 +948,371 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 //}
 
 
+#if USE_FLEXBUFFERS
+void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData )
+{
+	// Get the vector i guess
+	auto   vector    = spSrc.AsVector();
+	size_t i         = 0;
+	size_t curOffset = 0;
+
+	for ( const auto& [ offset, var ] : spRegData->aVars )
+	{
+		if ( !var.aIsNetVar )
+		{
+			curOffset += var.aSize + offset;
+			continue;
+		}
+
+		// size_t offset = EntComp_GetVarDirtyOffset( (char*)spData, var.aType );
+		void* data = ( (char*)spData ) + offset;
+		// curOffset += var.aSize + offset;
+
+		// Check these first
+		switch ( var.aType )
+		{
+			case EEntComponentVarType_Invalid:
+				continue;
+
+			case EEntComponentVarType_Bool:
+			{
+				bool* value = static_cast< bool* >( data );
+				*value      = vector[ i++ ].AsBool();
+				continue;
+			}
+		}
+
+		// Now, check if we wrote data for this var
+		bool wroteVar = vector[ i++ ].AsBool();
+
+		if ( !wroteVar )
+			continue;
+
+		Assert( var.aType != EEntComponentVarType_Invalid );
+		Assert( var.aType != EEntComponentVarType_Bool );
+
+		switch ( var.aType )
+		{
+			default:
+				break;
+
+			case EEntComponentVarType_Float:
+			{
+				auto value = (float*)( data );
+				*value     = vector[ i++ ].AsFloat();
+				break;
+			}
+			case EEntComponentVarType_Double:
+			{
+				auto value = (double*)( data );
+				*value     = vector[ i++ ].AsDouble();
+				break;
+			}
+
+			case EEntComponentVarType_S8:
+			{
+				auto value = (s8*)( data );
+				*value     = vector[ i++ ].AsInt8();
+				break;
+			}
+			case EEntComponentVarType_S16:
+			{
+				auto value = (s16*)( data );
+				*value     = vector[ i++ ].AsInt16();
+				break;
+			}
+			case EEntComponentVarType_S32:
+			{
+				auto value = (s32*)( data );
+				*value     = vector[ i++ ].AsInt32();
+				break;
+			}
+			case EEntComponentVarType_S64:
+			{
+				auto value = (s64*)( data );
+				*value     = vector[ i++ ].AsInt64();
+				break;
+			}
+
+			case EEntComponentVarType_U8:
+			{
+				auto value = (u8*)( data );
+				*value     = vector[ i++ ].AsUInt8();
+				break;
+			}
+			case EEntComponentVarType_U16:
+			{
+				auto value = (u16*)( data );
+				*value     = vector[ i++ ].AsUInt16();
+				break;
+			}
+			case EEntComponentVarType_U32:
+			{
+				auto value = (u32*)( data );
+				*value     = vector[ i++ ].AsUInt32();
+				break;
+			}
+			case EEntComponentVarType_U64:
+			{
+				auto value = (u64*)( data );
+				*value     = vector[ i++ ].AsUInt64();
+				break;
+			}
+
+			case EEntComponentVarType_StdString:
+			{
+				auto value = (std::string*)( data );
+				*value     = vector[ i++ ].AsString().str();
+				break;
+			}
+
+				// Will have a special case for these once i have each value in a vecX marked dirty
+
+			case EEntComponentVarType_Vec2:
+			{
+				auto value = (glm::vec2*)( data );
+				value->x   = vector[ i++ ].AsFloat();
+				value->y   = vector[ i++ ].AsFloat();
+				break;
+			}
+			case EEntComponentVarType_Vec3:
+			{
+				auto value = (glm::vec3*)( data );
+				value->x   = vector[ i++ ].AsFloat();
+				value->y   = vector[ i++ ].AsFloat();
+				value->z   = vector[ i++ ].AsFloat();
+				break;
+			}
+			case EEntComponentVarType_Vec4:
+			{
+				auto value = (glm::vec4*)( data );
+				value->x   = vector[ i++ ].AsFloat();
+				value->y   = vector[ i++ ].AsFloat();
+				value->z   = vector[ i++ ].AsFloat();
+				value->w   = vector[ i++ ].AsFloat();
+				break;
+			}
+		}
+	}
+}
+
+
+bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+{
+	bool   wroteData = false;
+	size_t curOffset = 0;
+	size_t flexVec   = srBuilder.StartVector();
+
+	for ( const auto& [ offset, var ] : spRegData->aVars )
+	{
+		if ( !var.aIsNetVar )
+			continue;
+
+		// size_t offset = EntComp_GetVarDirtyOffset( (char*)spData, var.aType );
+
+		auto IsVarDirty = [ & ]()
+		{
+			if ( sFullUpdate )
+			{
+				wroteData = true;
+				srBuilder.Bool( true );
+				return true;
+			}
+
+			char* dataChar = (char*)spData;
+			bool isDirty  = *reinterpret_cast< bool* >( dataChar + var.aSize + offset );
+			
+			wroteData |= isDirty;
+			srBuilder.Bool( isDirty );
+			return isDirty;
+		};
+
+		void* data = ( (char*)spData ) + offset;
+
+		switch ( var.aType )
+		{
+			default:
+			case EEntComponentVarType_Invalid:
+				break;
+
+			case EEntComponentVarType_Bool:
+			{
+				bool value = static_cast< bool >( data );
+				srBuilder.Bool( value );
+				wroteData = true;
+				break;
+			}
+
+			case EEntComponentVarType_Float:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(float*)( data );
+					srBuilder.Float( value );
+				}
+				
+				break;
+			}
+			case EEntComponentVarType_Double:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(double*)( data );
+					srBuilder.Double( value );
+				}
+				
+				break;
+			}
+
+			case EEntComponentVarType_S8:
+			{
+				// FLEX BUFFERS STORES ALL INTS AND UINTS AS INT64 AND UINT64, WHAT A WASTE OF SPACE
+				if ( IsVarDirty() )
+				{
+					auto value = *(s8*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_S16:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(s16*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_S32:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(s32*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_S64:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(s64*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+
+			case EEntComponentVarType_U8:
+			{
+				// FLEX BUFFERS STORES ALL INTS AND UINTS AS INT64 AND UINT64, WHAT A WASTE OF SPACE
+				if ( IsVarDirty() )
+				{
+					auto value = *(u8*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_U16:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(u16*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_U32:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(u32*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_U64:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(u64*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+
+			case EEntComponentVarType_StdString:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(const std::string*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+
+			// Will have a special case for these once i have each value in a vecX marked dirty
+
+			case EEntComponentVarType_Vec2:
+			{
+				if ( IsVarDirty() )
+				{
+					const glm::vec2* value = (const glm::vec2*)( data );
+					srBuilder.Add( value->x );
+					srBuilder.Add( value->y );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_Vec3:
+			{
+				if ( IsVarDirty() )
+				{
+					const glm::vec3* value = (const glm::vec3*)( data );
+					srBuilder.Add( value->x );
+					srBuilder.Add( value->y );
+					srBuilder.Add( value->z );
+				}
+
+				break;
+			}
+			case EEntComponentVarType_Vec4:
+			{
+				if ( IsVarDirty() )
+				{
+					const glm::vec4* value = (const glm::vec4*)( data );
+					srBuilder.Add( value->x );
+					srBuilder.Add( value->y );
+					srBuilder.Add( value->z );
+					srBuilder.Add( value->w );
+				}
+
+				break;
+			}
+		}
+	}
+
+	srBuilder.EndVector( flexVec, false, false );
+	return wroteData;
+}
+#endif
+
+
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
 void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
 {
+	PROF_SCOPE();
+
 	// Make a list of component pools with a component that need updating
 	std::vector< EntityComponentPool* >                 componentPools;
 	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
@@ -984,7 +1353,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		size_t compListI = 0;
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed || (!regData->apWrite && !sFullUpdate) )
+			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed && !sFullUpdate )
 			{
 				// Don't bother sending data if we're about to be destroyed or we have no write function
 				// srRootBuilder.Finish( compDataBuilder.Finish() );
@@ -995,24 +1364,21 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			void*                 data = pool->GetData( entity );
 
 			// Write Component Data
-			fb::FlatBufferBuilder componentBuffer;
+			flexb::Builder flexBuilder;
+			wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate );
 
-			if ( regData->apWrite )
-				wroteData = regData->apWrite( componentBuffer, data, ent_always_full_update ? true : sFullUpdate );
-
-			// If no data is written and this isn't a full update, don't send this component over
-			if ( regData->apWrite && !sFullUpdate && !wroteData )
-			{
-				compListI++;
-				continue;
-			}
+			// if ( !sFullUpdate && !wroteData )
+			// {
+			// 	compListI++;
+			// 	continue;
+			// }
 
 			fb::Offset< flatbuffers::Vector< u8 > > dataVector{};
 
 			if ( wroteData )
 			{
-				auto size  = componentBuffer.GetSize();
-				dataVector = srRootBuilder.CreateVector( componentBuffer.GetBufferPointer(), componentBuffer.GetSize() );
+				flexBuilder.Finish();
+				dataVector = srRootBuilder.CreateVector( flexBuilder.GetBuffer().data(), flexBuilder.GetSize() );
 			}
 
 			// Now after creating the data vector, we can make the update data builder
@@ -1030,7 +1396,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 				if ( Game_IsClient() && ent_show_component_net_updates )
 				{
 					// gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
-					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, componentBuffer.GetSize() );
+					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, flexBuilder.GetSize() );
 				}
 
 				compDataBuilder.add_values( dataVector );
@@ -1062,7 +1428,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			// oh my god
 			fb::Offset< fb::Vector< fb::Offset< NetMsg_ComponentUpdateData > > > compVector{};
 
-			if ( wroteData )
+			//if ( wroteData )
 				compVector = srRootBuilder.CreateVector( componentDataBuilt.data(), componentDataBuilt.size() );
 
 			auto                           compNameOffset = srRootBuilder.CreateString( pool->apName );
@@ -1070,7 +1436,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			NetMsg_ComponentUpdateBuilder compUpdate( srRootBuilder );
 			compUpdate.add_name( compNameOffset );
 
-			if ( wroteData )
+			//if ( wroteData )
 				compUpdate.add_components( compVector );
 
 			componentsBuilt.push_back( compUpdate.Finish() );
@@ -1104,6 +1470,115 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 	if ( Game_IsClient() && ent_show_component_net_updates )
 	{
 		gui->DebugMessage( "Total Size of Component Write Update: %zd bytes", srRootBuilder.GetSize() );
+	}
+}
+
+
+void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
+{
+	PROF_SCOPE();
+
+	auto componentUpdateList = spReader->update_list();
+
+	if ( !componentUpdateList )
+		return;
+
+	for ( size_t i = 0; i < componentUpdateList->size(); i++ )
+	{
+		const NetMsg_ComponentUpdate* componentUpdate = componentUpdateList->Get( i );
+
+		if ( !componentUpdate )
+			continue;
+
+		if ( !componentUpdate->name() )
+			continue;
+
+		// This shouldn't even be networked if we don't have any components
+		if ( !componentUpdate->components() )
+			continue;
+
+		const char*          componentName = componentUpdate->name()->string_view().data();
+
+		EntityComponentPool* pool          = GetComponentPool( componentName );
+
+		AssertMsg( pool, "Failed to find component pool" );
+
+		if ( !pool )
+		{
+			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
+			continue;
+		}
+
+		EntComponentData_t* regData = pool->GetRegistryData();
+
+		AssertMsg( regData, "Failed to find component registry data" );
+
+		// Tell the Component System this entity's component updated
+		IEntityComponentSystem* system = GetComponentSystem( regData->apName );
+
+		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
+		{
+			const NetMsg_ComponentUpdateData* componentUpdateData = componentUpdate->components()->Get( c );
+
+			if ( !componentUpdateData )
+				continue;
+
+			// Get the Entity and Make sure it exists
+			Entity entId  = componentUpdateData->id();
+			Entity entity = CH_ENT_INVALID;
+
+			if ( !EntityExists( entId ) )
+			{
+				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
+				continue;
+			}
+
+			entity = entId;
+
+			// Check the component state, do we need to remove it, or add it to the entity?
+			if ( componentUpdateData->destroyed() )
+			{
+				// We can just remove the component right now, no need to queue it,
+				// as this is before all client game processing
+				pool->Remove( entity );
+				continue;
+			}
+
+			void* componentData = GetComponent( entity, componentName );
+
+			if ( !componentData )
+			{
+				// Create the component
+				componentData = AddComponent( entity, componentName );
+
+				if ( componentData == nullptr )
+				{
+					Log_ErrorF( "Failed to create component\n" );
+					continue;
+				}
+			}
+
+			// Now, update component data
+			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
+			if ( !regData->aOverrideClient && entity == gLocalPlayer )
+				continue;
+
+			if ( componentUpdateData->values() )
+			{
+				auto             values   = componentUpdateData->values();
+				flexb::Reference flexRoot = flexb::GetRoot( values->data(), values->size() );
+
+				ReadComponent( flexRoot, regData, componentData );
+				// regData->apRead( componentVerifier, values->data(), componentData );
+
+				Log_DevF( gLC_Entity, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
+
+				if ( system )
+				{
+					system->ComponentUpdated( entity, componentData );
+				}
+			}
+		}
 	}
 }
 
@@ -1242,8 +1717,6 @@ CONCMD( ent_dump_registry )
 		Log_GroupF( group, "\nComponent: %s\n", regData->apName );
 		Log_GroupF( group, "   Override Client: %s\n", regData->aOverrideClient ? "TRUE" : "FALSE" );
 		Log_GroupF( group, "   Networking Type: %s\n", EntComp_NetTypeToStr( regData->aNetType ) );
-		Log_GroupF( group, "   Has Write:       %s\n", regData->apWrite ? "TRUE" : "FALSE" );
-		Log_GroupF( group, "   Has Read:        %s\n", regData->apRead ? "TRUE" : "FALSE" );
 		Log_GroupF( group, "   Variable Count:  %zd\n", regData->aVars.size() );
 
 		for ( const auto& [ offset, var ] : regData->aVars )
@@ -1797,7 +2270,7 @@ void Ent_RegisterBaseComponents()
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aPos", "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
-	EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
+	// EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
 	CH_REGISTER_COMPONENT_RW( CTransformSmall, transformSmall, true );

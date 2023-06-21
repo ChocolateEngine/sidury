@@ -49,6 +49,8 @@ constexpr ComponentType MAX_COMPONENTS  = 64;
 #define COMPONENT_POOLS 1
 #define COMPONENT_POOLS_TEMP 1
 
+#define USE_FLEXBUFFERS 1
+
 // NEW entity component system
 
 // ====================================================================================================
@@ -86,9 +88,11 @@ using FEntComp_Free      = std::function< void( void* spData ) >;
 // Functions for creating component systems
 using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
 
-// Functions for serializing and deserializing Components with Cap'n Proto
+#if !USE_FLEXBUFFERS
+// Functions for serializing and deserializing Components with FlatBuffers
 using FEntComp_ReadFunc  = void( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData );
 using FEntComp_WriteFunc = bool( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate );
+#endif
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
@@ -173,12 +177,14 @@ struct EntComponentData_t
 	const char*                                         apName;
 
 	// [Var Offset] = Var Data
-	std::unordered_map< size_t, EntComponentVarData_t > aVars;
+	std::map< size_t, EntComponentVarData_t > aVars;
 	// std::vector< EntComponentVarData_t > aVars;
 
+#if !USE_FLEXBUFFERS
 	FEntComp_ReadFunc*                                  apRead;
 	FEntComp_WriteFunc*                                 apWrite;
-	
+#endif
+
 	bool                                                aOverrideClient;  // probably temporary until prediction
 	EEntComponentNetType                                aNetType;
 
@@ -450,6 +456,7 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 }
 
 
+#if 0
 template< typename T >
 // void EntComp_RegisterComponentReadWrite( FEntComp_ReadFunc< T >* spRead, FEntComp_WriteFunc< T >* spWrite )
 inline void EntComp_RegisterComponentReadWrite( FEntComp_ReadFunc* spRead, FEntComp_WriteFunc* spWrite )
@@ -467,6 +474,7 @@ inline void EntComp_RegisterComponentReadWrite( FEntComp_ReadFunc* spRead, FEntC
 	data.apRead              = spRead;
 	data.apWrite             = spWrite;
 }
+#endif
 
 
 template< typename T >
@@ -564,7 +572,7 @@ class EntitySystem
 	//void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
 	void                                                          WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
 
-	//void                                                          ReadComponentUpdates( capnp::MessageReader& srReader );
+	void                                                          ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
 	void                                                          WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
 
 	// void                                                          SetComponentNetworked( Entity ent, const char* spName );
@@ -1185,8 +1193,8 @@ struct CLight
 #define CH_COMPONENT_WRITE( type ) __EntCompFunc_Write_##type
 
 #define CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, netType ) \
-  CH_REGISTER_COMPONENT( type, name, overrideClient, netType );  \
-  EntComp_RegisterComponentReadWrite< type >( CH_COMPONENT_RW( type ) )
+  CH_REGISTER_COMPONENT( type, name, overrideClient, netType )
+  // EntComp_RegisterComponentReadWrite< type >( CH_COMPONENT_RW( type ) )
 
 #define CH_REGISTER_COMPONENT_RW( type, name, overrideClient ) \
   CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, EEntComponentNetType_Both );

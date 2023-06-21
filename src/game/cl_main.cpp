@@ -821,119 +821,6 @@ void CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spMsg )
 }
 
 
-void CL_HandleMsg_ComponentList( const NetMsg_ComponentUpdates* spReader )
-{
-	PROF_SCOPE();
-
-	gClientWait_ComponentList = true;
-
-	auto componentUpdateList = spReader->update_list();
-
-	if ( !componentUpdateList )
-		return;
-
-	for ( size_t i = 0; i < componentUpdateList->size(); i++ )
-	{
-		const NetMsg_ComponentUpdate* componentUpdate = componentUpdateList->Get( i );
-
-		if ( !componentUpdate )
-			continue;
-
-		if ( !componentUpdate->name() )
-			continue;
-
-		// This shouldn't even be networked if we don't have any components
-		if ( !componentUpdate->components() )
-			continue;
-
-		const char*          componentName = componentUpdate->name()->string_view().data();
-
-		EntityComponentPool* pool = GetEntitySystem()->GetComponentPool( componentName );
-
-		AssertMsg( pool, "Failed to find component pool" );
-
-		if ( !pool )
-		{
-			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
-			continue;
-		}
-
-		EntComponentData_t* regData = pool->GetRegistryData();
-
-		AssertMsg( regData, "Failed to find component registry data" );
-
-		// Tell the Component System this entity's component updated
-		IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( regData->apName );
-		
-		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
-		{
-			const NetMsg_ComponentUpdateData* componentUpdateData = componentUpdate->components()->Get( c );
-
-			if ( !componentUpdateData )
-				continue;
-
-			// Get the Entity and Make sure it exists
-			Entity entId  = componentUpdateData->id();
-			Entity entity = CH_ENT_INVALID;
-
-			if ( !GetEntitySystem()->EntityExists( entId ) )
-			{
-				Log_Error( gLC_Client, "Failed to find entity while updating components from server\n" );
-				continue;
-			}
-
-			entity = entId;
-
-			// Check the component state, do we need to remove it, or add it to the entity?
-			if ( componentUpdateData->destroyed() )
-			{
-				// We can just remove the component right now, no need to queue it,
-				// as this is before all client game processing
-				pool->Remove( entity );
-				continue;
-			}
-
-			void* componentData = GetEntitySystem()->GetComponent( entity, componentName );
-
-			if ( !componentData )
-			{
-				// Create the component
-				componentData = GetEntitySystem()->AddComponent( entity, componentName );
-
-				if ( componentData == nullptr )
-				{
-					Log_ErrorF( "Failed to create component\n" );
-					continue;
-				}
-			}
-
-			// Now, update component data
-			if ( !regData->apRead )
-				continue;
-
-			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
-			if ( !regData->aOverrideClient && entity == gLocalPlayer )
-				continue;
-
-			if ( componentUpdateData->values() )
-			{
-				auto                  values = componentUpdateData->values();
-
-				flatbuffers::Verifier componentVerifier( values->data(), values->size() );
-				regData->apRead( componentVerifier, values->data(), componentData );
-
-				Log_DevF( gLC_Client, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
-
-				if ( system )
-				{
-					system->ComponentUpdated( entity, componentData );
-				}
-			}
-		}
-	}
-}
-
-
 template< typename T >
 inline bool CL_VerifyMsg( EMsgSrc_Server sMsgType, flatbuffers::Verifier& srVerifier, const T* spMsg )
 {
@@ -1091,7 +978,10 @@ void CL_GetServerMessages()
 			case EMsgSrc_Server_ComponentList:
 			{
 				if ( auto msg = CL_ReadMsg< NetMsg_ComponentUpdates >( msgType, msgDataVerify, msgData ) )
-					CL_HandleMsg_ComponentList( msg );
+				{
+					gClientWait_ComponentList = true;
+					GetEntitySystem()->ReadComponentUpdates( msg );
+				}
 				break;
 			}
 
