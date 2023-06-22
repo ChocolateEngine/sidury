@@ -35,6 +35,7 @@ using Entity = size_t;
 
 template< typename T >
 struct ComponentNetVar;
+struct EntComponentData_t;
 
 class EntitySystem;
 class IEntityComponentSystem;
@@ -98,7 +99,8 @@ using FEntComp_WriteFunc = bool( flatbuffers::FlatBufferBuilder& srBuilder, cons
 // Used for creating a new component pool for client and/or server entity system
 using FEntComp_Register  = void( const char* spName );
 
-using FEntComp_VarCopy   = void( void* spSrc, size_t sOffset, void* spOut );
+using FEntComp_VarRead   = void( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData );
+using FEntComp_VarWrite  = bool( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate );
 
 
 enum EEntComponentVarType : u8
@@ -195,42 +197,6 @@ struct EntComponentData_t
 };
 
 
-#if 0
-// Maybe just make a function pointer
-class IEntComponentVarHandler
-{
-  public:
-	virtual ~IEntComponentVarHandler() = default;
-
-	virtual void Copy( void* spSrc, size_t sOffset, void* spOut ) = 0;
-	// virtual void Write( void* spSrc, size_t sOffset, void* spOut ) = 0;
-};
-
-
-class EntComponentVarHandler_Vec3 : public IEntComponentVarHandler
-{
-  public:
-	virtual ~EntComponentVarHandler_Vec3() = default;
-
-	virtual inline void Copy( void* spSrc, size_t sOffset, void* spOut ) override
-	{
-		glm::vec3* src = static_cast< glm::vec3* >( (void*)( ( (char*)spSrc ) + sOffset ) );
-		glm::vec3* out = static_cast< glm::vec3* >( (void*)( ( (char*)spOut ) + sOffset ) );
-
-		memcpy( out, src, sizeof( glm::vec3 ) );
-	}
-
-	// virtual inline void Write( void* spSrc, size_t sOffset, void* spOut ) override
-	// {
-	// 	glm::vec3* src = static_cast< glm::vec3* >( (void*)( ( (char*)spSrc ) + sOffset ) );
-	// 	glm::vec3* out = static_cast< glm::vec3* >( (void*)( ( (char*)spOut ) + sOffset ) );
-	// 
-	// 	memcpy( out, src, sizeof( glm::vec3 ) );
-	// }
-};
-#endif
-
-
 struct EntComponentRegistry_t
 {
 	// [type hash of component] = Component Data
@@ -241,6 +207,10 @@ struct EntComponentRegistry_t
 
 	// [type hash of var] = Var Type Enum
 	std::unordered_map< size_t, EEntComponentVarType >          aVarTypes;
+
+	// [type hash of var] = Var Read/Write Function
+	// std::unordered_map< size_t, FEntComp_VarRead* >             aVarRead;
+	// std::unordered_map< size_t, FEntComp_VarWrite* >            aVarWrite;
 
 	// Callback Functions for when a new component is registered at runtime
 	// Used for creating a new component pool for client and/or server entity system
@@ -454,6 +424,26 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 
 	varData.aType = findEnum->second;
 }
+
+
+#if 0
+template< typename T >
+inline void EntComp_RegisterVarReadWrite( FEntComp_ReadFunc* spRead, FEntComp_WriteFunc* spWrite )
+{
+	size_t typeHash = typeid( T ).hash_code();
+	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+
+	if ( it == gEntComponentRegistry.aComponents.end() )
+	{
+		Log_ErrorF( "Component not registered, can't add read and write function: \"%s\" - \"%s\"\n", typeid( T ).name() );
+		return;
+	}
+
+	EntComponentData_t& data = it->second;
+	data.apRead              = spRead;
+	data.apWrite             = spWrite;
+}
+#endif
 
 
 #if 0
@@ -1204,6 +1194,19 @@ struct CLight
 
 #define CH_REGISTER_COMPONENT_RW_SV( type, name, overrideClient ) \
   CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Server )
+
+
+
+#define CH_NET_VAR_WRITE( type, typeName ) \
+	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+
+#define CH_NET_VAR_READ( type, typeName ) \
+	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+
+
+#define CH_REGISTER_VAR_RW( type, typeName ) \
+	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+
 
 
 

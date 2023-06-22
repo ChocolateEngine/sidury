@@ -8,6 +8,11 @@ enum ESiduryProtocolVer : ushort
     Value = 3,
 }
 
+enum ESiduryComponentProtocolVer : ushort
+{
+    Value = 1,
+}
+
 // Base Types
 struct Vec2
 {
@@ -217,110 +222,5 @@ table NetMsg_ComponentUpdates
 {
     // All Components to update
     update_list :[NetMsg_ComponentUpdate];
-}
-
-root_type NetMsg_EntityUpdates;
-root_type NetMsg_ComponentUpdates;
-
-// --------------------------------------------------------
-// Entity Components
-// TODO: REMOVE THESE ONCE YOU GET FLEX BUFFERS WORKING
-
-table NetComp_Transform
-{
-    pos   :Vec3;
-    ang   :Vec3;
-    scale :Vec3;
-}
-
-table NetComp_TransformSmall
-{
-    pos   :Vec3;
-    ang   :Vec3;
-}
-
-table NetComp_RigidBody
-{
-    vel   :Vec3;
-    accel :Vec3;
-}
-
-table NetComp_Direction
-{
-    forward :Vec3;
-    up      :Vec3;
-    right   :Vec3;
-}
-
-table NetComp_Gravity
-{
-    force :Vec3;
-}
-
-table NetComp_Camera
-{
-    direction :NetComp_Direction;
-    transform :NetComp_TransformSmall;
-    fov       :float;
-}
-
-table NetComp_ModelInfo
-{
-    path  :string;
-}
-
-// only some stuff in here is actually networked
-table NetComp_Light
-{
-    type     :int;  // TODO: MAKE AN ENUM
-    color    :Vec4;
-
-    // TODO: this should not be here
-    // it should be attached to it's own entity that can be parented
-    // and that entity needs to contain the transform (or transform small) component
-    pos      :Vec3;
-    ang      :Vec3;
-
-    innerFov :float;
-    outerFov :float;
-    radius   :float;
-    length   :float;
-
-    shadow   :bool;
-    enabled  :bool;
-}
-
-// only some stuff in here is actually networked
-table NetComp_PlayerMoveData
-{
-    moveType         :EPlayerMoveType;
-    playerFlags      :ubyte;
-    prevPlayerFlags  :ubyte;
-    maxSpeed         :float;
-
-    // View Bobbing
-    walkTime         :float;
-    bobOffsetAmount  :float;
-    prevViewTilt     :float;
-
-    // Smooth Land
-    landPower        :float;
-    landTime         :float;
-
-    // Smooth Duck
-    prevViewHeight   :float;
-    targetViewHeight :float;
-    outViewHeight    :float;
-    duckDuration     :float;
-    duckTime         :float;
-
-    // lastStepTime     :float;
-}
-
-
-table NetComp_PlayerZoom
-{
-    origFov :float;
-    newFov  :float;
 }
 

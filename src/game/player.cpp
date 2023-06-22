@@ -118,9 +118,6 @@ CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 	if ( CL_SendConVarIfClient( "respawn", args ) )
 		return;
 
-	if ( Game_GetCommandSource() != ECommandSource_Server )
-		return;
-
 	Entity player = SV_GetCommandClientEntity();
 
 	GetPlayers()->Respawn( player );
@@ -130,9 +127,6 @@ CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 {
 	if ( CL_SendConVarIfClient( "reset_velocity", args ) )
-		return;
-
-	if ( Game_GetCommandSource() != ECommandSource_Server )
 		return;
 
 	Entity player  = SV_GetCommandClientEntity();
@@ -214,152 +208,6 @@ float vec3_norm(glm::vec3& v)
 // ============================================================
 
 
-CH_COMPONENT_READ_DEF( CPlayerMoveData )
-{
-	//auto* spMoveData = static_cast< CPlayerMoveData* >( spData );
-	//auto  message    = srReader.getRoot< NetCompPlayerMoveData >();
-	//
-	//auto  moveType   = message.getMoveType();
-	//
-	//switch ( moveType )
-	//{
-	//	default:
-	//	case EPlayerMoveType::WALK:
-	//		spMoveData->aMoveType = PlayerMoveType::Walk;
-	//		break;
-	//
-	//	case EPlayerMoveType::NO_CLIP:
-	//		spMoveData->aMoveType = PlayerMoveType::NoClip;
-	//		break;
-	//
-	//	case EPlayerMoveType::FLY:
-	//		spMoveData->aMoveType = PlayerMoveType::Fly;
-	//		break;
-	//}
-	//
-	//spMoveData->aPlayerFlags      = message.getPlayerFlags();
-	//spMoveData->aPrevPlayerFlags  = message.getPrevPlayerFlags();
-	//spMoveData->aMaxSpeed         = message.getMaxSpeed();
-	//
-	//// View Bobbing
-	////spMoveData->aWalkTime         = message.getWalkTime();
-	////spMoveData->aBobOffsetAmount  = message.getBobOffsetAmount();
-	////spMoveData->aPrevViewTilt     = message.getPrevViewTilt();
-	//
-	//spMoveData->aLandPower        = message.getLandPower();
-	//spMoveData->aLandTime         = message.getLandTime();
-	//
-	//// Smooth Duck
-	//spMoveData->aPrevViewHeight   = message.getPrevViewHeight();
-	//spMoveData->aTargetViewHeight = message.getTargetViewHeight();
-	//spMoveData->aOutViewHeight    = message.getOutViewHeight();
-	//spMoveData->aDuckDuration     = message.getDuckDuration();
-	//spMoveData->aDuckTime         = message.getDuckTime();
-}
-
-
-CH_COMPONENT_WRITE_DEF( CPlayerMoveData )
-{
-	return false;
-
-	/*auto* spMoveData = static_cast< const CPlayerMoveData* >( spData );
-	bool  isDirty    = sFullUpdate;
-
-	isDirty |= spMoveData->aMoveType.aIsDirty;
-	isDirty |= spMoveData->aPlayerFlags.aIsDirty;
-	isDirty |= spMoveData->aPrevPlayerFlags.aIsDirty;
-	isDirty |= spMoveData->aMaxSpeed.aIsDirty;
-
-	// isDirty |= spMoveData->aWalkTime.aIsDirty;
-	// isDirty |= spMoveData->aBobOffsetAmount.aIsDirty;
-	// isDirty |= spMoveData->aPrevViewTilt.aIsDirty;
-
-	isDirty |= spMoveData->aLandPower.aIsDirty;
-	isDirty |= spMoveData->aLandTime.aIsDirty;
-
-	isDirty |= spMoveData->aPrevViewHeight.aIsDirty;
-	isDirty |= spMoveData->aTargetViewHeight.aIsDirty;
-	isDirty |= spMoveData->aOutViewHeight.aIsDirty;
-	isDirty |= spMoveData->aDuckDuration.aIsDirty;
-	isDirty |= spMoveData->aDuckTime.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto builder = srMessage.initRoot< NetCompPlayerMoveData >();
-
-	switch ( spMoveData->aMoveType )
-	{
-		default:
-		case PlayerMoveType::Walk:
-			builder.setMoveType( EPlayerMoveType::WALK );
-			break;
-
-		case PlayerMoveType::NoClip:
-			builder.setMoveType( EPlayerMoveType::NO_CLIP );
-			break;
-
-		case PlayerMoveType::Fly:
-			builder.setMoveType( EPlayerMoveType::FLY );
-			break;
-	}
-
-	builder.setPlayerFlags( spMoveData->aPlayerFlags );
-	builder.setPrevPlayerFlags( spMoveData->aPrevPlayerFlags );
-	builder.setMaxSpeed( spMoveData->aMaxSpeed );
-
-	//builder.setWalkTime( spMoveData->aWalkTime );
-	//builder.setBobOffsetAmount( spMoveData->aBobOffsetAmount );
-	//builder.setPrevViewTilt( spMoveData->aPrevViewTilt );
-
-	builder.setLandPower( spMoveData->aLandPower );
-	builder.setLandTime( spMoveData->aLandTime );
-
-	// Smooth Duck
-	builder.setPrevViewHeight( spMoveData->aPrevViewHeight );
-	builder.setTargetViewHeight( spMoveData->aTargetViewHeight );
-	builder.setOutViewHeight( spMoveData->aOutViewHeight );
-	builder.setDuckDuration( spMoveData->aDuckDuration );
-	builder.setDuckTime( spMoveData->aDuckTime );
-
-	return true;*/
-}
-
-
-CH_COMPONENT_READ_DEF( CPlayerZoom )
-{
-	// auto* spZoom    = static_cast< CPlayerZoom* >( spData );
-	// auto  message   = srReader.getRoot< NetCompPlayerZoom >();
-	// 
-	// spZoom->aOrigFov = message.getOrigFov();
-	// spZoom->aNewFov = message.getNewFov();
-}
-
-
-CH_COMPONENT_WRITE_DEF( CPlayerZoom )
-{
-	return false;
-
-	// auto* spZoom  = static_cast< const CPlayerZoom* >( spData );
-	// bool  isDirty = sFullUpdate;
-	// 
-	// isDirty |= spZoom->aNewFov.aIsDirty;
-	// 
-	// if ( !isDirty )
-	// 	return false;
-	// 
-	// auto builder = srMessage.initRoot< NetCompPlayerZoom >();
-	// 
-	// builder.setOrigFov( spZoom->aOrigFov );
-	// builder.setNewFov( spZoom->aNewFov );
-	// 
-	// return true;
-}
-
-
-// ============================================================
-
-
 #define CH_PLAYER_SV 0
 #define CH_PLAYER_CL 1
 
@@ -392,13 +240,13 @@ PlayerManager::~PlayerManager()
 void PlayerManager::RegisterComponents()
 {
 	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerMoveType, aMoveType, moveType );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPlayerFlags, playerFlags );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, PlayerFlags, aPrevPlayerFlags, prevPlayerFlags );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, unsigned char, aPlayerFlags, playerFlags );
+	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, unsigned char, aPrevPlayerFlags, prevPlayerFlags );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
 
 	// View Bobbing
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aWalkTime, walkTime );
+	//CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aWalkTime, walkTime );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aBobOffsetAmount, bobOffsetAmount );
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewTilt, prevViewTilt );
 
@@ -416,17 +264,17 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLastStepTime, lastStepTime );
 
 
-	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, false, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
-	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, true );
+	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed );
 
 	// what the fuck
@@ -494,7 +342,7 @@ void PlayerManager::Create( Entity player )
 {
 	// Add Components to entity
 	GetEntitySystem()->AddComponent( player, "playerMoveData" );
-	GetEntitySystem()->AddComponent( player, "playerZoom" );
+	auto zoom = Ent_AddComponent< CPlayerZoom >( player, "playerZoom" );
 
 	GetEntitySystem()->AddComponent( player, "rigidBody" );
 	GetEntitySystem()->AddComponent( player, "camera" );
@@ -506,6 +354,7 @@ void PlayerManager::Create( Entity player )
 	CLight* flashlight = static_cast< CLight* >( GetEntitySystem()->AddComponent( player, "light" ) );
 
 	Assert( flashlight );
+	Assert( zoom );
 
 	if ( Game_ProcessingClient() )
 	{
@@ -538,6 +387,9 @@ void PlayerManager::Create( Entity player )
 
 		Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
 	}
+
+	zoom->aOrigFov             = r_fov.GetFloat();
+	zoom->aNewFov              = r_fov.GetFloat();
 
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
@@ -1008,7 +860,7 @@ void CalcZoom( CCamera* camera, Entity player )
 		}
 		else
 		{
-			if ( zoom->aWasZoomed )
+			if ( zoom->aWasZoomed || zoom->aZoomDuration == 0.f )
 			{
 				zoom->aZoomChangeFov = camera->aFov;
 
@@ -1191,8 +1043,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	Assert( move );
 	Assert( camera );
 
-	// SetMoveType( *move, PlayerMoveType::Walk );
-	SetMoveType( *move, PlayerMoveType::NoClip );
+	SetMoveType( *move, PlayerMoveType::Walk );
 
 	camera->aTransform.Edit().aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
 }

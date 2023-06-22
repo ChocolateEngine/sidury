@@ -237,7 +237,14 @@ void CL_Update( float frameTime )
 				}
 
 				gClientState = EClientState_Connected;
-				GetEntitySystem()->AddComponent( gLocalPlayer, "playerInfo" );
+
+				// Tell the server we've connected
+				flatbuffers::FlatBufferBuilder builder;
+				MsgSrc_ClientBuilder           root( builder );
+
+				root.add_type( EMsgSrc_Client_ConnectFinish );
+				builder.Finish( root.Finish() );
+				CL_WriteToServer( builder );
 			}
 
 			break;
@@ -439,7 +446,12 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 	memset( &gClientAddr, 0, sizeof( gClientAddr ) );
 
 	if ( gClientState != EClientState_Idle )
-		Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
+	{
+		if ( spReason )
+			Log_DevF( 1, "Setting Client State to Idle (Disconnecting) - %s\n", spReason );
+		else
+			Log_Dev( 1, "Setting Client State to Idle (Disconnecting)\n" );
+	}
 
 	gClientState              = EClientState_Idle;
 	gClientConnectTimeout     = 0.f;
@@ -496,6 +508,7 @@ void CL_Connect( const char* spAddress )
 	{
 		// Continue connecting in CL_Update()
 		gClientState          = EClientState_WaitForAccept;
+		gClientTimeout        = cl_connect_timeout_duration;
 		gClientConnectTimeout = Game_GetCurTime() + cl_connect_timeout_duration;
 	}
 	else
@@ -765,8 +778,8 @@ void CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spMsg )
 	if ( spMsg->map_name() )
 		gClientServerData.aMapName = spMsg->map_name()->str();
 
-	gClientServerData.aMapName    = spMsg->client_count();
-	gClientServerData.aMaxClients = spMsg->max_clients();
+	gClientServerData.aClientCount = spMsg->client_count();
+	gClientServerData.aMaxClients  = spMsg->max_clients();
 }
 
 

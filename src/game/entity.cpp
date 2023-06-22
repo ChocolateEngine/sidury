@@ -422,6 +422,15 @@ void* EntityComponentPool::Create( Entity entity )
 	// Is this a client or server component pool?
 	// Make sure this component can be created on it
 
+	// Check if the component already exists
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it != aMapEntityToComponent.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Component already exists on entity - \"%s\"\n", apName );
+		return aComponents[ it->second ];
+	}
+
 	aMapComponentToEntity[ aCount ] = entity;
 	aMapEntityToComponent[ entity ] = aCount;
 
@@ -1137,7 +1146,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 			case EEntComponentVarType_Bool:
 			{
-				bool value = static_cast< bool >( data );
+				auto value = *(bool*)( data );
 				srBuilder.Bool( value );
 				wroteData = true;
 				break;
@@ -1339,9 +1348,12 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		if ( !pool->aMapComponentToEntity.size() )
 			continue;
 
-		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
+		EntComponentData_t* regData = pool->GetRegistryData();
 
-		EntComponentData_t*                                     regData = pool->GetRegistryData();
+		if ( regData->aNetType != EEntComponentNetType_Both && regData->aNetType != EEntComponentNetType_Server )
+			continue;
+
+		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
 
 		std::vector< NetMsg_ComponentUpdateDataBuilder >        componentDataBuilders;
 
@@ -1804,444 +1816,26 @@ CONCMD( ent_dump )
 }
 
 
+CONCMD( ent_mem )
+{
+	Log_Msg( gLC_Entity, "TODO: Print Memory Entity System is using\n" );
+}
+
+
 // ====================================================================================================
 // Base Components
-// 
-// TODO: Break these down into base functions for reading and writing certain types and structs
-// And then have the Component Database or Entity System call those base functions
-// Kind of like NetHelper_ReadVec3 and NetComp_WriteDirection
 // ====================================================================================================
 
 
-// TODO: try this instead for all these
-void TEMP_TransformRead( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData )
+void Ent_RegisterVarHandlers()
 {
-	CTransform* spTransform = static_cast< CTransform* >( spData );
-	auto        message     = flatbuffers::GetRoot< NetComp_Transform >( spSerialized );
-
-	if ( !message || !message->Verify( srVerifier ) )
-		return;
-
-	NetHelper_ReadVec3( message->pos(), spTransform->aPos.Edit() );
-	NetHelper_ReadVec3( message->ang(), spTransform->aAng.Edit() );
-	NetHelper_ReadVec3( message->scale(), spTransform->aScale.Edit() );
-}
-
-bool TEMP_TransformWrite( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate )
-{
-	const CTransform* spTransform = static_cast< const CTransform* >( spData );
-	bool              isDirty     = sFullUpdate;
-
-	isDirty |= spTransform->aPos.aIsDirty;
-	isDirty |= spTransform->aAng.aIsDirty;
-	isDirty |= spTransform->aScale.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-#if 0
-	flatbuffers::Offset< Vec3 > posOffset{};
-	flatbuffers::Offset< Vec3 > angOffset{};
-	flatbuffers::Offset< Vec3 > scaleOffset{};
-
-	if ( CH_VAR_DIRTY( spTransform->aPos ) )
-	{
-		Vec3Builder vecBuild( srBuilder );
-		NetHelper_WriteVec3( vecBuild, spTransform->aPos );
-		posOffset = vecBuild.Finish();
-	}
-
-	CH_NET_WRITE_VEC3( ang, spTransform->aAng );
-	CH_NET_WRITE_VEC3( scale, spTransform->aScale );
-#endif
-
-	NetComp_TransformBuilder transformBuilder( srBuilder );
-
-#if 1
-	Vec3 posVec( spTransform->aPos.Get().x, spTransform->aPos.Get().y, spTransform->aPos.Get().z );
-	transformBuilder.add_pos( &posVec );
-
-	CH_NET_WRITE_VEC3( transformBuilder, ang, spTransform->aAng );
-	CH_NET_WRITE_VEC3( transformBuilder, scale, spTransform->aScale );
-#else
-	if ( !posOffset.IsNull() )
-		transformBuilder.add_pos( posOffset );
-
-	CH_NET_WRITE_OFFSET( transformBuilder, ang );
-	CH_NET_WRITE_OFFSET( transformBuilder, scale );
-#endif
-
-	auto builtTransform = transformBuilder.Finish();
-	srBuilder.Finish( builtTransform );
-
-	return true;
-}
-
-
-CH_COMPONENT_READ_DEF( CTransformSmall )
-{
-	/*CTransformSmall* spTransform = static_cast< CTransformSmall* >( spData );
-	auto             message     = srReader.getRoot< NetCompTransformSmall >();
-
-	if ( message.hasPos() )
-		NetHelper_ReadVec3( message.getPos(), spTransform->aPos.Edit() );
-
-	if ( message.hasAng() )
-		NetHelper_ReadVec3( message.getAng(), spTransform->aAng.Edit() );*/
-}
-
-CH_COMPONENT_WRITE_DEF( CTransformSmall )
-{
-	return false;
-
-	/*const CTransformSmall* spTransform = static_cast< const CTransformSmall* >( spData );
-	bool                   isDirty     = sFullUpdate;
-
-	isDirty |= spTransform->aPos.aIsDirty;
-	isDirty |= spTransform->aAng.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto builder     = srMessage.initRoot< NetCompTransformSmall >();
-
-	if ( spTransform->aPos.aIsDirty || sFullUpdate )
-	{
-		auto pos = builder.initPos();
-		NetHelper_WriteVec3( &pos, spTransform->aPos );
-	}
-
-	if ( spTransform->aAng.aIsDirty || sFullUpdate )
-	{
-		auto ang = builder.initAng();
-		NetHelper_WriteVec3( &ang, spTransform->aAng );
-	}
-
-	return true;*/
-}
-
-
-CH_COMPONENT_READ_DEF( CRigidBody )
-{
-	CRigidBody* spRigidBody = static_cast< CRigidBody* >( spData );
-	auto        message     = flatbuffers::GetRoot< NetComp_RigidBody >( spSerialized );
-
-	if ( !message || !message->Verify( srVerifier ) )
-		return;
-
-	NetHelper_ReadVec3( message->vel(), spRigidBody->aVel.Edit() );
-	NetHelper_ReadVec3( message->accel(), spRigidBody->aAccel.Edit() );
-}
-
-CH_COMPONENT_WRITE_DEF( CRigidBody )
-{
-	const CRigidBody* spRigidBody = static_cast< const CRigidBody* >( spData );
-	bool              isDirty     = sFullUpdate;
-
-	isDirty |= spRigidBody->aVel.aIsDirty;
-	isDirty |= spRigidBody->aAccel.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	flatbuffers::Offset< Vec3 > velOffset{};
-	flatbuffers::Offset< Vec3 > accelOffset{};
-
-	NetComp_RigidBodyBuilder compBuilder( srBuilder );
-
-	CH_NET_WRITE_VEC3( compBuilder, vel, spRigidBody->aVel );
-	CH_NET_WRITE_VEC3( compBuilder, accel, spRigidBody->aAccel );
-
-	CH_NET_WRITE_OFFSET( compBuilder, vel );
-	CH_NET_WRITE_OFFSET( compBuilder, accel );
-
-	srBuilder.Finish( compBuilder.Finish() );
-
-	return true;
-}
-
-// TEMP
-void NetComp_ReadDirection( const NetComp_Direction* spReader, CDirection& srData )
-{
-	if ( spReader->forward() )
-		NetHelper_ReadVec3( spReader->forward(), srData.aForward.Edit() );
-
-	if ( spReader->up() )
-		NetHelper_ReadVec3( spReader->up(), srData.aUp.Edit() );
-
-	if ( spReader->right() )
-		NetHelper_ReadVec3( spReader->right(), srData.aRight.Edit() );
-}
-
-// void NetComp_WriteDirection( flatbuffers::FlatBufferBuilder& srBuilder, NetComp_DirectionBuilder& builder, const CDirection& srData, bool sFullUpdate )
-// {
-// 	CH_NET_WRITE_VEC3( builder, forward, srData.aForward );
-// 	CH_NET_WRITE_VEC3( builder, up, srData.aUp );
-// 	CH_NET_WRITE_VEC3( builder, right, srData.aRight );
-// }
-
-CH_COMPONENT_READ_DEF( CDirection )
-{
-	CDirection* spDirection = static_cast< CDirection* >( spData );
-	auto        message     = flatbuffers::GetRoot< NetComp_Direction >( spSerialized );
-
-	if ( !message )
-		return;
-
-	bool valid = message->Verify( srVerifier );
-	
-	if ( valid )
-		NetComp_ReadDirection( message, *spDirection );
-}
-
-CH_COMPONENT_WRITE_DEF( CDirection )
-{
-	const CDirection* spDirection = static_cast< const CDirection* >( spData );
-	bool              isDirty     = sFullUpdate;
-
-	isDirty |= spDirection->aForward.aIsDirty;
-	isDirty |= spDirection->aRight.aIsDirty;
-	isDirty |= spDirection->aUp.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	flatbuffers::Offset< Vec3 > forwardOffset{};
-	flatbuffers::Offset< Vec3 > upOffset{};
-	flatbuffers::Offset< Vec3 > rightOffset{};
-
-	NetComp_DirectionBuilder    dirBuilder( srBuilder );
-
-	CH_NET_WRITE_VEC3( dirBuilder, forward, spDirection->aForward );
-	CH_NET_WRITE_VEC3( dirBuilder, up, spDirection->aUp );
-	CH_NET_WRITE_VEC3( dirBuilder, right, spDirection->aRight );
-
-	CH_NET_WRITE_OFFSET( dirBuilder, forward );
-	CH_NET_WRITE_OFFSET( dirBuilder, up );
-	CH_NET_WRITE_OFFSET( dirBuilder, right );
-
-	srBuilder.Finish( dirBuilder.Finish() );
-
-	return true;
-}
-
-
-CH_COMPONENT_READ_DEF( CCamera )
-{
-	CCamera* spCamera = static_cast< CCamera* >( spData );
-	auto     message  = flatbuffers::GetRoot< NetComp_Camera >( spSerialized );
-
-	if ( !message || !message->Verify( srVerifier ) )
-		return;
-
-	if ( message->direction() )
-		NetComp_ReadDirection( message->direction(), *spCamera );
-
-	spCamera->aFov = message->fov();
-
-	if ( message->transform() )
-	{
-		NetHelper_ReadVec3( message->transform()->pos(), spCamera->aTransform.Edit().aPos.Edit() );
-		NetHelper_ReadVec3( message->transform()->ang(), spCamera->aTransform.Edit().aAng.Edit() );
-	}
-}
-
-CH_COMPONENT_WRITE_DEF( CCamera )
-{
-	const CCamera* spCamera = static_cast< const CCamera* >( spData );
-	bool           isDirty  = sFullUpdate;
-
-	isDirty |= spCamera->aFov.aIsDirty;
-	isDirty |= spCamera->aTransform.aIsDirty;
-	isDirty |= spCamera->aForward.aIsDirty;
-	isDirty |= spCamera->aRight.aIsDirty;
-	isDirty |= spCamera->aUp.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	flatbuffers::Offset< NetComp_Direction > dirOffset{};
-
-	// this is stupid
-	if ( spCamera->aForward.aIsDirty || spCamera->aRight.aIsDirty || spCamera->aUp.aIsDirty || sFullUpdate )
-	{
-		flatbuffers::Offset< Vec3 > forwardOffset{};
-		flatbuffers::Offset< Vec3 > upOffset{};
-		flatbuffers::Offset< Vec3 > rightOffset{};
-
-		NetComp_DirectionBuilder    dirBuilder( srBuilder );
-
-		CH_NET_WRITE_VEC3( dirBuilder, forward, spCamera->aForward );
-		CH_NET_WRITE_VEC3( dirBuilder, up, spCamera->aUp );
-		CH_NET_WRITE_VEC3( dirBuilder, right, spCamera->aRight );
-
-		CH_NET_WRITE_OFFSET( dirBuilder, forward );
-		CH_NET_WRITE_OFFSET( dirBuilder, up );
-		CH_NET_WRITE_OFFSET( dirBuilder, right );
-
-		dirOffset = dirBuilder.Finish();
-	}
-
-	NetComp_CameraBuilder compBuilder( srBuilder );
-
-	if ( !dirOffset.IsNull() )
-		compBuilder.add_direction( dirOffset );
-
-	if ( spCamera->aFov.aIsDirty || sFullUpdate )
-		compBuilder.add_fov( spCamera->aFov );
-
-	srBuilder.Finish( compBuilder.Finish() );
-
-	// if ( spCamera->aTransform.Get().aPos.aIsDirty || sFullUpdate )
-	// {
-	// 	Vec3::Builder pos = builder.getTransform().initPos();
-	// 	pos.setX( spCamera->aTransform.Get().aPos.Get().x );
-	// 	pos.setY( spCamera->aTransform.Get().aPos.Get().y );
-	// 	pos.setZ( spCamera->aTransform.Get().aPos.Get().z );
-	// }
-	// 
-	// if ( spCamera->aTransform.Get().aAng.aIsDirty || sFullUpdate )
-	// {
-	// 	Vec3::Builder ang = builder.getTransform().initAng();
-	// 	ang.setX( spCamera->aTransform.Get().aAng.Get().x );
-	// 	ang.setY( spCamera->aTransform.Get().aAng.Get().y );
-	// 	ang.setZ( spCamera->aTransform.Get().aAng.Get().z );
-	// }
-
-	return true;
-}
-
-
-CH_COMPONENT_READ_DEF( CGravity )
-{
-	// CGravity* spGravity = static_cast< CGravity* >( spData );
-	// auto      message  = srReader.getRoot< NetCompGravity >();
-	// 
-	// if ( message.hasForce() )
-	// 	NetHelper_ReadVec3( message.getForce(), spGravity->aForce.Edit() );
-}
-
-CH_COMPONENT_WRITE_DEF( CGravity )
-{
-	return false;
-
-	/*const CGravity* spGravity = static_cast< const CGravity* >( spData );
-	bool            isDirty   = sFullUpdate;
-
-	isDirty |= spGravity->aForce.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto builder = srMessage.initRoot< NetCompGravity >();
-
-	CH_NET_WRITE_VEC3( Force, spGravity->aForce );
-	return true;*/
-}
-
-
-CH_COMPONENT_READ_DEF( CModelInfo )
-{
-	auto* spModelPath = static_cast< CModelInfo* >( spData );
-	auto  message     = flatbuffers::GetRoot< NetComp_ModelInfo >( spSerialized );
-
-	if ( !message || !message->Verify( srVerifier ) )
-		return;
-
-	if ( message->path() )
-		spModelPath->aPath = message->path()->c_str();
-}
-
-CH_COMPONENT_WRITE_DEF( CModelInfo )
-{
-	const auto* spModelInfo = static_cast< const CModelInfo* >( spData );
-
-	bool        isDirty     = sFullUpdate;
-	isDirty |= spModelInfo->aPath.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto                     path = srBuilder.CreateString( spModelInfo->aPath.Get() );
-
-	NetComp_ModelInfoBuilder compBuilder( srBuilder );
-	compBuilder.add_path( path );
-	srBuilder.Finish( compBuilder.Finish() );
-
-	return true;
-}
-
-
-CH_COMPONENT_READ_DEF( CLight )
-{
-	auto* spLight = static_cast< CLight* >( spData );
-	auto  message = flatbuffers::GetRoot< NetComp_Light >( spSerialized );
-
-	if ( !message || !message->Verify( srVerifier ) )
-		return;
-
-	NetHelper_ReadVec4( message->color(), spLight->aColor.Edit() );
-	NetHelper_ReadVec3( message->pos(), spLight->aPos.Edit() );
-	NetHelper_ReadVec3( message->ang(), spLight->aAng.Edit() );
-
-	spLight->aType     = static_cast< ELightType >( message->type() );
-	spLight->aInnerFov = message->innerFov();
-	spLight->aOuterFov = message->outerFov();
-	spLight->aRadius   = message->radius();
-	spLight->aLength   = message->length();
-
-	spLight->aShadow   = message->shadow();
-	spLight->aEnabled  = message->enabled();
-}
-
-
-CH_COMPONENT_WRITE_DEF( CLight )
-{
-	return false;
-
-	/*auto* spLight = static_cast< const CLight* >( spData );
-
-	// Don't update anything else if the light isn't even enabled
-	// Actually, this may cause issues for a multiplayer map editor
-	// if ( !spLight->aEnabled && !spLight->aEnabled.aIsDirty )
-	// 	return false;
-
-	bool  isDirty = sFullUpdate;
-	isDirty |= spLight->aColor.aIsDirty;
-	isDirty |= spLight->aAng.aIsDirty;
-	isDirty |= spLight->aPos.aIsDirty;
-	isDirty |= spLight->aType.aIsDirty;
-	isDirty |= spLight->aInnerFov.aIsDirty;
-	isDirty |= spLight->aOuterFov.aIsDirty;
-	isDirty |= spLight->aRadius.aIsDirty;
-	isDirty |= spLight->aLength.aIsDirty;
-	isDirty |= spLight->aShadow.aIsDirty;
-	isDirty |= spLight->aEnabled.aIsDirty;
-
-	if ( !isDirty )
-		return false;
-
-	auto  builder = srMessage.initRoot< NetCompLight >();
-
-	CH_NET_WRITE_VEC4( Color, spLight->aColor );
-	CH_NET_WRITE_VEC3( Pos, spLight->aPos );
-	CH_NET_WRITE_VEC3( Ang, spLight->aAng );
-
-	builder.setType( spLight->aType );
-	builder.setInnerFov( spLight->aInnerFov );
-	builder.setOuterFov( spLight->aOuterFov );
-	builder.setRadius( spLight->aRadius );
-	builder.setLength( spLight->aLength );
-
-	builder.setShadow( spLight->aShadow );
-	builder.setEnabled( spLight->aEnabled );
-
-	return true;*/
 }
 
 
 void Ent_RegisterBaseComponents()
 {
+	Ent_RegisterVarHandlers();
+
 	// Setup Types
 	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntComponentVarType_Bool;
 	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntComponentVarType_Float;
