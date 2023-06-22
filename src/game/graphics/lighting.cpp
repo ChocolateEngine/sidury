@@ -337,6 +337,8 @@ void Graphics_DestroyLightBuffer( Light_t* spLight )
 
 	vec_remove( gLights, spLight );
 	delete spLight;
+
+	Log_Dev( gLC_ClientGraphics, 1, "Deleted Light\n" );
 }
 
 
@@ -574,6 +576,8 @@ Light_t* Graphics_CreateLight( ELightType sType )
 	gLights.push_back( light );
 	gDirtyLights.push_back( light );
 
+	Log_Dev( gLC_ClientGraphics, 1, "Created Light\n" );
+
 	return light;
 }
 
@@ -592,6 +596,8 @@ void Graphics_DestroyLight( Light_t* spLight )
 	gNeedLightInfoUpdate = true;
 
 	gDestroyLights.push_back( spLight );
+
+	Log_Dev( gLC_ClientGraphics, 1, "Queued Light For Deletion\n" );
 
 	vec_remove_if( gDirtyLights, spLight );
 }
