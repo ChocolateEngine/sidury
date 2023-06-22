@@ -230,6 +230,9 @@ void Game_UpdateGame( float frameTime )
 
 	gCurTime += gFrameTime;
 
+	// TODO: make a Tool_Update() function or something
+	LightEditor_Update();
+
 	if ( gServerData.aActive )
 		SV_Update( gFrameTime );
 
