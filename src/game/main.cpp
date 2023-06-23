@@ -24,7 +24,7 @@
 #include "cl_main.h"
 #include "sv_main.h"
 
-#include "tools/light_editor.h"
+#include "tools/tools.h"
 
 #include <SDL_system.h>
 #include <SDL_hints.h>
@@ -68,7 +68,7 @@ void Game_Shutdown()
 	CL_Shutdown();
 	SV_Shutdown();
 
-	LightEditor_Shutdown();
+	Tools_Shutdown();
 	Skybox_Destroy();
 	Phys_Shutdown();
 	Net_Shutdown();
@@ -128,7 +128,7 @@ bool Game_Init()
 #endif
 
 	Phys_Init();
-	LightEditor_Init(); // TODO: when tools are made, move this there
+	Tools_Init();
 
 	// Init Entity Component Registry
 	Ent_RegisterBaseComponents();
@@ -190,6 +190,7 @@ void Game_Update( float frameTime )
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
+		Tools_DrawUI();
 		Graphics_Present();
 	}
 	else
@@ -214,6 +215,8 @@ void Game_UpdateGame( float frameTime )
 
 	gFrameTime = frameTime * host_timescale;
 
+	Game_SetClient( true );
+
 	Game_HandleSystemEvents();
 
 	Input_Update();
@@ -230,8 +233,7 @@ void Game_UpdateGame( float frameTime )
 
 	gCurTime += gFrameTime;
 
-	// TODO: make a Tool_Update() function or something
-	LightEditor_Update();
+	Tools_Update( gFrameTime );
 
 	if ( gServerData.aActive )
 		SV_Update( gFrameTime );

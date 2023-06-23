@@ -176,24 +176,19 @@ struct EntComponentVarData_t
 // template< typename T >
 struct EntComponentData_t
 {
-	const char*                                         apName;
+	const char*                               apName;
 
 	// [Var Offset] = Var Data
 	std::map< size_t, EntComponentVarData_t > aVars;
 	// std::vector< EntComponentVarData_t > aVars;
 
-#if !USE_FLEXBUFFERS
-	FEntComp_ReadFunc*                                  apRead;
-	FEntComp_WriteFunc*                                 apWrite;
-#endif
+	bool                                      aOverrideClient;  // probably temporary until prediction
+	EEntComponentNetType                      aNetType;
 
-	bool                                                aOverrideClient;  // probably temporary until prediction
-	EEntComponentNetType                                aNetType;
+	FEntComp_New                              aFuncNew;
+	FEntComp_Free                             aFuncFree;
 
-	FEntComp_New                                        aFuncNew;
-	FEntComp_Free                                       aFuncFree;
-
-	FEntComp_NewSys                                     aFuncNewSystem;
+	FEntComp_NewSys                           aFuncNewSystem;
 };
 
 
@@ -618,8 +613,8 @@ class EntitySystem
 	// Entity ID's in use
 	std::vector< Entity >                                         aUsedEntities{};
 
-	// Array of signatures where the index corresponds to the entity ID
-	// std::array< Signature, CH_MAX_ENTITIES > aSignatures{};
+	// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
+	std::unordered_map< Entity, Entity >                          aEntityIDConvert;
 
 	// Total living entities - used to keep limits on how many exist
 	Entity                                                        aEntityCount = 0;

@@ -1,8 +1,37 @@
 #pragma once
 
-constexpr unsigned int MAP_VERSION = 1;
+constexpr u16         MAP_VERSION       = 1;
+constexpr const char* CH_MAP_IDENTIFIER = "SDMF";
+
+#define CH_MAP_SIGNATURE ( 'F' << 24 | 'M' << 16 | 'D' << 8 | 'S' )
+
+using MapHandle_t = size_t;
 
 struct SceneDraw_t;
+
+
+enum EMapHeaderFlag : u16
+{
+	EMapHeaderFlag_None              = 0,
+	EMapHeaderFlag_Compressed        = ( 1 << 0 ),
+	EMapHeaderFlag_ContainsVisData   = ( 1 << 1 ),
+	EMapHeaderFlag_ContainsLightMaps = ( 1 << 2 ),
+};
+
+
+// Keep the number on these for potential backwards compatability
+enum ESiduryMapCmd
+{
+	ESiduryMapCmd_Invalid       = 0,
+	ESiduryMapCmd_EntityData    = 1,
+	ESiduryMapCmd_ComponentData = 2,
+
+	ESiduryMapCmd_Count,
+
+	// ESiduryMapCmd_NewEntity,
+	// ESiduryMapCmd_NewComponent,
+};
+
 
 // matches the names in the keyvalues file
 struct MapInfo
@@ -18,14 +47,46 @@ struct MapInfo
 	glm::vec3    spawnPos;
 	glm::vec3    spawnAng;
 
-	// unused
+	// TODO: make a component
 	std::string  skybox;
+};
+
+
+struct SiduryMapHeader_t
+{
+	u16            aVersion            = 0;
+	int            aSignature          = 0;
+	EMapHeaderFlag aFlags              = EMapHeaderFlag_None;
+
+	// int            aEntityDataStart    = 0;  // Start offset into the binary for where this begins
+	// int            aEntityDataSize     = 0;  // The space it takes up
+	// 
+	// int            aComponentDataStart = 0;
+	// int            aComponentDataSize  = 0;
+	// 
+	// int            aVisDataStart       = 0;
+	// int            aVisDataSize        = 0;
+};
+
+
+// Prototyping
+struct SiduryMapDataV2_t
+{
+	std::string aMapName;
+
+	// VIS DATA
+	// LIGHTMAPS
 };
 
 
 struct SiduryMap
 {
-	std::string                    aMapPath    = "";
+	SiduryMapHeader_t              aHeader;
+	std::string                    aMapPath = "";
+	MapHandle_t                    aMapHandle;
+
+	// -------------------------------------------------------------------
+	// Old Sidury Map Format Below
 
 	MapInfo*                       aMapInfo    = nullptr;
 	SceneDraw_t*                   aRenderable = nullptr;
@@ -36,16 +97,38 @@ struct SiduryMap
 };
 
 
-bool             MapManager_FindMap( const std::string& path );
-bool             MapManager_LoadMap( const std::string& path );
+// Map Component Tag
+struct CMap
+{
+	// Vector of maps this entity is part of
+	std::vector< MapHandle_t > aMaps;
+};
+
+
+struct CMapRoot
+{
+	MapHandle_t aHandle;
+};
+
+
+bool             MapManager_FindMap( const std::string& srPath );
+bool             MapManager_LoadMap( const std::string& srPath );
+SiduryMap*       MapManager_CreateMap();
+void             MapManager_WriteMap( SiduryMap* spMap, const std::string& srPath );
 void             MapManager_CloseMap();
+
 bool             MapManager_HasMap();
 std::string_view MapManager_GetMapName();
 std::string_view MapManager_GetMapPath();
 
+
 void             MapManager_Update();
 
-MapInfo*         MapManager_ParseMapInfo( const std::string& path );
+MapInfo*         MapManager_ParseMapInfo( const std::string& srPath );
+
+// ------------------------------------------------------------------------
+// Functions to become obsolete for Sidury Map Format Version 2
+
 bool             MapManager_LoadWorldModel();
 // void            MapManager_ParseEntities( const std::string &path );
 void             MapManager_SpawnPlayer();

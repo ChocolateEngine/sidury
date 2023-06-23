@@ -21,6 +21,9 @@ extern Handle                                 gLocalPlayer;
 
 extern std::vector< Light_t* >                gLights;
 
+constexpr const char*                         gModelLightPointPath = "tools/light_editor/light_point.glb";
+constexpr const char*                         gModelLightConePath  = "tools/light_editor/light_cone.glb";
+
 
 CONVAR( r_light_line, 1 );
 CONVAR( r_light_line_dist, 64.f );
@@ -212,11 +215,26 @@ CONCMD( tool_light_editor )
 }
 
 
-void LightEditor_Init()
+bool LightEditor_Init()
 {
 	// Load Light Models
-	gModelLightPoint = Graphics_LoadModel( "tools/light_editor/light_point.glb" );
-	gModelLightCone  = Graphics_LoadModel( "tools/light_editor/light_cone.glb" );
+	gModelLightPoint = Graphics_LoadModel( gModelLightPointPath );
+
+	if ( gModelLightPoint == InvalidHandle )
+	{
+		Log_ErrorF( "Failed to load point light model for light editor: %s\n", gModelLightPointPath );
+		return false;
+	}
+
+	gModelLightCone = Graphics_LoadModel( gModelLightConePath );
+
+	if ( gModelLightCone == InvalidHandle )
+	{
+		Log_ErrorF( "Failed to load cone light model for light editor: %s\n", gModelLightConePath );
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -401,8 +419,10 @@ void LightEditor_DrawEditor()
 }
 
 
-void LightEditor_DrawLightModels()
+void LightEditor_Update()
 {
+	PROF_SCOPE();
+
 	if ( !tool_light_editor_draw_lights )
 		return;
 
@@ -410,11 +430,9 @@ void LightEditor_DrawLightModels()
 }
 
 
-void LightEditor_Update()
+void LightEditor_DrawUI()
 {
 	PROF_SCOPE();
-
-	LightEditor_DrawLightModels();
 
 	if ( !gLightEditorEnabled )
 		return;

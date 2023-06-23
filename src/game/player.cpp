@@ -397,7 +397,7 @@ void PlayerManager::Create( Entity player )
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
-	Transform*       transform = (Transform*)GetEntitySystem()->AddComponent( player, "transform" );
+	CTransform*      transform = (CTransform*)GetEntitySystem()->AddComponent( player, "transform" );
 
 	//Model* model = new Model;
 	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );

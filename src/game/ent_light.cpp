@@ -52,6 +52,18 @@ void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 			return;
 	}
 
+	// Light type switched, we need to recreate the light
+	if ( light->aType != light->apLight->aType )
+	{
+		Graphics_DestroyLight( light->apLight );
+		light->apLight = nullptr;
+
+		light->apLight = Graphics_CreateLight( light->aType );
+
+		if ( !light->apLight )
+			return;
+	}
+
 	Assert( light->apLight );
 
 	if ( light->apLight )

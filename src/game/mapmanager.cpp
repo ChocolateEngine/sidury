@@ -1,8 +1,4 @@
-/* 
-
-Loads Sidury Map Files (smf)
-
-*/
+// Loads Sidury Map Files (smf)
 
 #include "core/filesystem.h"
 #include "core/console.h"
@@ -132,27 +128,15 @@ bool MapManager_FindMap( const std::string& path )
 static Entity gMapEntity = CH_ENT_INVALID;
 
 
-bool MapManager_LoadMap( const std::string &path )
+// Temporary, will be removed
+bool MapManager_LoadLegacyV1Map( const std::string &path )
 {
-	if ( gpMap )
-		MapManager_CloseMap();
-
-	std::string absPath = FileSys_FindDir( "maps/" + path );
-
-	if ( absPath == "" )
-	{
-		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"", path.c_str() );
-		return false;
-	}
-
-	Log_DevF( gLC_Map, 1, "Loading Map: %s\n", path.c_str() );
-
-	MapInfo* mapInfo = MapManager_ParseMapInfo( absPath + "/mapInfo.smf" );
+	MapInfo* mapInfo = MapManager_ParseMapInfo( path + "/mapInfo.smf" );
 
 	if ( mapInfo == nullptr )
 		return false;
 
-	gpMap = new SiduryMap;
+	gpMap           = new SiduryMap;
 	gpMap->aMapPath = path;
 	gpMap->aMapInfo = mapInfo;
 
@@ -172,7 +156,7 @@ bool MapManager_LoadMap( const std::string &path )
 	MapManager_SpawnPlayer();
 
 	// rotate the world model
-	glm::mat4 modelMatrix = Util_ToMatrix( nullptr, &gpMap->aMapInfo->ang );
+	glm::mat4 modelMatrix      = Util_ToMatrix( nullptr, &gpMap->aMapInfo->ang );
 
 	// gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
 
@@ -192,6 +176,80 @@ bool MapManager_LoadMap( const std::string &path )
 		}
 	}
 
+	return true;
+}
+
+
+SiduryMap* MapManager_ReadMapHeader( const std::vector< char >& srMapData )
+{
+	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
+	{
+		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)", srMapData.size(), sizeof( SiduryMapHeader_t ) );
+		return nullptr;
+	}
+
+	SiduryMapHeader_t* header = (SiduryMapHeader_t*)srMapData.data();
+}
+
+
+ESiduryMapCmd MapManager_GetNextCommand( const std::vector< char >& srMapData, SiduryMap* spMap )
+{
+	return ESiduryMapCmd_Invalid;
+}
+
+
+void MapManager_ReadCommand( const std::vector< char >& srMapData, SiduryMap* spMap )
+{
+	
+}
+
+
+bool MapManager_LoadMap( const std::string &path )
+{
+	if ( gpMap )
+		MapManager_CloseMap();
+
+	std::string absPath = FileSys_FindDir( "maps/" + path );
+
+	if ( absPath.empty() )
+	{
+		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"", path.c_str() );
+		return false;
+	}
+
+	Log_DevF( gLC_Map, 1, "Loading Map: %s\n", path.c_str() );
+
+	std::string mapInfoPath = FileSys_FindFile( absPath + "/mapInfo.smf" );
+	if ( FileSys_FindFile( absPath + "/mapInfo.smf" ).size() )
+	{
+		// It's a Legacy Map
+		return MapManager_LoadLegacyV1Map( absPath );
+	}
+
+	std::string mapDataPath = FileSys_FindFile( path + "/mapData.smf" );
+
+	if ( mapDataPath.empty() )
+	{
+		Log_WarnF( gLC_Map, "Map does not contain a mapData.smf file: \"%s\"", path.c_str() );
+		return false;
+	}
+
+	std::vector< char > mapData = FileSys_ReadFile( mapDataPath );
+
+	if ( mapData.empty() )
+	{
+		Log_ErrorF( gLC_Map, "Map data file is empty: \"%s\"", path.c_str() );
+		return false;
+	}
+
+	SiduryMap* map = MapManager_ReadMapHeader( mapData );
+
+	if ( !map )
+	{
+		Log_ErrorF( gLC_Map, "Failed to read map header: \"%s\"", path.c_str() );
+		return false;
+	}
+
 	// return sceneDraw;
 	// 
 	// int      heap = _heapchk();
@@ -207,6 +265,12 @@ bool MapManager_LoadMap( const std::string &path )
 	// }
 
 	return true;
+}
+
+
+SiduryMap* MapManager_CreateMap()
+{
+	return nullptr;
 }
 
 
