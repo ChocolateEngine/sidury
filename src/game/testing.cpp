@@ -516,13 +516,24 @@ void TEST_CL_UpdateProtos( float frameTime )
 	// TEMP
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		auto modelInfo      = Ent_GetComponent< CModelInfo >( proto, "modelInfo" );
-		auto renderComp     = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
-		auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
+		// auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
+		// 
+		// Assert( protoTransform );
+		// 
+		// // Only update the renderable model matrix if the transform component is dirty
+		// bool transformDirty = false;
+		// transformDirty |= protoTransform->aPos.aIsDirty;
+		// transformDirty |= protoTransform->aAng.aIsDirty;
+		// transformDirty |= protoTransform->aScale.aIsDirty;
+		// 
+		// if ( !transformDirty )
+		// 	continue;
+
+		auto modelInfo  = Ent_GetComponent< CModelInfo >( proto, "modelInfo" );
+		auto renderComp = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
 
 		Assert( modelInfo );
 		Assert( renderComp );
-		Assert( protoTransform );
 
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
 		if ( renderComp->aHandle == InvalidHandle )
@@ -548,7 +559,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 
 		if ( renderData )
 		{
-			Util_ToMatrix( renderData->aModelMatrix, protoTransform->aPos, protoTransform->aAng, protoTransform->aScale );
+			GetEntitySystem()->GetWorldMatrix( renderData->aModelMatrix, proto );
 			Graphics_UpdateRenderableAABB( renderComp->aHandle );
 		}
 

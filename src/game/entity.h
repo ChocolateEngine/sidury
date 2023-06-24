@@ -182,6 +182,8 @@ struct EntComponentData_t
 	std::map< size_t, EntComponentVarData_t > aVars;
 	// std::vector< EntComponentVarData_t > aVars;
 
+	size_t                                    aSize;
+
 	bool                                      aOverrideClient;  // probably temporary until prediction
 	EEntComponentNetType                      aNetType;
 
@@ -338,6 +340,7 @@ inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient,
 
 	EntComponentData_t& data                        = gEntComponentRegistry.aComponents[ typeHash ];
 	data.apName                                     = spName;
+	data.aSize                                      = sizeof( T );
 	data.aOverrideClient                            = sOverrideClient;
 	data.aNetType                                   = sNetType;
 	data.aFuncNew                                   = sFuncNew;
@@ -550,11 +553,30 @@ class EntitySystem
 	// kind of a hack, this just allocates the entity for the client
 	// but what if a client only entity is using an ID that a newly created server entity is using?
 	// curl up into a ball and die i guess
-	Entity                                                        CreateEntityFromServer( Entity desiredId );
-	bool                                                          EntityExists( Entity desiredId );
+	// Entity                                                        CreateEntityFromServer( Entity desiredId );
+
+	bool                                                          EntityExists( Entity sDesiredId );
+
+	// Parents an entity to another one, only takes affect if the entity has a transform component
+	// TODO: actually implement, and tackle parenting with physics objects
+	void                                                          ParentEntity( Entity sSelf, Entity sParent );
+	Entity                                                        GetParent( Entity sEntity );
+
+	// Returns a Model Matrix with parents applied in world space IF we have a transform component
+	bool                                                          GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
+
+	// Same as GetWorldMatrix, but returns in a CTransform component
+	Transform                                                     GetWorldTransform( Entity sEntity );
+
+	// having local versions of these functions are useless, that's just the transform component
+	// GetWorldMatrix
+	// GetWorldTransform
+	// GetWorldPosition
+	// GetWorldAngles
+	// GetWorldScale
 
 	// Read and write from the network
-	//void                                                          ReadEntityUpdates( capnp::MessageReader& srReader );
+	void                                                          ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
 	void                                                          WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
 
 	void                                                          ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
@@ -628,6 +650,9 @@ class EntitySystem
 
 	// Entity States, will store if an entity is just created or deleted for one frame
 	std::unordered_map< Entity, EEntityCreateState >              aEntityStates;
+
+	// Entity Parents
+	std::unordered_map< Entity, Entity >                          aEntityParents;
 };
 
 
@@ -963,6 +988,7 @@ struct CTransform
 
 	CTransform()
 	{
+		aScale.aValue = { 1.f, 1.f, 1.f };
 	}
 
 	~CTransform()
@@ -1116,6 +1142,9 @@ struct CModelInfo
 	// Path to model to load
 	ComponentNetVar< std::string > aPath;
 
+	// Local Handle to model
+	Handle                         aModel = InvalidHandle;
+
 	// TODO: store animations, attachments, etc. here
 };
 
@@ -1127,12 +1156,13 @@ struct CLight
 	ComponentNetVar< glm::vec4 >  aColor{};
 	ComponentNetVar< glm::vec3 >  aPos{};
 	ComponentNetVar< glm::vec3 >  aAng{};
-	ComponentNetVar< float >      aInnerFov = 45.f;
-	ComponentNetVar< float >      aOuterFov = 45.f;
-	ComponentNetVar< float >      aRadius   = 0.f;
-	ComponentNetVar< float >      aLength   = 0.f;
-	ComponentNetVar< bool >       aShadow   = true;
-	ComponentNetVar< bool >       aEnabled  = true;
+	ComponentNetVar< float >      aInnerFov     = 45.f;
+	ComponentNetVar< float >      aOuterFov     = 45.f;
+	ComponentNetVar< float >      aRadius       = 0.f;
+	ComponentNetVar< float >      aLength       = 0.f;
+	ComponentNetVar< bool >       aShadow       = true;
+	ComponentNetVar< bool >       aEnabled      = true;
+	ComponentNetVar< bool >       aUseTransform = false;  // Use a CTransform component instead, will eventually be required and aPos/aAng will be removed
 
 	Light_t*                      apLight   = nullptr;  // var not registered
 };

@@ -783,54 +783,13 @@ void CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spMsg )
 }
 
 
-// IDEA: what if you had an internal translation list or whatever of server to client entity id's
-// The client entity ID's may be different thanks to client only entities
-// and having an internal system to convert the entity id to what we store it on the client
-// would completely resolve any potential entity id conflicts
 void CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spMsg )
 {
 	PROF_SCOPE();
 
 	gClientWait_EntityList    = true;
 
-	auto entityUpdateList = spMsg->update_list();
-
-	if ( !entityUpdateList )
-		return;
-
-	for ( size_t i = 0; i < entityUpdateList->size(); i++ )
-	{
-		const NetMsg_EntityUpdate* entityUpdate = entityUpdateList->Get( i );
-
-		if ( !entityUpdate )
-			continue;
-
-		// NetMsg_EntityUpdate
-
-		Entity entId  = entityUpdate->id();
-		Entity entity = CH_ENT_INVALID;
-
-		if ( entityUpdate->destroyed() )
-		{
-			GetEntitySystem()->DeleteEntity( entId );
-			continue;
-		}
-		else
-		{
-			if ( !GetEntitySystem()->EntityExists( entId ) )
-			{
-				// Log_Warn( gLC_Client, "Missed message from server to create entity\n" );
-
-				entity = GetEntitySystem()->CreateEntityFromServer( entId );
-
-				if ( entity == CH_ENT_INVALID )
-				{
-					Log_Warn( gLC_Client, "Failed to create client entity from server\n" );
-					continue;
-				}
-			}
-		}
-	}
+	GetEntitySystem()->ReadEntityUpdates( spMsg );
 }
 
 
@@ -1001,8 +960,10 @@ void CL_GetServerMessages()
 			case EMsgSrc_Server_EntityList:
 			{
 				if ( auto msg = CL_ReadMsg< NetMsg_EntityUpdates >( msgType, msgDataVerify, msgData ) )
-					CL_HandleMsg_EntityList( msg );
-
+				{
+					gClientWait_EntityList = true;
+					GetEntitySystem()->ReadEntityUpdates( msg );
+				}
 				break;
 			}
 

@@ -432,7 +432,7 @@ void SteamAbstraction::OnProfileDataLoaded( PersonaStateChange_t* spParam )
 	}
 
 	// Log_DevF( gLC_Steam, 1, "Persona State Changed for Steam User \"%s\"\n", steamID.Render() );
-	Log_DevF( gLC_Steam, 1, "Persona State Changed for Steam User \"%zd\"\n", spParam->m_ulSteamID );
+	// Log_DevF( gLC_Steam, 1, "Persona State Changed for Steam User \"%zd\"\n", spParam->m_ulSteamID );
 
 	if ( spParam->m_nChangeFlags & k_EPersonaChangeName )
 	{

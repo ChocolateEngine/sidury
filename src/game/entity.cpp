@@ -6,6 +6,7 @@
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "ent_light.h"
+#include "mapmanager.h"
 #include "igui.h"
 
 #include "graphics/graphics.h"
@@ -514,7 +515,7 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 	}
 
 	aMapComponentToEntity.erase( it );
-	aMapEntityToComponent.erase( sIndex );
+	aMapEntityToComponent.erase( entity );
 
 	aComponentStates.erase( sIndex );
 
@@ -545,13 +546,14 @@ void EntityComponentPool::RemoveQueued( Entity entity )
 // Removes components queued for deletion
 void EntityComponentPool::RemoveAllQueued()
 {
+	std::vector< size_t > toRemove;
+
 	// for ( auto& [ index, state ] : aComponentStates )
-	// for ( size_t i = 0; i < aComponentStates.size(); i++ )
 	for ( auto it = aComponentStates.begin(); it != aComponentStates.end(); it++ )
 	{
 		if ( it->second == EEntityCreateState_Destroyed )
 		{
-			RemoveByIndex( it->first );
+			toRemove.push_back( it->first );
 			continue;
 		}
 
@@ -559,6 +561,11 @@ void EntityComponentPool::RemoveAllQueued()
 		{
 			it->second = EEntityCreateState_None;
 		}
+	}
+
+	for ( size_t entity : toRemove )
+	{
+		RemoveByIndex( entity );
 	}
 }
 
@@ -882,24 +889,24 @@ Entity EntitySystem::GetEntityCount()
 }
 
 
-Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
-{
-	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
-
-	size_t index = vec_index( aEntityPool, desiredId );
-
-	if ( index == SIZE_MAX )
-	{
-		Log_Error( gLC_Entity, "Entity ID from Server is already taken on Client\n" );
-		return CH_ENT_INVALID;
-	}
-
-	vec_remove_index( aEntityPool, index );
-	aUsedEntities.push_back( desiredId );
-	++aEntityCount;
-
-	return desiredId;
-}
+//Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
+//{
+//	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
+//
+//	size_t index = vec_index( aEntityPool, desiredId );
+//
+//	if ( index == SIZE_MAX )
+//	{
+//		Log_Error( gLC_Entity, "Entity ID from Server is already taken on Client\n" );
+//		return CH_ENT_INVALID;
+//	}
+//
+//	vec_remove_index( aEntityPool, index );
+//	aUsedEntities.push_back( desiredId );
+//	++aEntityCount;
+//
+//	return desiredId;
+//}
 
 
 bool EntitySystem::EntityExists( Entity desiredId )
@@ -911,10 +918,136 @@ bool EntitySystem::EntityExists( Entity desiredId )
 }
 
 
+void EntitySystem::ParentEntity( Entity sSelf, Entity sParent )
+{
+	if ( sSelf == sParent )
+		return;
+
+	if ( sParent == CH_ENT_INVALID )
+	{
+		// Clear the parent
+		aEntityParents.erase( sSelf );
+	}
+	else
+	{
+		aEntityParents[ sSelf ] = sParent;
+	}
+}
+
+
+Entity EntitySystem::GetParent( Entity sSelf )
+{
+	auto it = aEntityParents.find( sSelf );
+
+	if ( it != aEntityParents.end() )
+		return it->second;
+
+	return CH_ENT_INVALID;
+}
+
+
+// Returns a Model Matrix with parents applied in world space IF we have a transform component
+bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
+{
+	// Check if we have a transform component first
+	auto transform = Ent_GetComponent< CTransform >( sEntity, "transform" );
+
+	if ( !transform )
+	{
+		srMat = glm::mat4( 1.f );
+		return false;
+	}
+
+	Entity    parent = GetParent( sEntity );
+	glm::mat4 parentMat( 1.f );
+
+	if ( parent )
+	{
+		// Get the world matrix recursively
+		GetWorldMatrix( parentMat, parent );
+	}
+
+	// NOTE: THIS IS PROBABLY WRONG
+	srMat = glm::translate( transform->aPos.Get() );
+
+	srMat *= glm::eulerAngleYZX(
+	  glm::radians( transform->aAng.Get().x ),
+	  glm::radians( transform->aAng.Get().y ),
+	  glm::radians( transform->aAng.Get().z ) );
+
+	srMat = glm::scale( srMat, transform->aScale.Get() );
+	srMat = parentMat * srMat;
+
+	return true;
+}
+
+
+Transform EntitySystem::GetWorldTransform( Entity sEntity )
+{
+	Transform final{};
+
+	glm::mat4 matrix;
+	if ( !GetWorldMatrix( matrix, sEntity ) )
+		return final;
+
+	final.aPos   = Util_GetMatrixPosition( matrix );
+	final.aAng   = Util_GetMatrixAngles( matrix );
+	final.aScale = Util_GetMatrixScale( matrix );
+
+	return final;
+}
+
+
 // Read and write from the network
-//void EntitySystem::ReadEntityUpdates( capnp::MessageReader& srReader )
-//{
-//}
+void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
+{
+	auto entityUpdateList = spMsg->update_list();
+
+	if ( !entityUpdateList )
+		return;
+
+	for ( size_t i = 0; i < entityUpdateList->size(); i++ )
+	{
+		const NetMsg_EntityUpdate* entityUpdate = entityUpdateList->Get( i );
+
+		if ( !entityUpdate )
+			continue;
+
+		// NetMsg_EntityUpdate
+
+		Entity entId  = entityUpdate->id();
+		Entity entity = CH_ENT_INVALID;
+
+		if ( entityUpdate->destroyed() )
+		{
+			GetEntitySystem()->DeleteEntity( entId );
+			continue;
+		}
+		else
+		{
+			// Is this entity in the translation system?
+			auto it = aEntityIDConvert.find( entId );
+
+			// It's not, add it
+			if ( it == aEntityIDConvert.end() )
+			{
+				entity = GetEntitySystem()->CreateEntity();
+
+				if ( entity == CH_ENT_INVALID )
+				{
+					Log_Warn( gLC_Entity, "Failed to create client entity\n" );
+					continue;
+				}
+
+				aEntityIDConvert[ entId ] = entity;
+			}
+			else if ( !GetEntitySystem()->EntityExists( it->second ) )
+			{
+				Log_Error( gLC_Entity, "wtf entity in translation list doesn't actually exist?\n" );
+			}
+		}
+	}
+}
 
 
 // TODO: redo this by having it loop through component pools, and not entitys
@@ -1422,6 +1555,9 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			{
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
+					if ( !var.aIsNetVar )
+						continue;
+
 					char* dataChar = static_cast< char* >( data );
 					// EntComp_ResetVarDirty( dataChar + offset, var.aType );
 
@@ -1490,6 +1626,28 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 {
 	PROF_SCOPE();
 
+	// First, reset all dirty variables
+	for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	{
+		EntComponentData_t* regData = pool->GetRegistryData();
+
+		for ( auto [entity, compIndex] : pool->aMapEntityToComponent )
+		{
+			void* componentData = pool->aComponents[ compIndex ];
+
+			// Reset Component Var Dirty Values
+			for ( const auto& [ offset, var ] : regData->aVars )
+			{
+				if ( !var.aIsNetVar )
+					continue;
+
+				char* dataChar = static_cast< char* >( componentData );
+				bool* isDirty  = reinterpret_cast< bool* >( dataChar + var.aSize + offset );
+				*isDirty       = false;
+			}
+		}
+	}
+
 	auto componentUpdateList = spReader->update_list();
 
 	if ( !componentUpdateList )
@@ -1537,15 +1695,22 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 			// Get the Entity and Make sure it exists
 			Entity entId  = componentUpdateData->id();
-			Entity entity = CH_ENT_INVALID;
 
-			if ( !EntityExists( entId ) )
+			// Is this entity in the translation system?
+			auto   it     = aEntityIDConvert.find( entId );
+			if ( it == aEntityIDConvert.end() )
 			{
 				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
 				continue;
 			}
 
-			entity = entId;
+			Entity entity = it->second;
+
+			if ( !EntityExists( entity ) )
+			{
+				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
+				continue;
+			}
 
 			// Check the component state, do we need to remove it, or add it to the entity?
 			if ( componentUpdateData->destroyed() )
@@ -1797,6 +1962,7 @@ CONCMD( ent_dump )
 			auto regData = pool->GetRegistryData();
 
 			Log_GroupF( group, "\n    Component: %s\n", regData->apName );
+			Log_GroupF( group, "    Size: %zd\n", regData->aSize );
 			Log_GroupF( group, "    Predicted: %s\n", pool->IsPredicted( entity ) ? "TRUE" : "FALSE" );
 
 			for ( const auto& [ offset, var ] : regData->aVars )
@@ -1816,9 +1982,73 @@ CONCMD( ent_dump )
 }
 
 
+// MOVE TO util.h
+template< typename KEY, typename VALUE >
+inline size_t Util_SizeOfUnordredMap( const std::unordered_map< KEY, VALUE >& srMap )
+{
+	return ( srMap.size() * ( sizeof( std::unordered_map< KEY, VALUE >::value_type ) + sizeof( void* ) ) +  // data list
+	         srMap.bucket_count() * ( sizeof( void* ) + sizeof( size_t ) ) )                                // bucket index
+	       * 1.5;                                                                                           // estimated allocation overheads
+}
+
+
 CONCMD( ent_mem )
 {
-	Log_Msg( gLC_Entity, "TODO: Print Memory Entity System is using\n" );
+	bool useServer = false;
+
+	if ( Game_IsHosting() && Game_ProcessingClient() )
+	{
+		// We have access to the server's entity system, so if we want it, use that
+		if ( args.size() > 0 && args[ 0 ] == "server" )
+		{
+			useServer = true;
+			Game_SetClient( false );
+		}
+	}
+
+	LogGroup group = Log_GroupBegin( gLC_Entity );
+
+	size_t componentPoolMapSize = Util_SizeOfUnordredMap( GetEntitySystem()->aComponentPools );
+	size_t componentPoolSize    = 0;
+
+	for ( auto& [name, pool] : GetEntitySystem()->aComponentPools )
+	{
+		size_t              curSize       = sizeof( EntityComponentPool );
+		size_t              compSize      = 0;
+		size_t              compOtherSize = 0;
+
+		EntComponentData_t* regData  = pool->GetRegistryData();
+
+		for ( const auto& [ offset, var ] : regData->aVars )
+		{
+			// Check for special case std::string
+			if ( var.aType == EEntComponentVarType_StdString )
+			{
+				// We have to iterate through all components and get the amount of memory used by each std::string
+				// compOtherSize += 0;
+			}
+		}
+
+		compSize = regData->aSize * pool->aCount;
+		curSize += compSize + compOtherSize;
+
+		Log_GroupF( group, "Component Pool \"%s\": %zd bytes\n", pool->apName, curSize );
+		Log_GroupF( group, "    %zd bytes per component * %zd components\n\n", regData->aSize, pool->aCount );
+
+		componentPoolSize += curSize;
+	}
+
+	Log_GroupF( group, "Component Pool Base Size: %zd bytes\n", sizeof( EntityComponentPool ) );
+	Log_GroupF( group, "Component Pool Map Size: %zd bytes\n", componentPoolMapSize );
+	Log_GroupF( group, "Component Pools: %zd bytes (%zd pools)\n", componentPoolSize, GetEntitySystem()->aComponentPools.size() );
+
+	Log_GroupEnd( group );
+
+	// Make sure to reset this
+	if ( useServer )
+	{
+		Game_SetClient( true );
+	}
 }
 
 
@@ -1858,18 +2088,22 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntComponentVarType_Vec4;
 
 	// Now Register Base Components
-	EntComp_RegisterComponent< CTransform >( "transform", true, EEntComponentNetType_Both,
-		[ & ]() { return new CTransform; }, [ & ]( void* spData ) { delete (CTransform*)spData; } );
+	EntComp_RegisterComponent< CTransform >(
+	  "transform", true, EEntComponentNetType_Both,
+	  [ & ]()
+	  {
+		  auto transform           = new CTransform;
+		  transform->aScale.Edit() = { 1.f, 1.f, 1.f };
+		  return transform;
+	  },
+	  [ & ]( void* spData )
+	  { delete (CTransform*)spData; } );
 
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aPos", "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
 	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
 	// EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
-
-	CH_REGISTER_COMPONENT_RW( CTransformSmall, transformSmall, true );
-	CH_REGISTER_COMPONENT_VAR( CTransformSmall, glm::vec3, aPos, pos );
-	CH_REGISTER_COMPONENT_VAR( CTransformSmall, glm::vec3, aAng, ang );
 
 	CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
 	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aVel, vel );
@@ -1898,6 +2132,31 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_SYS( CModelInfo, EntSys_ModelInfo, gEntSys_ModelInfo );
 	CH_REGISTER_COMPONENT_VAR( CModelInfo, std::string, aPath, path );
 
+	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT( CRenderable_t, renderable, false, EEntComponentNetType_Client );
+	CH_REGISTER_COMPONENT_SYS( CRenderable_t, EntSys_Renderable, gEntSys_Renderable );
+	// CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
+
+	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both );
+
+	// TODO: Merge CModelInfo and CRenderable_t into this instead
+	// would make your life easier
+	// only difficulty is figuring out how to network the model paths...
+	// since i would kind of like to be able to create models in the engine that use this,
+	// so there would be no path
+	// unless you used a "protocol system", so an internally created model path would be this:
+	// "internal://model_0"
+	// and a file on the disk to load will be this:
+	// "file://path/to/asset.glb"
+	CH_REGISTER_COMPONENT( CAutoRenderable, autoRenderable, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aTestVis, testVis );
+	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aCastShadow, castShadow );
+	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aVisible, visible );
+	CH_REGISTER_COMPONENT_SYS( CAutoRenderable, EntSys_AutoRenderable, gEntSys_AutoRenderable );
+
+	CH_REGISTER_COMPONENT( CPhysInfo, physInfo, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT_SYS( CPhysInfo, EntSys_PhysInfo, gEntSys_PhysInfo );
+
 	// Probably should be in graphics?
 	CH_REGISTER_COMPONENT_RW( CLight, light, true );
 	CH_REGISTER_COMPONENT_SYS( CLight, LightSystem, gLightEntSystems );
@@ -1916,5 +2175,6 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_VAR( CLight, float, aLength, length );
 	CH_REGISTER_COMPONENT_VAR( CLight, bool, aShadow, shadow );
 	CH_REGISTER_COMPONENT_VAR( CLight, bool, aEnabled, enabled );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aUseTransform, useTransform );
 }
 

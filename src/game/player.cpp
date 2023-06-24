@@ -277,12 +277,6 @@ void PlayerManager::RegisterComponents()
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed );
 
-	// what the fuck
-	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
-	CH_REGISTER_COMPONENT( CRenderable_t, renderable, false, EEntComponentNetType_Client );
-	CH_REGISTER_COMPONENT_SYS( CRenderable_t, EntSys_Renderable, gEntSys_Renderable );
-	// CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
-
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();
 	//GetEntitySystem()->RegisterComponent<PhysicsObject*>();

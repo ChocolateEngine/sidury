@@ -46,6 +46,7 @@ class EntSys_Transform : public IEntityComponentSystem
 	EntSys_Transform() {}
 	~EntSys_Transform() {}
 
+	void ComponentUpdated( Entity sEntity, void* spData ) override;
 	void Update() override;
 };
 
@@ -66,4 +67,58 @@ class EntSys_Renderable : public IEntityComponentSystem
 
 extern EntSys_Renderable* gEntSys_Renderable[ 2 ];
 
+
+// ------------------------------------------------------------
+
+
+// Really big hack
+// What this does is automatically create and update a renderable whenever modelInfo changes
+// Maybe I might keep this and merge it into the normal renderable, but I would need to do some changes first
+class EntSys_AutoRenderable : public IEntityComponentSystem
+{
+  public:
+	EntSys_AutoRenderable() {}
+	~EntSys_AutoRenderable() {}
+
+	void ComponentAdded( Entity sEntity, void* spData ) override;
+	void ComponentRemoved( Entity sEntity, void* spData ) override;
+	void ComponentUpdated( Entity sEntity, void* spData ) override;
+	void Update() override;
+};
+
+extern EntSys_AutoRenderable* gEntSys_AutoRenderable[ 2 ];
+EntSys_AutoRenderable*        GetAutoRenderableSys();
+
+
+struct CAutoRenderable
+{
+	ComponentNetVar< bool > aTestVis    = true;
+	ComponentNetVar< bool > aCastShadow = true;
+	ComponentNetVar< bool > aVisible    = true;
+};
+
+
+// ------------------------------------------------------------
+
+
+// Really big hack part 2
+// What this does is automatically create and update a physics object whenever physInfo changes
+class EntSys_PhysInfo : public IEntityComponentSystem
+{
+  public:
+	EntSys_PhysInfo() {}
+	~EntSys_PhysInfo() {}
+
+	void ComponentAdded( Entity sEntity, void* spData ) override;
+	void ComponentRemoved( Entity sEntity, void* spData ) override;
+	void ComponentUpdated( Entity sEntity, void* spData ) override;
+	void Update() override;
+};
+
+extern EntSys_PhysInfo* gEntSys_PhysInfo[ 2 ];
+
+
+struct CPhysInfo
+{
+};
 

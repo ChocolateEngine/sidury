@@ -169,3 +169,35 @@ void Skybox_SetMaterial( const std::string& srPath )
 	Mat_SetVar( mat, "ang", vec3_zero );
 }
 
+// TODO: how will you know which skybox is the active one?
+// Same goes for the playerSpawn component
+// Maybe in the game map struct, you can store a skybox entity to use the one to draw
+// And you can swap that out whenever with a different skybox entity
+// But what about for playerSpawn?
+
+// Called when the component is added to this entity
+void SkyboxSystem::ComponentAdded( Entity sEntity, void* spData )
+{
+	// Renderable_t* renderable = Ent_CreateRenderable( sEntity, gSkyboxModel );
+}
+
+
+// Called when the component is removed from this entity
+void SkyboxSystem::ComponentRemoved( Entity sEntity, void* spData )
+{
+}
+
+
+// Called when the component data has been updated (ONLY ON CLIENT RIGHT NOW)
+void SkyboxSystem::ComponentUpdated( Entity sEntity, void* spData )
+{
+	// Material Change
+}
+
+
+void SkyboxSystem::Update()
+{
+	// gViewInfo[ 0 ]
+	// Skybox_SetAng()
+}
+

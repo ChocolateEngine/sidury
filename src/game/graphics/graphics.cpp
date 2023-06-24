@@ -274,6 +274,9 @@ Handle Graphics_CreateModel( Model** spModel )
 
 void Graphics_FreeModel( Handle shModel )
 {
+	if ( shModel == InvalidHandle )
+		return;
+
 	// HACK HACK PERF: we have to wait for queues to finish, so we could just free this model later
 	// maybe right before the next draw?
 	render->WaitForQueues();
@@ -281,7 +284,7 @@ void Graphics_FreeModel( Handle shModel )
 	Model* model = nullptr;
 	if ( !gModels.Get( shModel, &model ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Model_SetMaterial: Model is nullptr\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_FreeModel: Model is nullptr\n" );
 		return;
 	}
 
@@ -322,7 +325,7 @@ Model* Graphics_GetModelData( Handle shModel )
 	Model* model = nullptr;
 	if ( !gModels.Get( shModel, &model ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Model_SetMaterial: Model is nullptr\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics_GetModelData: Model is nullptr\n" );
 		return nullptr;
 	}
 
@@ -354,13 +357,13 @@ Handle Model_GetMaterial( Handle shModel, size_t sSurface )
 	Model* model = nullptr;
 	if ( !gModels.Get( shModel, &model ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Model_SetMaterial: Model is nullptr\n" );
+		Log_Error( gLC_ClientGraphics, "Model_GetMaterial: Model is nullptr\n" );
 		return InvalidHandle;
 	}
 
 	if ( sSurface >= model->aMeshes.size() )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Model_SetMaterial: surface is out of range: %zu (Surface Count: %zu)\n", sSurface, model->aMeshes.size() );
+		Log_ErrorF( gLC_ClientGraphics, "Model_GetMaterial: surface is out of range: %zu (Surface Count: %zu)\n", sSurface, model->aMeshes.size() );
 		return InvalidHandle;
 	}
 
