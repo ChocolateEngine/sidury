@@ -535,6 +535,9 @@ void TEST_CL_UpdateProtos( float frameTime )
 		Assert( modelInfo );
 		Assert( renderComp );
 
+		if ( !modelInfo )
+			continue;
+
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
 		if ( renderComp->aHandle == InvalidHandle )
 		{
