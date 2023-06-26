@@ -65,14 +65,12 @@ void Phys_DebugInit()
 
 	gMatSolid         = Graphics_CreateMaterial( "__phys_debug_solid", gShader_Debug );
 	gMatWire          = Graphics_CreateMaterial( "__phys_debug_wire", gShader_DebugLine );
-
-	// apMatSolid->SetShader( "basic_3d" );
 }
 
 
 void Phys_DrawLine( const glm::vec3& from, const glm::vec3& to, const glm::vec3& color )
 {
-	// Graphics_DrawLine( from, to, color );
+	Graphics_DrawLine( from, to, color );
 }
 
 
@@ -82,9 +80,9 @@ void Phys_DrawTriangle(
   const glm::vec3& inV3,
   const glm::vec4& srColor )
 {
-	// Graphics_DrawLine( inV1, inV2, srColor );
-	// Graphics_DrawLine( inV1, inV3, srColor );
-	// Graphics_DrawLine( inV2, inV3, srColor );
+	Graphics_DrawLine( inV1, inV2, srColor );
+	Graphics_DrawLine( inV1, inV3, srColor );
+	Graphics_DrawLine( inV2, inV3, srColor );
 }
 
 // vertex_debug_t ToVertDBG( const JPH::DebugRenderer::Vertex& inVert )
@@ -105,11 +103,9 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 	Model*      model  = nullptr;
 	Handle      handle = Graphics_CreateModel( &model );
 
-	Handle      mat   = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
-
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "_phys_triangle_batch" );
-	meshBuilder.SetMaterial( mat );
+	meshBuilder.SetMaterial( gMatSolid );
 
 	meshBuilder.PreallocateVertices( srTriangles.size() * 3 );
 
@@ -159,11 +155,9 @@ Handle Phys_CreateTriangleBatchInd(
 	Model*      model  = nullptr;
 	Handle      handle = Graphics_CreateModel( &model );
 
-	Handle mat = Graphics_CreateMaterial( "__phys_material", gShader_Debug );
-
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "__phys_model" );
-	meshBuilder.SetMaterial( mat );
+	meshBuilder.SetMaterial( gMatSolid );
 
 	meshBuilder.PreallocateVertices( srInd.size() );
 
