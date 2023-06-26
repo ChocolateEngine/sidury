@@ -419,6 +419,8 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 					// morphPos = (float*)malloc( sizeof( float ) * 3 * prim.indices->count );
 					// cgltf_accessor_unpack_floats( morphTargets[2], morphPos, prim.indices->count );
 				}
+
+				meshBuilder.PreallocateVertices( prim.indices->count );
 					
 				for ( size_t i = 0; i < prim.indices->count; i++ )
 				{
