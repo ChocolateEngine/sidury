@@ -222,9 +222,14 @@ void EntEditor_DrawEntityList()
 
 	if ( ImGui::BeginCombo( "Parent Entity", "" ) )
 	{
+		Entity parent = GetEntitySystem()->GetParent( gSelectedEntity );
+
 		for ( Entity entity : GetEntitySystem()->aUsedEntities )
 		{
 			if ( entity == gSelectedEntity )
+				continue;
+
+			if ( parent == entity )
 				continue;
 
 			std::string entName = vstring( "Entity %zd", entity );
