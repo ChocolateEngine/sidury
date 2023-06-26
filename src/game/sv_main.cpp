@@ -420,15 +420,16 @@ bool SV_BuildServerMsg( flatbuffers::FlatBufferBuilder& srBuilder, EMsgSrc_Serve
 	{
 		case EMsgSrc_Server_Disconnect:
 		{
-			auto disconnectMsg = CreateNetMsg_Disconnect( messageBuilder, messageBuilder.CreateString( "Saving chunks." ) );
-			srBuilder.Finish( disconnectMsg );
+			auto string        = messageBuilder.CreateString( "Saving chunks." );
+			auto disconnectMsg = CreateNetMsg_Disconnect( messageBuilder, string );
+			messageBuilder.Finish( disconnectMsg );
 			wroteData = true;
 			break;
 		}
 		case EMsgSrc_Server_Paused:
 		{
 			auto pausedMsg = CreateNetMsg_Paused( messageBuilder, Game_IsPaused() );
-			srBuilder.Finish( pausedMsg );
+			messageBuilder.Finish( pausedMsg );
 			wroteData = true;
 			break;
 		}
