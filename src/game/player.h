@@ -98,8 +98,14 @@ struct CPlayerZoom
 
 struct CPlayerInfo
 {
+	// Entity with a camera component on it
+	ComponentNetVar< Entity > aCamera        = CH_ENT_INVALID;
+
+	// Entity with a light component on it to be used as the flashlight
+	ComponentNetVar< Entity > aFlashlight    = CH_ENT_INVALID;
+
 	// std::string aName;
-	bool        aIsLocalPlayer = false;  // only used on client, probably should split off from this
+	bool                      aIsLocalPlayer = false;  // only used on client, probably should split off from this
 };
 
 
@@ -188,20 +194,23 @@ class PlayerMovement // : public ComponentSystem
 	inline bool      WasInDuck() { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
 	// store it for use in functions, save on GetComponent calls
-	Entity           aPlayer     = CH_ENT_INVALID;
-	UserCmd_t*       apUserCmd   = nullptr;
+	Entity           aPlayer        = CH_ENT_INVALID;
+	UserCmd_t*       apUserCmd      = nullptr;
 
-	CPlayerMoveData* apMove      = nullptr;
-	CRigidBody*      apRigidBody = nullptr;
-	CTransform*      apTransform = nullptr;
-	CCamera*         apCamera    = nullptr;
-	CDirection*      apDir       = nullptr;
+	CPlayerMoveData* apMove         = nullptr;
+	CRigidBody*      apRigidBody    = nullptr;
+	CTransform*      apTransform    = nullptr;
+	CDirection*      apDir          = nullptr;
+
+	CTransform*      apCamTransform = nullptr;
+	CDirection*      apCamDir       = nullptr;
+	CCamera*         apCamera       = nullptr;
 
 	// CPhysShape*      apPhysShape = nullptr;
 	// CPhysObject*     apPhysObj   = nullptr;
 
-	IPhysicsShape*   apPhysShape = nullptr;
-	IPhysicsObject*  apPhysObj   = nullptr;
+	IPhysicsShape*   apPhysShape    = nullptr;
+	IPhysicsObject*  apPhysObj      = nullptr;
 
 	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;
@@ -219,6 +228,7 @@ public:
 	static void             RegisterComponents();
 
 	void                    ComponentAdded( Entity sEntity, void* spData ) override;
+	void                    ComponentUpdated( Entity sEntity, void* spData ) override;
 
 	// Set's current player to manage, and prepares all components for use
 	bool                    SetCurrentPlayer( Entity player );

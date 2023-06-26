@@ -100,11 +100,14 @@ static const char* gEntVarTypeStr[] = {
 	"unsigned long long",
 #endif
 
+	"Entity",
 	"std::string",
 
 	"glm::vec2",
 	"glm::vec3",
 	"glm::vec4",
+
+	"CUSTOM",
 };
 
 
@@ -168,14 +171,17 @@ size_t EntComp_GetVarDirtyOffset( char* spData, EEntComponentVarType sVarType )
 			break;
 
 		case EEntComponentVarType_U32:
-		{
 			offset = sizeof( u32 );
 			break;
-		}
+
 		case EEntComponentVarType_U64:
 			offset = sizeof( u64 );
 			break;
 
+
+		case EEntComponentVarType_Entity:
+			offset = sizeof( Entity );
+			break;
 
 		case EEntComponentVarType_StdString:
 			offset = sizeof( std::string );
@@ -278,6 +284,11 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarTyp
 			return vstring( "%zd", value );
 		}
 
+		case EEntComponentVarType_Entity:
+		{
+			Entity value = *static_cast< Entity* >( spData );
+			return vstring( "%zd", value );
+		}
 		case EEntComponentVarType_StdString:
 		{
 			return *(const std::string*)spData;
@@ -436,9 +447,7 @@ void* EntityComponentPool::Create( Entity entity )
 	aMapEntityToComponent[ entity ] = aCount;
 
 	void* data                      = aFuncNew();
-
-	aComponentStates[ aCount ]      = EEntityCreateState_Created;
-
+	aComponentFlags[ aCount ]       = EEntityFlag_Created;
 	aComponents[ aCount++ ]         = data;
 
 	// Add it to systems
@@ -483,7 +492,7 @@ void EntityComponentPool::Remove( Entity entity )
 	aMapComponentToEntity.erase( index );
 	aMapEntityToComponent.erase( it );
 
-	aComponentStates.erase( index );
+	aComponentFlags.erase( index );
 
 	aFuncFree( data );
 
@@ -517,7 +526,7 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 	aMapComponentToEntity.erase( it );
 	aMapEntityToComponent.erase( entity );
 
-	aComponentStates.erase( sIndex );
+	aComponentFlags.erase( sIndex );
 
 	aFuncFree( data );
 
@@ -539,7 +548,7 @@ void EntityComponentPool::RemoveQueued( Entity entity )
 	size_t index = it->second;
 
 	// Mark Component as Destroyed
-	aComponentStates[ index ] = EEntityCreateState_Destroyed;
+	aComponentFlags[ index ] |= EEntityFlag_Destroyed;
 }
 
 
@@ -548,19 +557,17 @@ void EntityComponentPool::RemoveAllQueued()
 {
 	std::vector< size_t > toRemove;
 
-	// for ( auto& [ index, state ] : aComponentStates )
-	for ( auto it = aComponentStates.begin(); it != aComponentStates.end(); it++ )
+	// for ( auto& [ index, state ] : aComponentFlags )
+	for ( auto it = aComponentFlags.begin(); it != aComponentFlags.end(); it++ )
 	{
-		if ( it->second == EEntityCreateState_Destroyed )
+		if ( it->second & EEntityFlag_Destroyed )
 		{
 			toRemove.push_back( it->first );
 			continue;
 		}
 
-		if ( it->second == EEntityCreateState_Created )
-		{
-			it->second = EEntityCreateState_None;
-		}
+		if ( it->second & EEntityFlag_Created )
+			it->second &= ~EEntityFlag_Created;
 	}
 
 	for ( size_t entity : toRemove )
@@ -600,23 +607,19 @@ void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
 	if ( sPredicted )
 	{
 		// We want this component predicted, add it to the prediction set
-		aPredicted.emplace( entity );
+		aComponentFlags[ entity ] |= EEntityFlag_Predicted;
 	}
 	else
 	{
-		// We don't want this component predicted, remove it from the prediction set if it exists
-		auto find = aPredicted.find( entity );
-		if ( find != aPredicted.end() )
-			aPredicted.erase( find );
+		// We don't want this component predicted, remove the prediction flag from it
+		aComponentFlags[ entity ] &= ~EEntityFlag_Predicted;
 	}
 }
 
 
 bool EntityComponentPool::IsPredicted( Entity entity )
 {
-	// If the entity is in this set, then this component is predicted
-	auto it = aPredicted.find( entity );
-	return ( it != aPredicted.end() );
+	return aComponentFlags[ entity ] & EEntityFlag_Predicted;
 }
 
 
@@ -773,10 +776,11 @@ void EntitySystem::UpdateStates()
 
 	DeleteQueuedEntities();
 
-	for ( auto& [ id, state ] : aEntityStates )
+	for ( auto& [ id, flags ] : aEntityFlags )
 	{
-		if ( state == EEntityCreateState_Created )
-			aEntityStates[ id ] = EEntityCreateState_None;
+		// Remove the created flag if it has that
+		if ( flags & EEntityFlag_Created )
+			aEntityFlags[ id ] &= ~EEntityFlag_Created;
 	}
 }
 
@@ -840,27 +844,47 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 
 	aUsedEntities.push_back( id );
 
-	aEntityStates[ id ] = EEntityCreateState_Created;
+	aEntityFlags[ id ] |= EEntityFlag_Created;
+
+	if ( sLocal )
+		aEntityFlags[ id ] |= EEntityFlag_Local;
 
 	return id;
 }
 
 
-void EntitySystem::DeleteEntity( Entity ent )
+void EntitySystem::DeleteEntity( Entity sEntity )
 {
-	AssertMsg( ent < CH_MAX_ENTITIES, "Entity out of range" );
+	AssertMsg( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
+	aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
 
-	aDeleteEntities.emplace( ent );
-	aEntityStates[ ent ] = EEntityCreateState_Destroyed;
+	// Get all children attached to this entity
+	std::set< Entity > children;
+	GetChildrenRecurse( sEntity, children );
+
+	// Mark all of them as destroyed
+	for ( Entity child : children )
+	{
+		aEntityFlags[ child ] |= EEntityFlag_Destroyed;
+	}
 }
 
 
 void EntitySystem::DeleteQueuedEntities()
 {
-	for ( Entity entity : aDeleteEntities )
+	for ( size_t i = 0; i < aUsedEntities.size(); i++ )
 	{
-		// Invalidate the destroyed entity's signature
-		// aSignatures[ ent ].reset();
+		Entity entity = aUsedEntities[ i ];
+
+		// Check the entity's flags to see if it's marked as deleted
+		if ( !( aEntityFlags[ entity ] & EEntityFlag_Destroyed ) )
+			continue;
+
+		// Tell each Component Pool that this entity was destroyed
+		for ( auto& [ name, pool ] : aComponentPools )
+		{
+			pool->EntityDestroyed( entity );
+		}
 
 		// Put the destroyed ID at the back of the queue
 		// aEntityPool.push( ent );
@@ -870,16 +894,8 @@ void EntitySystem::DeleteQueuedEntities()
 
 		vec_remove( aUsedEntities, entity );
 
-		// Tell each Component Pool that this entity was destroyed
-		for ( auto& [ name, pool ] : aComponentPools )
-		{
-			pool->EntityDestroyed( entity );
-		}
-
-		aEntityStates.erase( entity );
+		aEntityFlags.erase( entity );
 	}
-
-	aDeleteEntities.clear();
 }
 
 
@@ -887,26 +903,6 @@ Entity EntitySystem::GetEntityCount()
 {
 	return aEntityCount;
 }
-
-
-//Entity EntitySystem::CreateEntityFromServer( Entity desiredId )
-//{
-//	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
-//
-//	size_t index = vec_index( aEntityPool, desiredId );
-//
-//	if ( index == SIZE_MAX )
-//	{
-//		Log_Error( gLC_Entity, "Entity ID from Server is already taken on Client\n" );
-//		return CH_ENT_INVALID;
-//	}
-//
-//	vec_remove_index( aEntityPool, index );
-//	aUsedEntities.push_back( desiredId );
-//	++aEntityCount;
-//
-//	return desiredId;
-//}
 
 
 bool EntitySystem::EntityExists( Entity desiredId )
@@ -946,6 +942,34 @@ Entity EntitySystem::GetParent( Entity sSelf )
 }
 
 
+// Get the highest level parent for this entity, returns self if not parented
+Entity EntitySystem::GetRootParent( Entity sSelf )
+{
+	auto it = aEntityParents.find( sSelf );
+
+	if ( it != aEntityParents.end() )
+		return GetRootParent( it->second );
+
+	return sSelf;
+}
+
+
+// Recursively get all entities attached to this one (SLOW)
+void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren )
+{
+	for ( Entity otherEntity : aUsedEntities )
+	{
+		Entity otherParent = GetParent( otherEntity );
+
+		if ( otherParent == sEntity )
+		{
+			srChildren.emplace( otherEntity );
+			GetChildrenRecurse( otherEntity, srChildren );
+		}
+	}
+}
+
+
 // Returns a Model Matrix with parents applied in world space IF we have a transform component
 bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
@@ -961,21 +985,46 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 	Entity    parent = GetParent( sEntity );
 	glm::mat4 parentMat( 1.f );
 
-	if ( parent )
+	if ( parent != CH_ENT_INVALID )
 	{
 		// Get the world matrix recursively
 		GetWorldMatrix( parentMat, parent );
 	}
 
+	// is this all the wrong order?
+
 	// NOTE: THIS IS PROBABLY WRONG
 	srMat = glm::translate( transform->aPos.Get() );
+	// srMat = glm::mat4( 1.f );
 
-	srMat *= glm::eulerAngleYZX(
-	  glm::radians( transform->aAng.Get().x ),
-	  glm::radians( transform->aAng.Get().y ),
-	  glm::radians( transform->aAng.Get().z ) );
+	glm::mat4 rotMat( 1.f );
+	#define ROT_ANG( axis ) glm::vec3( rotMat[ 0 ][ axis ], rotMat[ 1 ][ axis ], rotMat[ 2 ][ axis ] )
+
+	// glm::vec3 temp = glm::radians( transform->aAng.Get() );
+	// glm::quat rotQuat = temp;
+
+	#undef ROT_ANG
+
+	// rotMat = glm::mat4_cast( rotQuat );
+
+	// srMat *= rotMat;
+	// srMat *= glm::eulerAngleYZX(
+	//   glm::radians(transform->aAng.Get().x ),
+	//   glm::radians(transform->aAng.Get().y ),
+	//   glm::radians(transform->aAng.Get().z ) );
+	
+	srMat *= glm::eulerAngleZYX(
+	  glm::radians( transform->aAng.Get()[ ROLL ] ),
+	  glm::radians( transform->aAng.Get()[ YAW ] ),
+	  glm::radians( transform->aAng.Get()[ PITCH ] ) );
+	
+	// srMat *= glm::yawPitchRoll(
+	//   glm::radians( transform->aAng.Get()[ PITCH ] ),
+	//   glm::radians( transform->aAng.Get()[ YAW ] ),
+	//   glm::radians( transform->aAng.Get()[ ROLL ] ) );
 
 	srMat = glm::scale( srMat, transform->aScale.Get() );
+
 	srMat = parentMat * srMat;
 
 	return true;
@@ -991,7 +1040,7 @@ Transform EntitySystem::GetWorldTransform( Entity sEntity )
 		return final;
 
 	final.aPos   = Util_GetMatrixPosition( matrix );
-	final.aAng   = Util_GetMatrixAngles( matrix );
+	final.aAng   = glm::degrees( Util_GetMatrixAngles( matrix ) );
 	final.aScale = Util_GetMatrixScale( matrix );
 
 	return final;
@@ -1018,32 +1067,60 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 		Entity entId  = entityUpdate->id();
 		Entity entity = CH_ENT_INVALID;
 
-		if ( entityUpdate->destroyed() )
+		auto   ConvertEntity = [ & ]( Entity sEntId ) -> Entity
 		{
-			GetEntitySystem()->DeleteEntity( entId );
-			continue;
-		}
-		else
-		{
+			if ( sEntId == CH_ENT_INVALID )
+				return CH_ENT_INVALID;
+
 			// Is this entity in the translation system?
 			auto it = aEntityIDConvert.find( entId );
 
 			// It's not, add it
 			if ( it == aEntityIDConvert.end() )
 			{
-				entity = GetEntitySystem()->CreateEntity();
+				entity = CreateEntity();
 
 				if ( entity == CH_ENT_INVALID )
 				{
-					Log_Warn( gLC_Entity, "Failed to create client entity\n" );
-					continue;
+					Log_Warn( gLC_Entity, "Failed to create networked entity\n" );
+					return CH_ENT_INVALID;
 				}
 
 				aEntityIDConvert[ entId ] = entity;
+				return entity;
 			}
-			else if ( !GetEntitySystem()->EntityExists( it->second ) )
+
+			return it->second;
+        };
+
+		if ( entityUpdate->destroyed() )
+		{
+			auto it = aEntityIDConvert.find( entId );
+			if ( it != aEntityIDConvert.end() )
+				DeleteEntity( it->second );
+			else
+				Log_Error( gLC_Entity, "Trying to delete entity not in translation list\n" );
+
+			continue;
+		}
+		else
+		{
+			Entity entity = ConvertEntity( entId );
+
+			if ( !EntityExists( entity ) )
 			{
 				Log_Error( gLC_Entity, "wtf entity in translation list doesn't actually exist?\n" );
+				continue;
+			}
+			else
+			{
+				// Check for an entity parent
+				Entity parent = ConvertEntity( entityUpdate->parent() );
+
+				if ( parent == CH_ENT_INVALID )
+					continue;
+
+				ParentEntity( entity, parent );
 			}
 		}
 	}
@@ -1062,14 +1139,23 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 
 	for ( size_t i = 0; i < aEntityCount; i++ )
 	{
-		Entity entity = aUsedEntities[ i ];
+		Entity      entity = aUsedEntities[ i ];
+		EEntityFlag flags  = aEntityFlags[ entity ];
+
+		// Make sure this and all the parents are networked
+		if ( !IsNetworked( entity ) )
+			continue;
+
 		auto&  update = updateBuilderList.emplace_back( srBuilder );
 
 		update.add_id( entity );
 
 		// Get Entity State
-		if ( aEntityStates[ entity ] == EEntityCreateState_Destroyed )
+		if ( flags & EEntityFlag_Destroyed )
 			update.add_destroyed( true );
+
+		// doesn't matter if it returns CH_ENT_INVALID
+		update.add_parent( GetParent( entity ) );
 
 		updateOut.push_back( update.Finish() );
 		// srBuilder.Finish( update.Finish() );
@@ -1198,6 +1284,31 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 			{
 				auto value = (u64*)( data );
 				*value     = vector[ i++ ].AsUInt64();
+				break;
+			}
+
+			case EEntComponentVarType_Entity:
+			{
+				auto value      = (Entity*)( data );
+				auto recvEntity = (Entity)( vector[ i++ ].AsUInt64() );
+
+				if ( recvEntity == CH_ENT_INVALID )
+				{
+					*value = CH_ENT_INVALID;
+					break;
+				}
+
+				auto it = GetEntitySystem()->aEntityIDConvert.find( recvEntity );
+
+				if ( it == GetEntitySystem()->aEntityIDConvert.end() )
+				{
+					Log_Error( gLC_Entity, "Can't find Networked Entity ID\n" );
+				}
+				else
+				{
+					*value = it->second;
+				}
+
 				break;
 			}
 
@@ -1390,6 +1501,17 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
+			case EEntComponentVarType_Entity:
+			{
+				if ( IsVarDirty() )
+				{
+					auto value = *(Entity*)( data );
+					srBuilder.Add( value );
+				}
+
+				break;
+			}
+
 			case EEntComponentVarType_StdString:
 			{
 				if ( IsVarDirty() )
@@ -1498,15 +1620,28 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		size_t compListI = 0;
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed && !sFullUpdate )
+			EEntityFlag entFlags     = aEntityFlags[ entity ];
+			EEntityFlag compFlags = pool->aComponentFlags[ index ];
+
+			bool        shouldSkipComponent = false;
+
+			// check if the entity isn't networked
+			shouldSkipComponent |= !IsNetworked( entity );
+			shouldSkipComponent |= compFlags & EEntityFlag_Local;
+
+			// check if the entity itself will be destroyed
+			// shouldSkipComponent |= ( (entFlags & EEntityFlag_Destroyed) && !sFullUpdate );
+			shouldSkipComponent |= entFlags & EEntityFlag_Destroyed;
+
+			// Have we determined we should skip this component?
+			if ( shouldSkipComponent )
 			{
 				// Don't bother sending data if we're about to be destroyed or we have no write function
-				// srRootBuilder.Finish( compDataBuilder.Finish() );
 				compListI++;
 				continue;
 			}
 
-			void*                 data = pool->GetData( entity );
+			void*          data = pool->GetData( entity );
 
 			// Write Component Data
 			flexb::Builder flexBuilder;
@@ -1533,7 +1668,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			compDataBuilder.add_id( entity );
 
 			// Set Destroyed
-			if ( pool->aComponentStates[ index ] == EEntityCreateState_Destroyed )
+			if ( compFlags & EEntityFlag_Destroyed )
 				compDataBuilder.add_destroyed( true );
 
 			if ( wroteData )
@@ -1693,11 +1828,8 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 			if ( !componentUpdateData )
 				continue;
 
-			// Get the Entity and Make sure it exists
-			Entity entId  = componentUpdateData->id();
-
 			// Is this entity in the translation system?
-			auto   it     = aEntityIDConvert.find( entId );
+			auto it = aEntityIDConvert.find( componentUpdateData->id() );
 			if ( it == aEntityIDConvert.end() )
 			{
 				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
@@ -1738,6 +1870,11 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 			// Now, update component data
 			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
 			if ( !regData->aOverrideClient && entity == gLocalPlayer )
+				continue;
+
+			// a bit of a hack and not implemented properly
+			bool predicted = IsComponentPredicted( entity, componentName );
+			if ( predicted )
 				continue;
 
 			if ( componentUpdateData->values() )
@@ -1858,6 +1995,47 @@ bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
 	}
 
 	return pool->IsPredicted( entity );
+}
+
+
+// Enables/Disables Networking on this Entity
+void EntitySystem::SetNetworked( Entity entity, bool sNetworked )
+{
+	auto it = aEntityFlags.find( entity );
+	if ( it == aEntityFlags.end() )
+	{
+		Log_Error( gLC_Entity, "Failed to set Entity Networked State - Entity not found\n" );
+		return;
+	}
+
+	if ( sNetworked )
+		it->second |= EEntityFlag_Local;
+	else
+		it->second &= ~EEntityFlag_Local;
+}
+
+
+// Is this Entity Networked?
+bool EntitySystem::IsNetworked( Entity entity )
+{
+	auto it = aEntityFlags.find( entity );
+	if ( it == aEntityFlags.end() )
+	{
+		Log_Error( gLC_Entity, "Failed to get Entity Networked State - Entity not found\n" );
+		return false;
+	}
+
+	// If we have the local flag, we aren't networked
+	if ( it->second & EEntityFlag_Local )
+		return false;
+
+	// Check if we have a parent entity
+	Entity parent = GetParent( entity );
+	if ( parent == CH_ENT_INVALID )
+		return true;
+
+	// We make sure the parents are also networked before networking this one
+	return IsNetworked( parent );
 }
 
 
@@ -1982,16 +2160,6 @@ CONCMD( ent_dump )
 }
 
 
-// MOVE TO util.h
-template< typename KEY, typename VALUE >
-inline size_t Util_SizeOfUnordredMap( const std::unordered_map< KEY, VALUE >& srMap )
-{
-	return ( srMap.size() * ( sizeof( std::unordered_map< KEY, VALUE >::value_type ) + sizeof( void* ) ) +  // data list
-	         srMap.bucket_count() * ( sizeof( void* ) + sizeof( size_t ) ) )                                // bucket index
-	       * 1.5;                                                                                           // estimated allocation overheads
-}
-
-
 CONCMD( ent_mem )
 {
 	bool useServer = false;
@@ -2062,11 +2230,26 @@ void Ent_RegisterVarHandlers()
 }
 
 
+CH_STRUCT_REGISTER_COMPONENT( CRigidBody, rigidBody, true, EEntComponentNetType_Both )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aVel, vel );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aAccel, accel );
+}
+
+
+CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_Both )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aForward, forward );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aUp, up );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aRight, right );
+}
+
+
 void Ent_RegisterBaseComponents()
 {
 	Ent_RegisterVarHandlers();
 
-	// Setup Types
+	// Setup Types, only used for registering variables without specifing the VarType
 	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntComponentVarType_Bool;
 	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntComponentVarType_Float;
 	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]      = EEntComponentVarType_Double;
@@ -2081,6 +2264,7 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntComponentVarType_U32;
 	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntComponentVarType_U64;
 
+	gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntComponentVarType_Entity;
 	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntComponentVarType_StdString;
 
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntComponentVarType_Vec2;
@@ -2105,15 +2289,15 @@ void Ent_RegisterBaseComponents()
 	// EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
-	CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
-	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aVel, vel );
-	CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aAccel, accel );
+	// CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
+	// CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aVel, vel );
+	// CH_REGISTER_COMPONENT_VAR( CRigidBody, glm::vec3, aAccel, accel );
 
-	CH_REGISTER_COMPONENT_RW( CDirection, direction, true );
-	CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aForward, forward );
-	CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aUp, up );
-	// CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aRight, right );
-	CH_REGISTER_COMP_VAR_VEC3( CDirection, aRight, right );
+	// CH_REGISTER_COMPONENT_RW( CDirection, direction, true );
+	// CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aForward, forward );
+	// CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aUp, up );
+	// // CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aRight, right );
+	// CH_REGISTER_COMP_VAR_VEC3( CDirection, aRight, right );
 
 	CH_REGISTER_COMPONENT_RW( CGravity, gravity, true );
 	CH_REGISTER_COMP_VAR_VEC3( CGravity, aForce, force );
@@ -2122,11 +2306,11 @@ void Ent_RegisterBaseComponents()
 	// HACK HACK: DONT OVERRIDE CLIENT VALUE, IT WILL NEVER BE UPDATED
 	CH_REGISTER_COMPONENT_RW( CCamera, camera, false );
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov );
-	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aForward, forward );
-	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aUp, up );
-	CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aRight, right );
-	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aValue.aPos ), typeid( CCamera::aTransform.aValue.aPos ).hash_code() );
-	EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aValue.aAng ), typeid( CCamera::aTransform.aValue.aAng ).hash_code() );
+	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aForward, forward );
+	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aUp, up );
+	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aRight, right );
+	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aValue.aPos ), typeid( CCamera::aTransform.aValue.aPos ).hash_code() );
+	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aValue.aAng ), typeid( CCamera::aTransform.aValue.aAng ).hash_code() );
 
 	CH_REGISTER_COMPONENT_RW( CModelInfo, modelInfo, true );
 	CH_REGISTER_COMPONENT_SYS( CModelInfo, EntSys_ModelInfo, gEntSys_ModelInfo );

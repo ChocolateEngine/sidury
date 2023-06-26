@@ -268,7 +268,7 @@ void EntSys_Transform::Update()
 				continue;
 
 			// Graphics_DrawAxis( transform->aPos, transform->aAng, transform->aScale );
-			Graphics_DrawAxis( Util_GetMatrixPosition( matrix ), Util_GetMatrixAngles( matrix ), Util_GetMatrixScale( matrix ) );
+			Graphics_DrawAxis( Util_GetMatrixPosition( matrix ), glm::degrees( Util_GetMatrixAngles( matrix ) ), Util_GetMatrixScale( matrix ) );
 		}
 	}
 }

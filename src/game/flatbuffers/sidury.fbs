@@ -208,6 +208,9 @@ table NetMsg_EntityUpdate
 
     // Is Entity Destroyed
     destroyed :bool;
+
+    // Parent Entity
+    parent: uint;
 }
 
 

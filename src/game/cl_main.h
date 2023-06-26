@@ -51,6 +51,9 @@ struct CL_Client_t
 
 extern CL_ServerData_t gClientServerData;
 
+// =======================================================================
+// General Client Functions
+// =======================================================================
 
 bool                   CL_Init();
 void                   CL_Shutdown();
@@ -68,8 +71,9 @@ Handle                 CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvat
 // Pick the best available steam avatar based on width
 Handle                 CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth );
 
-bool                   CL_IsMenuShown();
-void                   CL_UpdateMenuShown();
+// =======================================================================
+// Client Networking
+// =======================================================================
 
 void                   CL_Connect( const char* spAddress );
 void                   CL_Disconnect( bool sSendReason = true, const char* spReason = nullptr );
@@ -84,7 +88,6 @@ int                    CL_WriteToServer( flatbuffers::FlatBufferBuilder& srBuild
 
 void                   CL_HandleMsg_ClientInfo( const NetMsg_ServerClientInfo* spMessage );
 void                   CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spReader );
-void                   CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spReader );
 
 bool                   CL_WaitForAccept();
 void                   CL_UpdateUserCmd();
@@ -95,7 +98,14 @@ void                   CL_GetServerMessages();
 
 void                   CL_PrintStatus();
 
-// --------------------------------------------------
+void                   CL_CreateServerEntity();
+
+// =======================================================================
+// Main Menu
+// =======================================================================
+
+bool                   CL_IsMenuShown();
+void                   CL_UpdateMenuShown();
 
 void                   CL_DrawMainMenu();
 

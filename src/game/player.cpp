@@ -237,36 +237,41 @@ PlayerManager::~PlayerManager()
 }
 
 
-void PlayerManager::RegisterComponents()
+CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntComponentNetType_Both )
 {
-	CH_REGISTER_COMPONENT_RW( CPlayerMoveData, playerMoveData, true );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, int, aMoveType, moveType );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, unsigned char, aPlayerFlags, playerFlags );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, unsigned char, aPrevPlayerFlags, prevPlayerFlags );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aMaxSpeed, maxSpeed );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, EPlayerMoveType, aMoveType, moveType );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPlayerFlags, playerFlags );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxSpeed, maxSpeed );
 
 	// View Bobbing
-	//CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aWalkTime, walkTime );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aBobOffsetAmount, bobOffsetAmount );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewTilt, prevViewTilt );
+	//CH_REGISTER_COMPONENT_VAR( EEntComponentVarType_Float, float, aWalkTime, walkTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aBobOffsetAmount, bobOffsetAmount );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewTilt, prevViewTilt );
 
 	// Smooth Land
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLandPower, landPower );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLandTime, landTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandPower, landPower );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandTime, landTime );
 
 	// Smooth Duck
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aPrevViewHeight, prevViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aTargetViewHeight, targetViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aOutViewHeight, outViewHeight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckDuration, duckDuration );
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aDuckTime, duckTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewHeight, prevViewHeight );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aTargetViewHeight, targetViewHeight );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aOutViewHeight, outViewHeight );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckDuration, duckDuration );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckTime, duckTime );
 
-	CH_REGISTER_COMPONENT_VAR( CPlayerMoveData, float, aLastStepTime, lastStepTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLastStepTime, lastStepTime );
+}
 
 
-	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, false, EEntComponentNetType_Both );
+void PlayerManager::RegisterComponents()
+{
+	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aCamera, camera );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aFlashlight, flashlight );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
 
 	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false );
@@ -289,6 +294,25 @@ void PlayerManager::ComponentAdded( Entity sEntity, void* spData )
 }
 
 
+void PlayerManager::ComponentUpdated( Entity sEntity, void* spData )
+{
+	if ( Game_ProcessingServer() )
+		return;
+
+	CPlayerInfo* playerInfo = static_cast< CPlayerInfo* >( spData );
+
+	if ( playerInfo->aCamera != CH_ENT_INVALID )
+	{
+		// Parent the Entities to the Player Entity
+		GetEntitySystem()->ParentEntity( playerInfo->aCamera, sEntity );
+
+		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "transform", true );
+		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "direction", true );
+		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "camera", true );
+	}
+}
+
+
 bool PlayerManager::SetCurrentPlayer( Entity player )
 {
 	Assert( apMove );
@@ -308,19 +332,36 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 		apMove->apUserCmd = &client->aUserCmd;
 	}
 
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo component not found on player entity\n" );
+		return false;
+	}
+
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	apMove->apCamTransform = GetTransform( playerInfo->aCamera );
+	apMove->apCamDir       = GetComp_Direction( playerInfo->aCamera );
+	apMove->apCamera       = GetCamera( playerInfo->aCamera );
+
 	apMove->apDir       = Ent_GetComponent< CDirection >( player, "direction" );
 	apMove->apRigidBody = GetRigidBody( player );
 	apMove->apTransform = GetTransform( player );
-	apMove->apCamera    = GetCamera( player );
 	apMove->apPhysShape = GetComp_PhysShapePtr( player );
 	apMove->apPhysObj   = GetComp_PhysObjectPtr( player );
 
 	Assert( apMove->apDir );
 	Assert( apMove->apRigidBody );
 	Assert( apMove->apTransform );
-	Assert( apMove->apCamera );
 	Assert( apMove->apPhysShape );
 	Assert( apMove->apPhysObj );
+
+	Assert( apMove->apCamTransform );
+	Assert( apMove->apCamDir );
+	Assert( apMove->apCamera );
 
 	return true;
 }
@@ -339,8 +380,10 @@ void PlayerManager::Create( Entity player )
 	auto zoom = Ent_AddComponent< CPlayerZoom >( player, "playerZoom" );
 
 	GetEntitySystem()->AddComponent( player, "rigidBody" );
-	GetEntitySystem()->AddComponent( player, "camera" );
 	GetEntitySystem()->AddComponent( player, "direction" );
+
+	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
+	Assert( playerInfo );
 
 	auto modelInfo     = Ent_AddComponent< CModelInfo >( player, "modelInfo" );
 	modelInfo->aPath   = DEFAULT_PROTOGEN_PATH;
@@ -373,11 +416,19 @@ void PlayerManager::Create( Entity player )
 
 		// Setting the player name here crashes the game, amazing
 		auto playerInfo = GetPlayerInfo( player );
-		// playerInfo->aName = client->aName;
-		// playerInfo->aName = "bruh";
 
-		// This here is done just so the server can manage the light
-		// I really feel like im doing this wrong lol
+		// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
+		// And we parent them to the player
+		playerInfo->aCamera = GetEntitySystem()->CreateEntity();
+		// playerInfo->aFlashlight = GetEntitySystem()->CreateEntity( true );
+
+		// Parent the Entities to the Player Entity
+		GetEntitySystem()->ParentEntity( playerInfo->aCamera, player );
+		// GetEntitySystem()->ParentEntity( playerInfo->aFlashlight, player );
+
+		Ent_AddComponent( playerInfo->aCamera, "transform" );
+		Ent_AddComponent( playerInfo->aCamera, "direction" );
+		Ent_AddComponent( playerInfo->aCamera, "camera" );
 
 		Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
 	}
@@ -447,26 +498,39 @@ void PlayerManager::Spawn( Entity player )
 
 void PlayerManager::Respawn( Entity player )
 {
-	auto rigidBody    = GetRigidBody( player );
-	auto transform    = GetTransform( player );
-	auto camera       = GetCamera( player );
-	auto zoom         = GetPlayerZoom( player );
-	auto physObj      = GetComp_PhysObjectPtr( player );
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo component not found on player entity\n" );
+		return;
+	}
+
+	auto         rigidBody  = GetRigidBody( player );
+	auto         transform  = GetTransform( player );
+	auto         zoom       = GetPlayerZoom( player );
+	auto         physObj    = GetComp_PhysObjectPtr( player );
+
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	auto camTransform = GetTransform( playerInfo->aCamera );
 
 	Assert( rigidBody );
 	Assert( transform );
-	Assert( camera );
+	Assert( camTransform );
 	Assert( zoom );
 	Assert( physObj );
 
-	transform->aPos                = MapManager_GetSpawnPos();
-	transform->aAng.Edit()         = { 0, MapManager_GetSpawnAng().y, 0 };
-	camera->aTransform.Edit().aAng = MapManager_GetSpawnAng();
-	rigidBody->aVel.Edit()         = { 0, 0, 0 };
-	rigidBody->aAccel.Edit()       = { 0, 0, 0 };
+	transform->aPos           = MapManager_GetSpawnPos();
+	transform->aAng.Edit()    = { 0, MapManager_GetSpawnAng().y, 0 };
+	rigidBody->aVel.Edit()    = { 0, 0, 0 };
+	rigidBody->aAccel.Edit()  = { 0, 0, 0 };
 
-	zoom->aOrigFov                 = r_fov.GetFloat();
-	zoom->aNewFov                  = r_fov.GetFloat();
+	camTransform->aAng.Edit() = MapManager_GetSpawnAng();
+
+	zoom->aOrigFov            = r_fov.GetFloat();
+	zoom->aNewFov             = r_fov.GetFloat();
 
 	physObj->SetLinearVelocity( { 0, 0, 0 } );
 
@@ -478,26 +542,39 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 {
 	PROF_SCOPE();
 
-	CTransform* transform  = GetTransform( player );
-	CCamera*    camera     = GetCamera( player );
-	CLight*     flashlight = Ent_GetComponent< CLight >( player, "light" );
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo component not found on player entity\n" );
+		return;
+	}
+
+	Assert( playerInfo->aCamera );
+
+	CTransform* transform    = GetTransform( player );
+	CLight*     flashlight   = Ent_GetComponent< CLight >( player, "light" );
+
+	CTransform* camTransform = GetTransform( playerInfo->aCamera );
+	auto        camDir       = Ent_GetComponent< CDirection >( playerInfo->aCamera, "direction" );
 
 	Assert( transform );
-	Assert( camera );
+	Assert( camTransform );
+	Assert( camDir );
 	Assert( flashlight );
 
 	auto UpdateTransform = [ & ]()
 	{
 		// weird stuff to get the angle of the light correct
-		flashlight->aAng.Edit().x = camera->aTransform.Get().aAng.Get().z;
-		flashlight->aAng.Edit().y = -camera->aTransform.Get().aAng.Get().y;
-		flashlight->aAng.Edit().z = -camera->aTransform.Get().aAng.Get().x + 90.f;
+		flashlight->aAng.Edit().x = camTransform->aAng.Get().z;
+		flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
+		flashlight->aAng.Edit().z = -camTransform->aAng.Get().x + 90.f;
 
-		flashlight->aPos   = transform->aPos.Get() + camera->aTransform.Get().aPos.Get();
+		flashlight->aPos          = transform->aPos.Get() + camTransform->aPos.Get();
 
 		glm::vec3 offset( r_flashlight_offset_x.GetFloat(), r_flashlight_offset_y.GetFloat(), r_flashlight_offset_z.GetFloat() );
 
-		flashlight->aPos += offset * camera->aUp.Get();
+		flashlight->aPos += offset * camDir->aUp.Get();
 	};
 
 	// Toggle flashlight on or off
@@ -537,10 +614,13 @@ inline float DegreeConstrain( float num )
 }
 
 
-inline void ClampAngles( CTransform& transform, CCamera& camera )
+inline void ClampAngles( CTransform* spTransform )
 {
-	camera.aTransform.Edit().aAng.Edit()[ YAW ]   = DegreeConstrain( camera.aTransform.Get().aAng.Get()[ YAW ] );
-	camera.aTransform.Edit().aAng.Edit()[ PITCH ] = std::clamp( camera.aTransform.Get().aAng.Get()[ PITCH ], -90.0f, 90.0f );
+	if ( !spTransform )
+		return;
+
+	spTransform->aAng.Edit()[ YAW ]   = DegreeConstrain( spTransform->aAng.Get()[ YAW ] );
+	spTransform->aAng.Edit()[ PITCH ] = std::clamp( spTransform->aAng.Get()[ PITCH ], -90.0f, 90.0f );
 };
 
 
@@ -560,24 +640,25 @@ void PlayerManager::Update( float frameTime )
 		// auto camera     = GetCamera( player );
 
 		Assert( playerInfo );
+		Assert( playerInfo->aCamera );
 
 		if ( !Game_IsPaused() )
 		{
 			// Update Client UserCmd
-			auto            transform = GetTransform( player );
-			auto            camera    = GetCamera( player );
+			auto transform    = GetTransform( player );
+			auto camTransform = GetTransform( playerInfo->aCamera );
 
 			Assert( transform );
-			Assert( camera );
+			Assert( camTransform );
 
 			// transform.aAng[PITCH] = -mouse.y;
-			camera->aTransform.Edit().aAng.Edit()[ PITCH ] = userCmd.aAng[ PITCH ];
-			camera->aTransform.Edit().aAng.Edit()[ YAW ]   = userCmd.aAng[ YAW ];
-			camera->aTransform.Edit().aAng.Edit()[ ROLL ]  = userCmd.aAng[ ROLL ];
+			camTransform->aAng.Edit()[ PITCH ] = userCmd.aAng[ PITCH ];
+			camTransform->aAng.Edit()[ YAW ]   = userCmd.aAng[ YAW ];
+			camTransform->aAng.Edit()[ ROLL ]  = userCmd.aAng[ ROLL ];
 
 			transform->aAng.Set( { 0.f, DegreeConstrain( userCmd.aAng[ YAW ] ), 0.f } );
 
-			ClampAngles( *transform, *camera );
+			ClampAngles( camTransform );
 
 			apMove->MovePlayer( player, &userCmd );
 			Player_UpdateFlashlight( player, userCmd.aFlashlight );
@@ -593,33 +674,26 @@ void PlayerManager::UpdateLocalPlayer()
 	Assert( Game_ProcessingClient() );
 	Assert( apMove );
 
-	if ( !Game_IsPaused() )
-	{
-		if ( !CL_IsMenuShown() )
-			DoMouseLook( gLocalPlayer );
-	}
-
 	auto userCmd = gClientUserCmd;
-
-	if ( !Game_IsPaused() )
-	{
-		if ( input->WindowHasFocus() && !CL_IsMenuShown() )
-			DoMouseLook( gLocalPlayer );
-	}
 
 	// We still need to do client updating of players actually, so
 
 	for ( Entity player : aEntities )
 	{
+		auto playerInfo = GetPlayerInfo( player );
+		Assert( playerInfo );
+		Assert( playerInfo->aCamera );
+
 		auto     playerMove = GetPlayerMoveData( player );
-		auto     playerInfo = GetPlayerInfo( player );
-		auto     camera     = GetCamera( player );
 		auto     transform  = GetTransform( player );
 		CLight*  flashlight = Ent_GetComponent< CLight >( player, "light" );
 
+		auto     camTransform = GetTransform( playerInfo->aCamera );
+		// auto     camera     = GetCamera( playerInfo->aCamera );
+
 		Assert( playerMove );
-		Assert( playerInfo );
-		Assert( camera );
+		Assert( camTransform );
+		//Assert( camera );
 		Assert( transform );
 		Assert( flashlight );
 
@@ -631,7 +705,7 @@ void PlayerManager::UpdateLocalPlayer()
 		// Player_UpdateFlashlight( player, &userCmd );
 	
 		// TEMP
-		camera->aTransform.Edit().aPos.Edit()[ W_UP ] = playerMove->aOutViewHeight;
+		camTransform->aPos.Edit()[ W_UP ] = playerMove->aOutViewHeight;
 
 		// bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround && !( playerMove->aPlayerFlags & PlyOnGround );
 		bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround;
@@ -695,8 +769,8 @@ void PlayerManager::UpdateLocalPlayer()
 
 			if ( cl_playermodel_cam_ang )
 			{
-				ang = camera->aTransform.Get().aAng;
-				ang[ YAW ] *= -1;
+				ang = camTransform->aAng;
+				//ang[ YAW ] *= -1;
 				ang[ YAW ] += 180;
 				ang[ ROLL ]  = ang[ PITCH ] + 90;
 				ang[ PITCH ] = 0;
@@ -705,7 +779,7 @@ void PlayerManager::UpdateLocalPlayer()
 			{
 				ang = transform->aAng;
 				ang[ ROLL ] += 90;
-				ang[ YAW ] *= -1;
+				//ang[ YAW ] *= -1;
 				ang[ YAW ] += 180;
 			}
 
@@ -747,17 +821,28 @@ void PlayerManager::DoMouseLook( Entity player )
 {
 	Assert( Game_ProcessingClient() );
 
-	auto transform = GetTransform( player );
-	auto camera = GetCamera( player );
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo compoment not found when applying mouse look\n" );
+		return;
+	}
+
+	CTransform*     camTransform = GetTransform( playerInfo->aCamera );
+	CTransform*     transform    = GetTransform( player );
 
 	const glm::vec2 mouse = Input_GetMouseDelta();
 
 	// transform.aAng[PITCH] = -mouse.y;
-	camera->aTransform.Edit().aAng.Edit()[PITCH] += mouse.y * m_pitch;
-	camera->aTransform.Edit().aAng.Edit()[YAW] += mouse.x * m_yaw;
+	camTransform->aAng.Edit()[ PITCH ] += mouse.y * m_pitch;
+	camTransform->aAng.Edit()[ YAW ] += mouse.x * m_yaw;
 	transform->aAng.Edit()[ YAW ] += mouse.x * m_yaw;
 
-	ClampAngles( *transform, *camera );
+	ClampAngles( camTransform );
+	ClampAngles( transform );
 }
 
 
@@ -896,15 +981,21 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 {
 	PROF_SCOPE();
 
-	// auto& move = GetPlayerMoveData( player );
-	auto transform = GetTransform( player );
-	auto camera    = GetCamera( player );
-	auto dir       = GetComp_Direction( player );
-	auto rigidBody = GetRigidBody( player );
+	Assert( info );
+	Assert( info->aCamera );
+
+	CTransform* camTransform = GetTransform( info->aCamera );
+	CTransform* transform    = GetTransform( player );
+
+	auto        dir          = GetComp_Direction( player );
+
+	auto        rigidBody    = GetRigidBody( player );
+	auto        camera       = GetCamera( info->aCamera );
+	auto        camDir       = GetComp_Direction( info->aCamera );
 
 	Assert( transform );
 
-	ClampAngles( *transform, *camera );
+	ClampAngles( camTransform );
 
 	if ( transform->aPos.aIsDirty || transform->aAng.aIsDirty )
 	{
@@ -916,10 +1007,19 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	// MOVE ME ELSEWHERE IDK, MAYBE WHEN AN HEV SUIT COMPONENT IS MADE
 	CalcZoom( camera, player );
 
-	/* Copy the player transformation, and apply the view offsets to it. */
+	// TEMP UNTIL GetWorldMatrix works properly
 	CTransform transformView = *transform;
-	transformView.aPos += camera->aTransform.Get().aPos;
-	transformView.aAng = camera->aTransform.Get().aAng;
+	transformView.aPos += camTransform->aPos;
+	transformView.aAng = camTransform->aAng;
+
+	// Transform transformViewTmp = GetEntitySystem()->GetWorldTransform( info->aCamera );
+	// Transform transformView    = transformViewTmp;
+
+	//transformView.aAng[ PITCH ] = transformViewTmp.aAng[ YAW ];
+	//transformView.aAng[ YAW ]   = transformViewTmp.aAng[ PITCH ];
+
+	//transformView.aAng.Edit()[ YAW ] *= -1;
+
 	//Transform transformView = transform;
 	//transformView.aAng += move.aViewAngOffset;
 
@@ -943,7 +1043,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
 		}
 
-		Util_GetViewMatrixZDirection( viewMat, camera->aForward.Edit(), camera->aRight.Edit(), camera->aUp.Edit() );
+		Util_GetViewMatrixZDirection( viewMat, camDir->aForward.Edit(), camDir->aRight.Edit(), camDir->aUp.Edit() );
 	}
 	else
 	{
@@ -959,8 +1059,12 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			Game_SetView( viewMat );
 		}
 
-		Util_GetViewMatrixZDirection( viewMat, camera->aForward.Edit(), camera->aRight.Edit(), camera->aUp.Edit() );
+		Util_GetViewMatrixZDirection( viewMat, camDir->aForward.Edit(), camDir->aRight.Edit(), camDir->aUp.Edit() );
 	}
+
+	// temp
+	//Graphics_DrawAxis( transformView.aPos, transformView.aAng, { 40.f, 40.f, 40.f } );
+	//Graphics_DrawAxis( transform->aPos, transform->aAng, { 40.f, 40.f, 40.f } );
 
 	if ( info->aIsLocalPlayer )
 	// if ( player == gLocalPlayer )
@@ -1011,17 +1115,34 @@ void PlayerMovement::SetPlayer( Entity player )
 {
 	aPlayer     = player;
 
-	apMove      = GetPlayerMoveData( player );
-	apRigidBody = GetRigidBody( player );
-	apTransform = GetTransform( player );
-	apCamera    = GetCamera( player );
-	apDir       = Ent_GetComponent< CDirection >( player, "direction" );
-	apPhysObj   = GetComp_PhysObjectPtr( player );
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo component not found on player entity\n" );
+		return;
+	}
+
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	apCamTransform = GetTransform( playerInfo->aCamera );
+	apCamDir       = GetComp_Direction( playerInfo->aCamera );
+	apCamera       = GetCamera( playerInfo->aCamera );
+
+	apMove         = GetPlayerMoveData( player );
+	apRigidBody    = GetRigidBody( player );
+	apTransform    = GetTransform( player );
+	apDir          = Ent_GetComponent< CDirection >( player, "direction" );
+	apPhysObj      = GetComp_PhysObjectPtr( player );
+
+	Assert( apCamTransform );
+	Assert( apCamDir );
+	Assert( apCamera );
 
 	Assert( apMove );
 	Assert( apRigidBody );
 	Assert( apTransform );
-	Assert( apCamera );
 	Assert( apDir );
 	Assert( apPhysObj );
 }
@@ -1031,15 +1152,25 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 {
 	EnsureUserCmd( player );
 
-	auto move   = GetPlayerMoveData( player );
-	auto camera = GetCamera(player );
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo compoment not found in OnPlayerSpawn\n" );
+		return;
+	}
+
+	CTransform* camTransform = GetTransform( playerInfo->aCamera );
+	auto        move         = GetPlayerMoveData( player );
 
 	Assert( move );
-	Assert( camera );
+	Assert( camTransform );
 
 	SetMoveType( *move, PlayerMoveType::Walk );
 
-	camera->aTransform.Edit().aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
+	camTransform->aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
 }
 
 
@@ -1182,16 +1313,28 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	if ( !cl_show_player_stats )
 		return;
 
+	CPlayerInfo* playerInfo = GetPlayerInfo( player );
+	Assert( playerInfo );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo compoment not found in " CH_FUNC_NAME_CLASS "\n" );
+		return;
+	}
+
+	Assert( playerInfo->aCamera );
+
 	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( player );
 	auto rigidBody = GetRigidBody( player );
 	auto transform = GetTransform( player );
-	auto camera    = GetCamera( player );
+
+	CTransform* camTransform = GetTransform( playerInfo->aCamera );
+	CCamera*    camera       = GetCamera( playerInfo->aCamera );
 
 	Assert( rigidBody );
 	Assert( transform );
+	Assert( camTransform );
 	Assert( camera );
-
-	auto  camTransform = camera->aTransform;
 
 	float speed        = glm::length( glm::vec2( rigidBody->aVel.Get().x, rigidBody->aVel.Get().y ) );
 
@@ -1201,8 +1344,8 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
 	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov.Get() );
-	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform.Get().aPos).c_str() );
-	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform.Get().aAng).c_str() );
+	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform->aPos.Get()).c_str() );
+	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform->aAng.Get()).c_str() );
 }
 
 
@@ -1355,6 +1498,24 @@ float Math_EaseInOutCubic( float x )
 // VERY BUGGY STILL
 void PlayerMovement::DoSmoothDuck()
 {
+	CPlayerInfo* playerInfo = GetPlayerInfo( aPlayer );
+	Assert( playerInfo );
+	Assert( playerInfo->aCamera );
+
+	if ( !playerInfo )
+	{
+		Log_Error( "playerInfo compoment not found in OnPlayerSpawn\n" );
+		return;
+	}
+
+	CTransform* camTransform = GetTransform( playerInfo->aCamera );
+
+	if ( !camTransform )
+	{
+		Log_Error( "transform compoment not found on playerInfo->camera\n" );
+		return;
+	}
+
 	if ( Game_ProcessingServer() )
 	{
 		if ( IsOnGround() && apMove->aMoveType == PlayerMoveType::Walk )
@@ -1392,7 +1553,7 @@ void PlayerMovement::DoSmoothDuck()
 		}
 	}
 
-	apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] = apMove->aOutViewHeight;
+	camTransform->aPos.Edit()[ W_UP ] = apMove->aOutViewHeight;
 }
 
 
@@ -1601,7 +1762,7 @@ void PlayerMovement::BaseFlyMove()
 
 	// forward and side movement
 	for ( int i = 0; i < 3; i++ )
-		wishvel[ i ] = apCamera->aForward.Get()[ i ] * apRigidBody->aAccel.Get().x + apCamera->aRight.Get()[ i ] * apRigidBody->aAccel.Get()[ W_RIGHT ];
+		wishvel[ i ] = apCamDir->aForward.Get()[ i ] * apRigidBody->aAccel.Get().x + apCamDir->aRight.Get()[ i ] * apRigidBody->aAccel.Get()[ W_RIGHT ];
 
 	float wishspeed = GetMoveSpeed( wishdir, wishvel );
 
@@ -1767,7 +1928,7 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 	{
 		if ( apMove->aLandPower > 0.f )
 			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;
-			apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += ( -apMove->aLandPower * sin( apMove->aLandTime / apMove->aLandPower ) / exp( apMove->aLandTime / apMove->aLandPower ) ) * sv_land_power_scale;
+			apCamTransform->aPos.Edit()[ W_UP ] += ( -apMove->aLandPower * sin( apMove->aLandTime / apMove->aLandPower ) / exp( apMove->aLandTime / apMove->aLandPower ) ) * sv_land_power_scale;
 
 	}
 }
@@ -1791,7 +1952,7 @@ void PlayerMovement::DoViewBob()
 		// lerp back to 0 to not snap view the offset (not good enough) and reset input
 		apMove->aWalkTime        = 0.f;
 		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount.Get(), 0.f, cl_bob_exit_lerp.GetFloat() );
-		apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
+		apCamTransform->aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 		//inExit = aBobOffsetAmount > 0.01;
 		//prevMove = aMove;
 		return;
@@ -1835,7 +1996,7 @@ void PlayerMovement::DoViewBob()
 		playedStepSound = false;
 	}
 
-	apCamera->aTransform.Edit().aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
+	apCamTransform->aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 	
 	if ( cl_bob_debug )
 	{
@@ -1881,7 +2042,7 @@ void PlayerMovement::DoViewTilt()
 		output = glm::mix( apMove->aPrevViewTilt.Get(), output * cl_tilt, cl_tilt_lerp * gFrameTime );
 	}
 
-	apCamera->aTransform.Edit().aAng.Edit()[ ROLL ] = output;
+	apCamTransform->aAng.Edit()[ ROLL ] = output;
 	apMove->aPrevViewTilt.Edit()                    = output;
 }
 

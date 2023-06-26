@@ -122,11 +122,15 @@ enum EEntComponentVarType : u8
 	EEntComponentVarType_U32,   // unsigned int
 	EEntComponentVarType_U64,   // unsigned long long
 
+	EEntComponentVarType_Entity,
+
 	EEntComponentVarType_StdString,  // std::string
 
 	EEntComponentVarType_Vec2,  // glm::vec2
 	EEntComponentVarType_Vec3,  // glm::vec3
 	EEntComponentVarType_Vec4,  // glm::vec4
+
+	EEntComponentVarType_Custom,  // Custom Type, must define your own read and write function for this type
 
 	EEntComponentVarType_Count,
 };
@@ -148,16 +152,23 @@ enum EEntComponentNetType
 };
 
 
-enum EEntityCreateState
+using EEntityFlag = int;
+enum EEntityFlag_ : EEntityFlag
 {
 	// Entity still exists
-	EEntityCreateState_None,
+	EEntityFlag_None      = 0,
 
 	// Entity was just created
-	EEntityCreateState_Created,
+	EEntityFlag_Created   = ( 1 << 0 ),
 
 	// Entity was destroyed and is queued for removal
-	EEntityCreateState_Destroyed,
+	EEntityFlag_Destroyed = ( 1 << 1 ),
+
+	// Entity is not networked and is local only
+	EEntityFlag_Local     = ( 1 << 2 ),
+
+	// Entity is Predicted
+	EEntityFlag_Predicted = ( 1 << 3 ),
 };
 
 
@@ -286,12 +297,9 @@ class EntityComponentPool
 	// This is an std::array so that when a component is freed, it does not changes the index of each component
 	std::array< void*, CH_MAX_ENTITIES >             aComponents{};
 
-	// Component States, will store if an entity is just created or deleted for one frame
+	// Component Flags, just uses Entity Flags for now
 	// Key is an index into aComponents
-	std::unordered_map< size_t, EEntityCreateState > aComponentStates;
-
-	// Entity's that are in here will have this component type predicted for it
-	std::set< Entity >                               aPredicted{};
+	std::unordered_map< size_t, EEntityFlag >        aComponentFlags;
 
 	// Amount of Components we have allocated
 	size_t                                           aCount;
@@ -372,7 +380,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -383,7 +391,7 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 		return;
 	}
 
-	EntComponentData_t& data = it->second;
+	EntComponentData_t& data    = it->second;
 	auto                varFind = data.aVars.find( sOffset );
 
 	if ( varFind != data.aVars.end() )
@@ -392,10 +400,11 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 		return;
 	}
 
-	auto& varData       = data.aVars[ sOffset ];
-	varData.apVarName   = spVarName;
-	varData.apName      = spName;
-	varData.aSize       = sizeof( VAR_TYPE );
+	auto& varData     = data.aVars[ sOffset ];
+	varData.apVarName = spVarName;
+	varData.apName    = spName;
+	varData.aSize     = sizeof( VAR_TYPE );
+	varData.aType     = sVarType;
 
 	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
 
@@ -409,7 +418,56 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 	{
 		varData.aIsNetVar = true;
 	}
+}
 
+
+#if 0
+template< typename T >
+inline void EntComp_RegisterComponentVarEx2( EEntComponentVarType sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+{
+	size_t typeHash = typeid( T ).hash_code();
+	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+
+	if ( it == gEntComponentRegistry.aComponents.end() )
+	{
+		Log_ErrorF( "Component not registered, can't add var: \"%s\" - \"%s\"\n", typeid( T ).name() );
+		return;
+	}
+
+	EntComponentData_t& data    = it->second;
+	auto                varFind = data.aVars.find( sOffset );
+
+	if ( varFind != data.aVars.end() )
+	{
+		Log_ErrorF( "Component Var already registered: \"%s::%s\" - \"%s\"\n", typeid( T ).name(), typeid( VAR_TYPE ).name(), spName );
+		return;
+	}
+
+	auto& varData     = data.aVars[ sOffset ];
+	varData.apVarName = spVarName;
+	varData.apName    = spName;
+	varData.aSize     = sizeof( VAR_TYPE );
+	varData.aType     = sVarType;
+
+	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
+
+	if ( sVarHash != typeid( ComponentNetVar< VAR_TYPE > ).hash_code() )
+	{
+		varData.aIsNetVar = false;
+		// Log_ErrorF( "Not Registering Component Var, is not a ComponentNetVar Type: \"%s\" - \"%s\"\n", typeid( VAR_TYPE ).name(), spVarName );
+		// return;
+	}
+	else
+	{
+		varData.aIsNetVar = true;
+	}
+}
+#endif
+
+
+template< typename T, typename VAR_TYPE >
+inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+{
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
 	auto   findEnum    = gEntComponentRegistry.aVarTypes.find( varTypeHash );
@@ -420,7 +478,7 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 		return;
 	}
 
-	varData.aType = findEnum->second;
+	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spVarName, spName, sOffset, sVarHash );
 }
 
 
@@ -541,8 +599,6 @@ class EntitySystem
 	// Get a system for managing this component 
 	IEntityComponentSystem*                                       GetComponentSystem( const char* spName );
 
-	// Entity                                                        CreateEntityNetworked();
-
 	// if sLocal is true, then the entity is only created on client or server, and is never networked
 	// Useful for client or server only entities, if we ever have those
 	Entity                                                        CreateEntity( bool sLocal = false );
@@ -550,22 +606,23 @@ class EntitySystem
 	void                                                          DeleteQueuedEntities();
 	Entity                                                        GetEntityCount();
 
-	// kind of a hack, this just allocates the entity for the client
-	// but what if a client only entity is using an ID that a newly created server entity is using?
-	// curl up into a ball and die i guess
-	// Entity                                                        CreateEntityFromServer( Entity desiredId );
-
 	bool                                                          EntityExists( Entity sDesiredId );
 
-	// Parents an entity to another one, only takes affect if the entity has a transform component
-	// TODO: actually implement, and tackle parenting with physics objects
+	// Parents an entity to another one
+	// TODO: tackle parenting with physics objects
 	void                                                          ParentEntity( Entity sSelf, Entity sParent );
 	Entity                                                        GetParent( Entity sEntity );
+
+	// Get the highest level parent for this entity, returns self if not parented
+	Entity                                                        GetRootParent( Entity sEntity );
+
+	// Recursively get all entities attached to this one (SLOW)
+	void                                                          GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren );
 
 	// Returns a Model Matrix with parents applied in world space IF we have a transform component
 	bool                                                          GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
 
-	// Same as GetWorldMatrix, but returns in a CTransform component
+	// Same as GetWorldMatrix, but returns in a Transform struct
 	Transform                                                     GetWorldTransform( Entity sEntity );
 
 	// having local versions of these functions are useless, that's just the transform component
@@ -602,6 +659,12 @@ class EntitySystem
 	// Is this component predicted for this Entity?
 	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
 
+	// Enables/Disables Networking on this Entity
+	void                                                          SetNetworked( Entity entity, bool sNetworked = true );
+
+	// Is this Entity Networked?
+	bool                                                          IsNetworked( Entity entity );
+
 	// Get the Component Pool for this Component
 	EntityComponentPool*                                          GetComponentPool( const char* spName );
 
@@ -629,9 +692,6 @@ class EntitySystem
 	// std::queue< Entity >                               aEntityPool{};
 	std::vector< Entity >                                         aEntityPool{};
 
-	// Entities queued to delete later
-	std::set< Entity >                                            aDeleteEntities{};
-
 	// Entity ID's in use
 	std::vector< Entity >                                         aUsedEntities{};
 
@@ -648,8 +708,8 @@ class EntitySystem
 	// NOTE: it's a bit strange to have them be stored here and one in each component pool
 	std::unordered_map< size_t, IEntityComponentSystem* >         aComponentSystems;
 
-	// Entity States, will store if an entity is just created or deleted for one frame
-	std::unordered_map< Entity, EEntityCreateState >              aEntityStates;
+	// Entity Flags
+	std::unordered_map< Entity, EEntityFlag >                     aEntityFlags;
 
 	// Entity Parents
 	std::unordered_map< Entity, Entity >                          aEntityParents;
@@ -698,6 +758,8 @@ inline T* Ent_GetSystem()
 template< typename T >
 struct ComponentNetVar
 {
+	using Type = T;
+
 	T    aValue{};
 	bool aIsDirty = true;
 
@@ -1118,10 +1180,9 @@ struct CDirection
 };
 
 
-struct CCamera: public CDirection
+struct CCamera
 {
-	ComponentNetVar< CTransformSmall > aTransform = {};
-	ComponentNetVar< float >           aFov       = 90.f;
+	ComponentNetVar< float > aFov = 90.f;
 };
 
 
@@ -1191,21 +1252,22 @@ struct CLight
 #define CH_REGISTER_COMPONENT_NEWFREE( type, name, overrideClient, netType, newFunc, freeFunc ) \
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, newFunc, freeFunc )
 
+
+
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
   EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
 
+#define CH_REGISTER_COMPONENT_VAR_EX( type, netVarType, varType, varName, varStr ) \
+  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+
+
+//define CH_REGISTER_COMPONENT_VAR_EX( type, varType, varName, varStr ) \
+// EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+
+
+
 // #define CH_REGISTER_COMPONENT_RW_EX( type, read, write ) \
 //   EntComp_RegisterComponentReadWrite< type >( read, write )
-
-#define CH_COMPONENT_READ_DEF( type ) \
-  static void __EntCompFunc_Read_##type( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData )
-
-#define CH_COMPONENT_WRITE_DEF( type ) \
-  static bool __EntCompFunc_Write_##type( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate )
-
-#define CH_COMPONENT_RW( type )    __EntCompFunc_Read_##type, __EntCompFunc_Write_##type
-#define CH_COMPONENT_READ( type )  __EntCompFunc_Read_##type
-#define CH_COMPONENT_WRITE( type ) __EntCompFunc_Write_##type
 
 #define CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, netType ) \
   CH_REGISTER_COMPONENT( type, name, overrideClient, netType )
@@ -1222,17 +1284,39 @@ struct CLight
 
 
 
-#define CH_NET_VAR_WRITE( type, typeName ) \
-	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+//#define CH_NET_VAR_WRITE( type, typeName ) \
+//	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+//
+//#define CH_NET_VAR_READ( type, typeName ) \
+//	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+//
+//
+//#define CH_REGISTER_VAR_RW( type, typeName ) \
+//	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
 
-#define CH_NET_VAR_READ( type, typeName ) \
-	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+
+#define CH_STRUCT_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
+  struct __CompRegister_##type##_t                                          \
+  {                                                                         \
+	using TYPE = type;                                                      \
+                                                                            \
+	void RegisterVars();                                                    \
+	__CompRegister_##type##_t()                                             \
+	{                                                                       \
+	  EntComp_RegisterComponent< TYPE >(                                    \
+		#name, overrideClient, netType, [ & ]() { return new TYPE; },       \
+		[ & ]( void* spData )                                               \
+		{ delete (type*)spData; } );                                        \
+                                                                            \
+	  RegisterVars();                                                       \
+	}                                                                       \
+  };                                                                        \
+  static __CompRegister_##type##_t __CompRegister_##type;                   \
+  void                             __CompRegister_##type##_t::RegisterVars()
 
 
-#define CH_REGISTER_VAR_RW( type, typeName ) \
-	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
-
-
+#define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr ) \
+  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varName, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code() )
 
 
 #define CH_NET_WRITE_VEC2( varName, var ) \

@@ -157,9 +157,9 @@ void CL_Shutdown()
 
 void CL_WriteMsgData( flatbuffers::FlatBufferBuilder& srRootBuilder, flatbuffers::FlatBufferBuilder& srDataBuffer, EMsgSrc_Client sType )
 {
-	auto                           vector = srRootBuilder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
+	auto                 vector = srRootBuilder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
 
-	MsgSrc_ClientBuilder           root( srRootBuilder );
+	MsgSrc_ClientBuilder root( srRootBuilder );
 	root.add_type( sType );
 	root.add_data( vector );
 	srRootBuilder.Finish( root.Finish() );
@@ -193,20 +193,10 @@ void CL_Update( float frameTime )
 			break;
 
 		case EClientState_WaitForAccept:
-		{
-			// Recieve Server Info first
-			CL_GetServerMessages();
-			break;
-		}
-
 		case EClientState_WaitForFullUpdate:
 		{
-			CL_GetServerMessages();
-
 			// Recieve Server Info first
-			// if ( !CL_RecvServerInfo() )
-			// 	CL_Disconnect();
-		
+			CL_GetServerMessages();
 			break;
 		}
 
@@ -254,6 +244,9 @@ void CL_Update( float frameTime )
 		{
 			// Process Stuff from server
 			CL_GetServerMessages();
+
+			if ( !Game_IsPaused() && input->WindowHasFocus() && !CL_IsMenuShown() )
+				GetPlayers()->DoMouseLook( gLocalPlayer );
 
 			CL_UpdateUserCmd();
 
@@ -391,29 +384,6 @@ Handle CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth )
 }
 
 
-bool CL_IsMenuShown()
-{
-	return gClientMenuShown;
-}
-
-
-void CL_UpdateMenuShown()
-{
-	bool wasShown    = gClientMenuShown;
-	gClientMenuShown = gui->IsConsoleShown();
-
-	if ( wasShown != gClientMenuShown )
-	{
-		SDL_SetRelativeMouseMode( (SDL_bool)!gClientMenuShown );
-
-		if ( gClientMenuShown )
-		{
-			CenterMouseOnScreen();
-		}
-	}
-}
-
-
 // =======================================================================
 // Client Networking
 // =======================================================================
@@ -524,52 +494,6 @@ int CL_WriteToServer( flatbuffers::FlatBufferBuilder& srBuilder )
 }
 
 
-#if 0
-bool CL_WaitForAccept()
-{
-	ChVector< char > data( 8192 );
-	int              len = Net_Read( gClientSocket, data.data(), data.size(), &gClientAddr );
-
-	if ( len == 0 )
-	{
-		// NOTE: this might get hit, we need some sort of retry thing
-		Log_Warn( gLC_Client, "No Server Info\n" );
-
-		if ( gClientConnectTimeout < Game_GetCurTime() )
-			return false;
-
-		// keep waiting i guess?
-		return true;
-	}
-	else if ( len < 0 )
-	{
-		CL_Disconnect( false );
-		return false;
-	}
-
-	Log_Msg( gLC_Client, "Receiving Server Info\n" );
-
-
-
-	MsgSrc_Server                 serverMsg;
-
-	NetBufferedInputStream        inputStream( (char*)data.begin(), len );
-	capnp::PackedMessageReader    reader( inputStream );
-
-	NetMsgServerInfo::Reader      serverInfoMsg = reader.getRoot< NetMsgServerInfo >();
-
-	CL_HandleMsg_ServerInfo( serverInfoMsg );
-	gLocalPlayer   = serverInfoMsg.getClientEntityId();
-	gClientState   = EClientState_Connecting;
-
-	// Reset the connection timer
-	gClientTimeout = cl_timeout_duration;
-
-	return true;
-}
-#endif
-
-
 bool CL_SendConVarIfClient( std::string_view sName, const std::vector< std::string >& srArgs )
 {
 	if ( Game_ProcessingClient() )
@@ -621,17 +545,25 @@ void CL_SendConVars()
 
 void CL_UpdateUserCmd()
 {
-	// Get the camera component from the local player, and get the angles from it
-	CCamera* camera = GetCamera( gLocalPlayer );
+	// Get the transform component from the camera entity on the local player, and get the angles from it
+	auto playerInfo = Ent_GetComponent< CPlayerInfo >( gLocalPlayer, "playerInfo" );
 
-	Assert( camera );
+	if ( !playerInfo )
+		return;
+
+	auto camTransform = Ent_GetComponent< CTransform >( playerInfo->aCamera, "transform" );
+
+	Assert( camTransform );
 
 	// Reset Values
 	gClientUserCmd.aButtons    = 0;
 	gClientUserCmd.aFlashlight = false;
 
-	if ( camera )
-		gClientUserCmd.aAng = camera->aTransform.Get().aAng;
+	if ( camTransform )
+	{
+		gClientUserCmd.aAng = camTransform->aAng;
+		// gClientUserCmd.aAng[ YAW ] *= -1;
+	}
 
 	// Don't update buttons if the menu is shown
 	if ( CL_IsMenuShown() )
@@ -780,16 +712,6 @@ void CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spMsg )
 
 	gClientServerData.aClientCount = spMsg->client_count();
 	gClientServerData.aMaxClients  = spMsg->max_clients();
-}
-
-
-void CL_HandleMsg_EntityList( const NetMsg_EntityUpdates* spMsg )
-{
-	PROF_SCOPE();
-
-	gClientWait_EntityList    = true;
-
-	GetEntitySystem()->ReadEntityUpdates( spMsg );
 }
 
 
@@ -999,7 +921,32 @@ CONCMD( status_cl )
 }
 
 
-// --------------------------------------------------
+// =======================================================================
+// Main Menu
+// =======================================================================
+
+
+bool CL_IsMenuShown()
+{
+	return gClientMenuShown;
+}
+
+
+void CL_UpdateMenuShown()
+{
+	bool wasShown    = gClientMenuShown;
+	gClientMenuShown = gui->IsConsoleShown();
+
+	if ( wasShown != gClientMenuShown )
+	{
+		SDL_SetRelativeMouseMode( (SDL_bool)!gClientMenuShown );
+
+		if ( gClientMenuShown )
+		{
+			CenterMouseOnScreen();
+		}
+	}
+}
 
 
 void CL_DrawMainMenu()
