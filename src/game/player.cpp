@@ -739,6 +739,8 @@ void PlayerManager::UpdateLocalPlayer()
 				if ( model == InvalidHandle )
 					continue;
 
+				modelInfo->aModel   = model;
+
 				renderComp->aHandle = Graphics_CreateRenderable( model );
 				if ( renderComp->aHandle == InvalidHandle )
 					continue;

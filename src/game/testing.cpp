@@ -103,8 +103,17 @@ class ProtogenSystem : public IEntityComponentSystem
 			return;
 
 		// Add a renderable component
-		auto renderable     = Ent_AddComponent< CRenderable_t >( sEntity, "renderable" );
-		renderable->aHandle = InvalidHandle;
+		auto modelInfo = Ent_GetComponent< CModelInfo >( sEntity, "modelInfo" );
+		auto renderable = Ent_AddComponent< CRenderable_t >( sEntity, "renderable" );
+
+		// if ( modelInfo && renderable )
+		// {
+		// 	renderable->aHandle = modelInfo->aModel;
+		// }
+		// else
+		{
+			renderable->aHandle = InvalidHandle;
+		}
 	}
 
 	void ComponentRemoved( Entity sEntity, void* spData ) override
@@ -168,6 +177,7 @@ void CreateProtogen_f( const std::string& path )
 
 	CModelInfo* modelInfo      = Ent_AddComponent< CModelInfo >( proto, "modelInfo" );
 	modelInfo->aPath           = path;
+	modelInfo->aModel          = model;
 
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
 	// renderComp->aHandle        = Graphics_CreateRenderable( model );
@@ -287,12 +297,12 @@ CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 	if ( CL_SendConVarIfClient( "delete_protos" ) )
 		return;
 
-	// for ( auto& proto : GetProtogenSys()->aEntities )
-	while ( GetProtogenSys()->aEntities.size() )
+	// while ( GetProtogenSys()->aEntities.size() )
+	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
 		// Graphics_FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
 		// Graphics_FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
-		GetEntitySystem()->DeleteEntity( GetProtogenSys()->aEntities[ 0 ] );
+		GetEntitySystem()->DeleteEntity( proto );
 	}
 }
 

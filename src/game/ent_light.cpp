@@ -174,19 +174,24 @@ static bool UpdateModelHandle( CModelInfo* modelInfo )
 	if ( !modelInfo )
 		return false;
 
-	if ( modelInfo->aPath.aIsDirty || ( modelInfo->aModel == InvalidHandle && modelInfo->aPath.Get().size() ) )
+	if ( !( modelInfo->aPath.aIsDirty || ( modelInfo->aModel == InvalidHandle && modelInfo->aPath.Get().size() ) ) )
+		return false;
+
+	if ( modelInfo->aModel != InvalidHandle )
 	{
-		if ( modelInfo->aModel != InvalidHandle )
+		std::string_view curModel = Graphics_GetModelPath( modelInfo->aModel );
+			
+		if ( curModel != modelInfo->aPath.Get() )
 		{
 			Graphics_FreeModel( modelInfo->aModel );
 			modelInfo->aModel = InvalidHandle;
 		}
-
-		modelInfo->aModel = Graphics_LoadModel( modelInfo->aPath );
-		return true;
 	}
 
-	return false;
+	if ( modelInfo->aModel == InvalidHandle )
+		modelInfo->aModel = Graphics_LoadModel( modelInfo->aPath );
+
+	return true;
 }
 
 

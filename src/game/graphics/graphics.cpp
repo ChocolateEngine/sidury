@@ -200,6 +200,22 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	if ( it != gModelPaths.end() )
 	{
 		// We have, use that model instead
+		// Increment the ref counters
+		Model* model = nullptr;
+		if ( !gModels.Get( it->second, &model ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Graphics_LoadModel: Model is nullptr\n" );
+			return InvalidHandle;
+		}
+
+		if ( model->apBuffers )
+			model->apBuffers->AddRef();
+
+		if ( model->apVertexData )
+			model->apVertexData->AddRef();
+
+		model->AddRef();
+
 		return it->second;
 	}
 
@@ -262,13 +278,20 @@ Handle Graphics_LoadModel( const std::string& srPath )
 
 	gModelPaths[ srPath ] = handle;
 
+	model->AddRef();
+
 	return handle;
 }
 
 
 Handle Graphics_CreateModel( Model** spModel )
 {
-	return gModels.Create( spModel );
+	Handle handle = gModels.Create( spModel );
+
+	if ( handle != InvalidHandle )
+		( *spModel )->AddRef();
+
+	return handle;
 }
 
 
@@ -280,6 +303,16 @@ void Graphics_FreeModel( Handle shModel )
 	// HACK HACK PERF: we have to wait for queues to finish, so we could just free this model later
 	// maybe right before the next draw?
 	render->WaitForQueues();
+
+	// use smart pointer for apVertexData and apBuffers?
+	// though with the resource system, you can't do that, darn
+	// you need to use placement new there
+
+	// prototyping idea
+	// 
+	// Resource_GetData( gModels, &model );
+	// Resource_IncrementRefCount( gModels, &model );
+	// 
 
 	Model* model = nullptr;
 	if ( !gModels.Get( shModel, &model ) )
@@ -306,17 +339,20 @@ void Graphics_FreeModel( Handle shModel )
 	// 	model->apBuffers->aIndex = InvalidHandle;
 	}
 
-	for ( auto& [ path, modelHandle ] : gModelPaths )
+	if ( model->Release() )
 	{
-		if ( modelHandle == shModel )
+		for ( auto& [ path, modelHandle ] : gModelPaths )
 		{
-			gModelPaths.erase( path );
-			break;
+			if ( modelHandle == shModel )
+			{
+				gModelPaths.erase( path );
+				break;
+			}
 		}
-	}
 
-	gModels.Remove( shModel );
-	gModelBBox.erase( shModel );
+		gModels.Remove( shModel );
+		gModelBBox.erase( shModel );
+	}
 }
 
 
@@ -330,6 +366,20 @@ Model* Graphics_GetModelData( Handle shModel )
 	}
 
 	return model;
+}
+
+
+std::string_view Graphics_GetModelPath( Handle sModel )
+{
+	for ( auto& [ path, modelHandle ] : gModelPaths )
+	{
+		if ( modelHandle == sModel )
+		{
+			return path;
+		}
+	}
+
+	return "";
 }
 
 

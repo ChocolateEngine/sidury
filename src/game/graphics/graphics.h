@@ -255,7 +255,7 @@ struct Mesh
 // they will never free themselves, only the system managing it will free it
 
 // A Model contains vertex and index buffers, vertex data, and a vector of meshes the model contains
-struct Model
+struct Model : public RefCounted
 {
 	ModelBuffers_t*  apBuffers    = nullptr;
 	VertexData_t*    apVertexData = nullptr;
@@ -490,6 +490,7 @@ Handle             Graphics_LoadModel( const std::string& srPath );
 Handle             Graphics_CreateModel( Model** spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
+std::string_view   Graphics_GetModelPath( Handle sModel );
 void               Graphics_CalcModelBBox( Handle sModel );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
