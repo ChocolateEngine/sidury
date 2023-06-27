@@ -99,23 +99,22 @@ class ProtogenSystem : public IEntityComponentSystem
 
 	void ComponentAdded( Entity sEntity, void* spData ) override
 	{
-		if ( !Game_ProcessingClient() )
+		if ( Game_ProcessingServer() )
 			return;
 
 		// Add a renderable component
-		auto modelInfo = Ent_GetComponent< CModelInfo >( sEntity, "modelInfo" );
-		auto renderable = Ent_AddComponent< CRenderable_t >( sEntity, "renderable" );
+		auto renderable = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 		if ( !renderable )
 			return;
 
-		if ( modelInfo && modelInfo->aModel )
+		if ( renderable->aModel )
 		{
-			renderable->aHandle = Graphics_CreateRenderable( modelInfo->aModel );
+			renderable->aRenderable = Graphics_CreateRenderable( renderable->aModel );
 		}
 		else
 		{
-			renderable->aHandle = InvalidHandle;
+			renderable->aRenderable = InvalidHandle;
 		}
 	}
 
@@ -176,18 +175,18 @@ void CreateProtogen_f( const std::string& path )
 
 	Ent_AddComponent( proto, "protogen" );
 
-	Handle      model          = Graphics_LoadModel( path );
+	Handle       model          = Graphics_LoadModel( path );
 
-	CModelInfo* modelInfo      = Ent_AddComponent< CModelInfo >( proto, "modelInfo" );
-	modelInfo->aPath           = path;
-	modelInfo->aModel          = model;
+	CRenderable* renderable     = Ent_AddComponent< CRenderable >( proto, "renderable" );
+	renderable->aPath           = path;
+	renderable->aModel          = model;
 
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
 	// renderComp->aHandle        = Graphics_CreateRenderable( model );
 
 	CTransform* transform       = Ent_AddComponent< CTransform >( proto, "transform" );
 
-	auto       playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
+	auto        playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
 
 	transform->aPos            = playerTransform->aPos;
 	transform->aScale.Set( { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() } );
@@ -542,27 +541,26 @@ void TEST_CL_UpdateProtos( float frameTime )
 		// if ( !transformDirty )
 		// 	continue;
 
-		auto modelInfo  = Ent_GetComponent< CModelInfo >( proto, "modelInfo" );
-		auto renderComp = Ent_GetComponent< CRenderable_t >( proto, "renderable" );
+		auto renderComp = Ent_GetComponent< CRenderable >( proto, "renderable" );
 
-		Assert( modelInfo );
 		Assert( renderComp );
 
-		if ( !modelInfo )
+		if ( !renderComp )
 			continue;
 
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
-		if ( renderComp->aHandle == InvalidHandle )
+		if ( renderComp->aRenderable == InvalidHandle )
 		{
-			if ( modelInfo->aModel == InvalidHandle )
+			if ( renderComp->aModel == InvalidHandle )
 			{
-				modelInfo->aModel = Graphics_LoadModel( modelInfo->aPath );
+				if ( renderComp->aPath.Get().empty() )
 
-				if ( modelInfo->aModel == InvalidHandle )
+				renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+				if ( renderComp->aModel == InvalidHandle )
 					continue;
 			}
 
-			Handle        renderable = Graphics_CreateRenderable( modelInfo->aModel );
+			Handle        renderable = Graphics_CreateRenderable( renderComp->aModel );
 			Renderable_t* renderData = Graphics_GetRenderableData( renderable );
 
 			if ( !renderData )
@@ -571,15 +569,15 @@ void TEST_CL_UpdateProtos( float frameTime )
 				continue;
 			}
 
-			renderComp->aHandle = renderable;
+			renderComp->aRenderable = renderable;
 		}
 
-		Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+		Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
 
 		if ( renderData )
 		{
 			GetEntitySystem()->GetWorldMatrix( renderData->aModelMatrix, proto );
-			Graphics_UpdateRenderableAABB( renderComp->aHandle );
+			Graphics_UpdateRenderableAABB( renderComp->aRenderable );
 		}
 
 		// glm::vec3 modelForward, modelRight, modelUp;

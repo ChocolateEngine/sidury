@@ -385,8 +385,8 @@ void PlayerManager::Create( Entity player )
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
 	Assert( playerInfo );
 
-	auto modelInfo     = Ent_AddComponent< CModelInfo >( player, "modelInfo" );
-	modelInfo->aPath   = DEFAULT_PROTOGEN_PATH;
+	auto renderable    = Ent_AddComponent< CRenderable >( player, "renderable" );
+	renderable->aPath  = DEFAULT_PROTOGEN_PATH;
 
 	CLight* flashlight = static_cast< CLight* >( GetEntitySystem()->AddComponent( player, "light" ) );
 
@@ -397,11 +397,6 @@ void PlayerManager::Create( Entity player )
 	{
 		auto playerInfo            = GetPlayerInfo( player );
 		playerInfo->aIsLocalPlayer = player == gLocalPlayer;
-
-		auto renderComp = Ent_AddComponent< CRenderable_t >( player, "renderable" );
-		
-		Assert( renderComp );
-		//renderComp->aHandle = Graphics_CreateRenderable();
 
 		Log_Msg( "Client Creating Local Player\n" );
 	}
@@ -722,35 +717,32 @@ void PlayerManager::UpdateLocalPlayer()
 		// if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
 		if ( cl_playermodel_enable && ( cl_thirdperson.GetBool() || !playerInfo->aIsLocalPlayer ) )
 		{
-			auto renderComp = Ent_GetComponent< CRenderable_t >( player, "renderable" );
+			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
 
 			// I hate this so much
-			if ( renderComp->aHandle == InvalidHandle )
+			if ( renderComp->aRenderable == InvalidHandle )
 			{
-				auto modelInfo = Ent_GetComponent< CModelInfo >( player, "modelInfo" );
-				if ( !modelInfo )
-				{
-					// Log_Msg( "Failed to get modelInfo, Turning off playermodels for now\n" );
-					// cl_playermodel_enable.SetValue( 0 );
+				if ( renderComp->aPath.Get().empty() )
 					continue;
+
+				if ( renderComp->aModel == InvalidHandle )
+				{
+					renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+					if ( renderComp->aModel == InvalidHandle )
+						continue;
 				}
 
-				Handle model = Graphics_LoadModel( modelInfo->aPath );
-				if ( model == InvalidHandle )
-					continue;
-
-				modelInfo->aModel   = model;
-
-				renderComp->aHandle = Graphics_CreateRenderable( model );
-				if ( renderComp->aHandle == InvalidHandle )
+				renderComp->aRenderable = Graphics_CreateRenderable( renderComp->aModel );
+				if ( renderComp->aRenderable == InvalidHandle )
 					continue;
 			}
 			
-			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
 
 			if ( !renderData )
 				continue;
 
+			renderComp->aVisible = true;
 			renderData->aVisible = true;
 
 			if ( cl_playermodel_shadow )
@@ -800,19 +792,20 @@ void PlayerManager::UpdateLocalPlayer()
 
 			renderData->aModelMatrix = glm::scale( renderData->aModelMatrix, scale );
 
-			Graphics_UpdateRenderableAABB( renderComp->aHandle );
+			Graphics_UpdateRenderableAABB( renderComp->aRenderable );
 		}
 		else
 		{
 			// Make sure this thing is hidden
-			auto renderComp = Ent_GetComponent< CRenderable_t >( player, "renderable" );
-			if ( renderComp->aHandle == InvalidHandle )
+			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
+			if ( renderComp->aRenderable == InvalidHandle )
 				continue;
 
-			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aHandle );
+			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
 			if ( !renderData )
 				continue;
 
+			renderComp->aVisible = false;
 			renderData->aVisible = false;
 		}
 	}

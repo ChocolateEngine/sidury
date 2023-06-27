@@ -1192,21 +1192,17 @@ struct CSound
 };
 
 
-struct CRenderable_t
-{
-	ComponentNetVar< Handle > aHandle = InvalidHandle;
-};
-
-
-struct CModelInfo
+struct CRenderable
 {
 	// Path to model to load
 	ComponentNetVar< std::string > aPath;
 
-	// Local Handle to model
-	Handle                         aModel = InvalidHandle;
+	ComponentNetVar< bool >        aTestVis    = true;
+	ComponentNetVar< bool >        aCastShadow = true;
+	ComponentNetVar< bool >        aVisible    = true;
 
-	// TODO: store animations, attachments, etc. here
+	Handle                         aModel      = InvalidHandle;
+	Handle                         aRenderable = InvalidHandle;
 };
 
 
@@ -1318,6 +1314,17 @@ struct CLight
 #define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr ) \
   EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varName, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code() )
 
+#define CH_REGISTER_COMPONENT_SYS2( systemClass, systemVar ) \
+  EntComp_RegisterComponentSystem< TYPE >( [ & ]() { \
+		if ( Game_ProcessingClient() ) { \
+			systemVar[ 1 ] = new systemClass; \
+			return systemVar[ 1 ]; \
+		} \
+		else { \
+			systemVar[ 0 ] = new systemClass; \
+			return systemVar[ 0 ]; \
+		} } )
+
 
 #define CH_NET_WRITE_VEC2( varName, var ) \
   if ( var.aIsDirty || sFullUpdate )                 \
@@ -1372,7 +1379,7 @@ struct CLight
 // Helper Functions
 inline Handle Ent_GetRenderableHandle( Entity sEntity )
 {
-	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 	if ( !renderComp )
 	{
@@ -1380,13 +1387,13 @@ inline Handle Ent_GetRenderableHandle( Entity sEntity )
 		return InvalidHandle;
 	}
 
-	return renderComp->aHandle;
+	return renderComp->aRenderable;
 }
 
 
 inline Renderable_t* Ent_GetRenderable( Entity sEntity )
 {
-	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 	if ( !renderComp )
 	{
@@ -1394,14 +1401,14 @@ inline Renderable_t* Ent_GetRenderable( Entity sEntity )
 		return nullptr;
 	}
 
-	return Graphics_GetRenderableData( renderComp->aHandle );
+	return Graphics_GetRenderableData( renderComp->aRenderable );
 }
 
 
-// Requires the entity to have renderable component and modelInfo component with a model path set
+// Requires the entity to have renderable component with a model path set
 inline Renderable_t* Ent_CreateRenderable( Entity sEntity )
 {
-	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 	if ( !renderComp )
 	{
@@ -1409,38 +1416,34 @@ inline Renderable_t* Ent_CreateRenderable( Entity sEntity )
 		return nullptr;
 	}
 
-	// I hate this so much
-	if ( renderComp->aHandle == InvalidHandle )
+	if ( renderComp->aRenderable == InvalidHandle )
 	{
-		auto modelInfo = Ent_GetComponent< CModelInfo >( sEntity, "modelInfo" );
-		if ( !modelInfo )
+		if ( renderComp->aModel == InvalidHandle )
 		{
-			Log_Error( "Failed to get modelInfo to create renderable\n" );
-			return nullptr;
+			renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+			if ( renderComp->aModel == InvalidHandle )
+			{
+				Log_Error( "Failed to load model for renderable\n" );
+				return nullptr;
+			}
 		}
 
-		Handle model = Graphics_LoadModel( modelInfo->aPath );
-		if ( model == InvalidHandle )
-		{
-			Log_Error( "Failed to load model for renderable\n" );
-			return nullptr;
-		}
-
-		renderComp->aHandle = Graphics_CreateRenderable( model );
-		if ( renderComp->aHandle == InvalidHandle )
+		renderComp->aRenderable = Graphics_CreateRenderable( renderComp->aModel );
+		if ( renderComp->aRenderable == InvalidHandle )
 		{
 			Log_Error( "Failed to create renderable\n" );
 			return nullptr;
 		}
 	}
 
-	return Graphics_GetRenderableData( renderComp->aHandle );
+	return Graphics_GetRenderableData( renderComp->aRenderable );
 }
 
+#if 0
 // This version has an option to enter a model handle
 inline Renderable_t* Ent_CreateRenderable( Entity sEntity, Handle sModel )
 {
-	auto renderComp = Ent_GetComponent< CRenderable_t >( sEntity, "renderable" );
+	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 	if ( !renderComp )
 	{
@@ -1448,17 +1451,21 @@ inline Renderable_t* Ent_CreateRenderable( Entity sEntity, Handle sModel )
 		return nullptr;
 	}
 
+	// TODO: CHECK IF renderComp->aModel is different, and handle that
+
 	// I hate this so much
-	if ( renderComp->aHandle == InvalidHandle )
+	if ( renderComp->aRenderable == InvalidHandle )
 	{
-		renderComp->aHandle = Graphics_CreateRenderable( sModel );
-		if ( renderComp->aHandle == InvalidHandle )
+		renderComp->aModel      = sModel;
+		renderComp->aRenderable = Graphics_CreateRenderable( sModel );
+		if ( renderComp->aRenderable == InvalidHandle )
 		{
 			Log_Error( "Failed to create renderable\n" );
 			return nullptr;
 		}
 	}
 
-	return Graphics_GetRenderableData( renderComp->aHandle );
+	return Graphics_GetRenderableData( renderComp->aRenderable );
 }
+#endif
 

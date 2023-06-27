@@ -2245,6 +2245,21 @@ CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_
 }
 
 
+// TODO: use a "protocol system", so an internally created model path would be this:
+// "internal://model_0"
+// and a file on the disk to load will be this:
+// "file://path/to/asset.glb"
+CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, true, EEntComponentNetType_Both )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aTestVis, testVis );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCastShadow, castShadow );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aVisible, visible );
+	
+	CH_REGISTER_COMPONENT_SYS2( EntSys_Renderable, gEntSys_Renderable );
+}
+
+
 void Ent_RegisterBaseComponents()
 {
 	Ent_RegisterVarHandlers();
@@ -2312,31 +2327,7 @@ void Ent_RegisterBaseComponents()
 	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aValue.aPos ), typeid( CCamera::aTransform.aValue.aPos ).hash_code() );
 	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aValue.aAng ), typeid( CCamera::aTransform.aValue.aAng ).hash_code() );
 
-	CH_REGISTER_COMPONENT_RW( CModelInfo, modelInfo, true );
-	CH_REGISTER_COMPONENT_SYS( CModelInfo, EntSys_ModelInfo, gEntSys_ModelInfo );
-	CH_REGISTER_COMPONENT_VAR( CModelInfo, std::string, aPath, path );
-
-	// CH_REGISTER_COMPONENT( Model, model, true, EEntComponentNetType_Both );
-	CH_REGISTER_COMPONENT( CRenderable_t, renderable, false, EEntComponentNetType_Client );
-	CH_REGISTER_COMPONENT_SYS( CRenderable_t, EntSys_Renderable, gEntSys_Renderable );
-	// CH_REGISTER_COMPONENT( Renderable_t, renderable, false, EEntComponentNetType_Client );
-
 	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both );
-
-	// TODO: Merge CModelInfo and CRenderable_t into this instead
-	// would make your life easier
-	// only difficulty is figuring out how to network the model paths...
-	// since i would kind of like to be able to create models in the engine that use this,
-	// so there would be no path
-	// unless you used a "protocol system", so an internally created model path would be this:
-	// "internal://model_0"
-	// and a file on the disk to load will be this:
-	// "file://path/to/asset.glb"
-	CH_REGISTER_COMPONENT( CAutoRenderable, autoRenderable, true, EEntComponentNetType_Both );
-	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aTestVis, testVis );
-	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aCastShadow, castShadow );
-	CH_REGISTER_COMPONENT_VAR( CAutoRenderable, bool, aVisible, visible );
-	CH_REGISTER_COMPONENT_SYS( CAutoRenderable, EntSys_AutoRenderable, gEntSys_AutoRenderable );
 
 	CH_REGISTER_COMPONENT( CPhysInfo, physInfo, true, EEntComponentNetType_Both );
 	CH_REGISTER_COMPONENT_SYS( CPhysInfo, EntSys_PhysInfo, gEntSys_PhysInfo );

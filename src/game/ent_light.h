@@ -22,21 +22,6 @@ LightSystem*        GetLightEntSys();
 // ------------------------------------------------------------
 
 
-class EntSys_ModelInfo : public IEntityComponentSystem
-{
-  public:
-	EntSys_ModelInfo() {}
-	~EntSys_ModelInfo() {}
-
-	void ComponentAdded( Entity sEntity, void* spData ) override;
-	void ComponentRemoved( Entity sEntity, void* spData ) override;
-	void ComponentUpdated( Entity sEntity, void* spData ) override;
-	void Update() override;
-};
-
-extern EntSys_ModelInfo* gEntSys_ModelInfo[ 2 ];
-
-
 // ------------------------------------------------------------
 
 
@@ -56,29 +41,17 @@ extern EntSys_Transform* gEntSys_Transform[ 2 ];
 // ------------------------------------------------------------
 
 
-class EntSys_Renderable : public IEntityComponentSystem
-{
-  public:
-	EntSys_Renderable() {}
-	~EntSys_Renderable() {}
-
-	void ComponentRemoved( Entity sEntity, void* spData ) override;
-};
-
-extern EntSys_Renderable* gEntSys_Renderable[ 2 ];
-
-
 // ------------------------------------------------------------
 
 
 // Really big hack
 // What this does is automatically create and update a renderable whenever modelInfo changes
 // Maybe I might keep this and merge it into the normal renderable, but I would need to do some changes first
-class EntSys_AutoRenderable : public IEntityComponentSystem
+class EntSys_Renderable : public IEntityComponentSystem
 {
   public:
-	EntSys_AutoRenderable() {}
-	~EntSys_AutoRenderable() {}
+	EntSys_Renderable() {}
+	~EntSys_Renderable() {}
 
 	void ComponentAdded( Entity sEntity, void* spData ) override;
 	void ComponentRemoved( Entity sEntity, void* spData ) override;
@@ -86,21 +59,8 @@ class EntSys_AutoRenderable : public IEntityComponentSystem
 	void Update() override;
 };
 
-extern EntSys_AutoRenderable* gEntSys_AutoRenderable[ 2 ];
-EntSys_AutoRenderable*        GetAutoRenderableSys();
-
-
-struct CAutoRenderable
-{
-	// Path to model to load
-	ComponentNetVar< std::string > aPath;
-
-	ComponentNetVar< bool >        aTestVis    = true;
-	ComponentNetVar< bool >        aCastShadow = true;
-	ComponentNetVar< bool >        aVisible    = true;
-
-	Handle                         aModel      = InvalidHandle;
-};
+extern EntSys_Renderable* gEntSys_Renderable[ 2 ];
+EntSys_Renderable*        GetRenderableEntSys();
 
 
 // ------------------------------------------------------------
