@@ -339,7 +339,8 @@ void Graphics_FreeModel( Handle shModel )
 	// 	model->apBuffers->aIndex = InvalidHandle;
 	}
 
-	if ( model->Release() )
+	model->aRefCount--;
+	if ( model->aRefCount == 0 )
 	{
 		for ( auto& [ path, modelHandle ] : gModelPaths )
 		{
