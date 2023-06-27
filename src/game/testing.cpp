@@ -106,11 +106,14 @@ class ProtogenSystem : public IEntityComponentSystem
 		auto modelInfo = Ent_GetComponent< CModelInfo >( sEntity, "modelInfo" );
 		auto renderable = Ent_AddComponent< CRenderable_t >( sEntity, "renderable" );
 
-		// if ( modelInfo && renderable )
-		// {
-		// 	renderable->aHandle = modelInfo->aModel;
-		// }
-		// else
+		if ( !renderable )
+			return;
+
+		if ( modelInfo && modelInfo->aModel )
+		{
+			renderable->aHandle = Graphics_CreateRenderable( modelInfo->aModel );
+		}
+		else
 		{
 			renderable->aHandle = InvalidHandle;
 		}
@@ -551,12 +554,15 @@ void TEST_CL_UpdateProtos( float frameTime )
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
 		if ( renderComp->aHandle == InvalidHandle )
 		{
-			Handle model = Graphics_LoadModel( modelInfo->aPath );
+			if ( modelInfo->aModel == InvalidHandle )
+			{
+				modelInfo->aModel = Graphics_LoadModel( modelInfo->aPath );
 
-			if ( !model )
-				continue;
+				if ( modelInfo->aModel == InvalidHandle )
+					continue;
+			}
 
-			Handle        renderable = Graphics_CreateRenderable( model );
+			Handle        renderable = Graphics_CreateRenderable( modelInfo->aModel );
 			Renderable_t* renderData = Graphics_GetRenderableData( renderable );
 
 			if ( !renderData )

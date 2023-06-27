@@ -92,9 +92,14 @@ EntSys_AutoRenderable*        GetAutoRenderableSys();
 
 struct CAutoRenderable
 {
-	ComponentNetVar< bool > aTestVis    = true;
-	ComponentNetVar< bool > aCastShadow = true;
-	ComponentNetVar< bool > aVisible    = true;
+	// Path to model to load
+	ComponentNetVar< std::string > aPath;
+
+	ComponentNetVar< bool >        aTestVis    = true;
+	ComponentNetVar< bool >        aCastShadow = true;
+	ComponentNetVar< bool >        aVisible    = true;
+
+	Handle                         aModel      = InvalidHandle;
 };
 
 
