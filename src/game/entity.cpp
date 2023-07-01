@@ -14,7 +14,7 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LOG_REGISTER_CHANNEL2( Entity, LogColor::White );
+LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
 
 
 EntComponentRegistry_t gEntComponentRegistry;
@@ -26,6 +26,7 @@ extern Entity          gLocalPlayer;
 
 CONVAR( ent_always_full_update, 0, "For debugging, always send a full update" );
 CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
+CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
 
 
 // void* EntComponentRegistry_Create( std::string_view sName )
@@ -394,7 +395,7 @@ bool EntitySystem::CreateServer()
 		return false;
 
 	sv_entities            = new EntitySystem;
-	cl_entities->aIsClient = false;
+	sv_entities->aIsClient = false;
 
 	return sv_entities->Init();
 }
@@ -429,8 +430,10 @@ void EntitySystem::DestroyServer()
 bool EntitySystem::Init()
 {
 	aEntityCount = 0;
+	aEntityPool.clear();
 	aUsedEntities.clear();
 	aComponentPools.clear();
+	aEntityIDConvert.clear();
 
 	// Initialize the queue with all possible entity IDs
 	// for ( Entity entity = 0; entity < CH_MAX_ENTITIES; ++entity )
@@ -454,14 +457,23 @@ void EntitySystem::Shutdown()
 	// Remove callback
 	EntComp_RemoveRegisterCallback( this );
 
-	// Tell all component pools every entity was destroyed
+	// Mark all entities as destroyed
 	for ( Entity entity : aUsedEntities )
 	{
-		for ( auto& [ name, pool ] : aComponentPools )
-		{
-			pool->EntityDestroyed( entity );
-		}
+		aEntityFlags[ entity ] |= EEntityFlag_Destroyed;
 	}
+
+	// Destroy entities marked as destroyed
+	DeleteQueuedEntities();
+
+	// Tell all component pools every entity was destroyed
+	// for ( Entity entity : aUsedEntities )
+	// {
+	// 	for ( auto& [ name, pool ] : aComponentPools )
+	// 	{
+	// 		pool->EntityDestroyed( entity );
+	// 	}
+	// }
 
 	// Free component pools
 	for ( auto& [ name, pool ] : aComponentPools )
@@ -477,8 +489,10 @@ void EntitySystem::Shutdown()
 	}
 
 	aEntityCount = 0;
+	aEntityPool.clear();
 	aUsedEntities.clear();
 	aComponentPools.clear();
+	aEntityIDConvert.clear();
 }
 
 
@@ -569,7 +583,7 @@ IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
 
 Entity EntitySystem::CreateEntity( bool sLocal )
 {
-	AssertMsg( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
+	CH_ASSERT_MSG( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
 
 	// Take an ID from the front of the queue
 	// Entity id = aEntityPool.front();
@@ -578,6 +592,10 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 	aEntityPool.pop_back();
 	++aEntityCount;
 
+	// SANITY CHECK
+	size_t findUsedIndex = vec_index( aUsedEntities, id );
+	CH_ASSERT( findUsedIndex == SIZE_MAX );
+
 	aUsedEntities.push_back( id );
 
 	aEntityFlags[ id ] |= EEntityFlag_Created;
@@ -585,14 +603,18 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 	if ( sLocal )
 		aEntityFlags[ id ] |= EEntityFlag_Local;
 
+	Log_DevF( gLC_Entity, 2, "%s - Created Entity %zd\n", aIsClient ? "CLIENT" : "SERVER", id );
+
 	return id;
 }
 
 
 void EntitySystem::DeleteEntity( Entity sEntity )
 {
-	AssertMsg( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
+	CH_ASSERT_MSG( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
+
 	aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
+	Log_DevF( gLC_Entity, 2, "%s - Marked Entity to be Destroyed: %zd\n", aIsClient ? "CLIENT" : "SERVER", sEntity );
 
 	// Get all children attached to this entity
 	std::set< Entity > children;
@@ -602,19 +624,23 @@ void EntitySystem::DeleteEntity( Entity sEntity )
 	for ( Entity child : children )
 	{
 		aEntityFlags[ child ] |= EEntityFlag_Destroyed;
+		Log_DevF( gLC_Entity, 2, "%s - Marked Child Entity to be Destroyed (parent %zd): %zd\n", aIsClient ? "CLIENT" : "SERVER", sEntity, child );
 	}
 }
 
 
 void EntitySystem::DeleteQueuedEntities()
 {
-	for ( size_t i = 0; i < aUsedEntities.size(); i++ )
+	for ( size_t i = 0; i < aUsedEntities.size(); )
 	{
 		Entity entity = aUsedEntities[ i ];
 
 		// Check the entity's flags to see if it's marked as deleted
 		if ( !( aEntityFlags[ entity ] & EEntityFlag_Destroyed ) )
+		{
+			i++;
 			continue;
+		}
 
 		// Tell each Component Pool that this entity was destroyed
 		for ( auto& [ name, pool ] : aComponentPools )
@@ -622,7 +648,22 @@ void EntitySystem::DeleteQueuedEntities()
 			pool->EntityDestroyed( entity );
 		}
 
+		// Remove this entity from the translation list if it's in it
+		for ( auto it = aEntityIDConvert.begin(); it != aEntityIDConvert.end(); it++ )
+		{
+			if ( it->second == entity )
+			{
+				aEntityIDConvert.erase( it );
+				break;
+			}
+		}
+
 		// Put the destroyed ID at the back of the queue
+		
+		// SANITY CHECK
+		size_t sanityCheckPool = vec_index( aEntityPool, entity );
+		CH_ASSERT( sanityCheckPool == SIZE_MAX );  // can't be in pool already
+
 		// aEntityPool.push( ent );
 		// aEntityPool.push_back( ent );
 		aEntityPool.insert( aEntityPool.begin(), entity );
@@ -631,6 +672,8 @@ void EntitySystem::DeleteQueuedEntities()
 		vec_remove( aUsedEntities, entity );
 
 		aEntityFlags.erase( entity );
+
+		Log_DevF( gLC_Entity, 2, "%s - Destroyed Entity %zd\n", aIsClient ? "CLIENT" : "SERVER", entity );
 	}
 }
 
@@ -800,40 +843,13 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 
 		// NetMsg_EntityUpdate
 
-		Entity entId  = entityUpdate->id();
-		Entity entity = CH_ENT_INVALID;
-
-		auto   ConvertEntity = [ & ]( Entity sEntId ) -> Entity
-		{
-			if ( sEntId == CH_ENT_INVALID )
-				return CH_ENT_INVALID;
-
-			// Is this entity in the translation system?
-			auto it = aEntityIDConvert.find( entId );
-
-			// It's not, add it
-			if ( it == aEntityIDConvert.end() )
-			{
-				entity = CreateEntity();
-
-				if ( entity == CH_ENT_INVALID )
-				{
-					Log_Warn( gLC_Entity, "Failed to create networked entity\n" );
-					return CH_ENT_INVALID;
-				}
-
-				aEntityIDConvert[ entId ] = entity;
-				return entity;
-			}
-
-			return it->second;
-        };
+		Entity entId = entityUpdate->id();
 
 		if ( entityUpdate->destroyed() )
 		{
-			auto it = aEntityIDConvert.find( entId );
-			if ( it != aEntityIDConvert.end() )
-				DeleteEntity( it->second );
+			Entity entity = TranslateEntityID( entId, false );
+			if ( entity != CH_ENT_INVALID )
+				DeleteEntity( entity );
 			else
 				Log_Error( gLC_Entity, "Trying to delete entity not in translation list\n" );
 
@@ -841,7 +857,7 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 		}
 		else
 		{
-			Entity entity = ConvertEntity( entId );
+			Entity entity = TranslateEntityID( entId, true );
 
 			if ( !EntityExists( entity ) )
 			{
@@ -851,7 +867,7 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 			else
 			{
 				// Check for an entity parent
-				Entity parent = ConvertEntity( entityUpdate->parent() );
+				Entity parent = TranslateEntityID( entityUpdate->parent(), true );
 
 				if ( parent == CH_ENT_INVALID )
 					continue;
@@ -1033,15 +1049,15 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 					break;
 				}
 
-				auto it = GetEntitySystem()->aEntityIDConvert.find( recvEntity );
+				Entity convertEntity = GetEntitySystem()->TranslateEntityID( recvEntity );
 
-				if ( it == GetEntitySystem()->aEntityIDConvert.end() )
+				if ( convertEntity == CH_ENT_INVALID )
 				{
 					Log_Error( gLC_Entity, "Can't find Networked Entity ID\n" );
 				}
 				else
 				{
-					*value = it->second;
+					*value = convertEntity;
 				}
 
 				break;
@@ -1500,9 +1516,9 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 	{
 		EntComponentData_t* regData = pool->GetRegistryData();
 
-		for ( auto [entity, compIndex] : pool->aMapEntityToComponent )
+		for ( auto& [entity, compIndex] : pool->aMapEntityToComponent )
 		{
-			void* componentData = pool->aComponents[ compIndex ];
+			void* componentData = pool->aComponents[ compIndex.aIndex ];
 
 			// Reset Component Var Dirty Values
 			for ( const auto& [ offset, var ] : regData->aVars )
@@ -1563,16 +1579,8 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				continue;
 
 			// Is this entity in the translation system?
-			auto it = aEntityIDConvert.find( componentUpdateData->id() );
-			if ( it == aEntityIDConvert.end() )
-			{
-				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
-				continue;
-			}
-
-			Entity entity = it->second;
-
-			if ( !EntityExists( entity ) )
+			Entity entity = TranslateEntityID( componentUpdateData->id(), false );
+			if ( entity == CH_ENT_INVALID )
 			{
 				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
 				continue;
@@ -1784,6 +1792,49 @@ EntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
 }
 
 
+Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
+{
+	if ( sEntity == CH_ENT_INVALID )
+		return CH_ENT_INVALID;
+
+	auto it = aEntityIDConvert.find( sEntity );
+	if ( it != aEntityIDConvert.end() )
+	{
+		// Make sure it actually exists
+		if ( !EntityExists( it->second ) )
+		{
+			Log_ErrorF( gLC_Entity, "Failed to find entity while translating Entity ID: %zd -> %zd\n", sEntity, it->second );
+			// remove it from the list
+			aEntityIDConvert.erase( it );
+			return CH_ENT_INVALID;
+		}
+
+		if ( ent_show_translations.GetBool() )
+			Log_DevF( gLC_Entity, 2, "Translating Entity ID %zd -> %zd\n", sEntity, it->second );
+
+		return it->second;
+	}
+
+	if ( !sCreate )
+	{
+		Log_ErrorF( gLC_Entity, "Entity not in translation list: %zd\n", sEntity );
+		return CH_ENT_INVALID;
+	}
+
+	Entity entity = CreateEntity();
+
+	if ( entity == CH_ENT_INVALID )
+	{
+		Log_Warn( gLC_Entity, "Failed to create networked entity\n" );
+		return CH_ENT_INVALID;
+	}
+
+	Log_DevF( gLC_Entity, 2, "Added Translation of Entity ID %zd -> %zd\n", sEntity, entity );
+	aEntityIDConvert[ sEntity ] = entity;
+	return entity;
+}
+
+
 // ===================================================================================
 // Console Commands
 // ===================================================================================
@@ -1931,11 +1982,11 @@ CONCMD( ent_mem )
 			}
 		}
 
-		compSize = regData->aSize * pool->aCount;
+		compSize = regData->aSize * pool->GetCount();
 		curSize += compSize + compOtherSize;
 
 		Log_GroupF( group, "Component Pool \"%s\": %zd bytes\n", pool->apName, curSize );
-		Log_GroupF( group, "    %zd bytes per component * %zd components\n\n", regData->aSize, pool->aCount );
+		Log_GroupF( group, "    %zd bytes per component * %zd components\n\n", regData->aSize, pool->GetCount() );
 
 		componentPoolSize += curSize;
 	}

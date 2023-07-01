@@ -210,7 +210,7 @@ table NetMsg_EntityUpdate
     destroyed :bool;
 
     // Parent Entity
-    parent: uint;
+    parent: ulong;
 }
 
 

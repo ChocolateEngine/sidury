@@ -122,16 +122,13 @@ void MapManager_CloseMap()
 
 bool MapManager_FindMap( const std::string& path )
 {
-	std::string absPath = FileSys_FindDir( "maps/" + path );
+	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
 
 	if ( absPath == "" )
 		return false;
 
 	return true;
 }
-
-
-static Entity gMapEntity = CH_ENT_INVALID;
 
 
 // Temporary, will be removed
@@ -156,28 +153,28 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 
 	// ParseEntities( absPath + "/entities.smf" );
 
-	// the map should always be entity index 0
-	gMapEntity = GetEntitySystem()->CreateEntity();
-
-	Entity playerSpawnEnt = GetEntitySystem()->CreateEntity();
-
-	if ( playerSpawnEnt == CH_ENT_INVALID )
+	if ( Game_ProcessingServer() )
 	{
-		Log_ErrorF( gLC_Map, "Failed to create playerSpawn Entity\n" );
-		return false;
+		Entity playerSpawnEnt = GetEntitySystem()->CreateEntity();
+
+		if ( playerSpawnEnt == CH_ENT_INVALID )
+		{
+			Log_ErrorF( gLC_Map, "Failed to create playerSpawn Entity\n" );
+			return false;
+		}
+
+		auto spawnTransform = Ent_AddComponent< CTransform >( playerSpawnEnt, "transform" );
+		auto spawnComp      = Ent_AddComponent< CPlayerSpawn >( playerSpawnEnt, "playerSpawn" );
+
+		CH_ASSERT( spawnTransform );
+		CH_ASSERT( spawnComp );
+
+		spawnTransform->aPos          = gpMap->aMapInfo->spawnPos;
+		spawnTransform->aAng          = gpMap->aMapInfo->spawnAng;
+		spawnTransform->aScale.Edit() = { 1.f, 1.f, 1.f };
+
+		gpMap->aMapEntities.push_back( playerSpawnEnt );
 	}
-
-	auto spawnTransform = Ent_AddComponent< CTransform >( playerSpawnEnt, "transform" );
-	auto spawnComp      = Ent_AddComponent< CPlayerSpawn >( playerSpawnEnt, "playerSpawn" );
-
-	CH_ASSERT( spawnTransform );
-	CH_ASSERT( spawnComp );
-
-	spawnTransform->aPos          = gpMap->aMapInfo->spawnPos;
-	spawnTransform->aAng          = gpMap->aMapInfo->spawnAng;
-	spawnTransform->aScale.Edit() = { 1.f, 1.f, 1.f };
-
-	gpMap->aMapEntities.push_back( playerSpawnEnt );
 
 	// TODO: Have a root map entity with transform, and probably a physics shape for StaticCompound
 	// then in CPhysShape, add an option to use an entity and everything parented to that
@@ -254,7 +251,7 @@ bool MapManager_LoadMap( const std::string &path )
 	if ( gpMap )
 		MapManager_CloseMap();
 
-	std::string absPath = FileSys_FindDir( "maps/" + path );
+	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
 
 	if ( absPath.empty() )
 	{

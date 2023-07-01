@@ -17,14 +17,27 @@
 LOG_CHANNEL2( Entity );
 
 
+// returns "CLIENT", "SERVER", or "GAME" depending on what we are processing
+inline const char* GetProcessingName()
+{
+	if ( Game_ProcessingClient() )
+		return "CLIENT";
+
+	return "SERVER";
+}
+
+
 EntityComponentPool::EntityComponentPool()
 {
-	aCount = 0;
+	// aCount = 0;
 }
 
 
 EntityComponentPool::~EntityComponentPool()
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+
 	while ( aMapEntityToComponent.size() )
 	{
 		auto it = aMapEntityToComponent.begin();
@@ -35,6 +48,10 @@ EntityComponentPool::~EntityComponentPool()
 
 bool EntityComponentPool::Init( const char* spName )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	apName  = spName;
 
 	// Get Creation and Free functions
@@ -46,8 +63,8 @@ bool EntityComponentPool::Init( const char* spName )
 		return false;
 	}
 
-	Assert( it->second->aFuncNew );
-	Assert( it->second->aFuncFree );
+	CH_ASSERT( it->second->aFuncNew );
+	CH_ASSERT( it->second->aFuncFree );
 
 	aFuncNew  = it->second->aFuncNew;
 	aFuncFree = it->second->aFuncFree;
@@ -61,6 +78,10 @@ bool EntityComponentPool::Init( const char* spName )
 // Get Component Registry Data
 EntComponentData_t* EntityComponentPool::GetRegistryData()
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	return gEntComponentRegistry.aComponentNames[ apName ];
 }
 
@@ -68,6 +89,10 @@ EntComponentData_t* EntityComponentPool::GetRegistryData()
 // Does this pool contain a component for this entity?
 bool EntityComponentPool::Contains( Entity entity )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	auto it = aMapEntityToComponent.find( entity );
 	return ( it != aMapEntityToComponent.end() );
 }
@@ -81,14 +106,29 @@ void EntityComponentPool::EntityDestroyed( Entity entity )
 	{
 		Remove( entity );
 	}
+
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 }
 
 
 // Adds This component to the entity
 void* EntityComponentPool::Create( Entity entity )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	// Is this a client or server component pool?
 	// Make sure this component can be created on it
+
+	// TEMP
+	if ( strcmp( apName, "transform" ) == 0 )
+	{
+		// breakpoint lmao
+		int fuck = 0;
+	}
 
 	// Check if the component already exists
 	auto it = aMapEntityToComponent.find( entity );
@@ -96,15 +136,26 @@ void* EntityComponentPool::Create( Entity entity )
 	if ( it != aMapEntityToComponent.end() )
 	{
 		Log_ErrorF( gLC_Entity, "Component already exists on entity - \"%s\"\n", apName );
-		return aComponents[ it->second ];
+		return aComponents[ it->second.aIndex ];
 	}
 
-	aMapComponentToEntity[ aCount ] = entity;
-	aMapEntityToComponent[ entity ] = aCount;
+	ComponentID_t newID;
+	newID.aIndex = aComponentIDs.size();
+	auto it2     = aMapComponentToEntity.find( newID );
+
+	if ( it2 != aMapComponentToEntity.end() )
+	{
+		Log_ErrorF( gLC_Entity, "what - component \"%s\"\n", apName );
+	}
+
+	aMapComponentToEntity[ newID ]  = entity;
+	aMapEntityToComponent[ entity ] = newID;
 
 	void* data                      = aFuncNew();
-	aComponentFlags[ aCount ]       = EEntityFlag_Created;
-	aComponents[ aCount++ ]         = data;
+	aComponentFlags[ newID ]        = EEntityFlag_Created;
+	aComponents[ newID.aIndex ]     = data;
+
+	aComponentIDs.push_back( newID );
 
 	// Add it to systems
 	// for ( auto system : aComponentSystems )
@@ -115,6 +166,12 @@ void* EntityComponentPool::Create( Entity entity )
 		// call this later maybe?
 		// apComponentSystem->ComponentAdded( entity, data );
 	}
+
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
+	Log_DevF( gLC_Entity, 1, "%s - Added Component To Entity %zd - %s\n", GetProcessingName(), entity, apName );
 
 	// TODO: use malloc and use that pointer in the constructor for this
 	// use placement new
@@ -127,6 +184,10 @@ void* EntityComponentPool::Create( Entity entity )
 // Removes this component from the entity
 void EntityComponentPool::Remove( Entity entity )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it == aMapEntityToComponent.end() )
@@ -135,8 +196,8 @@ void EntityComponentPool::Remove( Entity entity )
 		return;
 	}
 
-	size_t index = it->second;
-	void* data = aComponents[ index ];
+	ComponentID_t index = it->second;
+	void* data = aComponents[ index.aIndex ];
 	Assert( data );
 
 	// Remove it from systems
@@ -154,14 +215,25 @@ void EntityComponentPool::Remove( Entity entity )
 
 	aFuncFree( data );
 
-	aCount--;
+	vec_remove( aComponentIDs, index );
+	// aCount--;
+
+	Log_DevF( gLC_Entity, 1, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
+
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 }
 
 
 // Removes this component by index
-void EntityComponentPool::RemoveByIndex( size_t sIndex )
+void EntityComponentPool::RemoveByID( ComponentID_t sID )
 {
-	auto it = aMapComponentToEntity.find( sIndex );
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
+	auto it = aMapComponentToEntity.find( sID );
 
 	if ( it == aMapComponentToEntity.end() )
 	{
@@ -171,8 +243,8 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 
 	Entity entity = it->second;
 
-	void*  data   = aComponents[ sIndex ];
-	Assert( data );
+	void*  data   = aComponents[ sID.aIndex ];
+	CH_ASSERT( data );
 
 	// Remove it from the system
 	if ( apComponentSystem )
@@ -181,14 +253,21 @@ void EntityComponentPool::RemoveByIndex( size_t sIndex )
 		vec_remove( apComponentSystem->aEntities, entity );
 	}
 
-	aMapComponentToEntity.erase( it );
+	aMapComponentToEntity.erase( sID );
 	aMapEntityToComponent.erase( entity );
 
-	aComponentFlags.erase( sIndex );
+	aComponentFlags.erase( sID );
 
 	aFuncFree( data );
 
-	aCount--;
+	vec_remove( aComponentIDs, sID );
+	// aCount--;
+
+	Log_DevF( gLC_Entity, 1, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
+
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 }
 
 
@@ -203,17 +282,19 @@ void EntityComponentPool::RemoveQueued( Entity entity )
 		return;
 	}
 
-	size_t index = it->second;
+	ComponentID_t index = it->second;
 
 	// Mark Component as Destroyed
 	aComponentFlags[ index ] |= EEntityFlag_Destroyed;
+
+	Log_DevF( gLC_Entity, 1, "%s - Marked Component to be removed From Entity %zd - %s\n", GetProcessingName(), entity, apName );
 }
 
 
 // Removes components queued for deletion
 void EntityComponentPool::RemoveAllQueued()
 {
-	std::vector< size_t > toRemove;
+	std::vector< ComponentID_t > toRemove;
 
 	// for ( auto& [ index, state ] : aComponentFlags )
 	for ( auto it = aComponentFlags.begin(); it != aComponentFlags.end(); it++ )
@@ -225,9 +306,9 @@ void EntityComponentPool::RemoveAllQueued()
 		}
 	}
 
-	for ( size_t entity : toRemove )
+	for ( ComponentID_t entity : toRemove )
 	{
-		RemoveByIndex( entity );
+		RemoveByID( entity );
 	}
 }
 
@@ -242,7 +323,7 @@ void EntityComponentPool::InitCreatedComponents()
 
 			if ( apComponentSystem )
 			{
-				apComponentSystem->ComponentAdded( aMapComponentToEntity[ it->first ], aComponents[ it->first ] );
+				apComponentSystem->ComponentAdded( aMapComponentToEntity[ it->first ], aComponents[ it->first.aIndex ] );
 			}
 		}
 	}
@@ -252,11 +333,15 @@ void EntityComponentPool::InitCreatedComponents()
 // Gets the data for this component
 void* EntityComponentPool::GetData( Entity entity )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it != aMapEntityToComponent.end() )
 	{
-		size_t index = it->second;
+		size_t index = it->second.aIndex;
 		// return &aComponents[ index ];
 		return aComponents[ index ];
 	}
@@ -268,6 +353,10 @@ void* EntityComponentPool::GetData( Entity entity )
 // Marks this component as predicted
 void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
 {
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it == aMapEntityToComponent.end() )
@@ -279,25 +368,33 @@ void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
 	if ( sPredicted )
 	{
 		// We want this component predicted, add it to the prediction set
-		aComponentFlags[ entity ] |= EEntityFlag_Predicted;
+		aComponentFlags[ it->second ] |= EEntityFlag_Predicted;
 	}
 	else
 	{
 		// We don't want this component predicted, remove the prediction flag from it
-		aComponentFlags[ entity ] &= ~EEntityFlag_Predicted;
+		aComponentFlags[ it->second ] &= ~EEntityFlag_Predicted;
 	}
 }
 
 
 bool EntityComponentPool::IsPredicted( Entity entity )
 {
-	return aComponentFlags[ entity ] & EEntityFlag_Predicted;
+	auto it = aMapEntityToComponent.find( entity );
+
+	if ( it == aMapEntityToComponent.end() )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to get Entity Component Flags, Entity does not have this component - \"%s\"\n", apName );
+		return false;
+	}
+
+	return aComponentFlags[ it->second ] & EEntityFlag_Predicted;
 }
 
 
 // How Many Components are in this Pool?
 size_t EntityComponentPool::GetCount()
 {
-	return aCount;
+	return aComponentIDs.size();
 }
 

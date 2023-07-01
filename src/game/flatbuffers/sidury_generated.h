@@ -1143,14 +1143,14 @@ struct NetMsg_EntityUpdate FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
   bool destroyed() const {
     return GetField<uint8_t>(VT_DESTROYED, 0) != 0;
   }
-  uint32_t parent() const {
-    return GetField<uint32_t>(VT_PARENT, 0);
+  uint64_t parent() const {
+    return GetField<uint64_t>(VT_PARENT, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint32_t>(verifier, VT_ID, 4) &&
            VerifyField<uint8_t>(verifier, VT_DESTROYED, 1) &&
-           VerifyField<uint32_t>(verifier, VT_PARENT, 4) &&
+           VerifyField<uint64_t>(verifier, VT_PARENT, 8) &&
            verifier.EndTable();
   }
 };
@@ -1165,8 +1165,8 @@ struct NetMsg_EntityUpdateBuilder {
   void add_destroyed(bool destroyed) {
     fbb_.AddElement<uint8_t>(NetMsg_EntityUpdate::VT_DESTROYED, static_cast<uint8_t>(destroyed), 0);
   }
-  void add_parent(uint32_t parent) {
-    fbb_.AddElement<uint32_t>(NetMsg_EntityUpdate::VT_PARENT, parent, 0);
+  void add_parent(uint64_t parent) {
+    fbb_.AddElement<uint64_t>(NetMsg_EntityUpdate::VT_PARENT, parent, 0);
   }
   explicit NetMsg_EntityUpdateBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1183,7 +1183,7 @@ inline ::flatbuffers::Offset<NetMsg_EntityUpdate> CreateNetMsg_EntityUpdate(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint32_t id = 0,
     bool destroyed = false,
-    uint32_t parent = 0) {
+    uint64_t parent = 0) {
   NetMsg_EntityUpdateBuilder builder_(_fbb);
   builder_.add_parent(parent);
   builder_.add_id(id);

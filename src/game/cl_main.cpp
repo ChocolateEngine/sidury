@@ -214,6 +214,7 @@ void CL_Update( float frameTime )
 					if ( !MapManager_FindMap( gClientServerData.aMapName ) )
 					{
 						// Maybe one day we can download the map from the server
+						Log_ErrorF( gLC_Client, "Failed to Find Map: \"%s\"\n", gClientServerData.aMapName.c_str() );
 						CL_Disconnect( true, "Missing Map" );
 						break;
 					}
@@ -221,6 +222,7 @@ void CL_Update( float frameTime )
 					// Load Map (MAKE THIS ASYNC)
 					if ( !MapManager_LoadMap( gClientServerData.aMapName ) )
 					{
+						Log_ErrorF( gLC_Client, "Failed to Load Map: \"%s\"\n", gClientServerData.aMapName.c_str() );
 						CL_Disconnect( true, "Failed to Load Map" );
 						break;
 					}
@@ -260,12 +262,12 @@ void CL_Update( float frameTime )
 
 			GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
 
-			// Update Entity and Component States after everything is processed
-			GetEntitySystem()->UpdateStates();
-
 			break;
 		}
 	}
+
+	// Update Entity and Component States
+	GetEntitySystem()->UpdateStates();
 
 	if ( CL_IsMenuShown() )
 	{

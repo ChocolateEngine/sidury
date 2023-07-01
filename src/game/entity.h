@@ -41,6 +41,39 @@ class IEntityComponentSystem;
 constexpr Entity CH_MAX_ENTITIES = 8192;
 constexpr Entity CH_ENT_INVALID  = SIZE_MAX;
 
+
+struct ComponentID_t
+{
+	size_t aIndex;
+
+	bool   operator==( const ComponentID_t& srOther )
+	{
+		return aIndex == srOther.aIndex;
+	};
+};
+
+
+// why do i need this here and i can't have it in the class?????
+inline bool operator==( const ComponentID_t& srSelf, const ComponentID_t& srOther )
+{
+	return srSelf.aIndex == srOther.aIndex;
+};
+
+
+// Hashing Support for ComponentID_t
+namespace std
+{
+	template<  > struct hash< ComponentID_t >
+	{
+		size_t operator()( ComponentID_t const& srID ) const
+		{
+			size_t value = ( hash< size_t >()( srID.aIndex ) );
+			return value;
+		}
+	};
+}
+
+
 // Functions for creating and freeing components
 using FEntComp_New      = std::function< void*() >;
 using FEntComp_Free     = std::function< void( void* spData ) >;
@@ -459,8 +492,8 @@ class EntityComponentPool
 	// Removes this component from the entity
 	void                                      Remove( Entity entity );
 
-	// Removes this component by index
-	void                                      RemoveByIndex( size_t sIndex );
+	// Removes this component by ID
+	void                                      RemoveByID( ComponentID_t sID );
 
 	// Removes this component from the entity later
 	void                                      RemoveQueued( Entity entity );
@@ -486,37 +519,38 @@ class EntityComponentPool
 	// ------------------------------------------------------------------
 
 	// Map Component Index to Entity
-	std::unordered_map< size_t, Entity >      aMapComponentToEntity;
+	std::unordered_map< ComponentID_t, Entity >      aMapComponentToEntity;
 
 	// Map Entity to Component Index
-	std::unordered_map< Entity, size_t >      aMapEntityToComponent;
+	std::unordered_map< Entity, ComponentID_t >      aMapEntityToComponent;
 
 	// Memory Pool of Components
 	// This is an std::array so that when a component is freed, it does not changes the index of each component
 	// TODO: I DON'T LIKE THIS, TAKES UP TOO MUCH MEMORY
 	// maybe use Handle's from ResourceList<> instead, as it uses a memory pool?
-	std::array< void*, CH_MAX_ENTITIES >      aComponents{};
+	std::array< void*, CH_MAX_ENTITIES >             aComponents{};
 
 	// Component Flags, just uses Entity Flags for now
 	// Key is an index into aComponents
-	std::unordered_map< size_t, EEntityFlag > aComponentFlags;
+	std::unordered_map< ComponentID_t, EEntityFlag > aComponentFlags;
 
 	// Amount of Components we have allocated
-	size_t                                    aCount;
+	// size_t                                           aCount;
+	std::vector < ComponentID_t >                    aComponentIDs;
 
 	// Component Name
-	const char*                               apName;
+	const char*                                      apName;
 
 	// Component Creation and Free Func
-	FEntComp_New                              aFuncNew;
-	FEntComp_Free                             aFuncFree;
+	FEntComp_New                                     aFuncNew;
+	FEntComp_Free                                    aFuncFree;
 
-	EntComponentData_t*                       apData;
+	EntComponentData_t*                              apData;
 
 	// Component Systems that manage this component
 	// NOTE: This may always just be one
 	// std::set< IEntityComponentSystem* >  aComponentSystems;
-	IEntityComponentSystem*                   apComponentSystem = nullptr;
+	IEntityComponentSystem*                          apComponentSystem = nullptr;
 };
 
 
@@ -646,6 +680,8 @@ class EntitySystem
 
 	// Get the Component Pool for this Component
 	EntityComponentPool*    GetComponentPool( const char* spName );
+
+	Entity                  TranslateEntityID( Entity sEntity, bool sCreate = false );
 
 	// Gets a component system by type_hash()
 	template< typename T >
