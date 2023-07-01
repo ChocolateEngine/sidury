@@ -996,8 +996,8 @@ struct NetMsg_ComponentUpdateData FLATBUFFERS_FINAL_CLASS : private ::flatbuffer
     VT_VALUES = 6,
     VT_DESTROYED = 8
   };
-  uint32_t id() const {
-    return GetField<uint32_t>(VT_ID, 0);
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   const ::flatbuffers::Vector<uint8_t> *values() const {
     return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_VALUES);
@@ -1007,7 +1007,7 @@ struct NetMsg_ComponentUpdateData FLATBUFFERS_FINAL_CLASS : private ::flatbuffer
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_ID, 4) &&
+           VerifyField<uint64_t>(verifier, VT_ID, 8) &&
            VerifyOffset(verifier, VT_VALUES) &&
            verifier.VerifyVector(values()) &&
            VerifyField<uint8_t>(verifier, VT_DESTROYED, 1) &&
@@ -1019,8 +1019,8 @@ struct NetMsg_ComponentUpdateDataBuilder {
   typedef NetMsg_ComponentUpdateData Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_id(uint32_t id) {
-    fbb_.AddElement<uint32_t>(NetMsg_ComponentUpdateData::VT_ID, id, 0);
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(NetMsg_ComponentUpdateData::VT_ID, id, 0);
   }
   void add_values(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> values) {
     fbb_.AddOffset(NetMsg_ComponentUpdateData::VT_VALUES, values);
@@ -1041,19 +1041,19 @@ struct NetMsg_ComponentUpdateDataBuilder {
 
 inline ::flatbuffers::Offset<NetMsg_ComponentUpdateData> CreateNetMsg_ComponentUpdateData(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id = 0,
+    uint64_t id = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> values = 0,
     bool destroyed = false) {
   NetMsg_ComponentUpdateDataBuilder builder_(_fbb);
-  builder_.add_values(values);
   builder_.add_id(id);
+  builder_.add_values(values);
   builder_.add_destroyed(destroyed);
   return builder_.Finish();
 }
 
 inline ::flatbuffers::Offset<NetMsg_ComponentUpdateData> CreateNetMsg_ComponentUpdateDataDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id = 0,
+    uint64_t id = 0,
     const std::vector<uint8_t> *values = nullptr,
     bool destroyed = false) {
   auto values__ = values ? _fbb.CreateVector<uint8_t>(*values) : 0;
@@ -1137,8 +1137,8 @@ struct NetMsg_EntityUpdate FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
     VT_DESTROYED = 6,
     VT_PARENT = 8
   };
-  uint32_t id() const {
-    return GetField<uint32_t>(VT_ID, 0);
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   bool destroyed() const {
     return GetField<uint8_t>(VT_DESTROYED, 0) != 0;
@@ -1148,7 +1148,7 @@ struct NetMsg_EntityUpdate FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_ID, 4) &&
+           VerifyField<uint64_t>(verifier, VT_ID, 8) &&
            VerifyField<uint8_t>(verifier, VT_DESTROYED, 1) &&
            VerifyField<uint64_t>(verifier, VT_PARENT, 8) &&
            verifier.EndTable();
@@ -1159,8 +1159,8 @@ struct NetMsg_EntityUpdateBuilder {
   typedef NetMsg_EntityUpdate Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_id(uint32_t id) {
-    fbb_.AddElement<uint32_t>(NetMsg_EntityUpdate::VT_ID, id, 0);
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(NetMsg_EntityUpdate::VT_ID, id, 0);
   }
   void add_destroyed(bool destroyed) {
     fbb_.AddElement<uint8_t>(NetMsg_EntityUpdate::VT_DESTROYED, static_cast<uint8_t>(destroyed), 0);
@@ -1181,7 +1181,7 @@ struct NetMsg_EntityUpdateBuilder {
 
 inline ::flatbuffers::Offset<NetMsg_EntityUpdate> CreateNetMsg_EntityUpdate(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id = 0,
+    uint64_t id = 0,
     bool destroyed = false,
     uint64_t parent = 0) {
   NetMsg_EntityUpdateBuilder builder_(_fbb);

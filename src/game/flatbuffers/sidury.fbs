@@ -178,7 +178,7 @@ table MsgSrc_Server
 table NetMsg_ComponentUpdateData
 {
     // Entity to update
-    id :uint;
+    id :ulong;
 
     // ComponentData
     values :[ubyte];
@@ -204,7 +204,7 @@ table NetMsg_ComponentUpdate
 table NetMsg_EntityUpdate
 {
     // Entity to update
-    id :uint;
+    id :ulong;
 
     // Is Entity Destroyed
     destroyed :bool;
