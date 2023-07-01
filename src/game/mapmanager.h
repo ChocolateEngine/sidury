@@ -8,6 +8,7 @@ constexpr const char* CH_MAP_IDENTIFIER = "SDMF";
 using MapHandle_t = size_t;
 
 struct SceneDraw_t;
+struct Renderable_t;
 
 
 enum EMapHeaderFlag : u16
@@ -85,12 +86,17 @@ struct SiduryMap
 	std::string                    aMapPath = "";
 	MapHandle_t                    aMapHandle;
 
+	std::vector< Entity >          aMapEntities;
+
 	// -------------------------------------------------------------------
 	// Old Sidury Map Format Below
 
 	MapInfo*                       aMapInfo    = nullptr;
-	SceneDraw_t*                   aRenderable = nullptr;
-	Handle                         aScene      = InvalidHandle;
+	// SceneDraw_t*                   aRenderable = nullptr;
+	// Handle                         aScene      = InvalidHandle;
+
+	Handle                         aModel      = CH_INVALID_HANDLE;
+	Handle                         aRenderable = CH_INVALID_HANDLE;
 
 	std::vector< IPhysicsShape* >  aWorldPhysShapes;
 	std::vector< IPhysicsObject* > aWorldPhysObjs;
@@ -132,6 +138,6 @@ MapInfo*         MapManager_ParseMapInfo( const std::string& srPath );
 bool             MapManager_LoadWorldModel();
 // void            MapManager_ParseEntities( const std::string &path );
 
-glm::vec3        MapManager_GetSpawnPos();
-glm::vec3        MapManager_GetSpawnAng();
+// glm::vec3        MapManager_GetSpawnPos();
+// glm::vec3        MapManager_GetSpawnAng();
 

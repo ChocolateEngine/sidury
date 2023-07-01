@@ -1,5 +1,5 @@
 #include "game_shared.h"
-#include "ent_light.h"
+#include "entity_systems.h"
 #include "graphics/graphics.h"
 #include "graphics/lighting.h"
 

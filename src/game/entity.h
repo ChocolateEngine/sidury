@@ -1298,67 +1298,12 @@ struct CLight
 
 
 // Helper Functions
-inline Handle Ent_GetRenderableHandle( Entity sEntity )
-{
-	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
+Handle        Ent_GetRenderableHandle( Entity sEntity );
 
-	if ( !renderComp )
-	{
-		Log_Error( "Failed to get renderable component\n" );
-		return InvalidHandle;
-	}
-
-	return renderComp->aRenderable;
-}
-
-
-inline Renderable_t* Ent_GetRenderable( Entity sEntity )
-{
-	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
-
-	if ( !renderComp )
-	{
-		Log_Error( "Failed to get renderable component\n" );
-		return nullptr;
-	}
-
-	return Graphics_GetRenderableData( renderComp->aRenderable );
-}
-
+Renderable_t* Ent_GetRenderable( Entity sEntity );
 
 // Requires the entity to have renderable component with a model path set
-inline Renderable_t* Ent_CreateRenderable( Entity sEntity )
-{
-	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
-
-	if ( !renderComp )
-	{
-		Log_Error( "Failed to get renderable component\n" );
-		return nullptr;
-	}
-
-	if ( renderComp->aRenderable == InvalidHandle )
-	{
-		if ( renderComp->aModel == InvalidHandle )
-		{
-			renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
-			if ( renderComp->aModel == InvalidHandle )
-			{
-				Log_Error( "Failed to load model for renderable\n" );
-				return nullptr;
-			}
-		}
-
-		renderComp->aRenderable = Graphics_CreateRenderable( renderComp->aModel );
-		if ( renderComp->aRenderable == InvalidHandle )
-		{
-			Log_Error( "Failed to create renderable\n" );
-			return nullptr;
-		}
-	}
-
-	return Graphics_GetRenderableData( renderComp->aRenderable );
-}
+Renderable_t* Ent_CreateRenderable( Entity sEntity );
 
 #if 0
 // This version has an option to enter a model handle

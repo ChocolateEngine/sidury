@@ -14,7 +14,7 @@
 #include "game_shared.h"
 #include "game_physics.h"
 #include "mapmanager.h"
-#include "ent_light.h"
+#include "entity_systems.h"
 #include "testing.h"
 
 #include "imgui/imgui.h"
@@ -212,7 +212,8 @@ float vec3_norm(glm::vec3& v)
 #define CH_PLAYER_CL 1
 
 
-static PlayerManager* players[ 2 ] = { 0, 0 };
+static PlayerManager*      players[ 2 ]     = { 0, 0 };
+static PlayerSpawnManager* playerSpawn[ 2 ] = { 0, 0 };
 
 
 PlayerManager* GetPlayers()
@@ -267,6 +268,7 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntCompone
 
 CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetType_Both )
 {
+	CH_REGISTER_COMPONENT_SYS2( PlayerSpawnManager, playerSpawn );
 }
 
 
@@ -507,12 +509,14 @@ void PlayerManager::Respawn( Entity player )
 
 	Assert( physObj );
 
-	transform->aPos               = MapManager_GetSpawnPos();
-	transform->aAng.Edit()        = { 0, MapManager_GetSpawnAng().y, 0 };
+	Transform playerSpawnSpot = GetPlayerSpawn()->SelectSpawnTransform();
+
+	transform->aPos               = playerSpawnSpot.aPos;
+	transform->aAng.Edit()        = { 0, playerSpawnSpot.aAng.y, 0 };
 	rigidBody->aVel.Edit()        = { 0, 0, 0 };
 	rigidBody->aAccel.Edit()      = { 0, 0, 0 };
 
-	camTransform->aAng.Edit()     = MapManager_GetSpawnAng();
+	camTransform->aAng.Edit()     = playerSpawnSpot.aAng;
 
 	zoom->aOrigFov                = r_fov.GetFloat();
 	zoom->aNewFov                 = r_fov.GetFloat();
@@ -2127,5 +2131,54 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 
 	for ( int i = 0; i < 3; i++ )
 		apRigidBody->aVel.Edit()[ i ] += addspeed * wishDir[ i ];
+}
+
+
+Transform PlayerSpawnManager::SelectSpawnTransform()
+{
+	CH_ASSERT_MSG( Game_ProcessingServer(), "Tried to get playerSpawn transform on client!" );
+
+	if ( Game_ProcessingClient() )
+	{
+		Log_Error( "Tried to get playerSpawn transform on client!\n" );
+		return {};
+	}
+
+	if ( aEntities.empty() )
+	{
+		Log_Error( "No playerSpawn entities found, returning origin for spawn position\n" );
+		return {};
+	}
+
+	Transform spot{};
+	size_t    index = 0;
+
+	// If we have more than one playerSpawn entity, pick a random one
+	// TODO: maybe make some priority thing, or master spawn like in source engine? idk
+	if ( aEntities.size() > 1 )
+		index = RandomSizeT( 0, aEntities.size() - 1 );
+	
+	auto transform = Ent_GetComponent< CTransform >( aEntities[ index ], "transform" );
+
+	if ( !transform )
+	{
+		Log_Error( "Entity with playerSpawn does not have a transform component, returning origin for spawn position\n" );
+		return spot;
+	}
+
+	spot.aPos = transform->aPos.Get();
+	spot.aAng = transform->aAng.Get();
+
+	return spot;
+}
+
+
+PlayerSpawnManager* GetPlayerSpawn()
+{
+	CH_ASSERT_MSG( Game_ProcessingServer(), "Tried to get playerSpawn system on client!" );
+
+	int i = Game_ProcessingClient() ? CH_PLAYER_CL : CH_PLAYER_SV;
+	CH_ASSERT( playerSpawn[ i ] );
+	return playerSpawn[ i ];
 }
 

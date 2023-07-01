@@ -94,10 +94,15 @@ void MapManager_CloseMap()
 	if ( gpMap == nullptr )
 		return;
 
-	if ( gpMap->aScene != InvalidHandle )
+	for ( Entity entity : gpMap->aMapEntities )
 	{
-		Graphics_RemoveSceneDraw( gpMap->aRenderable );
-		Graphics_FreeScene( gpMap->aScene );
+		GetEntitySystem()->DeleteEntity( entity );
+	}
+
+	if ( gpMap->aModel != InvalidHandle )
+	{
+		Graphics_FreeRenderable( gpMap->aRenderable );
+		Graphics_FreeModel( gpMap->aModel );
 	}
 
 	for ( auto physObj : gpMap->aWorldPhysObjs )
@@ -106,6 +111,7 @@ void MapManager_CloseMap()
 	for ( auto physShape : gpMap->aWorldPhysShapes )
 		GetPhysEnv()->DestroyShape( physShape );
 
+	gpMap->aMapEntities.clear();
 	gpMap->aWorldPhysObjs.clear();
 	gpMap->aWorldPhysShapes.clear();
 
@@ -153,6 +159,26 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 	// the map should always be entity index 0
 	gMapEntity = GetEntitySystem()->CreateEntity();
 
+	Entity playerSpawnEnt = GetEntitySystem()->CreateEntity();
+
+	if ( playerSpawnEnt == CH_ENT_INVALID )
+	{
+		Log_ErrorF( gLC_Map, "Failed to create playerSpawn Entity\n" );
+		return false;
+	}
+
+	auto spawnTransform = Ent_AddComponent< CTransform >( playerSpawnEnt, "transform" );
+	auto spawnComp      = Ent_AddComponent< CPlayerSpawn >( playerSpawnEnt, "playerSpawn" );
+
+	CH_ASSERT( spawnTransform );
+	CH_ASSERT( spawnComp );
+
+	spawnTransform->aPos          = gpMap->aMapInfo->spawnPos;
+	spawnTransform->aAng          = gpMap->aMapInfo->spawnAng;
+	spawnTransform->aScale.Edit() = { 1.f, 1.f, 1.f };
+
+	gpMap->aMapEntities.push_back( playerSpawnEnt );
+
 	// TODO: Have a root map entity with transform, and probably a physics shape for StaticCompound
 	// then in CPhysShape, add an option to use an entity and everything parented to that
 
@@ -161,6 +187,23 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 
 	// gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
 
+#if 1
+	gpMap->aRenderable = Graphics_CreateRenderable( gpMap->aModel );
+
+	if ( gpMap->aRenderable == CH_INVALID_HANDLE )
+	{
+		Log_ErrorF( gLC_Map, "Failed to create renderable for model of map \"%s\"\n", path.data() );
+		MapManager_CloseMap();
+		return false;
+	}
+
+	if ( Renderable_t* renderable = Graphics_GetRenderableData( gpMap->aRenderable ) )
+	{
+		renderable->aModelMatrix = modelMatrix;
+		renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
+	}
+
+#else
 	gpMap->aRenderable         = new SceneDraw_t;
 	gpMap->aRenderable->aScene = gpMap->aScene;
 
@@ -176,6 +219,7 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 			renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
 		}
 	}
+#endif
 
 	return true;
 }
@@ -185,7 +229,7 @@ SiduryMap* MapManager_ReadMapHeader( const std::vector< char >& srMapData )
 {
 	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
 	{
-		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)", srMapData.size(), sizeof( SiduryMapHeader_t ) );
+		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)\n", srMapData.size(), sizeof( SiduryMapHeader_t ) );
 		return nullptr;
 	}
 
@@ -301,14 +345,14 @@ std::string_view MapManager_GetMapPath()
 
 bool MapManager_LoadWorldModel()
 {
-	if ( !( gpMap->aScene = Graphics_LoadScene( gpMap->aMapInfo->modelPath ) ) )
+	if ( !( gpMap->aModel = Graphics_LoadModel( gpMap->aMapInfo->modelPath ) ) )
 		return false;
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
 	
-	for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
+	// for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
 	{
-		Handle       model     = Graphics_GetSceneModel( gpMap->aScene, i );
+		// Handle       model     = Graphics_GetModelData( gpMap->aScene, i );
 		// Renderable_t* modelDraw = Graphics_AddModelDraw( model );
 		// 
 		// if ( modelDraw )
@@ -318,7 +362,8 @@ bool MapManager_LoadWorldModel()
 		// modelDraw->aModelMatrix = modelMatrix;
 
 #if 1
-		Phys_GetModelInd( model, shapeInfo.aConcaveData );
+		// Phys_GetModelInd( model, shapeInfo.aConcaveData );
+		Phys_GetModelInd( gpMap->aModel, shapeInfo.aConcaveData );
 #endif
 	}
 
@@ -453,13 +498,4 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 }
 
 
-glm::vec3 MapManager_GetSpawnPos()
-{
-	return ( gpMap ) ? gpMap->aMapInfo->spawnPos : glm::vec3( 0, 0, 0 );
-}
-
-glm::vec3 MapManager_GetSpawnAng()
-{
-	return ( gpMap ) ? gpMap->aMapInfo->spawnAng : glm::vec3( 0, 0, 0 );
-}
 

@@ -248,7 +248,15 @@ public:
 };
 
 
-PlayerManager* GetPlayers();
+class PlayerSpawnManager : public IEntityComponentSystem
+{
+  public:
+	Transform SelectSpawnTransform();
+};
+
+
+PlayerManager*      GetPlayers();
+PlayerSpawnManager* GetPlayerSpawn();
 
 
 // convinence

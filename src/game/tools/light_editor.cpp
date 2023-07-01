@@ -1,7 +1,7 @@
 #include "../graphics/graphics.h"
 #include "../main.h"
 #include "../cl_main.h"
-#include "../ent_light.h"
+#include "../entity_systems.h"
 #include "../player.h"
 #include "light_editor.h"
 
