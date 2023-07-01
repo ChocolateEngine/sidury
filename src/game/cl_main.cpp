@@ -287,6 +287,8 @@ void CL_GameUpdate( float frameTime )
 		gui->DebugMessage( "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
 	}
 
+	GetEntitySystem()->InitCreatedComponents();
+
 	GetEntitySystem()->UpdateSystems();
 
 	GetPlayers()->UpdateLocalPlayer();
@@ -772,13 +774,15 @@ void CL_GetServerMessages()
 		gClientTimeout = cl_timeout_duration;
 
 		// Read the message sent from the server
-		auto serverMsg = flatbuffers::GetRoot< MsgSrc_Server >( data.begin() );
+		auto                  serverMsg = flatbuffers::GetRoot< MsgSrc_Server >( data.begin() );
+		flatbuffers::Verifier verifyMsg( (u8*)data.data(), data.size_bytes() );
 
-		if ( !serverMsg )
+		if ( !serverMsg->Verify( verifyMsg ) )
 		{
-			Log_Warn( gLC_Client, "Unknown Message from Server\n" );
+			Log_Warn( gLC_Client, "Error Parsing Message from Server\n" );
 			continue;
 		}
+
 
 		EMsgSrc_Server msgType = serverMsg->type();
 

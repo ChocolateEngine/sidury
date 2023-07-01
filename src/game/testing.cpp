@@ -759,7 +759,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 				protoTurn.aRand     = ( rand() / ( RAND_MAX / 360.0f ) ) - 180.f;
 			}
 		
-			float randTurn       = std::lerp( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
+			float randTurn       = glm::mix( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
 		
 			protoTransform->aPos = protoTransform->aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
 		

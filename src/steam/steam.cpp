@@ -147,6 +147,9 @@ void SteamAbstraction::LoadSteamOverlay()
 
 	bool enabled = SteamUtils()->IsOverlayEnabled();
 
+	// TODO:
+	// GameOverlayUI.exe -pid 12345 -steampid 67890 -gameid chocolate_app_id
+
 	// Only win32 because GetSteamInstallPath is windows only and deprecated
 #ifdef _WIN32
 	// Check if this is already loaded (It will be if we are running from steam)

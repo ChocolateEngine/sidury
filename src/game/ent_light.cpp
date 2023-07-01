@@ -341,35 +341,3 @@ EntSys_Renderable* GetRenderableEntSys()
 	return gEntSys_Renderable[ i ];
 }
 
-
-// ------------------------------------------------------------
-
-
-void EntSys_PhysInfo::ComponentAdded( Entity sEntity, void* spData )
-{
-}
-
-
-void EntSys_PhysInfo::ComponentRemoved( Entity sEntity, void* spData )
-{
-	if ( Game_ProcessingServer() )
-		return;
-}
-
-
-void EntSys_PhysInfo::ComponentUpdated( Entity sEntity, void* spData )
-{
-	if ( Game_ProcessingServer() )
-		return;
-}
-
-
-void EntSys_PhysInfo::Update()
-{
-	if ( Game_ProcessingServer() )
-		return;
-}
-
-
-EntSys_PhysInfo* gEntSys_PhysInfo[ 2 ] = { 0, 0 };
-

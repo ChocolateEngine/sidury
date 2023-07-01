@@ -3,8 +3,6 @@
 #include "lighting.h"
 #include "types/transform.h"
 
-#include "../entity.h"
-
 // --------------------------------------------------------------------------------------
 // Lighting
 

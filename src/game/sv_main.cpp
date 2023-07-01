@@ -232,6 +232,8 @@ void SV_Update( float frameTime )
 
 void SV_GameUpdate( float frameTime )
 {
+	GetEntitySystem()->InitCreatedComponents();
+
 	MapManager_Update();
 
 	GetPlayers()->Update( frameTime );
@@ -597,6 +599,21 @@ SV_Client_t* SV_GetClientFromAddr( ch_sockaddr& srAddr )
 }
 
 
+template< typename T >
+inline const T* SV_ReadMsg( EMsgSrc_Client sMsgType, flatbuffers::Verifier& srVerifier, const flatbuffers::Vector< u8 >* srMsgData )
+{
+	auto msg = flatbuffers::GetRoot< T >( srMsgData->data() );
+
+	if ( !msg->Verify( srVerifier ) )
+	{
+		Log_WarnF( gLC_Server, "Message Data is not Valid: %s\n", CL_MsgToString( sMsgType ) );
+		return nullptr;
+	}
+
+	return msg;
+}
+
+
 void SV_ProcessSocketMsgs()
 {
 	while ( true )
@@ -621,7 +638,14 @@ void SV_ProcessSocketMsgs()
 		// Reset the connection timer
 		client->aTimeout = Game_GetCurTime() + sv_client_timeout;
 
+		flatbuffers::Verifier verifyMsg( reinterpret_cast< u8* >( data.data() ), data.size_bytes() );
 		const MsgSrc_Client* clientMsg = flatbuffers::GetRoot< MsgSrc_Client >( data.data() );
+
+		if ( !clientMsg->Verify( verifyMsg ) )
+		{
+			Log_Warn( gLC_Server, "Message Data is not Valid\n" );
+			continue;
+		}
 
 		// Read the message sent from the client
 		SV_ProcessClientMsg( *client, clientMsg );
@@ -700,12 +724,13 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 		return;
 	}
 
+	flatbuffers::Verifier verifyMsg( msgData->data(), msgData->size() );
+
 	switch ( msgType )
 	{
 		case EMsgSrc_Client_ClientInfo:
 		{
-			auto clientMsg = flatbuffers::GetRoot< NetMsg_ClientInfo >( msgData->data() );
-
+			auto clientMsg = SV_ReadMsg< NetMsg_ClientInfo >( msgType, verifyMsg, msgData );
 			if ( clientMsg )
 			{
 				SV_HandleMsg_ClientInfo( srClient, clientMsg );
@@ -746,7 +771,7 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 				break;
 
 			SV_SetCommandClient( &srClient );
-			const NetMsg_ConVar* clientMsg = flatbuffers::GetRoot< NetMsg_ConVar >( msgData->data() );
+			auto clientMsg = SV_ReadMsg< NetMsg_ConVar >( msgType, verifyMsg, msgData );
 
 			if ( clientMsg && clientMsg->command() )
 			{
@@ -762,8 +787,9 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 			if ( srClient.aState == ESV_ClientState_WaitForClientInfo )
 				break;
 
-			const NetMsg_UserCmd* clientMsg  = flatbuffers::GetRoot< NetMsg_UserCmd >( msgData->data() );
-			SV_HandleMsg_UserCmd( srClient, clientMsg );
+			if ( auto clientMsg = SV_ReadMsg< NetMsg_UserCmd >( msgType, verifyMsg, msgData ) )
+				SV_HandleMsg_UserCmd( srClient, clientMsg );
+
 			break;
 		}
 
@@ -866,10 +892,12 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	// Get Client Info
 	//NetMsg_ClientConnect       msgClientConnect();
 
+	flatbuffers::Verifier       verifyMsg( (u8*)srData.data(), srData.size() );
 	const NetMsg_ClientConnect* clientMsg = flatbuffers::GetRoot< NetMsg_ClientConnect >( srData.data() );
 
-	if ( !clientMsg )
-		return;
+	// This is invalid for some reason?
+	// if ( !clientMsg->Verify( verifyMsg ) );
+	// 	return;
 
 	// First thing's first, make sure our protocol is the same
 	if ( clientMsg->protocol() != ESiduryProtocolVer_Value )

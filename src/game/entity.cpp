@@ -455,7 +455,9 @@ void* EntityComponentPool::Create( Entity entity )
 	if ( apComponentSystem )
 	{
 		apComponentSystem->aEntities.push_back( entity );
-		apComponentSystem->ComponentAdded( entity, data );
+
+		// call this later maybe?
+		// apComponentSystem->ComponentAdded( entity, data );
 	}
 
 	// TODO: use malloc and use that pointer in the constructor for this
@@ -565,14 +567,28 @@ void EntityComponentPool::RemoveAllQueued()
 			toRemove.push_back( it->first );
 			continue;
 		}
-
-		if ( it->second & EEntityFlag_Created )
-			it->second &= ~EEntityFlag_Created;
 	}
 
 	for ( size_t entity : toRemove )
 	{
 		RemoveByIndex( entity );
+	}
+}
+
+
+void EntityComponentPool::InitCreatedComponents()
+{
+	for ( auto it = aComponentFlags.begin(); it != aComponentFlags.end(); it++ )
+	{
+		if ( it->second & EEntityFlag_Created )
+		{
+			it->second &= ~EEntityFlag_Created;
+
+			if ( apComponentSystem )
+			{
+				apComponentSystem->ComponentAdded( aMapComponentToEntity[ it->first ], aComponents[ it->first ] );
+			}
+		}
 	}
 }
 
@@ -781,6 +797,16 @@ void EntitySystem::UpdateStates()
 		// Remove the created flag if it has that
 		if ( flags & EEntityFlag_Created )
 			aEntityFlags[ id ] &= ~EEntityFlag_Created;
+	}
+}
+
+
+void EntitySystem::InitCreatedComponents()
+{
+	// Remove Components Queued for Deletion
+	for ( auto& [ name, pool ] : aComponentPools )
+	{
+		pool->InitCreatedComponents();
 	}
 }
 
@@ -1176,7 +1202,6 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 //}
 
 
-#if USE_FLEXBUFFERS
 void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData )
 {
 	// Get the vector i guess
@@ -1567,7 +1592,6 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 	srBuilder.EndVector( flexVec, false, false );
 	return wroteData;
 }
-#endif
 
 
 // TODO: redo this by having it loop through component pools, and not entitys
@@ -2279,7 +2303,8 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntComponentVarType_U32;
 	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntComponentVarType_U64;
 
-	gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntComponentVarType_Entity;
+	// probably overrides type have of u64, hmmm
+	// gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntComponentVarType_Entity;
 	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntComponentVarType_StdString;
 
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntComponentVarType_Vec2;
@@ -2298,10 +2323,9 @@ void Ent_RegisterBaseComponents()
 	  [ & ]( void* spData )
 	  { delete (CTransform*)spData; } );
 
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aPos", "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aAng", "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "aScale", "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
-	// EntComp_RegisterComponentReadWrite< CTransform >( TEMP_TransformRead, TEMP_TransformWrite );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
 	// CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
@@ -2314,23 +2338,15 @@ void Ent_RegisterBaseComponents()
 	// // CH_REGISTER_COMPONENT_VAR( CDirection, glm::vec3, aRight, right );
 	// CH_REGISTER_COMP_VAR_VEC3( CDirection, aRight, right );
 
-	CH_REGISTER_COMPONENT_RW( CGravity, gravity, true );
-	CH_REGISTER_COMP_VAR_VEC3( CGravity, aForce, force );
+	// CH_REGISTER_COMPONENT_RW( CGravity, gravity, true );
+	// CH_REGISTER_COMP_VAR_VEC3( CGravity, aForce, force );
 
 	// might be a bit weird
 	// HACK HACK: DONT OVERRIDE CLIENT VALUE, IT WILL NEVER BE UPDATED
 	CH_REGISTER_COMPONENT_RW( CCamera, camera, false );
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov );
-	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aForward, forward );
-	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aUp, up );
-	// CH_REGISTER_COMPONENT_VAR( CCamera, glm::vec3, aRight, right );
-	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aPos", "pos", offsetof( CCamera, aTransform.aValue.aPos ), typeid( CCamera::aTransform.aValue.aPos ).hash_code() );
-	// EntComp_RegisterComponentVar< CCamera, glm::vec3 >( "aAng", "ang", offsetof( CCamera, aTransform.aValue.aAng ), typeid( CCamera::aTransform.aValue.aAng ).hash_code() );
-
+	
 	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both );
-
-	CH_REGISTER_COMPONENT( CPhysInfo, physInfo, true, EEntComponentNetType_Both );
-	CH_REGISTER_COMPONENT_SYS( CPhysInfo, EntSys_PhysInfo, gEntSys_PhysInfo );
 
 	// Probably should be in graphics?
 	CH_REGISTER_COMPONENT_RW( CLight, light, true );

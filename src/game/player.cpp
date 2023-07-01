@@ -265,6 +265,11 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntCompone
 }
 
 
+CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetType_Both )
+{
+}
+
+
 void PlayerManager::RegisterComponents()
 {
 	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
@@ -347,16 +352,18 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 	apMove->apCamDir       = GetComp_Direction( playerInfo->aCamera );
 	apMove->apCamera       = GetCamera( playerInfo->aCamera );
 
-	apMove->apDir       = Ent_GetComponent< CDirection >( player, "direction" );
-	apMove->apRigidBody = GetRigidBody( player );
-	apMove->apTransform = GetTransform( player );
-	apMove->apPhysShape = GetComp_PhysShapePtr( player );
-	apMove->apPhysObj   = GetComp_PhysObjectPtr( player );
+	apMove->apDir          = Ent_GetComponent< CDirection >( player, "direction" );
+	apMove->apRigidBody    = GetRigidBody( player );
+	apMove->apTransform    = GetTransform( player );
+	apMove->apPhysShape    = GetComp_PhysShapePtr( player );
+	apMove->apPhysObjComp  = GetComp_PhysObject( player );
+	apMove->apPhysObj      = apMove->apPhysObjComp->apObj;
 
 	Assert( apMove->apDir );
 	Assert( apMove->apRigidBody );
 	Assert( apMove->apTransform );
 	Assert( apMove->apPhysShape );
+	Assert( apMove->apPhysObjComp );
 	Assert( apMove->apPhysObj );
 
 	Assert( apMove->apCamTransform );
@@ -375,23 +382,24 @@ void PlayerManager::Init()
 
 void PlayerManager::Create( Entity player )
 {
-	// Add Components to entity
-	GetEntitySystem()->AddComponent( player, "playerMoveData" );
-	auto zoom = Ent_AddComponent< CPlayerZoom >( player, "playerZoom" );
-
-	GetEntitySystem()->AddComponent( player, "rigidBody" );
-	GetEntitySystem()->AddComponent( player, "direction" );
-
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
 	Assert( playerInfo );
 
-	auto renderable    = Ent_AddComponent< CRenderable >( player, "renderable" );
-	renderable->aPath  = DEFAULT_PROTOGEN_PATH;
+	// Add Components to entity
+	Ent_AddComponent( player, "playerMoveData" );
+	Ent_AddComponent( player, "rigidBody" );
+	Ent_AddComponent( player, "direction" );
 
-	CLight* flashlight = static_cast< CLight* >( GetEntitySystem()->AddComponent( player, "light" ) );
+	auto renderable   = Ent_AddComponent< CRenderable >( player, "renderable" );
+	renderable->aPath = DEFAULT_PROTOGEN_PATH;
+
+	auto flashlight   = Ent_AddComponent< CLight >( player, "light" );
+	auto zoom         = Ent_AddComponent< CPlayerZoom >( player, "playerZoom" );
+	auto transform    = Ent_AddComponent< CTransform >( player, "transform" );
 
 	Assert( flashlight );
 	Assert( zoom );
+	Assert( transform );
 
 	if ( Game_ProcessingClient() )
 	{
@@ -437,19 +445,13 @@ void PlayerManager::Create( Entity player )
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
-	CTransform*      transform = (CTransform*)GetEntitySystem()->AddComponent( player, "transform" );
+	auto compPhysShape        = Ent_AddComponent< CPhysShape >( player, "physShape" );
+	compPhysShape->aShapeType = PhysShapeType::Cylinder;
+	compPhysShape->aBounds    = glm::vec3( 72, 16, 1 );
 
-	//Model* model = new Model;
-	//graphics->LoadModel( "materials/models/protogen_wip_22/protogen_wip_22.obj", "", model );
-	//GetEntitySystem()->AddComponent( player, model );
+	Phys_CreatePhysShapeComponent( compPhysShape );
 
-	// Model *model = graphics->LoadModel( "materials/models/protogen_wip_25d/protogen_wip_25d.obj" );
-	// GetEntitySystem()->AddComponent< Model* >( player, model );
-
-	PhysicsShapeInfo shapeInfo( PhysShapeType::Cylinder );
-	shapeInfo.aBounds        = glm::vec3( 72, 16, 1 );
-
-	IPhysicsShape* physShape = Phys_CreateShape( player, shapeInfo );
+	IPhysicsShape* physShape = compPhysShape->apShape;
 
 	Assert( physShape );
 
@@ -461,25 +463,9 @@ void PlayerManager::Create( Entity player )
 	physInfo.aCustomMass = true;
 	physInfo.aMass = PLAYER_MASS;
 
-	IPhysicsObject* physObj = Phys_CreateObject( player, physShape, physInfo );
+	CPhysObject* physObj = Phys_CreateObject( player, physShape, physInfo );
 
 	Assert( physObj );
-
-	physObj->SetAllowSleeping( false );
-	physObj->SetMotionQuality( PhysMotionQuality::LinearCast );
-	physObj->SetLinearVelocity( {0, 0, 0} );
-	physObj->SetAngularVelocity( {0, 0, 0} );
-
-	Phys_SetMaxVelocities( physObj );
-
-	physObj->SetFriction( phys_friction_player );
-
-	// Don't allow any rotation on this
-	physObj->SetInverseMass( 1.f / PLAYER_MASS );
-	physObj->SetInverseInertia( {0, 0, 0}, {1, 0, 0, 0} );
-
-	// rotate 90 degrees
-	physObj->SetAng( { 90, 0, 0 } );
 }
 
 
@@ -504,7 +490,7 @@ void PlayerManager::Respawn( Entity player )
 	auto         rigidBody  = GetRigidBody( player );
 	auto         transform  = GetTransform( player );
 	auto         zoom       = GetPlayerZoom( player );
-	auto         physObj    = GetComp_PhysObjectPtr( player );
+	auto         physObjComp    = GetComp_PhysObject( player );
 
 	Assert( playerInfo );
 	Assert( playerInfo->aCamera );
@@ -515,19 +501,42 @@ void PlayerManager::Respawn( Entity player )
 	Assert( transform );
 	Assert( camTransform );
 	Assert( zoom );
+	Assert( physObjComp );
+
+	IPhysicsObject* physObj = physObjComp->apObj;
+
 	Assert( physObj );
 
-	transform->aPos           = MapManager_GetSpawnPos();
-	transform->aAng.Edit()    = { 0, MapManager_GetSpawnAng().y, 0 };
-	rigidBody->aVel.Edit()    = { 0, 0, 0 };
-	rigidBody->aAccel.Edit()  = { 0, 0, 0 };
+	transform->aPos               = MapManager_GetSpawnPos();
+	transform->aAng.Edit()        = { 0, MapManager_GetSpawnAng().y, 0 };
+	rigidBody->aVel.Edit()        = { 0, 0, 0 };
+	rigidBody->aAccel.Edit()      = { 0, 0, 0 };
 
-	camTransform->aAng.Edit() = MapManager_GetSpawnAng();
+	camTransform->aAng.Edit()     = MapManager_GetSpawnAng();
 
-	zoom->aOrigFov            = r_fov.GetFloat();
-	zoom->aNewFov             = r_fov.GetFloat();
+	zoom->aOrigFov                = r_fov.GetFloat();
+	zoom->aNewFov                 = r_fov.GetFloat();
+
+	physObjComp->aUpdateTransform = false;
 
 	physObj->SetLinearVelocity( { 0, 0, 0 } );
+
+	physObj->SetAllowSleeping( false );
+	physObj->SetMotionQuality( PhysMotionQuality::LinearCast );
+	physObj->SetLinearVelocity( { 0, 0, 0 } );
+	physObj->SetAngularVelocity( { 0, 0, 0 } );
+
+	Phys_SetMaxVelocities( physObj );
+
+	physObj->SetFriction( phys_friction_player );
+
+	// Don't allow any rotation on this
+	physObj->SetInverseMass( 1.f / PLAYER_MASS );
+	physObj->SetInverseInertia( { 0, 0, 0 }, { 1, 0, 0, 0 } );
+
+	// rotate 90 degrees
+	// physObj->SetAng( { 90, transform->aAng.Get().y, 0 } );
+	physObj->SetAng( { 90, 0, 0 } );
 
 	apMove->OnPlayerRespawn( player );
 }
@@ -1129,7 +1138,8 @@ void PlayerMovement::SetPlayer( Entity player )
 	apRigidBody    = GetRigidBody( player );
 	apTransform    = GetTransform( player );
 	apDir          = Ent_GetComponent< CDirection >( player, "direction" );
-	apPhysObj      = GetComp_PhysObjectPtr( player );
+	apPhysObjComp  = GetComp_PhysObject( player );
+	apPhysObj      = apPhysObjComp->apObj;
 
 	Assert( apCamTransform );
 	Assert( apCamDir );
@@ -1139,6 +1149,7 @@ void PlayerMovement::SetPlayer( Entity player )
 	Assert( apRigidBody );
 	Assert( apTransform );
 	Assert( apDir );
+	Assert( apPhysObjComp );
 	Assert( apPhysObj );
 }
 
@@ -1224,18 +1235,6 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 		case PlayerMoveType::Fly:     FlyMove();      break;
 		case PlayerMoveType::NoClip:  NoClipMove();   break;
 	}
-
-	// CHANGE THIS IN THE FUTURE FOR NETWORKING
-#if 0
-	if ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() )
-	{
-		auto model = GetEntitySystem()->GetComponent< Model* >( player );
-
-		model->aTransform.aAng[ROLL] += 90;
-		model->aTransform.aAng[YAW] *= -1;
-		model->aTransform.aAng[YAW] += 180;
-	}
-#endif
 }
 
 
@@ -1291,12 +1290,14 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, PlayerMoveType type )
 
 void PlayerMovement::SetCollisionEnabled( bool enable )
 {
+	apPhysObjComp->aEnableCollision = enable;
 	apPhysObj->SetCollisionEnabled( enable );
 }
 
 
 void PlayerMovement::EnableGravity( bool enabled )
 {
+	apPhysObjComp->aGravity = enabled;
 	apPhysObj->SetGravityEnabled( enabled );
 }
 
@@ -1452,14 +1453,16 @@ CONVAR( phys_player_max_sep_dist, 1 );
 // Post Physics Simulation Update
 void PlayerMovement::UpdatePosition( Entity player )
 {
-	apMove      = GetPlayerMoveData( player );
-	apTransform = GetTransform( player );
-	apRigidBody = GetRigidBody( player );
-	apPhysObj   = GetComp_PhysObjectPtr( player );
+	apMove        = GetPlayerMoveData( player );
+	apTransform   = GetTransform( player );
+	apRigidBody   = GetRigidBody( player );
+	apPhysObjComp = GetComp_PhysObject( player );
+	apPhysObj     = apPhysObjComp->apObj;
 
 	Assert( apMove );
 	Assert( apTransform );
 	Assert( apRigidBody );
+	Assert( apPhysObjComp );
 	Assert( apPhysObj );
 
 	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );

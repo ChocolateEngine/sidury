@@ -131,7 +131,6 @@ MapInfo*         MapManager_ParseMapInfo( const std::string& srPath );
 
 bool             MapManager_LoadWorldModel();
 // void            MapManager_ParseEntities( const std::string &path );
-void             MapManager_SpawnPlayer();
 
 glm::vec3        MapManager_GetSpawnPos();
 glm::vec3        MapManager_GetSpawnAng();

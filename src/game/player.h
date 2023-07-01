@@ -211,6 +211,7 @@ class PlayerMovement // : public ComponentSystem
 
 	IPhysicsShape*   apPhysShape    = nullptr;
 	IPhysicsObject*  apPhysObj      = nullptr;
+	CPhysObject*     apPhysObjComp  = nullptr;
 
 	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;

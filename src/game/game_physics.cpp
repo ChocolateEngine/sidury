@@ -1,5 +1,6 @@
 #include "game_physics.h"
 #include "game_shared.h"
+#include "cl_main.h"
 #include "entity.h"
 #include "render/irender.h"
 #include "graphics/graphics.h"
@@ -28,12 +29,10 @@ IPhysicsEnvironment*     GetPhysEnv()
 	return sv_physenv;
 }
 
-CONVAR_CMD( phys_gravity, -800 )
+CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
 {
-	if ( Game_GetCommandSource() == ECommandSource_Client )
-	{
-		// return;
-	}
+	if ( Game_GetCommandSource() != ECommandSource_Console && CL_SendConVarIfClient( "phys_gravity", args ) )
+		return;
 
 	GetPhysEnv()->SetGravityZ( phys_gravity );
 }
@@ -54,6 +53,338 @@ static Handle                 gMatSolid         = InvalidHandle;
 static Handle                 gMatWire          = InvalidHandle;
 
 static std::unordered_map< Handle, Handle >       gPhysRenderables;
+
+
+// ==============================================================
+
+//#define CH_COMPONENT_EDITOR_FUNC() static void ASDKASOPDOPKEOPFGK9oieGFKJIOPEGIOPESJFi()
+//#define CH_REGISTER_COMPONENT_EDITOR()
+
+// CH_COMPONENT_EDITOR_FUNC()
+// {
+// }
+
+
+CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_Both )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysShapeType, aShapeType, shapeType );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aBounds, bounds );
+
+	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysShape, gEntSys_PhysShape );
+
+	// TODO: add a read and write function for the entity editor
+	// we need to have physShape and physObject not be created instantly
+	// so what we're going to do instead is add a button called "Create Phys Shape" and "Create Phys Object", that creates or recreates them manually
+	// would probably cause less issues
+	// CH_REGISTER_COMPONENT_EDITOR();
+}
+
+
+CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, true, EEntComponentNetType_Both )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aStartActive, startActive );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aAllowSleeping, allowSleeping );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxLinearVelocity, maxLinearVelocity );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxAngularVelocity, maxAngularVelocity );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionType, aMotionType, motionType );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionQuality, aMotionQuality, motionQuality );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aIsSensor, isSensor );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCustomMass, customMass );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMass, mass );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aGravity, gravity );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aUpdateTransform, updateTransform );
+
+	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysObject, gEntSys_PhysObject );
+}
+
+
+// ==============================================================
+
+
+bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
+{
+	PhysicsShapeInfo shapeInfo( compPhysShape->aShapeType );
+
+	switch ( compPhysShape->aShapeType )
+	{
+		default:
+		{
+			// Free a model if we have one
+			if ( compPhysShape->aModel != InvalidHandle )
+				Graphics_FreeModel( compPhysShape->aModel );
+
+			compPhysShape->aModel = InvalidHandle;
+
+			break;
+		}
+
+		case PhysShapeType::Convex:
+		case PhysShapeType::Mesh:
+		{
+			if ( compPhysShape->aModel == InvalidHandle )
+			{
+				compPhysShape->aModel = Graphics_LoadModel( compPhysShape->aPath.Get() );
+			}
+
+			if ( compPhysShape->aModel == InvalidHandle )
+			{
+				Log_ErrorF( "Failed to load physics model: \"%s\"\n", compPhysShape->aPath.Get().c_str() );
+				return false;
+			}
+
+			break;
+		}
+	}
+
+	switch ( compPhysShape->aShapeType )
+	{
+		default:
+			break;
+
+		// Uses the path for this
+		case PhysShapeType::Convex:
+			Phys_GetModelVerts( compPhysShape->aModel, shapeInfo.aConvexData );
+			break;
+
+		case PhysShapeType::Mesh:
+			Phys_GetModelInd( compPhysShape->aModel, shapeInfo.aConcaveData );
+			break;
+
+		case PhysShapeType::Sphere:
+		case PhysShapeType::Box:
+		case PhysShapeType::Capsule:
+		case PhysShapeType::TaperedCapsule:
+		case PhysShapeType::Cylinder:
+			shapeInfo.aBounds = compPhysShape->aBounds;
+			break;
+	}
+
+	IPhysicsShape* shape = GetPhysEnv()->CreateShape( shapeInfo );
+
+	if ( !shape )
+	{
+		Log_Error( "Failed to create physics shape\n" );
+		return false;
+	}
+
+	compPhysShape->apShape = shape;
+	return true;
+}
+
+
+static void OnCreatePhysShape( Entity sEntity, CPhysShape* compPhysShape )
+{
+	auto physObject = Ent_GetComponent< CPhysObject >( sEntity, "physObject" );
+
+	if ( !physObject || !physObject->apObj )
+		return;
+
+	physObject->apObj->SetShape( compPhysShape->apShape, true, true );
+}
+
+
+void EntSys_PhysShape::ComponentAdded( Entity sEntity, void* spData )
+{
+	auto compPhysShape = static_cast< CPhysShape* >( spData );
+
+	Phys_CreatePhysShapeComponent( compPhysShape );
+}
+
+
+void EntSys_PhysShape::ComponentRemoved( Entity sEntity, void* spData )
+{
+	auto compPhysShape = static_cast< CPhysShape* >( spData );
+
+	if ( !compPhysShape->apShape )
+		return;
+
+	GetPhysEnv()->DestroyShape( compPhysShape->apShape );
+}
+
+
+void EntSys_PhysShape::ComponentUpdated( Entity sEntity, void* spData )
+{
+	auto physShape = static_cast< CPhysShape* >( spData );
+
+	if ( !physShape->apShape )
+		return;
+
+	if ( physShape->aShapeType.aIsDirty )
+	{
+		if ( physShape->apShape )
+			GetPhysEnv()->DestroyShape( physShape->apShape );
+
+		physShape->apShape = nullptr;
+		Phys_CreatePhysShapeComponent( physShape );
+		OnCreatePhysShape( sEntity, physShape );
+	}
+}
+
+
+void EntSys_PhysShape::Update()
+{
+	for ( Entity entity : aEntities )
+	{
+		auto physShape  = Ent_GetComponent< CPhysShape >( entity, "physShape" );
+
+		Assert( physShape );
+
+		if ( !physShape )
+			continue;
+
+		if ( !physShape->apShape )
+		{
+			Phys_CreatePhysShapeComponent( physShape );
+			continue;
+		}
+	}
+}
+
+
+// ==============================================================
+
+
+static void CreatePhysObjectComponent( Entity sEntity, CPhysShape* srCompShape, CPhysObject* srCompObject )
+{
+	if ( !srCompShape->apShape )
+	{
+		if ( !Phys_CreatePhysShapeComponent( srCompShape ) )
+			return;
+	}
+
+	PhysicsObjectInfo physObjectInfo;
+	physObjectInfo.aStartActive        = srCompObject->aStartActive;
+	physObjectInfo.aAllowSleeping      = srCompObject->aAllowSleeping;
+
+	physObjectInfo.aMaxLinearVelocity  = srCompObject->aMaxLinearVelocity;
+	physObjectInfo.aMaxAngularVelocity = srCompObject->aMaxAngularVelocity;
+
+	physObjectInfo.aMotionType         = srCompObject->aMotionType;
+	physObjectInfo.aMotionQuality      = srCompObject->aMotionQuality;
+
+	physObjectInfo.aIsSensor           = srCompObject->aIsSensor;
+
+	physObjectInfo.aCustomMass         = srCompObject->aCustomMass;
+	physObjectInfo.aMass               = srCompObject->aMass;
+
+	auto transform                     = Ent_GetComponent< CTransform >( sEntity, "transform" );
+
+	if ( transform )
+	{
+		physObjectInfo.aPos = transform->aPos;
+		physObjectInfo.aAng = transform->aAng;
+	}
+
+	srCompObject->apObj = GetPhysEnv()->CreateObject( srCompShape->apShape, physObjectInfo );
+}
+
+
+void EntSys_PhysObject::ComponentAdded( Entity sEntity, void* spData )
+{
+}
+
+
+void EntSys_PhysObject::ComponentRemoved( Entity sEntity, void* spData )
+{
+	auto physObject = static_cast< CPhysObject* >( spData );
+
+	if ( !physObject->apObj )
+		return;
+
+	GetPhysEnv()->DestroyObject( physObject->apObj );
+}
+
+
+void EntSys_PhysObject::ComponentUpdated( Entity sEntity, void* spData )
+{
+	auto physObject = static_cast< CPhysObject* >( spData );
+
+	if ( !physObject->apObj )
+		return;
+
+	if ( physObject->aGravity.aIsDirty )
+		physObject->apObj->SetGravityEnabled( physObject->aGravity );
+
+	if ( physObject->aEnableCollision.aIsDirty )
+		physObject->apObj->SetCollisionEnabled( physObject->aEnableCollision );
+
+	if ( physObject->aIsSensor.aIsDirty )
+		physObject->apObj->SetSensor( physObject->aIsSensor );
+}
+
+
+void EntSys_PhysObject::Update()
+{
+	for ( Entity entity : aEntities )
+	{
+		auto physShape = Ent_GetComponent< CPhysShape >( entity, "physShape" );
+		auto physObject = Ent_GetComponent< CPhysObject >( entity, "physObject" );
+
+		Assert( physShape );
+		Assert( physObject );
+
+		if ( !physShape || !physObject )
+			continue;
+
+		if ( !physObject->apObj )
+		{
+			CreatePhysObjectComponent( entity, physShape, physObject );
+			continue;
+		}
+
+		if ( physObject->aGravity.aIsDirty )
+			physObject->apObj->SetGravityEnabled( physObject->aGravity );
+
+		if ( physObject->aEnableCollision.aIsDirty )
+			physObject->apObj->SetCollisionEnabled( physObject->aEnableCollision );
+
+		if ( physObject->aIsSensor.aIsDirty )
+			physObject->apObj->SetSensor( physObject->aIsSensor );
+
+		auto transform = Ent_GetComponent< CTransform >( entity, "transform" );
+
+		if ( !transform )
+			continue;
+
+		physObject->apObj->SetScale( transform->aScale );
+
+		if ( physObject->aUpdateTransform )
+		{
+			transform->aPos = physObject->apObj->GetPos();
+			transform->aAng = physObject->apObj->GetAng();
+		}
+	}
+}
+
+
+// ==============================================================
+
+
+EntSys_PhysShape*  gEntSys_PhysShape[ 2 ];
+EntSys_PhysObject* gEntSys_PhysObject[ 2 ];
+
+
+EntSys_PhysShape* GetPhysShapeEntSys()
+{
+	int i = Game_ProcessingClient() ? 1 : 0;
+	Assert( gEntSys_PhysShape[ i ] );
+	return gEntSys_PhysShape[ i ];
+}
+
+
+EntSys_PhysObject* GetPhysObjectEntSys()
+{
+	int i = Game_ProcessingClient() ? 1 : 0;
+	Assert( gEntSys_PhysObject[ i ] );
+	return gEntSys_PhysObject[ i ];
+}
+
 
 // ==============================================================
 
@@ -484,9 +815,6 @@ void Phys_Init()
 	gPhysDebugFuncs.apDrawText          = Phys_DrawText;
 
 	ch_physics->SetDebugDrawFuncs( gPhysDebugFuncs );
-
-	CH_REGISTER_COMPONENT( CPhysShape, physShape, false, EEntComponentNetType_None );
-	CH_REGISTER_COMPONENT( CPhysObject, physObject, false, EEntComponentNetType_None );
 }
 
 
@@ -579,6 +907,7 @@ void Phys_SetMaxVelocities( IPhysicsObject* spPhysObj )
 }
 
 
+#if 0
 IPhysicsShape* Phys_CreateShape( Entity sEntity, PhysicsShapeInfo& srShapeInfo )
 {
 	IPhysicsShape* shape = GetPhysEnv()->CreateShape( srShapeInfo );
@@ -592,12 +921,14 @@ IPhysicsShape* Phys_CreateShape( Entity sEntity, PhysicsShapeInfo& srShapeInfo )
 	// Attach it to the Entity
 	auto shapeWrapper     = static_cast< CPhysShape* >( GetEntitySystem()->AddComponent( sEntity, "physShape" ) );
 	shapeWrapper->apShape = shape;
+	shapeWrapper->aBounds = srShapeInfo.aBounds;
 
 	return shape;
 }
+#endif
 
 
-IPhysicsObject* Phys_CreateObject( Entity sEntity, PhysicsObjectInfo& srObjectInfo )
+CPhysObject* Phys_CreateObject( Entity sEntity, PhysicsObjectInfo& srObjectInfo )
 {
 	// Get the physics shape from the entity
 	CPhysShape* shape = GetComp_PhysShape( sEntity );
@@ -612,7 +943,7 @@ IPhysicsObject* Phys_CreateObject( Entity sEntity, PhysicsObjectInfo& srObjectIn
 }
 
 
-IPhysicsObject* Phys_CreateObject( Entity sEntity, IPhysicsShape* spShape, PhysicsObjectInfo& srObjectInfo )
+CPhysObject* Phys_CreateObject( Entity sEntity, IPhysicsShape* spShape, PhysicsObjectInfo& srObjectInfo )
 {
 	IPhysicsObject* object = GetPhysEnv()->CreateObject( spShape, srObjectInfo );
 
@@ -622,12 +953,23 @@ IPhysicsObject* Phys_CreateObject( Entity sEntity, IPhysicsShape* spShape, Physi
 		return nullptr;
 	}
 
-	CPhysObject* objWrapper  = static_cast< CPhysObject* >( GetEntitySystem()->AddComponent( sEntity, "physObject" ) );
-	objWrapper->apObj        = object;
+	CPhysObject* objWrapper         = static_cast< CPhysObject* >( GetEntitySystem()->AddComponent( sEntity, "physObject" ) );
+	objWrapper->apObj               = object;
 
-	// sanity check
-	CPhysObject* testWrapper = GetComp_PhysObject( sEntity );
+	objWrapper->aStartActive        = srObjectInfo.aStartActive;
+	objWrapper->aAllowSleeping      = srObjectInfo.aAllowSleeping;
 
-	return object;
+	objWrapper->aMaxLinearVelocity  = srObjectInfo.aMaxLinearVelocity;
+	objWrapper->aMaxAngularVelocity = srObjectInfo.aMaxAngularVelocity;
+
+	objWrapper->aMotionType         = srObjectInfo.aMotionType;
+	objWrapper->aMotionQuality      = srObjectInfo.aMotionQuality;
+
+	objWrapper->aIsSensor           = srObjectInfo.aIsSensor;
+
+	objWrapper->aCustomMass         = srObjectInfo.aCustomMass;
+	objWrapper->aMass               = srObjectInfo.aMass;
+
+	return objWrapper;
 }
 

@@ -4,10 +4,7 @@
 #include <string>
 #include <vector>
 #include <type_traits>
-#include <bitset>
-#include <queue>
 #include <set>
-#include <memory>
 #include <array>
 
 #include "types/transform.h"
@@ -27,82 +24,40 @@ using Entity = size_t;
 #include "iaudio.h"
 
 
-// Forward Declarations
-// namespace flatbuffers
-// {
-// class FlatBufferBuilder;
-// }
-
 template< typename T >
 struct ComponentNetVar;
 struct EntComponentData_t;
 
 class EntitySystem;
+class EntityComponentPool;
 class IEntityComponentSystem;
 
-using ComponentType                     = uint8_t;
-
-constexpr Entity        CH_MAX_ENTITIES = 8192;
-constexpr Entity        CH_ENT_INVALID  = SIZE_MAX;
-
-constexpr ComponentType MAX_COMPONENTS  = 64;
-
-#define COMPONENT_POOLS 1
-#define COMPONENT_POOLS_TEMP 1
-
-#define USE_FLEXBUFFERS 1
-
-// NEW entity component system
 
 // ====================================================================================================
-// Entity Component Database
-// 
-// A shared system between client and server that stores info on each component
-// this will not talk to anything, only things to talk to it
+// Base Entity and Component Stuff
 // ====================================================================================================
 
 
-// prototype component stuff, would work nice for a map editor and networking
-// look at datatable stuff
-//
-// CH_REGISTER_COMPONENT( transform, Transform, NetCompTransform, Net_WriteTransform, Net_ReadTransform )
-//		CH_COMP_VEC3( aAng, "ang" )
-//		CH_COMP_VEC3( aPos, "pos" )
-//		CH_COMP_VEC3( aScale, "scale" )
-// CH_END_COMPONENT()
-//
-// CH_REGISTER_COMPONENT( player_zoom, CPlayerZoom, NetCompPlayerZoom, Net_WritePlayerZoom, Net_ReadPlayerZoom )
-//		CH_COMP_FLOAT( aZoom, "zoom" )
-// CH_END_COMPONENT()
-// 
-
-// template< typename T >
-// using FEntComp_ReadFunc = void( T& srData );
-// 
-// template< typename T >
-// using FEntComp_WriteFunc = void( capnp::MessageBuilder& srMessage, const T& srData );
+constexpr Entity CH_MAX_ENTITIES = 8192;
+constexpr Entity CH_ENT_INVALID  = SIZE_MAX;
 
 // Functions for creating and freeing components
-using FEntComp_New       = std::function< void*() >;
-using FEntComp_Free      = std::function< void( void* spData ) >;
+using FEntComp_New      = std::function< void*() >;
+using FEntComp_Free     = std::function< void( void* spData ) >;
 
 // Functions for creating component systems
-using FEntComp_NewSys    = std::function< IEntityComponentSystem*() >;
-
-#if !USE_FLEXBUFFERS
-// Functions for serializing and deserializing Components with FlatBuffers
-using FEntComp_ReadFunc  = void( flatbuffers::Verifier& srVerifier, const uint8_t* spSerialized, void* spData );
-using FEntComp_WriteFunc = bool( flatbuffers::FlatBufferBuilder& srBuilder, const void* spData, bool sFullUpdate );
-#endif
+using FEntComp_NewSys   = std::function< IEntityComponentSystem*() >;
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
-using FEntComp_Register  = void( const char* spName );
+using FEntComp_Register = void( const char* spName );
 
-using FEntComp_VarRead   = void( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData );
-using FEntComp_VarWrite  = bool( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate );
+// Used for custom defined variables
+using FEntComp_VarRead  = void( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData );
+using FEntComp_VarWrite = bool( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate );
 
 
+// TODO: Rename this to EEntNetField
 enum EEntComponentVarType : u8
 {
 	EEntComponentVarType_Invalid,
@@ -129,6 +84,10 @@ enum EEntComponentVarType : u8
 	EEntComponentVarType_Vec2,  // glm::vec2
 	EEntComponentVarType_Vec3,  // glm::vec3
 	EEntComponentVarType_Vec4,  // glm::vec4
+
+	// TODO: Implement
+	// EEntComponentVarType_Color3,  // glm::vec3
+	// EEntComponentVarType_Color4,  // glm::vec4
 
 	EEntComponentVarType_Custom,  // Custom Type, must define your own read and write function for this type
 
@@ -169,7 +128,19 @@ enum EEntityFlag_ : EEntityFlag
 
 	// Entity is Predicted
 	EEntityFlag_Predicted = ( 1 << 3 ),
+
+	// Ignore data from the server on the client, useful for first person camera entity
+	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
+	EEntityFlag_IgnoreOnClient = ( 1 << 4 ),
 };
+
+
+// ====================================================================================================
+// Entity Component Database
+//
+// A shared system between client and server that stores info on each component
+// this will not talk to anything, only things to talk to it
+// ====================================================================================================
 
 
 // Var Data for a component
@@ -178,20 +149,17 @@ struct EntComponentVarData_t
 	EEntComponentVarType aType;
 	bool                 aIsNetVar;
 	size_t               aSize;
-	const char*          apVarName;
 	const char*          apName;
 };
 
 
 // Data for a specific component
-// template< typename T >
 struct EntComponentData_t
 {
 	const char*                               apName;
 
 	// [Var Offset] = Var Data
 	std::map< size_t, EntComponentVarData_t > aVars;
-	// std::vector< EntComponentVarData_t > aVars;
 
 	size_t                                    aSize;
 
@@ -234,91 +202,11 @@ struct EntCompVarTypeToEnum_t
 };
 
 
+// it would be funny if we changed this to "TheEntityComponentRegistry"
 extern EntComponentRegistry_t gEntComponentRegistry;
 
 // void* EntComponentRegistry_Create( std::string_view sName );
 // void* EntComponentRegistry_GetVarHandler();
-
-
-class EntityComponentPool
-{
-  public:
-	EntityComponentPool();
-	~EntityComponentPool();
-
-	// Called whenever an entity is destroyed on all Component Pools
-	bool                                             Init( const char* spName );
-
-	// Get Component Registry Data
-	EntComponentData_t*                              GetRegistryData();
-
-	// Does this pool contain a component for this entity?
-	bool                                             Contains( Entity entity );
-
-	// Called whenever an entity is destroyed on all Component Pools
-	void                                             EntityDestroyed( Entity entity );
-
-	// Adds This component to the entity
-	void*                                            Create( Entity entity );
-
-	// Removes this component from the entity
-	void                                             Remove( Entity entity );
-
-	// Removes this component by index
-	void                                             RemoveByIndex( size_t sIndex );
-
-	// Removes this component from the entity later
-	void                                             RemoveQueued( Entity entity );
-
-	// Removes components queued for deletion
-	void                                             RemoveAllQueued();
-
-	// Gets the data for this component
-	void*                                            GetData( Entity entity );
-
-	// Marks this component as predicted
-	void                                             SetPredicted( Entity entity, bool sPredicted );
-
-	// Is this component predicted for this Entity?
-	bool                                             IsPredicted( Entity entity );
-
-	// How Many Components are in this Pool?
-	size_t                                           GetCount();
-
-	// ------------------------------------------------------------------
-
-	// Map Component Index to Entity
-	std::unordered_map< size_t, Entity >             aMapComponentToEntity;
-
-	// Map Entity to Component Index
-	std::unordered_map< Entity, size_t >             aMapEntityToComponent;
-
-	// Memory Pool of Components
-	// This is an std::array so that when a component is freed, it does not changes the index of each component
-	std::array< void*, CH_MAX_ENTITIES >             aComponents{};
-
-	// Component Flags, just uses Entity Flags for now
-	// Key is an index into aComponents
-	std::unordered_map< size_t, EEntityFlag >        aComponentFlags;
-
-	// Amount of Components we have allocated
-	size_t                                           aCount;
-
-	// Component Name
-	const char*                                      apName;
-
-	// Component Creation and Free Func
-	FEntComp_New                                     aFuncNew;
-	FEntComp_Free                                    aFuncFree;
-
-	EntComponentData_t*                              apData;
-
-	// Component Systems that manage this component
-	// NOTE: This may always just be one
-	// std::set< IEntityComponentSystem* >  aComponentSystems;
-	IEntityComponentSystem*                          apComponentSystem = nullptr;
-};
-
 
 const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType );
 const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType );
@@ -380,7 +268,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spName, size_t sOffset, size_t sVarHash )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -400,11 +288,10 @@ inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const
 		return;
 	}
 
-	auto& varData     = data.aVars[ sOffset ];
-	varData.apVarName = spVarName;
-	varData.apName    = spName;
-	varData.aSize     = sizeof( VAR_TYPE );
-	varData.aType     = sVarType;
+	auto& varData  = data.aVars[ sOffset ];
+	varData.apName = spName;
+	varData.aSize  = sizeof( VAR_TYPE );
+	varData.aType  = sVarType;
 
 	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
 
@@ -466,7 +353,7 @@ inline void EntComp_RegisterComponentVarEx2( EEntComponentVarType sVarType, cons
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, size_t sVarHash )
 {
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
@@ -478,7 +365,7 @@ inline void EntComp_RegisterComponentVar( const char* spVarName, const char* spN
 		return;
 	}
 
-	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spVarName, spName, sOffset, sVarHash );
+	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash );
 }
 
 
@@ -543,6 +430,97 @@ inline void EntComp_RegisterVarHandler()
 
 
 // ====================================================================================================
+// Entity Component Pool
+// Stores all data for a specific component for each entity
+// ====================================================================================================
+
+
+class EntityComponentPool
+{
+  public:
+	EntityComponentPool();
+	~EntityComponentPool();
+
+	// Called whenever an entity is destroyed on all Component Pools
+	bool                                      Init( const char* spName );
+
+	// Get Component Registry Data
+	EntComponentData_t*                       GetRegistryData();
+
+	// Does this pool contain a component for this entity?
+	bool                                      Contains( Entity entity );
+
+	// Called whenever an entity is destroyed on all Component Pools
+	void                                      EntityDestroyed( Entity entity );
+
+	// Adds This component to the entity
+	void*                                     Create( Entity entity );
+
+	// Removes this component from the entity
+	void                                      Remove( Entity entity );
+
+	// Removes this component by index
+	void                                      RemoveByIndex( size_t sIndex );
+
+	// Removes this component from the entity later
+	void                                      RemoveQueued( Entity entity );
+
+	// Removes components queued for deletion
+	void                                      RemoveAllQueued();
+
+	// Initializes Created Components
+	void                                      InitCreatedComponents();
+
+	// Gets the data for this component
+	void*                                     GetData( Entity entity );
+
+	// Marks this component as predicted
+	void                                      SetPredicted( Entity entity, bool sPredicted );
+
+	// Is this component predicted for this Entity?
+	bool                                      IsPredicted( Entity entity );
+
+	// How Many Components are in this Pool?
+	size_t                                    GetCount();
+
+	// ------------------------------------------------------------------
+
+	// Map Component Index to Entity
+	std::unordered_map< size_t, Entity >      aMapComponentToEntity;
+
+	// Map Entity to Component Index
+	std::unordered_map< Entity, size_t >      aMapEntityToComponent;
+
+	// Memory Pool of Components
+	// This is an std::array so that when a component is freed, it does not changes the index of each component
+	// TODO: I DON'T LIKE THIS, TAKES UP TOO MUCH MEMORY
+	// maybe use Handle's from ResourceList<> instead, as it uses a memory pool?
+	std::array< void*, CH_MAX_ENTITIES >      aComponents{};
+
+	// Component Flags, just uses Entity Flags for now
+	// Key is an index into aComponents
+	std::unordered_map< size_t, EEntityFlag > aComponentFlags;
+
+	// Amount of Components we have allocated
+	size_t                                    aCount;
+
+	// Component Name
+	const char*                               apName;
+
+	// Component Creation and Free Func
+	FEntComp_New                              aFuncNew;
+	FEntComp_Free                             aFuncFree;
+
+	EntComponentData_t*                       apData;
+
+	// Component Systems that manage this component
+	// NOTE: This may always just be one
+	// std::set< IEntityComponentSystem* >  aComponentSystems;
+	IEntityComponentSystem*                   apComponentSystem = nullptr;
+};
+
+
+// ====================================================================================================
 // Entity Component System Interface
 // stores a list of entities with that component type
 // ====================================================================================================
@@ -579,51 +557,52 @@ class IEntityComponentSystem
 class EntitySystem
 {
   public:
-	static bool                                                   CreateClient();
-	static bool                                                   CreateServer();
+	static bool             CreateClient();
+	static bool             CreateServer();
 
-	static void                                                   DestroyClient();
-	static void                                                   DestroyServer();
+	static void             DestroyClient();
+	static void             DestroyServer();
 
-	bool                                                          Init();
-	void                                                          Shutdown();
+	bool                    Init();
+	void                    Shutdown();
 
-	void                                                          UpdateSystems();
+	void                    UpdateSystems();
 
 	// Update Entity and Component States, and Delete Queued Entities
-	void                                                          UpdateStates();
+	void                    UpdateStates();
+	void                    InitCreatedComponents();
 
-	void                                                          CreateComponentPools();
-	void                                                          CreateComponentPool( const char* spName );
+	void                    CreateComponentPools();
+	void                    CreateComponentPool( const char* spName );
 
-	// Get a system for managing this component 
-	IEntityComponentSystem*                                       GetComponentSystem( const char* spName );
+	// Get a system for managing this component
+	IEntityComponentSystem* GetComponentSystem( const char* spName );
 
 	// if sLocal is true, then the entity is only created on client or server, and is never networked
 	// Useful for client or server only entities, if we ever have those
-	Entity                                                        CreateEntity( bool sLocal = false );
-	void                                                          DeleteEntity( Entity ent );
-	void                                                          DeleteQueuedEntities();
-	Entity                                                        GetEntityCount();
+	Entity                  CreateEntity( bool sLocal = false );
+	void                    DeleteEntity( Entity ent );
+	void                    DeleteQueuedEntities();
+	Entity                  GetEntityCount();
 
-	bool                                                          EntityExists( Entity sDesiredId );
+	bool                    EntityExists( Entity sDesiredId );
 
 	// Parents an entity to another one
 	// TODO: tackle parenting with physics objects
-	void                                                          ParentEntity( Entity sSelf, Entity sParent );
-	Entity                                                        GetParent( Entity sEntity );
+	void                    ParentEntity( Entity sSelf, Entity sParent );
+	Entity                  GetParent( Entity sEntity );
 
 	// Get the highest level parent for this entity, returns self if not parented
-	Entity                                                        GetRootParent( Entity sEntity );
+	Entity                  GetRootParent( Entity sEntity );
 
 	// Recursively get all entities attached to this one (SLOW)
-	void                                                          GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren );
+	void                    GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren );
 
 	// Returns a Model Matrix with parents applied in world space IF we have a transform component
-	bool                                                          GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
+	bool                    GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
 
 	// Same as GetWorldMatrix, but returns in a Transform struct
-	Transform                                                     GetWorldTransform( Entity sEntity );
+	Transform               GetWorldTransform( Entity sEntity );
 
 	// having local versions of these functions are useless, that's just the transform component
 	// GetWorldMatrix
@@ -633,40 +612,40 @@ class EntitySystem
 	// GetWorldScale
 
 	// Read and write from the network
-	void                                                          ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
-	void                                                          WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
+	void                    ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
+	void                    WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
 
-	void                                                          ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
-	void                                                          WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
-
-	// void                                                          SetComponentNetworked( Entity ent, const char* spName );
+	void                    ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
+	void                    WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
 
 	// Add a component to an entity
-	void*                                                         AddComponent( Entity entity, const char* spName );
+	void*                   AddComponent( Entity entity, const char* spName );
 
 	// Does this entity have this component?
-	bool                                                          HasComponent( Entity entity, const char* spName );
+	bool                    HasComponent( Entity entity, const char* spName );
 
 	// Get a component from an entity
-	void*                                                         GetComponent( Entity entity, const char* spName );
+	void*                   GetComponent( Entity entity, const char* spName );
 
 	// Remove a component from an entity
-	void                                                          RemoveComponent( Entity entity, const char* spName );
+	void                    RemoveComponent( Entity entity, const char* spName );
 
 	// Sets Prediction on this component
-	void                                                          SetComponentPredicted( Entity entity, const char* spName, bool sPredicted );
+	void                    SetComponentPredicted( Entity entity, const char* spName, bool sPredicted );
 
 	// Is this component predicted for this Entity?
-	bool                                                          IsComponentPredicted( Entity entity, const char* spName );
+	bool                    IsComponentPredicted( Entity entity, const char* spName );
 
 	// Enables/Disables Networking on this Entity
-	void                                                          SetNetworked( Entity entity, bool sNetworked = true );
+	void                    SetNetworked( Entity entity, bool sNetworked = true );
 
 	// Is this Entity Networked?
-	bool                                                          IsNetworked( Entity entity );
+	bool                    IsNetworked( Entity entity );
+
+	// void                    SetComponentNetworked( Entity ent, const char* spName );
 
 	// Get the Component Pool for this Component
-	EntityComponentPool*                                          GetComponentPool( const char* spName );
+	EntityComponentPool*    GetComponentPool( const char* spName );
 
 	// Gets a component system by type_hash()
 	template< typename T >
@@ -677,7 +656,7 @@ class EntitySystem
 
 		if ( it != aComponentSystems.end() )
 		{
-			static_cast< T* >( it->second );
+			return static_cast< T* >( it->second );
 		}
 
 		Log_ErrorF( "Failed to find Component System \"%s\"\n", typeid( T ).name() );
@@ -685,34 +664,34 @@ class EntitySystem
 	}
 
 	// TEMP DEBUG
-	bool                                                          aIsClient = false;
+	bool                                                         aIsClient = false;
 
 	// Queue of unused entity IDs
 	// TODO: CHANGE BACK TO QUEUE
 	// std::queue< Entity >                               aEntityPool{};
-	std::vector< Entity >                                         aEntityPool{};
+	std::vector< Entity >                                        aEntityPool{};
 
 	// Entity ID's in use
-	std::vector< Entity >                                         aUsedEntities{};
+	std::vector< Entity >                                        aUsedEntities{};
 
 	// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
-	std::unordered_map< Entity, Entity >                          aEntityIDConvert;
+	std::unordered_map< Entity, Entity >                         aEntityIDConvert;
 
-	// Total living entities - used to keep limits on how many exist
-	Entity                                                        aEntityCount = 0;
+	// Total living entities - used to keep limits on how many exist (TODO: remove this now that aUsedEntities exists)
+	Entity                                                       aEntityCount = 0;
 
-	// Component Array - list of all of this type of component in existence
-	std::unordered_map< std::string_view, EntityComponentPool* >  aComponentPools;
+	// Component Pools - Pool of all of this type of component in existence
+	std::unordered_map< std::string_view, EntityComponentPool* > aComponentPools;
 
 	// All Component Systems, key is the type_hash() of the system
 	// NOTE: it's a bit strange to have them be stored here and one in each component pool
-	std::unordered_map< size_t, IEntityComponentSystem* >         aComponentSystems;
+	std::unordered_map< size_t, IEntityComponentSystem* >        aComponentSystems;
 
 	// Entity Flags
-	std::unordered_map< Entity, EEntityFlag >                     aEntityFlags;
+	std::unordered_map< Entity, EEntityFlag >                    aEntityFlags;
 
 	// Entity Parents
-	std::unordered_map< Entity, Entity >                          aEntityParents;
+	std::unordered_map< Entity, Entity >                         aEntityParents;
 };
 
 
@@ -1100,63 +1079,6 @@ struct CTransform
 };
 
 
-struct CTransformSmall
-{
-	ComponentNetVar< glm::vec3 > aPos = {};
-	ComponentNetVar< glm::vec3 > aAng = {};
-
-	// -------------------------------------------------
-	// C++ class essentials
-
-	CTransformSmall()
-	{
-	}
-
-	~CTransformSmall()
-	{
-	}
-
-	// copying
-	void                         assign( const CTransformSmall& other )
-	{
-		aPos   = std::move( other.aPos );
-		aAng   = std::move( other.aAng );
-	}
-
-	// moving
-	void assign( CTransformSmall&& other )
-	{
-		// swap the values of this one with that one
-		std::swap( aPos, other.aPos );
-		std::swap( aAng, other.aAng );
-	}
-
-	CTransformSmall& operator=( const CTransformSmall& other )
-	{
-		assign( other );
-		return *this;
-	}
-
-	CTransformSmall& operator=( CTransformSmall&& other )
-	{
-		assign( std::move( other ) );
-		return *this;
-	}
-
-	// copying
-	CTransformSmall( const CTransformSmall& other )
-	{
-		assign( other );
-	}
-
-	// moving
-	CTransformSmall( CTransformSmall&& other ) noexcept
-	{
-		assign( std::move( other ) );
-	}
-};
-
-
 struct CRigidBody
 {
 	ComponentNetVar< glm::vec3 > aVel = {};
@@ -1164,11 +1086,10 @@ struct CRigidBody
 };
 
 
-struct CGravity
-{
-	// glm::vec3 aForce = {};
-	ComponentNetVar< glm::vec3 > aForce = {};
-};
+// struct CGravity
+// {
+// 	ComponentNetVar< glm::vec3 > aForce = {};
+// };
 
 
 // Direction Vectors
@@ -1251,10 +1172,10 @@ struct CLight
 
 
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
-  EntComp_RegisterComponentVar< type, varType >( #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+  EntComp_RegisterComponentVar< type, varType >( #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
 
 #define CH_REGISTER_COMPONENT_VAR_EX( type, netVarType, varType, varName, varStr ) \
-  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varName, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
 
 
 //define CH_REGISTER_COMPONENT_VAR_EX( type, varType, varName, varStr ) \
@@ -1312,7 +1233,7 @@ struct CLight
 
 
 #define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr ) \
-  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varName, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code() )
+  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code() )
 
 #define CH_REGISTER_COMPONENT_SYS2( systemClass, systemVar ) \
   EntComp_RegisterComponentSystem< TYPE >( [ & ]() { \

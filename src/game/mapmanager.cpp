@@ -153,7 +153,8 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 	// the map should always be entity index 0
 	gMapEntity = GetEntitySystem()->CreateEntity();
 
-	MapManager_SpawnPlayer();
+	// TODO: Have a root map entity with transform, and probably a physics shape for StaticCompound
+	// then in CPhysShape, add an option to use an entity and everything parented to that
 
 	// rotate the world model
 	glm::mat4 modelMatrix      = Util_ToMatrix( nullptr, &gpMap->aMapInfo->ang );
@@ -449,12 +450,6 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 	}
 
 	return mapInfo;
-}
-
-
-void MapManager_SpawnPlayer()
-{
-	// players->Respawn( gLocalPlayer );
 }
 
 
