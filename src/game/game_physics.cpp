@@ -65,11 +65,11 @@ static std::unordered_map< Handle, Handle >       gPhysRenderables;
 // }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysShapeType, aShapeType, shapeType );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aBounds, bounds );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysShapeType, aShapeType, shapeType, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aBounds, bounds, CH_ENT_SAVE_TO_MAP );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysShape, gEntSys_PhysShape );
 
@@ -81,24 +81,24 @@ CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aStartActive, startActive );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aAllowSleeping, allowSleeping );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aStartActive, startActive, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aAllowSleeping, allowSleeping, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxLinearVelocity, maxLinearVelocity );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxAngularVelocity, maxAngularVelocity );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxLinearVelocity, maxLinearVelocity, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxAngularVelocity, maxAngularVelocity, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionType, aMotionType, motionType );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionQuality, aMotionQuality, motionQuality );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionType, aMotionType, motionType, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, PhysMotionQuality, aMotionQuality, motionQuality, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aIsSensor, isSensor );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aIsSensor, isSensor, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCustomMass, customMass );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMass, mass );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCustomMass, customMass, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMass, mass, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aGravity, gravity );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aUpdateTransform, updateTransform );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aGravity, gravity, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aUpdateTransform, updateTransform, CH_ENT_SAVE_TO_MAP );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysObject, gEntSys_PhysObject );
 }

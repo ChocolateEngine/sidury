@@ -1627,7 +1627,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				ReadComponent( flexRoot, regData, componentData );
 				// regData->apRead( componentVerifier, values->data(), componentData );
 
-				Log_DevF( gLC_Entity, 2, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
+				Log_DevF( gLC_Entity, 3, "Parsed component data for entity \"%zd\" - \"%s\"\n", entity, componentName );
 
 				if ( system )
 				{
@@ -1778,6 +1778,35 @@ bool EntitySystem::IsNetworked( Entity entity )
 
 	// We make sure the parents are also networked before networking this one
 	return IsNetworked( parent );
+}
+
+
+void EntitySystem::SetAllowSavingToMap( Entity entity, bool sSaveToMap )
+{
+	auto it = aEntityFlags.find( entity );
+	if ( it == aEntityFlags.end() )
+	{
+		Log_Error( gLC_Entity, "Failed to get Entity SaveToMap State - Entity not found\n" );
+		return;
+	}
+
+	if ( sSaveToMap )
+		it->second &= ~EEntityFlag_DontSaveToMap;
+	else
+		it->second |= EEntityFlag_DontSaveToMap;
+}
+
+
+bool EntitySystem::CanSaveToMap( Entity entity )
+{
+	auto it = aEntityFlags.find( entity );
+	if ( it == aEntityFlags.end() )
+	{
+		Log_Error( gLC_Entity, "Failed to get Entity SaveToMap State - Entity not found\n" );
+		return false;
+	}
+
+	return !( it->second & EEntityFlag_DontSaveToMap );
 }
 
 

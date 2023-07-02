@@ -171,7 +171,7 @@ void* EntityComponentPool::Create( Entity entity )
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 
-	Log_DevF( gLC_Entity, 1, "%s - Added Component To Entity %zd - %s\n", GetProcessingName(), entity, apName );
+	Log_DevF( gLC_Entity, 2, "%s - Added Component To Entity %zd - %s\n", GetProcessingName(), entity, apName );
 
 	// TODO: use malloc and use that pointer in the constructor for this
 	// use placement new
@@ -218,7 +218,7 @@ void EntityComponentPool::Remove( Entity entity )
 	vec_remove( aComponentIDs, index );
 	// aCount--;
 
-	Log_DevF( gLC_Entity, 1, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
+	Log_DevF( gLC_Entity, 2, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
 
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
@@ -263,7 +263,7 @@ void EntityComponentPool::RemoveByID( ComponentID_t sID )
 	vec_remove( aComponentIDs, sID );
 	// aCount--;
 
-	Log_DevF( gLC_Entity, 1, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
+	Log_DevF( gLC_Entity, 2, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
 
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
@@ -287,7 +287,7 @@ void EntityComponentPool::RemoveQueued( Entity entity )
 	// Mark Component as Destroyed
 	aComponentFlags[ index ] |= EEntityFlag_Destroyed;
 
-	Log_DevF( gLC_Entity, 1, "%s - Marked Component to be removed From Entity %zd - %s\n", GetProcessingName(), entity, apName );
+	Log_DevF( gLC_Entity, 2, "%s - Marked Component to be removed From Entity %zd - %s\n", GetProcessingName(), entity, apName );
 }
 
 

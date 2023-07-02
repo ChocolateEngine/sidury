@@ -938,6 +938,9 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	client->aState  = ESV_ClientState_WaitForClientInfo;
 	client->aEntity = entity;
 
+	// Don't try to save the player in the map
+	GetEntitySystem()->SetAllowSavingToMap( entity, false );
+
 	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", Net_AddrToString( srAddr ) );
 
 	// Add the playerInfo Component

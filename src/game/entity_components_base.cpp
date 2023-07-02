@@ -30,18 +30,18 @@ void Ent_RegisterVarHandlers()
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CRigidBody, rigidBody, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CRigidBody, rigidBody, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aVel, vel );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aAccel, accel );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aVel, vel, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aAccel, accel, true );
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aForward, forward );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aUp, up );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aRight, right );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aForward, forward, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aUp, up, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aRight, right, true );
 }
 
 
@@ -49,12 +49,12 @@ CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_
 // "internal://model_0"
 // and a file on the disk to load will be this:
 // "file://path/to/asset.glb"
-CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aTestVis, testVis );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCastShadow, castShadow );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aVisible, visible );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aTestVis, testVis, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCastShadow, castShadow, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aVisible, visible, true );
 	
 	CH_REGISTER_COMPONENT_SYS2( EntSys_Renderable, gEntSys_Renderable );
 }
@@ -97,11 +97,11 @@ void Ent_RegisterBaseComponents()
 		  return transform;
 	  },
 	  [ & ]( void* spData )
-	  { delete (CTransform*)spData; } );
+	  { delete (CTransform*)spData; }, true );
 
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code(), true );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code(), true );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code(), true );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
 	// CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
@@ -119,30 +119,30 @@ void Ent_RegisterBaseComponents()
 
 	// might be a bit weird
 	// HACK HACK: DONT OVERRIDE CLIENT VALUE, IT WILL NEVER BE UPDATED
-	CH_REGISTER_COMPONENT_RW( CCamera, camera, false );
-	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov );
+	CH_REGISTER_COMPONENT_RW( CCamera, camera, false, true );
+	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov, true );
 	
-	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both, false );
 
 	// Probably should be in graphics?
-	CH_REGISTER_COMPONENT_RW( CLight, light, true );
+	CH_REGISTER_COMPONENT_RW( CLight, light, true, true );
 	CH_REGISTER_COMPONENT_SYS( CLight, LightSystem, gLightEntSystems );
-	CH_REGISTER_COMPONENT_VAR( CLight, ELightType, aType, type );
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec4, aColor, color );
+	CH_REGISTER_COMPONENT_VAR( CLight, ELightType, aType, type, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec4, aColor, color, true );
 
 	// TODO: these 2 should not be here
     // it should be attached to it's own entity that can be parented
     // and that entity needs to contain the transform (or transform small) component
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aPos, pos );
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aAng, ang );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aPos, pos, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aAng, ang, true );
 
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aInnerFov, innerFov );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aOuterFov, outerFov );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aRadius, radius );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aLength, length );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aShadow, shadow );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aEnabled, enabled );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aUseTransform, useTransform );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aInnerFov, innerFov, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aOuterFov, outerFov, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aRadius, radius, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, float, aLength, length, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aShadow, shadow, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aEnabled, enabled, true );
+	CH_REGISTER_COMPONENT_VAR( CLight, bool, aUseTransform, useTransform, true );
 }
 
 

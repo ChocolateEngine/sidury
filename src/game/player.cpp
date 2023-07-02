@@ -238,35 +238,35 @@ PlayerManager::~PlayerManager()
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntComponentNetType_Both, false )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, EPlayerMoveType, aMoveType, moveType );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPlayerFlags, playerFlags );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, EPlayerMoveType, aMoveType, moveType, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPlayerFlags, playerFlags, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, false );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxSpeed, maxSpeed );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxSpeed, maxSpeed, false );
 
 	// View Bobbing
-	//CH_REGISTER_COMPONENT_VAR( EEntComponentVarType_Float, float, aWalkTime, walkTime );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aBobOffsetAmount, bobOffsetAmount );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewTilt, prevViewTilt );
+	//CH_REGISTER_COMPONENT_VAR( EEntComponentVarType_Float, float, aWalkTime, walkTime, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aBobOffsetAmount, bobOffsetAmount, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewTilt, prevViewTilt, false );
 
 	// Smooth Land
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandPower, landPower );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandTime, landTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandPower, landPower, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandTime, landTime, false );
 
 	// Smooth Duck
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewHeight, prevViewHeight );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aTargetViewHeight, targetViewHeight );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aOutViewHeight, outViewHeight );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckDuration, duckDuration );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckTime, duckTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewHeight, prevViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aTargetViewHeight, targetViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aOutViewHeight, outViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckDuration, duckDuration, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckTime, duckTime, false );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLastStepTime, lastStepTime );
+	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLastStepTime, lastStepTime, false );
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetType_Both )
+CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetType_Both, true )
 {
 	CH_REGISTER_COMPONENT_SYS2( PlayerSpawnManager, playerSpawn );
 }
@@ -274,20 +274,20 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetT
 
 void PlayerManager::RegisterComponents()
 {
-	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both );
+	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both, false );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aCamera, camera );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aFlashlight, flashlight );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer );  // don't mess with this
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aCamera, camera, false );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aFlashlight, flashlight, false );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, false );  // don't mess with this
 
-	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov );
+	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false, false );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, false );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov, false );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed, false );
 
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();

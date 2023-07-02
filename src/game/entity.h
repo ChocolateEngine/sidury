@@ -41,6 +41,9 @@ class IEntityComponentSystem;
 constexpr Entity CH_MAX_ENTITIES = 8192;
 constexpr Entity CH_ENT_INVALID  = SIZE_MAX;
 
+constexpr bool   CH_ENT_SAVE_TO_MAP      = true;
+constexpr bool   CH_ENT_DONT_SAVE_TO_MAP = false;
+
 
 struct ComponentID_t
 {
@@ -165,6 +168,9 @@ enum EEntityFlag_ : EEntityFlag
 	// Ignore data from the server on the client, useful for first person camera entity
 	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
 	EEntityFlag_IgnoreOnClient = ( 1 << 4 ),
+
+	// Don't save this Entity/Component To the Map
+	EEntityFlag_DontSaveToMap  = ( 1 << 5 ),
 };
 
 
@@ -181,6 +187,7 @@ struct EntComponentVarData_t
 {
 	EEntComponentVarType aType;
 	bool                 aIsNetVar;
+	bool                 aSaveToMap;
 	size_t               aSize;
 	const char*          apName;
 };
@@ -196,12 +203,12 @@ struct EntComponentData_t
 
 	size_t                                    aSize;
 
+	bool                                      aSaveToMap;
 	bool                                      aOverrideClient;  // probably temporary until prediction
 	EEntComponentNetType                      aNetType;
 
 	FEntComp_New                              aFuncNew;
 	FEntComp_Free                             aFuncFree;
-
 	FEntComp_NewSys                           aFuncNewSystem;
 };
 
@@ -256,7 +263,13 @@ void        Ent_RegisterBaseComponents();
 
 
 template< typename T >
-inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient, EEntComponentNetType sNetType, FEntComp_New sFuncNew, FEntComp_Free sFuncFree )
+inline void EntComp_RegisterComponent(
+	const char* spName,
+	bool sOverrideClient,
+	EEntComponentNetType sNetType,
+	FEntComp_New sFuncNew,
+	FEntComp_Free sFuncFree,
+	bool sSaveToMap )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -272,6 +285,7 @@ inline void EntComp_RegisterComponent( const char* spName, bool sOverrideClient,
 	data.aSize                                      = sizeof( T );
 	data.aOverrideClient                            = sOverrideClient;
 	data.aNetType                                   = sNetType;
+	data.aSaveToMap                                 = sSaveToMap;
 	data.aFuncNew                                   = sFuncNew;
 	data.aFuncFree                                  = sFuncFree;
 
@@ -301,7 +315,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -321,10 +335,11 @@ inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const
 		return;
 	}
 
-	auto& varData  = data.aVars[ sOffset ];
-	varData.apName = spName;
-	varData.aSize  = sizeof( VAR_TYPE );
-	varData.aType  = sVarType;
+	EntComponentVarData_t& varData = data.aVars[ sOffset ];
+	varData.apName                 = spName;
+	varData.aSize                  = sizeof( VAR_TYPE );
+	varData.aType                  = sVarType;
+	varData.aSaveToMap             = sSaveToMap;
 
 	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
 
@@ -386,7 +401,7 @@ inline void EntComp_RegisterComponentVarEx2( EEntComponentVarType sVarType, cons
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
 {
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
@@ -398,7 +413,7 @@ inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, si
 		return;
 	}
 
-	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash );
+	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash, sSaveToMap );
 }
 
 
@@ -675,6 +690,12 @@ class EntitySystem
 
 	// Is this Entity Networked?
 	bool                    IsNetworked( Entity entity );
+
+	// Sets whether this entity can be saved to a map or not
+	void                    SetAllowSavingToMap( Entity entity, bool sSaveToMap = true );
+
+	// Is this Entity able to be saved to a map?
+	bool                    CanSaveToMap( Entity entity );
 
 	// void                    SetComponentNetworked( Entity ent, const char* spName );
 
@@ -1187,8 +1208,9 @@ struct CLight
 
 
 // Helper Macros
-#define CH_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
-  EntComp_RegisterComponent< type >( #name, overrideClient, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; } )
+#define CH_REGISTER_COMPONENT( type, name, overrideClient, netType, sSaveToMap ) \
+  EntComp_RegisterComponent< type >(                                             \
+	#name, overrideClient, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; }, sSaveToMap )
 
 #define CH_REGISTER_COMPONENT_SYS( type, systemClass, systemVar ) \
   EntComp_RegisterComponentSystem< type >( [ & ]() { \
@@ -1207,11 +1229,11 @@ struct CLight
 
 
 
-#define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr ) \
-  EntComp_RegisterComponentVar< type, varType >( #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+#define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr, sSaveToMap ) \
+  EntComp_RegisterComponentVar< type, varType >( #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code(), sSaveToMap )
 
-#define CH_REGISTER_COMPONENT_VAR_EX( type, netVarType, varType, varName, varStr ) \
-  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code() )
+#define CH_REGISTER_COMPONENT_VAR_EX( type, netVarType, varType, varName, varStr, sSaveToMap ) \
+  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code(), sSaveToMap )
 
 
 //define CH_REGISTER_COMPONENT_VAR_EX( type, varType, varName, varStr ) \
@@ -1222,18 +1244,14 @@ struct CLight
 // #define CH_REGISTER_COMPONENT_RW_EX( type, read, write ) \
 //   EntComp_RegisterComponentReadWrite< type >( read, write )
 
-#define CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, netType ) \
-  CH_REGISTER_COMPONENT( type, name, overrideClient, netType )
-  // EntComp_RegisterComponentReadWrite< type >( CH_COMPONENT_RW( type ) )
+#define CH_REGISTER_COMPONENT_RW( type, name, overrideClient, sSaveToMap ) \
+  CH_REGISTER_COMPONENT( type, name, overrideClient, EEntComponentNetType_Both, sSaveToMap );
 
-#define CH_REGISTER_COMPONENT_RW( type, name, overrideClient ) \
-  CH_REGISTER_COMPONENT_RW_EX( type, name, overrideClient, EEntComponentNetType_Both );
+#define CH_REGISTER_COMPONENT_RW_CL( type, name, overrideClient, sSaveToMap ) \
+  CH_REGISTER_COMPONENT( type, name, overrideClient, EEntComponentNetType_Client, sSaveToMap )
 
-#define CH_REGISTER_COMPONENT_RW_CL( type, name, overrideClient ) \
-  CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Client )
-
-#define CH_REGISTER_COMPONENT_RW_SV( type, name, overrideClient ) \
-  CH_REGISTER_COMPONENT_RW( type, name, overrideClient, EEntComponentNetType_Server )
+#define CH_REGISTER_COMPONENT_RW_SV( type, name, overrideClient, sSaveToMap ) \
+  CH_REGISTER_COMPONENT( type, name, overrideClient, EEntComponentNetType_Server, sSaveToMap )
 
 
 
@@ -1248,28 +1266,29 @@ struct CLight
 //	bool _NetComp_Write_##typeName( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
 
 
-#define CH_STRUCT_REGISTER_COMPONENT( type, name, overrideClient, netType ) \
-  struct __CompRegister_##type##_t                                          \
-  {                                                                         \
-	using TYPE = type;                                                      \
-                                                                            \
-	void RegisterVars();                                                    \
-	__CompRegister_##type##_t()                                             \
-	{                                                                       \
-	  EntComp_RegisterComponent< TYPE >(                                    \
-		#name, overrideClient, netType, [ & ]() { return new TYPE; },       \
-		[ & ]( void* spData )                                               \
-		{ delete (type*)spData; } );                                        \
-                                                                            \
-	  RegisterVars();                                                       \
-	}                                                                       \
-  };                                                                        \
-  static __CompRegister_##type##_t __CompRegister_##type;                   \
+#define CH_STRUCT_REGISTER_COMPONENT( type, name, overrideClient, netType, sSaveToMap ) \
+  struct __CompRegister_##type##_t                                                      \
+  {                                                                                     \
+	using TYPE = type;                                                                  \
+                                                                                        \
+	void RegisterVars();                                                                \
+	__CompRegister_##type##_t()                                                         \
+	{                                                                                   \
+	  EntComp_RegisterComponent< TYPE >(                                                \
+		#name, overrideClient, netType, [ & ]() { return new TYPE; },                   \
+		[ & ]( void* spData )                                                           \
+		{ delete (type*)spData; },                                                      \
+		sSaveToMap );                                                                   \
+                                                                                        \
+	  RegisterVars();                                                                   \
+	}                                                                                   \
+  };                                                                                    \
+  static __CompRegister_##type##_t __CompRegister_##type;                               \
   void                             __CompRegister_##type##_t::RegisterVars()
 
 
-#define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr ) \
-  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code() )
+#define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr, sSaveToMap ) \
+  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code(), sSaveToMap )
 
 #define CH_REGISTER_COMPONENT_SYS2( systemClass, systemVar ) \
   EntComp_RegisterComponentSystem< TYPE >( [ & ]() { \

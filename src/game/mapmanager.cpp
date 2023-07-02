@@ -268,6 +268,9 @@ bool MapManager_LoadMap( const std::string &path )
 		return MapManager_LoadLegacyV1Map( absPath );
 	}
 
+	// ======================================================
+	// Reading the new Map Format
+
 	std::string mapDataPath = FileSys_FindFile( path + "/mapData.smf" );
 
 	if ( mapDataPath.empty() )
@@ -291,20 +294,6 @@ bool MapManager_LoadMap( const std::string &path )
 		Log_ErrorF( gLC_Map, "Failed to read map header: \"%s\"", path.c_str() );
 		return false;
 	}
-
-	// return sceneDraw;
-	// 
-	// int      heap = _heapchk();
-	// 
-	// uint32_t i = 0;
-	// for ( auto& renderable : gpMap->aRenderable->aDraw )
-	// {
-	// 	renderable->aModelMatrix = modelMatrix;
-	// 	renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
-	// 	i++;
-	// 
-	// 	_heapchk();
-	// }
 
 	return true;
 }
