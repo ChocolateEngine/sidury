@@ -60,6 +60,30 @@ CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, true, EEntComponentNetTyp
 }
 
 
+// Probably should be in graphics?
+CH_STRUCT_REGISTER_COMPONENT( CLight, light, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, ELightType, aType, type, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Color4, glm::vec4, aColor, color, CH_ENT_SAVE_TO_MAP );
+
+	// TODO: these 2 should not be here
+	// it should be attached to it's own entity that can be parented
+	// and that entity needs to contain the transform (or transform small) component
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aPos, pos, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aAng, ang, CH_ENT_SAVE_TO_MAP );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aInnerFov, innerFov, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOuterFov, outerFov, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aRadius, radius, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLength, length, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aShadow, shadow, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aEnabled, enabled, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aUseTransform, useTransform, CH_ENT_SAVE_TO_MAP );
+	
+	CH_REGISTER_COMPONENT_SYS2( LightSystem, gLightEntSystems );
+}
+
+
 void Ent_RegisterBaseComponents()
 {
 	Ent_RegisterVarHandlers();
@@ -123,26 +147,6 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov, true );
 	
 	CH_REGISTER_COMPONENT( CMap, map, true, EEntComponentNetType_Both, false );
-
-	// Probably should be in graphics?
-	CH_REGISTER_COMPONENT_RW( CLight, light, true, true );
-	CH_REGISTER_COMPONENT_SYS( CLight, LightSystem, gLightEntSystems );
-	CH_REGISTER_COMPONENT_VAR( CLight, ELightType, aType, type, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec4, aColor, color, true );
-
-	// TODO: these 2 should not be here
-    // it should be attached to it's own entity that can be parented
-    // and that entity needs to contain the transform (or transform small) component
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aPos, pos, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, glm::vec3, aAng, ang, true );
-
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aInnerFov, innerFov, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aOuterFov, outerFov, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aRadius, radius, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, float, aLength, length, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aShadow, shadow, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aEnabled, enabled, true );
-	CH_REGISTER_COMPONENT_VAR( CLight, bool, aUseTransform, useTransform, true );
 }
 
 

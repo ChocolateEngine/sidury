@@ -108,6 +108,9 @@ static const char* gEntVarTypeStr[] = {
 	"glm::vec3",
 	"glm::vec4",
 
+	"glm::vec3",
+	"glm::vec4",
+
 	"CUSTOM",
 };
 
@@ -192,10 +195,12 @@ size_t EntComp_GetVarDirtyOffset( char* spData, EEntNetField sVarType )
 			offset = sizeof( glm::vec2 );
 			break;
 
+		case EEntNetField_Color3:
 		case EEntNetField_Vec3:
 			offset = sizeof( glm::vec3 );
 			break;
 
+		case EEntNetField_Color4:
 		case EEntNetField_Vec4:
 			offset = sizeof( glm::vec4 );
 			break;
@@ -300,10 +305,12 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType )
 			const glm::vec2* value = (const glm::vec2*)spData;
 			return vstring( "(%.4f, %.4f)", value->x, value->y );
 		}
+		case EEntNetField_Color3:
 		case EEntNetField_Vec3:
 		{
 			return Vec2Str( *(const glm::vec3*)spData );
 		}
+		case EEntNetField_Color4:
 		case EEntNetField_Vec4:
 		{
 			const glm::vec4* value = (const glm::vec4*)spData;
@@ -1079,6 +1086,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 				value->y   = vector[ i++ ].AsFloat();
 				break;
 			}
+			case EEntNetField_Color3:
 			case EEntNetField_Vec3:
 			{
 				auto value = (glm::vec3*)( data );
@@ -1087,6 +1095,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 				value->z   = vector[ i++ ].AsFloat();
 				break;
 			}
+			case EEntNetField_Color4:
 			case EEntNetField_Vec4:
 			{
 				auto value = (glm::vec4*)( data );
@@ -1287,6 +1296,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
+			case EEntNetField_Color3:
 			case EEntNetField_Vec3:
 			{
 				if ( IsVarDirty() )
@@ -1299,6 +1309,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
+			case EEntNetField_Color4:
 			case EEntNetField_Vec4:
 			{
 				if ( IsVarDirty() )
