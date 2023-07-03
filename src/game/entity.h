@@ -124,9 +124,9 @@ enum EEntNetField : u8
 	EEntNetField_Vec3,  // glm::vec3
 	EEntNetField_Vec4,  // glm::vec4
 
-	// TODO: Implement
-	// EEntNetField_Color3,  // glm::vec3
-	// EEntNetField_Color4,  // glm::vec4
+	// Behaves the same as Vec3 and Vec4 for now, but has a different ui in the entity editor
+	EEntNetField_Color3,  // glm::vec3
+	EEntNetField_Color4,  // glm::vec4
 
 	EEntNetField_Custom,  // Custom Type, must define your own read and write function for this type
 

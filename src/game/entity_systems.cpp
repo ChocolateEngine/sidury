@@ -45,7 +45,7 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 		if ( GetEntitySystem()->GetWorldMatrix( matrix, sEntity ) )
 		{
 			spLight->apLight->aPos = Util_GetMatrixPosition( matrix );
-			spLight->apLight->aAng = Util_GetMatrixAngles( matrix );
+			spLight->apLight->aAng = glm::degrees( Util_GetMatrixAngles( matrix ) );
 		}
 	}
 	else

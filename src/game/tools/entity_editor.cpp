@@ -50,69 +50,69 @@ bool EntEditor_DrawComponentVarUI( void* spData, EntComponentVarData_t& srVarDat
 	switch ( srVarData.aType )
 	{
 		default:
-		case EEntComponentVarType_Invalid:
+		case EEntNetField_Invalid:
 			return false;
 
-		case EEntComponentVarType_Bool:
+		case EEntNetField_Bool:
 		{
 			auto value = static_cast< bool* >( spData );
 			return ImGui::Checkbox( srVarData.apName, value );
 		}
 
-		case EEntComponentVarType_Float:
+		case EEntNetField_Float:
 		{
 			auto value = static_cast< float* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_Double:
+		case EEntNetField_Double:
 		{
 			auto value = static_cast< double* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Double, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
 
-		case EEntComponentVarType_S8:
+		case EEntNetField_S8:
 		{
 			auto value = static_cast< s8* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S8, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_S16:
+		case EEntNetField_S16:
 		{
 			auto value = static_cast< s16* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S16, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_S32:
+		case EEntNetField_S32:
 		{
 			auto value = static_cast< s32* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S32, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_S64:
+		case EEntNetField_S64:
 		{
 			auto value = static_cast< s64* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S64, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
 
-		case EEntComponentVarType_U8:
+		case EEntNetField_U8:
 		{
 			auto value = static_cast< u8* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U8, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_U16:
+		case EEntNetField_U16:
 		{
 			auto value = static_cast< u16* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U16, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_U32:
+		case EEntNetField_U32:
 		{
 			auto value = static_cast< u32* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U32, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_U64:
+		case EEntNetField_U64:
 		{
 			auto value = static_cast< u64* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U64, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
 
-		case EEntComponentVarType_StdString:
+		case EEntNetField_StdString:
 		{
 			auto value = static_cast< std::string* >( spData );
 			value->reserve( 512 );
@@ -120,21 +120,32 @@ bool EntEditor_DrawComponentVarUI( void* spData, EntComponentVarData_t& srVarDat
 			return enterPressed;
 		}
 
-		case EEntComponentVarType_Vec2:
+		case EEntNetField_Vec2:
 		{
 			auto value = static_cast< glm::vec2* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 2, 1.f, nullptr, nullptr, nullptr, 1.f );
 
 		}
-		case EEntComponentVarType_Vec3:
+		case EEntNetField_Vec3:
 		{
 			auto value = static_cast< glm::vec3* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
 		}
-		case EEntComponentVarType_Vec4:
+		case EEntNetField_Vec4:
 		{
 			auto value = static_cast< glm::vec4* >( spData );
 			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 4, 1.f, nullptr, nullptr, nullptr, 1.f );
+		}
+			
+		case EEntNetField_Color3:
+		{
+			auto value = static_cast< glm::vec3* >( spData );
+			return ImGui::ColorEdit3( srVarData.apName, &value->x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
+		}
+		case EEntNetField_Color4:
+		{
+			auto value = static_cast< glm::vec4* >( spData );
+			return ImGui::ColorEdit4( srVarData.apName, &value->x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
 		}
 	}
 
