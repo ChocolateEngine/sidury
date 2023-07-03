@@ -32,16 +32,16 @@ void Ent_RegisterVarHandlers()
 
 CH_STRUCT_REGISTER_COMPONENT( CRigidBody, rigidBody, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aVel, vel, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aAccel, accel, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aVel, vel, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aAccel, accel, true );
 }
 
 
 CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aForward, forward, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aUp, up, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Vec3, glm::vec3, aRight, right, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aForward, forward, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aUp, up, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aRight, right, true );
 }
 
 
@@ -51,10 +51,10 @@ CH_STRUCT_REGISTER_COMPONENT( CDirection, direction, true, EEntComponentNetType_
 // "file://path/to/asset.glb"
 CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, true, EEntComponentNetType_Both, true )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_StdString, std::string, aPath, path, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aTestVis, testVis, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aCastShadow, castShadow, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Bool, bool, aVisible, visible, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aTestVis, testVis, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aCastShadow, castShadow, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aVisible, visible, true );
 	
 	CH_REGISTER_COMPONENT_SYS2( EntSys_Renderable, gEntSys_Renderable );
 }
@@ -65,27 +65,27 @@ void Ent_RegisterBaseComponents()
 	Ent_RegisterVarHandlers();
 
 	// Setup Types, only used for registering variables without specifing the VarType
-	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntComponentVarType_Bool;
-	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntComponentVarType_Float;
-	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]      = EEntComponentVarType_Double;
+	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntNetField_Bool;
+	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntNetField_Float;
+	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]      = EEntNetField_Double;
 
-	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]          = EEntComponentVarType_S8;
-	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]         = EEntComponentVarType_S16;
-	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]         = EEntComponentVarType_S32;
-	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]         = EEntComponentVarType_S64;
+	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]          = EEntNetField_S8;
+	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]         = EEntNetField_S16;
+	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]         = EEntNetField_S32;
+	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]         = EEntNetField_S64;
 
-	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]          = EEntComponentVarType_U8;
-	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]         = EEntComponentVarType_U16;
-	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntComponentVarType_U32;
-	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntComponentVarType_U64;
+	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]          = EEntNetField_U8;
+	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]         = EEntNetField_U16;
+	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntNetField_U32;
+	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntNetField_U64;
 
 	// probably overrides type have of u64, hmmm
-	// gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntComponentVarType_Entity;
-	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntComponentVarType_StdString;
+	// gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntNetField_Entity;
+	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntNetField_StdString;
 
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntComponentVarType_Vec2;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntComponentVarType_Vec3;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntComponentVarType_Vec4;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntNetField_Vec2;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntNetField_Vec3;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntNetField_Vec4;
 
 	// Now Register Base Components
 	EntComp_RegisterComponent< CTransform >(

@@ -56,6 +56,9 @@ struct ComponentID_t
 };
 
 
+// maybe do this?
+#define SOURCE_DECLARE_POINTER_HANDLE( name ) struct name##__{}; typedef struct name##__ * name
+
 // why do i need this here and i can't have it in the class?????
 inline bool operator==( const ComponentID_t& srSelf, const ComponentID_t& srOther )
 {
@@ -94,40 +97,40 @@ using FEntComp_VarWrite = bool( flexb::Builder& srBuilder, EntComponentData_t* s
 
 
 // TODO: Rename this to EEntNetField
-enum EEntComponentVarType : u8
+enum EEntNetField : u8
 {
-	EEntComponentVarType_Invalid,
+	EEntNetField_Invalid,
 
-	EEntComponentVarType_Bool,
+	EEntNetField_Bool,
 
-	EEntComponentVarType_Float,
-	EEntComponentVarType_Double,
+	EEntNetField_Float,
+	EEntNetField_Double,
 
-	EEntComponentVarType_S8,    // signed char
-	EEntComponentVarType_S16,   // signed short
-	EEntComponentVarType_S32,   // signed int
-	EEntComponentVarType_S64,   // signed long long
-	
-	EEntComponentVarType_U8,    // unsigned char
-	EEntComponentVarType_U16,   // unsigned short
-	EEntComponentVarType_U32,   // unsigned int
-	EEntComponentVarType_U64,   // unsigned long long
+	EEntNetField_S8,   // signed char
+	EEntNetField_S16,  // signed short
+	EEntNetField_S32,  // signed int
+	EEntNetField_S64,  // signed long long
 
-	EEntComponentVarType_Entity,
+	EEntNetField_U8,   // unsigned char
+	EEntNetField_U16,  // unsigned short
+	EEntNetField_U32,  // unsigned int
+	EEntNetField_U64,  // unsigned long long
 
-	EEntComponentVarType_StdString,  // std::string
+	EEntNetField_Entity,
 
-	EEntComponentVarType_Vec2,  // glm::vec2
-	EEntComponentVarType_Vec3,  // glm::vec3
-	EEntComponentVarType_Vec4,  // glm::vec4
+	EEntNetField_StdString,  // std::string
+
+	EEntNetField_Vec2,  // glm::vec2
+	EEntNetField_Vec3,  // glm::vec3
+	EEntNetField_Vec4,  // glm::vec4
 
 	// TODO: Implement
-	// EEntComponentVarType_Color3,  // glm::vec3
-	// EEntComponentVarType_Color4,  // glm::vec4
+	// EEntNetField_Color3,  // glm::vec3
+	// EEntNetField_Color4,  // glm::vec4
 
-	EEntComponentVarType_Custom,  // Custom Type, must define your own read and write function for this type
+	EEntNetField_Custom,  // Custom Type, must define your own read and write function for this type
 
-	EEntComponentVarType_Count,
+	EEntNetField_Count,
 };
 
 
@@ -185,11 +188,11 @@ enum EEntityFlag_ : EEntityFlag
 // Var Data for a component
 struct EntComponentVarData_t
 {
-	EEntComponentVarType aType;
-	bool                 aIsNetVar;
-	bool                 aSaveToMap;
-	size_t               aSize;
-	const char*          apName;
+	EEntNetField aType;
+	bool         aIsNetVar;
+	bool         aSaveToMap;
+	size_t       aSize;
+	const char*  apName;
 };
 
 
@@ -222,7 +225,7 @@ struct EntComponentRegistry_t
 	std::unordered_map< std::string_view, EntComponentData_t* > aComponentNames;
 
 	// [type hash of var] = Var Type Enum
-	std::unordered_map< size_t, EEntComponentVarType >          aVarTypes;
+	std::unordered_map< size_t, EEntNetField >                  aVarTypes;
 
 	// [type hash of var] = Var Read/Write Function
 	// std::unordered_map< size_t, FEntComp_VarRead* >             aVarRead;
@@ -238,7 +241,7 @@ struct EntComponentRegistry_t
 struct EntCompVarTypeToEnum_t
 {
 	size_t               aHashCode;
-	EEntComponentVarType aType;
+	EEntNetField aType;
 };
 
 
@@ -249,9 +252,9 @@ extern EntComponentRegistry_t gEntComponentRegistry;
 // void* EntComponentRegistry_GetVarHandler();
 
 const char* EntComp_NetTypeToStr( EEntComponentNetType sNetType );
-const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType );
-std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType );
-std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntComponentVarType sVarType );
+const char* EntComp_VarTypeToStr( EEntNetField sVarType );
+std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType );
+std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNetField sVarType );
 
 // void        EntComp_AddRegisterCallback( FEntComp_Register* spFunc );
 // void        EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc );
@@ -315,7 +318,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename T, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
+inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
@@ -358,7 +361,7 @@ inline void EntComp_RegisterComponentVarEx( EEntComponentVarType sVarType, const
 
 #if 0
 template< typename T >
-inline void EntComp_RegisterComponentVarEx2( EEntComponentVarType sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
+inline void EntComp_RegisterComponentVarEx2( EEntNetField sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
 {
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );

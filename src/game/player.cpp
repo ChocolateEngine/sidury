@@ -240,29 +240,29 @@ PlayerManager::~PlayerManager()
 
 CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntComponentNetType_Both, false )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_S32, EPlayerMoveType, aMoveType, moveType, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPlayerFlags, playerFlags, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, EPlayerMoveType, aMoveType, moveType, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPlayerFlags, playerFlags, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, false );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aMaxSpeed, maxSpeed, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxSpeed, maxSpeed, false );
 
 	// View Bobbing
-	//CH_REGISTER_COMPONENT_VAR( EEntComponentVarType_Float, float, aWalkTime, walkTime, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aBobOffsetAmount, bobOffsetAmount, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewTilt, prevViewTilt, false );
+	//CH_REGISTER_COMPONENT_VAR( EEntNetField_Float, float, aWalkTime, walkTime, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aBobOffsetAmount, bobOffsetAmount, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewTilt, prevViewTilt, false );
 
 	// Smooth Land
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandPower, landPower, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLandTime, landTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandPower, landPower, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandTime, landTime, false );
 
 	// Smooth Duck
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aPrevViewHeight, prevViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aTargetViewHeight, targetViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aOutViewHeight, outViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckDuration, duckDuration, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aDuckTime, duckTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewHeight, prevViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aTargetViewHeight, targetViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOutViewHeight, outViewHeight, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckDuration, duckDuration, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, false );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntComponentVarType_Float, float, aLastStepTime, lastStepTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, false );
 }
 
 
@@ -277,8 +277,8 @@ void PlayerManager::RegisterComponents()
 	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both, false );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aCamera, camera, false );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntComponentVarType_Entity, Entity, aFlashlight, flashlight, false );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, false );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, false );
 	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, false );  // don't mess with this
 
 	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false, false );

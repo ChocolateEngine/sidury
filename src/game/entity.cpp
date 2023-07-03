@@ -44,8 +44,8 @@ CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
 // }
 
 
-EntCompVarTypeToEnum_t gEntCompVarToEnum[ EEntComponentVarType_Count ] = {
-	{ typeid( glm::vec3 ).hash_code(), EEntComponentVarType_Vec3 },
+EntCompVarTypeToEnum_t gEntCompVarToEnum[ EEntNetField_Count ] = {
+	{ typeid( glm::vec3 ).hash_code(), EEntNetField_Vec3 },
 };
 
 
@@ -112,91 +112,91 @@ static const char* gEntVarTypeStr[] = {
 };
 
 
-static_assert( ARR_SIZE( gEntVarTypeStr ) == EEntComponentVarType_Count );
+static_assert( ARR_SIZE( gEntVarTypeStr ) == EEntNetField_Count );
 
 
-const char* EntComp_VarTypeToStr( EEntComponentVarType sVarType )
+const char* EntComp_VarTypeToStr( EEntNetField sVarType )
 {
-	if ( sVarType < 0 || sVarType > EEntComponentVarType_Count )
-		return gEntVarTypeStr[ EEntComponentVarType_Invalid ];
+	if ( sVarType < 0 || sVarType > EEntNetField_Count )
+		return gEntVarTypeStr[ EEntNetField_Invalid ];
 
 	return gEntVarTypeStr[ sVarType ];
 }
 
 
-size_t EntComp_GetVarDirtyOffset( char* spData, EEntComponentVarType sVarType )
+size_t EntComp_GetVarDirtyOffset( char* spData, EEntNetField sVarType )
 {
 	size_t offset = 0;
 	switch ( sVarType )
 	{
 		default:
-		case EEntComponentVarType_Invalid:
+		case EEntNetField_Invalid:
 			return 0;
 
-		case EEntComponentVarType_Bool:
+		case EEntNetField_Bool:
 			offset = sizeof( bool );
 			break;
 
-		case EEntComponentVarType_Float:
+		case EEntNetField_Float:
 			offset = sizeof( float );
 			break;
 
-		case EEntComponentVarType_Double:
+		case EEntNetField_Double:
 			offset = sizeof( double );
 			break;
 
 
-		case EEntComponentVarType_S8:
+		case EEntNetField_S8:
 			offset = sizeof( s8 );
 			break;
 
-		case EEntComponentVarType_S16:
+		case EEntNetField_S16:
 			offset = sizeof( s16 );
 			break;
 
-		case EEntComponentVarType_S32:
+		case EEntNetField_S32:
 			offset = sizeof( s32 );
 			break;
 
-		case EEntComponentVarType_S64:
+		case EEntNetField_S64:
 			offset = sizeof( s64 );
 			break;
 
 
-		case EEntComponentVarType_U8:
+		case EEntNetField_U8:
 			offset = sizeof( u8 );
 			break;
 
-		case EEntComponentVarType_U16:
+		case EEntNetField_U16:
 			offset = sizeof( u16 );
 			break;
 
-		case EEntComponentVarType_U32:
+		case EEntNetField_U32:
 			offset = sizeof( u32 );
 			break;
 
-		case EEntComponentVarType_U64:
+		case EEntNetField_U64:
 			offset = sizeof( u64 );
 			break;
 
 
-		case EEntComponentVarType_Entity:
+		case EEntNetField_Entity:
 			offset = sizeof( Entity );
 			break;
 
-		case EEntComponentVarType_StdString:
+		case EEntNetField_StdString:
 			offset = sizeof( std::string );
 			break;
 
-		case EEntComponentVarType_Vec2:
+		case EEntNetField_Vec2:
 			offset = sizeof( glm::vec2 );
 			break;
 
-		case EEntComponentVarType_Vec3:
+		case EEntNetField_Vec3:
 			offset = sizeof( glm::vec3 );
 			break;
 
-		case EEntComponentVarType_Vec4:
+		case EEntNetField_Vec4:
 			offset = sizeof( glm::vec4 );
 			break;
 	}
@@ -205,7 +205,7 @@ size_t EntComp_GetVarDirtyOffset( char* spData, EEntComponentVarType sVarType )
 }
 
 
-void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
+void EntComp_ResetVarDirty( char* spData, EEntNetField sVarType )
 {
 	size_t offset = EntComp_GetVarDirtyOffset( spData, sVarType );
 
@@ -217,7 +217,7 @@ void EntComp_ResetVarDirty( char* spData, EEntComponentVarType sVarType )
 }
 
 
-std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarType )
+std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType )
 {
 	switch ( sVarType )
 	{
@@ -225,86 +225,86 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarTyp
 		{
 			return "INVALID OR UNFINISHED";
 		}
-		case EEntComponentVarType_Invalid:
+		case EEntNetField_Invalid:
 		{
 			return "INVALID";
 		}
-		case EEntComponentVarType_Bool:
+		case EEntNetField_Bool:
 		{
 			return *static_cast< bool* >( spData ) ? "TRUE" : "FALSE";
 		}
 
-		case EEntComponentVarType_Float:
+		case EEntNetField_Float:
 		{
 			return ToString( *static_cast< float* >( spData ) );
 		}
-		case EEntComponentVarType_Double:
+		case EEntNetField_Double:
 		{
 			return ToString( *static_cast< double* >( spData ) );
 		}
 
-		case EEntComponentVarType_S8:
+		case EEntNetField_S8:
 		{
 			s8 value = *static_cast< s8* >( spData );
 			return vstring( "%c", value );
 		}
-		case EEntComponentVarType_S16:
+		case EEntNetField_S16:
 		{
 			s16 value = *static_cast< s16* >( spData );
 			return vstring( "%d", value );
 		}
-		case EEntComponentVarType_S32:
+		case EEntNetField_S32:
 		{
 			s32 value = *static_cast< s32* >( spData );
 			return vstring( "%d", value );
 		}
-		case EEntComponentVarType_S64:
+		case EEntNetField_S64:
 		{
 			s64 value = *static_cast< s64* >( spData );
 			return vstring( "%lld", value );
 		}
 
-		case EEntComponentVarType_U8:
+		case EEntNetField_U8:
 		{
 			u8 value = *static_cast< u8* >( spData );
 			return vstring( "%uc", value );
 		}
-		case EEntComponentVarType_U16:
+		case EEntNetField_U16:
 		{
 			u16 value = *static_cast< u16* >( spData );
 			return vstring( "%ud", value );
 		}
-		case EEntComponentVarType_U32:
+		case EEntNetField_U32:
 		{
 			u32 value = *static_cast< u32* >( spData );
 			return vstring( "%ud", value );
 		}
-		case EEntComponentVarType_U64:
+		case EEntNetField_U64:
 		{
 			u64 value = *static_cast< u64* >( spData );
 			return vstring( "%zd", value );
 		}
 
-		case EEntComponentVarType_Entity:
+		case EEntNetField_Entity:
 		{
 			Entity value = *static_cast< Entity* >( spData );
 			return vstring( "%zd", value );
 		}
-		case EEntComponentVarType_StdString:
+		case EEntNetField_StdString:
 		{
 			return *(const std::string*)spData;
 		}
 
-		case EEntComponentVarType_Vec2:
+		case EEntNetField_Vec2:
 		{
 			const glm::vec2* value = (const glm::vec2*)spData;
 			return vstring( "(%.4f, %.4f)", value->x, value->y );
 		}
-		case EEntComponentVarType_Vec3:
+		case EEntNetField_Vec3:
 		{
 			return Vec2Str( *(const glm::vec3*)spData );
 		}
-		case EEntComponentVarType_Vec4:
+		case EEntNetField_Vec4:
 		{
 			const glm::vec4* value = (const glm::vec4*)spData;
 			return vstring( "(%.4f, %.4f, %.4f, %.4f)", value->x, value->y, value->z, value->w );
@@ -313,7 +313,7 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntComponentVarType sVarTyp
 }
 
 
-std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntComponentVarType sVarType )
+std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNetField sVarType )
 {
 	char* data = static_cast< char* >( spData );
 	return EntComp_GetStrValueOfVar( data + sOffset, sVarType );
@@ -950,10 +950,10 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 		// Check these first
 		switch ( var.aType )
 		{
-			case EEntComponentVarType_Invalid:
+			case EEntNetField_Invalid:
 				continue;
 
-			case EEntComponentVarType_Bool:
+			case EEntNetField_Bool:
 			{
 				bool* value = static_cast< bool* >( data );
 				*value      = vector[ i++ ].AsBool();
@@ -967,78 +967,78 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 		if ( !wroteVar )
 			continue;
 
-		Assert( var.aType != EEntComponentVarType_Invalid );
-		Assert( var.aType != EEntComponentVarType_Bool );
+		Assert( var.aType != EEntNetField_Invalid );
+		Assert( var.aType != EEntNetField_Bool );
 
 		switch ( var.aType )
 		{
 			default:
 				break;
 
-			case EEntComponentVarType_Float:
+			case EEntNetField_Float:
 			{
 				auto value = (float*)( data );
 				*value     = vector[ i++ ].AsFloat();
 				break;
 			}
-			case EEntComponentVarType_Double:
+			case EEntNetField_Double:
 			{
 				auto value = (double*)( data );
 				*value     = vector[ i++ ].AsDouble();
 				break;
 			}
 
-			case EEntComponentVarType_S8:
+			case EEntNetField_S8:
 			{
 				auto value = (s8*)( data );
 				*value     = vector[ i++ ].AsInt8();
 				break;
 			}
-			case EEntComponentVarType_S16:
+			case EEntNetField_S16:
 			{
 				auto value = (s16*)( data );
 				*value     = vector[ i++ ].AsInt16();
 				break;
 			}
-			case EEntComponentVarType_S32:
+			case EEntNetField_S32:
 			{
 				auto value = (s32*)( data );
 				*value     = vector[ i++ ].AsInt32();
 				break;
 			}
-			case EEntComponentVarType_S64:
+			case EEntNetField_S64:
 			{
 				auto value = (s64*)( data );
 				*value     = vector[ i++ ].AsInt64();
 				break;
 			}
 
-			case EEntComponentVarType_U8:
+			case EEntNetField_U8:
 			{
 				auto value = (u8*)( data );
 				*value     = vector[ i++ ].AsUInt8();
 				break;
 			}
-			case EEntComponentVarType_U16:
+			case EEntNetField_U16:
 			{
 				auto value = (u16*)( data );
 				*value     = vector[ i++ ].AsUInt16();
 				break;
 			}
-			case EEntComponentVarType_U32:
+			case EEntNetField_U32:
 			{
 				auto value = (u32*)( data );
 				*value     = vector[ i++ ].AsUInt32();
 				break;
 			}
-			case EEntComponentVarType_U64:
+			case EEntNetField_U64:
 			{
 				auto value = (u64*)( data );
 				*value     = vector[ i++ ].AsUInt64();
 				break;
 			}
 
-			case EEntComponentVarType_Entity:
+			case EEntNetField_Entity:
 			{
 				auto value      = (Entity*)( data );
 				auto recvEntity = (Entity)( vector[ i++ ].AsUInt64() );
@@ -1063,7 +1063,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 				break;
 			}
 
-			case EEntComponentVarType_StdString:
+			case EEntNetField_StdString:
 			{
 				auto value = (std::string*)( data );
 				*value     = vector[ i++ ].AsString().str();
@@ -1072,14 +1072,14 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 
 				// Will have a special case for these once i have each value in a vecX marked dirty
 
-			case EEntComponentVarType_Vec2:
+			case EEntNetField_Vec2:
 			{
 				auto value = (glm::vec2*)( data );
 				value->x   = vector[ i++ ].AsFloat();
 				value->y   = vector[ i++ ].AsFloat();
 				break;
 			}
-			case EEntComponentVarType_Vec3:
+			case EEntNetField_Vec3:
 			{
 				auto value = (glm::vec3*)( data );
 				value->x   = vector[ i++ ].AsFloat();
@@ -1087,7 +1087,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 				value->z   = vector[ i++ ].AsFloat();
 				break;
 			}
-			case EEntComponentVarType_Vec4:
+			case EEntNetField_Vec4:
 			{
 				auto value = (glm::vec4*)( data );
 				value->x   = vector[ i++ ].AsFloat();
@@ -1136,10 +1136,10 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 		switch ( var.aType )
 		{
 			default:
-			case EEntComponentVarType_Invalid:
+			case EEntNetField_Invalid:
 				break;
 
-			case EEntComponentVarType_Bool:
+			case EEntNetField_Bool:
 			{
 				auto value = *(bool*)( data );
 				srBuilder.Bool( value );
@@ -1147,7 +1147,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
-			case EEntComponentVarType_Float:
+			case EEntNetField_Float:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1157,7 +1157,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				
 				break;
 			}
-			case EEntComponentVarType_Double:
+			case EEntNetField_Double:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1168,7 +1168,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
-			case EEntComponentVarType_S8:
+			case EEntNetField_S8:
 			{
 				// FLEX BUFFERS STORES ALL INTS AND UINTS AS INT64 AND UINT64, WHAT A WASTE OF SPACE
 				if ( IsVarDirty() )
@@ -1179,7 +1179,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_S16:
+			case EEntNetField_S16:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1189,7 +1189,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_S32:
+			case EEntNetField_S32:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1199,7 +1199,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_S64:
+			case EEntNetField_S64:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1210,7 +1210,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
-			case EEntComponentVarType_U8:
+			case EEntNetField_U8:
 			{
 				// FLEX BUFFERS STORES ALL INTS AND UINTS AS INT64 AND UINT64, WHAT A WASTE OF SPACE
 				if ( IsVarDirty() )
@@ -1221,7 +1221,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_U16:
+			case EEntNetField_U16:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1231,7 +1231,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_U32:
+			case EEntNetField_U32:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1241,7 +1241,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_U64:
+			case EEntNetField_U64:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1252,7 +1252,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
-			case EEntComponentVarType_Entity:
+			case EEntNetField_Entity:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1263,7 +1263,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				break;
 			}
 
-			case EEntComponentVarType_StdString:
+			case EEntNetField_StdString:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1276,7 +1276,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 			// Will have a special case for these once i have each value in a vecX marked dirty
 
-			case EEntComponentVarType_Vec2:
+			case EEntNetField_Vec2:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1287,7 +1287,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_Vec3:
+			case EEntNetField_Vec3:
 			{
 				if ( IsVarDirty() )
 				{
@@ -1299,7 +1299,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 				break;
 			}
-			case EEntComponentVarType_Vec4:
+			case EEntNetField_Vec4:
 			{
 				if ( IsVarDirty() )
 				{
@@ -2004,7 +2004,7 @@ CONCMD( ent_mem )
 		for ( const auto& [ offset, var ] : regData->aVars )
 		{
 			// Check for special case std::string
-			if ( var.aType == EEntComponentVarType_StdString )
+			if ( var.aType == EEntNetField_StdString )
 			{
 				// We have to iterate through all components and get the amount of memory used by each std::string
 				// compOtherSize += 0;
