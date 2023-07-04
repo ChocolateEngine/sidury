@@ -22,16 +22,45 @@ static Handle           gSkyboxModel  = InvalidHandle;
 static Handle           gSkyboxShader = InvalidHandle;
 
 
+void skybox_set_dropdown(
+	const std::vector< std::string >& args,  // arguments currently typed in by the user
+	std::vector< std::string >& results )      // results to populate the dropdown list with
+{
+	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
+	{
+		if ( file.ends_with( ".." ) )
+			continue;
+
+		// Make sure it's a chocolate material file
+		if ( !file.ends_with( ".cmt" ) )
+			continue;
+
+		if ( args.size() && !file.starts_with( args[ 0 ] ) )
+			continue;
+
+		results.push_back( file );
+	}
+}
+
+
+CONCMD_DROP_VA( skybox_set, skybox_set_dropdown, 0, "Set the skybox material" )
+{
+	if ( args.empty() )
+		return;
+
+	Skybox_SetMaterial( args[ 0 ] );
+}
+
+
 bool Skybox_Init()
 {
-	Model* model            = nullptr;
-	gSkyboxModel            = Graphics_CreateModel( &model );
-
-	gSkyboxShader           = Graphics_GetShader( "skybox" );
+	Model* model    = nullptr;
+	gSkyboxModel    = Graphics_CreateModel( &model );
+	gSkyboxShader   = Graphics_GetShader( "skybox" );
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
-	Handle      mat         = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
+	Handle      mat = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
 
 	MeshBuilder meshBuilder;
 	meshBuilder.Start( model, "__skybox_model" );
@@ -147,7 +176,7 @@ void Skybox_SetMaterial( const std::string& srPath )
 
 	if ( Mat_GetShader( mat ) != gSkyboxShader )
 	{
-		Log_WarnF( "[Game] Skybox Material is not using skybox shader: %s\n", srPath.c_str() );
+		Log_WarnF( "Skybox Material is not using skybox shader: %s\n", srPath.c_str() );
 		return;
 	}
 
@@ -168,6 +197,20 @@ void Skybox_SetMaterial( const std::string& srPath )
 
 	Mat_SetVar( mat, "ang", vec3_zero );
 }
+
+
+const char* Skybox_GetMaterialName()
+{
+	if ( ( !gSkyboxModel && !Skybox_Init() ) || !gSkyboxValid )
+		return nullptr;
+
+	Handle mat = Model_GetMaterial( gSkyboxModel, 0 );
+	if ( mat == CH_INVALID_HANDLE )
+		return nullptr;
+
+	return Mat_GetName( mat );
+}
+
 
 // TODO: how will you know which skybox is the active one?
 // Same goes for the playerSpawn component

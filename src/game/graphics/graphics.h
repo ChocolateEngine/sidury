@@ -557,6 +557,9 @@ Handle             Graphics_FindMaterial( const char* spName );
 // Get the total amount of materials created
 size_t             Graphics_GetMaterialCount();
 
+// Get the path to the material
+const std::string& Graphics_GetMaterialPath( Handle sMaterial );
+
 // Tell all materials to rebuild
 void               Graphics_SetAllMaterialsDirty();
 

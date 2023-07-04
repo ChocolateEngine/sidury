@@ -1,9 +1,11 @@
 #pragma once
 
 constexpr u16         MAP_VERSION       = 1;
+constexpr u16         CH_MAP_VERSION    = 2;
 constexpr const char* CH_MAP_IDENTIFIER = "SDMF";
 
-#define CH_MAP_SIGNATURE ( 'F' << 24 | 'M' << 16 | 'D' << 8 | 'S' )
+// #define CH_MAP_SIGNATURE ( 'F' << 24 | 'M' << 16 | 'D' << 8 | 'S' )
+#define CH_MAP_SIGNATURE ( 'F' << 16 | 'M' << 8 | 'S' )
 
 using MapHandle_t = size_t;
 
@@ -43,7 +45,6 @@ struct MapInfo
 	std::string  modelPath;
 
 	glm::vec3    ang;
-	glm::vec3    physAng;
 
 	glm::vec3    spawnPos;
 	glm::vec3    spawnAng;
@@ -58,48 +59,18 @@ struct SiduryMapHeader_t
 	u16            aVersion            = 0;
 	int            aSignature          = 0;
 	EMapHeaderFlag aFlags              = EMapHeaderFlag_None;
-
-	// int            aEntityDataStart    = 0;  // Start offset into the binary for where this begins
-	// int            aEntityDataSize     = 0;  // The space it takes up
-	// 
-	// int            aComponentDataStart = 0;
-	// int            aComponentDataSize  = 0;
-	// 
-	// int            aVisDataStart       = 0;
-	// int            aVisDataSize        = 0;
-};
-
-
-// Prototyping
-struct SiduryMapDataV2_t
-{
-	std::string aMapName;
-
-	// VIS DATA
-	// LIGHTMAPS
 };
 
 
 struct SiduryMap
 {
-	SiduryMapHeader_t              aHeader;
 	std::string                    aMapPath = "";
-	MapHandle_t                    aMapHandle;
+	MapHandle_t                    aMapHandle;  // TODO: USE THIS
 
 	std::vector< Entity >          aMapEntities;
 
-	// -------------------------------------------------------------------
-	// Old Sidury Map Format Below
-
+	// Kept for Legacy Sidury Maps
 	MapInfo*                       aMapInfo    = nullptr;
-	// SceneDraw_t*                   aRenderable = nullptr;
-	// Handle                         aScene      = InvalidHandle;
-
-	Handle                         aModel      = CH_INVALID_HANDLE;
-	Handle                         aRenderable = CH_INVALID_HANDLE;
-
-	std::vector< IPhysicsShape* >  aWorldPhysShapes;
-	std::vector< IPhysicsObject* > aWorldPhysObjs;
 };
 
 
@@ -119,8 +90,8 @@ struct CMapRoot
 
 bool             MapManager_FindMap( const std::string& srPath );
 bool             MapManager_LoadMap( const std::string& srPath );
-SiduryMap*       MapManager_CreateMap();
-void             MapManager_WriteMap( SiduryMap* spMap, const std::string& srPath );
+// SiduryMap*       MapManager_CreateMap();
+void             MapManager_WriteMap( const std::string& srPath );
 void             MapManager_CloseMap();
 
 bool             MapManager_HasMap();

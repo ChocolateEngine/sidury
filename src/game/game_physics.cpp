@@ -98,7 +98,7 @@ CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, true, EEntComponentNetTyp
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMass, mass, CH_ENT_SAVE_TO_MAP );
 
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aGravity, gravity, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aUpdateTransform, updateTransform, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, EPhysTransformMode, aTransformMode, transformMode, CH_ENT_SAVE_TO_MAP );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysObject, gEntSys_PhysObject );
 }
@@ -354,10 +354,15 @@ void EntSys_PhysObject::Update()
 
 		physObject->apObj->SetScale( transform->aScale );
 
-		if ( physObject->aUpdateTransform )
+		if ( physObject->aTransformMode.Get() == EPhysTransformMode_Update )
 		{
 			transform->aPos = physObject->apObj->GetPos();
 			transform->aAng = physObject->apObj->GetAng();
+		}
+		else if ( physObject->aTransformMode.Get() == EPhysTransformMode_Inherit )
+		{
+			physObject->apObj->SetPos( transform->aPos );
+			physObject->apObj->SetAng( transform->aAng );
 		}
 	}
 }

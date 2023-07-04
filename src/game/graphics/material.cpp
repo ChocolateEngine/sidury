@@ -573,6 +573,22 @@ size_t Graphics_GetMaterialCount()
 }
 
 
+// Get the path to the material
+const std::string& Graphics_GetMaterialPath( Handle sMaterial )
+{
+	if ( sMaterial == CH_INVALID_HANDLE )
+		return "";
+
+	for ( auto& [ path, handle ] : gMaterialPaths )
+	{
+		if ( sMaterial == handle )
+			return path;
+	}
+
+	return "";
+}
+
+
 // Tell all materials to rebuild
 void Graphics_SetAllMaterialsDirty()
 {

@@ -67,6 +67,15 @@ struct NetMsg_EntityUpdatesBuilder;
 struct NetMsg_ComponentUpdates;
 struct NetMsg_ComponentUpdatesBuilder;
 
+struct SMF_Command;
+struct SMF_CommandBuilder;
+
+struct SMF_Data;
+struct SMF_DataBuilder;
+
+struct SMF_Skybox;
+struct SMF_SkyboxBuilder;
+
 enum ESiduryProtocolVer : uint16_t {
   ESiduryProtocolVer_Value = 3,
   ESiduryProtocolVer_MIN = ESiduryProtocolVer_Value,
@@ -95,7 +104,7 @@ inline const char *EnumNameESiduryProtocolVer(ESiduryProtocolVer e) {
 }
 
 enum ESiduryComponentProtocolVer : uint16_t {
-  ESiduryComponentProtocolVer_Value = 1,
+  ESiduryComponentProtocolVer_Value = 2,
   ESiduryComponentProtocolVer_MIN = ESiduryComponentProtocolVer_Value,
   ESiduryComponentProtocolVer_MAX = ESiduryComponentProtocolVer_Value
 };
@@ -251,6 +260,42 @@ inline const char *EnumNameEMsgSrc_Server(EMsgSrc_Server e) {
   if (::flatbuffers::IsOutRange(e, EMsgSrc_Server_Invalid, EMsgSrc_Server_Paused)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesEMsgSrc_Server()[index];
+}
+
+enum ESMF_Command : uint32_t {
+  ESMF_Command_Invalid = 0,
+  ESMF_Command_Skybox = 1,
+  ESMF_Command_EntityList = 2,
+  ESMF_Command_ComponentList = 3,
+  ESMF_Command_MIN = ESMF_Command_Invalid,
+  ESMF_Command_MAX = ESMF_Command_ComponentList
+};
+
+inline const ESMF_Command (&EnumValuesESMF_Command())[4] {
+  static const ESMF_Command values[] = {
+    ESMF_Command_Invalid,
+    ESMF_Command_Skybox,
+    ESMF_Command_EntityList,
+    ESMF_Command_ComponentList
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesESMF_Command() {
+  static const char * const names[5] = {
+    "Invalid",
+    "Skybox",
+    "EntityList",
+    "ComponentList",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameESMF_Command(ESMF_Command e) {
+  if (::flatbuffers::IsOutRange(e, ESMF_Command_Invalid, ESMF_Command_ComponentList)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesESMF_Command()[index];
 }
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec2 FLATBUFFERS_FINAL_CLASS {
@@ -1068,10 +1113,14 @@ struct NetMsg_ComponentUpdate FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   typedef NetMsg_ComponentUpdateBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_COMPONENTS = 6
+    VT_HASH = 6,
+    VT_COMPONENTS = 8
   };
   const ::flatbuffers::String *name() const {
     return GetPointer<const ::flatbuffers::String *>(VT_NAME);
+  }
+  uint64_t hash() const {
+    return GetField<uint64_t>(VT_HASH, 0);
   }
   const ::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>> *components() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>> *>(VT_COMPONENTS);
@@ -1080,6 +1129,7 @@ struct NetMsg_ComponentUpdate FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<uint64_t>(verifier, VT_HASH, 8) &&
            VerifyOffset(verifier, VT_COMPONENTS) &&
            verifier.VerifyVector(components()) &&
            verifier.VerifyVectorOfTables(components()) &&
@@ -1093,6 +1143,9 @@ struct NetMsg_ComponentUpdateBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_name(::flatbuffers::Offset<::flatbuffers::String> name) {
     fbb_.AddOffset(NetMsg_ComponentUpdate::VT_NAME, name);
+  }
+  void add_hash(uint64_t hash) {
+    fbb_.AddElement<uint64_t>(NetMsg_ComponentUpdate::VT_HASH, hash, 0);
   }
   void add_components(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>>> components) {
     fbb_.AddOffset(NetMsg_ComponentUpdate::VT_COMPONENTS, components);
@@ -1111,8 +1164,10 @@ struct NetMsg_ComponentUpdateBuilder {
 inline ::flatbuffers::Offset<NetMsg_ComponentUpdate> CreateNetMsg_ComponentUpdate(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> name = 0,
+    uint64_t hash = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>>> components = 0) {
   NetMsg_ComponentUpdateBuilder builder_(_fbb);
+  builder_.add_hash(hash);
   builder_.add_components(components);
   builder_.add_name(name);
   return builder_.Finish();
@@ -1121,12 +1176,14 @@ inline ::flatbuffers::Offset<NetMsg_ComponentUpdate> CreateNetMsg_ComponentUpdat
 inline ::flatbuffers::Offset<NetMsg_ComponentUpdate> CreateNetMsg_ComponentUpdateDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    uint64_t hash = 0,
     const std::vector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>> *components = nullptr) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   auto components__ = components ? _fbb.CreateVector<::flatbuffers::Offset<NetMsg_ComponentUpdateData>>(*components) : 0;
   return CreateNetMsg_ComponentUpdate(
       _fbb,
       name__,
+      hash,
       components__);
 }
 
@@ -1293,6 +1350,184 @@ inline ::flatbuffers::Offset<NetMsg_ComponentUpdates> CreateNetMsg_ComponentUpda
   return CreateNetMsg_ComponentUpdates(
       _fbb,
       update_list__);
+}
+
+struct SMF_Command FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SMF_CommandBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_COMMAND = 4,
+    VT_VERSION = 6,
+    VT_DATA = 8
+  };
+  ESMF_Command command() const {
+    return static_cast<ESMF_Command>(GetField<uint32_t>(VT_COMMAND, 0));
+  }
+  uint16_t version() const {
+    return GetField<uint16_t>(VT_VERSION, 0);
+  }
+  const ::flatbuffers::Vector<uint8_t> *data() const {
+    return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_DATA);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_COMMAND, 4) &&
+           VerifyField<uint16_t>(verifier, VT_VERSION, 2) &&
+           VerifyOffset(verifier, VT_DATA) &&
+           verifier.VerifyVector(data()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SMF_CommandBuilder {
+  typedef SMF_Command Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_command(ESMF_Command command) {
+    fbb_.AddElement<uint32_t>(SMF_Command::VT_COMMAND, static_cast<uint32_t>(command), 0);
+  }
+  void add_version(uint16_t version) {
+    fbb_.AddElement<uint16_t>(SMF_Command::VT_VERSION, version, 0);
+  }
+  void add_data(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> data) {
+    fbb_.AddOffset(SMF_Command::VT_DATA, data);
+  }
+  explicit SMF_CommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SMF_Command> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SMF_Command>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SMF_Command> CreateSMF_Command(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ESMF_Command command = ESMF_Command_Invalid,
+    uint16_t version = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> data = 0) {
+  SMF_CommandBuilder builder_(_fbb);
+  builder_.add_data(data);
+  builder_.add_command(command);
+  builder_.add_version(version);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<SMF_Command> CreateSMF_CommandDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ESMF_Command command = ESMF_Command_Invalid,
+    uint16_t version = 0,
+    const std::vector<uint8_t> *data = nullptr) {
+  auto data__ = data ? _fbb.CreateVector<uint8_t>(*data) : 0;
+  return CreateSMF_Command(
+      _fbb,
+      command,
+      version,
+      data__);
+}
+
+struct SMF_Data FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SMF_DataBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_COMMANDS = 4
+  };
+  const ::flatbuffers::Vector<::flatbuffers::Offset<SMF_Command>> *commands() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<SMF_Command>> *>(VT_COMMANDS);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_COMMANDS) &&
+           verifier.VerifyVector(commands()) &&
+           verifier.VerifyVectorOfTables(commands()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SMF_DataBuilder {
+  typedef SMF_Data Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_commands(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<SMF_Command>>> commands) {
+    fbb_.AddOffset(SMF_Data::VT_COMMANDS, commands);
+  }
+  explicit SMF_DataBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SMF_Data> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SMF_Data>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SMF_Data> CreateSMF_Data(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<SMF_Command>>> commands = 0) {
+  SMF_DataBuilder builder_(_fbb);
+  builder_.add_commands(commands);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<SMF_Data> CreateSMF_DataDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const std::vector<::flatbuffers::Offset<SMF_Command>> *commands = nullptr) {
+  auto commands__ = commands ? _fbb.CreateVector<::flatbuffers::Offset<SMF_Command>>(*commands) : 0;
+  return CreateSMF_Data(
+      _fbb,
+      commands__);
+}
+
+struct SMF_Skybox FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SMF_SkyboxBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MATERIAL = 4
+  };
+  const ::flatbuffers::String *material() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_MATERIAL);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_MATERIAL) &&
+           verifier.VerifyString(material()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SMF_SkyboxBuilder {
+  typedef SMF_Skybox Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_material(::flatbuffers::Offset<::flatbuffers::String> material) {
+    fbb_.AddOffset(SMF_Skybox::VT_MATERIAL, material);
+  }
+  explicit SMF_SkyboxBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SMF_Skybox> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SMF_Skybox>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SMF_Skybox> CreateSMF_Skybox(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> material = 0) {
+  SMF_SkyboxBuilder builder_(_fbb);
+  builder_.add_material(material);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<SMF_Skybox> CreateSMF_SkyboxDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *material = nullptr) {
+  auto material__ = material ? _fbb.CreateString(material) : 0;
+  return CreateSMF_Skybox(
+      _fbb,
+      material__);
 }
 
 #endif  // FLATBUFFERS_GENERATED_SIDURY_H_

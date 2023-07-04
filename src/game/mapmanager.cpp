@@ -14,12 +14,23 @@
 
 #include "speedykeyv/KeyValue.h"
 
+#include <filesystem>
+
 
 LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
 
 SiduryMap*    gpMap      = nullptr;
 
 extern Entity gLocalPlayer;
+
+
+enum ESMF_CommandVersion : u16
+{
+	ESMF_CommandVersion_Invalid       = 0,
+	ESMF_CommandVersion_EntityList    = 1,
+	ESMF_CommandVersion_Skybox        = 1,
+	ESMF_CommandVersion_ComponentList = 2,
+};
 
 
 void map_dropdown(
@@ -82,6 +93,15 @@ CONCMD_DROP( map, map_dropdown )
 }
 
 
+CONCMD( map_save )
+{
+	if ( args.size() )
+		MapManager_WriteMap( args[ 0 ] );
+	else
+		MapManager_WriteMap( MapManager_GetMapPath().data() );
+}
+
+
 void MapManager_Update()
 {
 	if ( !gpMap )
@@ -98,22 +118,8 @@ void MapManager_CloseMap()
 	{
 		GetEntitySystem()->DeleteEntity( entity );
 	}
-
-	if ( gpMap->aModel != InvalidHandle )
-	{
-		Graphics_FreeRenderable( gpMap->aRenderable );
-		Graphics_FreeModel( gpMap->aModel );
-	}
-
-	for ( auto physObj : gpMap->aWorldPhysObjs )
-		GetPhysEnv()->DestroyObject( physObj );
-
-	for ( auto physShape : gpMap->aWorldPhysShapes )
-		GetPhysEnv()->DestroyShape( physShape );
-
+	
 	gpMap->aMapEntities.clear();
-	gpMap->aWorldPhysObjs.clear();
-	gpMap->aWorldPhysShapes.clear();
 
 	delete gpMap;
 	gpMap = nullptr;
@@ -145,16 +151,14 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 
 	Skybox_SetMaterial( mapInfo->skybox );
 
-	if ( !MapManager_LoadWorldModel() )
-	{
-		MapManager_CloseMap();
-		return false;
-	}
-
-	// ParseEntities( absPath + "/entities.smf" );
-
 	if ( Game_ProcessingServer() )
 	{
+		if ( !MapManager_LoadWorldModel() )
+		{
+			MapManager_CloseMap();
+			return false;
+		}
+
 		Entity playerSpawnEnt = GetEntitySystem()->CreateEntity();
 
 		if ( playerSpawnEnt == CH_ENT_INVALID )
@@ -176,73 +180,177 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 		gpMap->aMapEntities.push_back( playerSpawnEnt );
 	}
 
-	// TODO: Have a root map entity with transform, and probably a physics shape for StaticCompound
-	// then in CPhysShape, add an option to use an entity and everything parented to that
+	return true;
+}
 
-	// rotate the world model
-	glm::mat4 modelMatrix      = Util_ToMatrix( nullptr, &gpMap->aMapInfo->ang );
 
-	// gpMap->aRenderable = Graphics_AddSceneDraw( gpMap->aScene );
-
-#if 1
-	gpMap->aRenderable = Graphics_CreateRenderable( gpMap->aModel );
-
-	if ( gpMap->aRenderable == CH_INVALID_HANDLE )
+bool MapManager_ReadMapHeader( const std::vector< char >& srMapData )
+{
+	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
 	{
-		Log_ErrorF( gLC_Map, "Failed to create renderable for model of map \"%s\"\n", path.data() );
-		MapManager_CloseMap();
+		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)\n", srMapData.size(), sizeof( SiduryMapHeader_t ) );
 		return false;
 	}
 
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( gpMap->aRenderable ) )
+	SiduryMapHeader_t* header = (SiduryMapHeader_t*)srMapData.data();
+
+	if ( header->aVersion != CH_MAP_VERSION )
 	{
-		renderable->aModelMatrix = modelMatrix;
-		renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
+		Log_ErrorF( gLC_Map, "Expected Map Version %zd, got %zd", CH_MAP_VERSION, header->aVersion );
+		return false;
 	}
 
-#else
-	gpMap->aRenderable         = new SceneDraw_t;
-	gpMap->aRenderable->aScene = gpMap->aScene;
-
-	gpMap->aRenderable->aDraw.resize( Graphics_GetSceneModelCount( gpMap->aScene ) );
-
-	for ( uint32_t i = 0; i < gpMap->aRenderable->aDraw.size(); i++ )
+	if ( header->aSignature != CH_MAP_SIGNATURE )
 	{
-		gpMap->aRenderable->aDraw[ i ] = Graphics_CreateRenderable( Graphics_GetSceneModel( gpMap->aScene, i ) );
-
-		if ( Renderable_t* renderable = Graphics_GetRenderableData( gpMap->aRenderable->aDraw[ i ] ) )
-		{
-			renderable->aModelMatrix = modelMatrix;
-			renderable->aAABB        = Graphics_CreateWorldAABB( modelMatrix, renderable->aAABB );
-		}
+		Log_ErrorF( gLC_Map, "Expected Map Signature %zd, got %zd", CH_MAP_SIGNATURE, header->aSignature );
+		return false;
 	}
-#endif
 
 	return true;
 }
 
 
-SiduryMap* MapManager_ReadMapHeader( const std::vector< char >& srMapData )
+ESMF_CommandVersion Map_GetCommandVersion( ESMF_Command sCommand )
 {
-	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
+	switch ( sCommand )
 	{
-		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)\n", srMapData.size(), sizeof( SiduryMapHeader_t ) );
+		default:
+		case ESMF_Command_Invalid:
+			return ESMF_CommandVersion_Invalid;
+
+		case ESMF_Command_EntityList:
+			return ESMF_CommandVersion_EntityList;
+
+		case ESMF_Command_ComponentList:
+			return ESMF_CommandVersion_ComponentList;
+	}
+}
+
+
+template< typename T >
+inline const T* Map_GetCommandData( const SMF_Command* spCommand, fb::Verifier& srVerifier )
+{
+	auto msg = fb::GetRoot< T >( spCommand->data()->data() );
+
+	if ( !msg->Verify( srVerifier ) )
+	{
+		// Log_WarnF( gLC_Map, "Command Data is not Valid: %s\n", SV_MsgToString( sMsgType ) );
+		Log_WarnF( gLC_Map, "Command Data is not Valid\n" );
 		return nullptr;
 	}
 
-	SiduryMapHeader_t* header = (SiduryMapHeader_t*)srMapData.data();
+	ESMF_CommandVersion version = Map_GetCommandVersion( spCommand->command() );
+	if ( spCommand->version() != version )
+	{
+		Log_WarnF( gLC_Map, "Older command version (got %zd, expected %zd), skipping: \"%s\"\n",
+		           spCommand->version(), version, EnumNameESMF_Command( spCommand->command() ) );
+
+		return nullptr;
+	}
+
+	return msg;
 }
 
 
-ESiduryMapCmd MapManager_GetNextCommand( const std::vector< char >& srMapData, SiduryMap* spMap )
+void MapManager_ReadCommand( const SMF_Command* spCommand )
 {
-	return ESiduryMapCmd_Invalid;
+	fb::Verifier cmdVerify( spCommand->data()->data(), spCommand->data()->size() );
+
+	switch ( spCommand->command() )
+	{
+		case ESMF_Command_Skybox:
+		{
+			if ( auto msg = Map_GetCommandData< SMF_Skybox >( spCommand, cmdVerify ) )
+			{
+				Skybox_SetMaterial( msg->material()->c_str() );
+			}
+
+			break;
+		}
+		case ESMF_Command_EntityList:
+		{
+			// we don't read entities or components from the map if we are not hosting
+			// the server will send this data to us
+			if ( !Game_IsHosting() )
+				return;
+
+			if ( auto msg = Map_GetCommandData< NetMsg_EntityUpdates >( spCommand, cmdVerify ) )
+				GetEntitySystem()->ReadEntityUpdates( msg );
+			break;
+		}
+		case ESMF_Command_ComponentList:
+		{
+			if ( !Game_IsHosting() )
+				return;
+
+			// IDEA: for reading multiple maps to stream in, maybe have an option to insert our own entity translation table?
+			// This would be so the translation table doesn't conflict with the previous map
+			if ( auto msg = Map_GetCommandData< NetMsg_ComponentUpdates >( spCommand, cmdVerify ) )
+				GetEntitySystem()->ReadComponentUpdates( msg );
+			break;
+		}
+		default:
+		{
+			Log_ErrorF( gLC_Map, "Invalid Map Command Type: %zd\n", spCommand->command() );
+			return;
+		}
+	}
 }
 
 
-void MapManager_ReadCommand( const std::vector< char >& srMapData, SiduryMap* spMap )
+void MapManager_BuildCommand( fb::FlatBufferBuilder& srBuilder, std::vector< fb::Offset< SMF_Command > >& srCommandsBuilt, ESMF_Command sCommand )
 {
-	
+	fb::FlatBufferBuilder messageBuilder;
+	bool                  wroteData = false;
+
+	switch ( sCommand )
+	{
+		case ESMF_Command_Skybox:
+		{
+			const char*       skyboxName       = Skybox_GetMaterialName();
+
+			auto              skyboxNameOffset = messageBuilder.CreateString( skyboxName ? skyboxName : "" );
+			SMF_SkyboxBuilder skyboxBuilder( messageBuilder );
+			skyboxBuilder.add_material( skyboxNameOffset );
+			messageBuilder.Finish( skyboxBuilder.Finish() );
+
+			wroteData = true;
+			break;
+		}
+		case ESMF_Command_EntityList:
+		{
+			GetEntitySystem()->WriteEntityUpdates( messageBuilder, true );
+			wroteData = true;
+			break;
+		}
+		case ESMF_Command_ComponentList:
+		{
+			GetEntitySystem()->WriteComponentUpdates( messageBuilder, true, true );
+			wroteData = true;
+			break;
+		}
+		default:
+		{
+			Log_ErrorF( gLC_Map, "Invalid Map Command Type: %zd\n", sCommand );
+			return;
+		}
+	}
+
+	flatbuffers::Offset< flatbuffers::Vector< u8 > > dataVector{};
+
+	if ( wroteData )
+		dataVector = srBuilder.CreateVector( messageBuilder.GetBufferPointer(), messageBuilder.GetSize() );
+
+	SMF_CommandBuilder command( srBuilder );
+	command.add_command( sCommand );
+	command.add_version( Map_GetCommandVersion( sCommand ) );
+
+	if ( wroteData )
+		command.add_data( dataVector );
+
+	fb::Offset< SMF_Command > offset = command.Finish();
+	srBuilder.Finish( offset );
+	srCommandsBuilt.push_back( offset );
 }
 
 
@@ -271,7 +379,7 @@ bool MapManager_LoadMap( const std::string &path )
 	// ======================================================
 	// Reading the new Map Format
 
-	std::string mapDataPath = FileSys_FindFile( path + "/mapData.smf" );
+	std::string mapDataPath = FileSys_FindFile( absPath + "/mapData.smf" );
 
 	if ( mapDataPath.empty() )
 	{
@@ -287,13 +395,41 @@ bool MapManager_LoadMap( const std::string &path )
 		return false;
 	}
 
-	SiduryMap* map = MapManager_ReadMapHeader( mapData );
-
-	if ( !map )
+	if ( !MapManager_ReadMapHeader( mapData ) )
 	{
 		Log_ErrorF( gLC_Map, "Failed to read map header: \"%s\"", path.c_str() );
 		return false;
 	}
+
+	// Start parsing commands
+	char*        serializedData = mapData.data() + sizeof( SiduryMapHeader_t );
+	size_t       serializedSize = mapData.size() - sizeof( SiduryMapHeader_t );
+
+	fb::Verifier cmdVerify( (u8*)serializedData, serializedSize );
+	auto         mapDataRoot = fb::GetRoot< SMF_Data >( (u8*)serializedData );
+
+	if ( mapDataRoot->Verify( cmdVerify ) )
+	{
+		for ( size_t i = 0; i < mapDataRoot->commands()->size(); i++ )
+		{
+			const SMF_Command* command = mapDataRoot->commands()->Get( i );
+
+			if ( !command )
+				continue;
+
+			MapManager_ReadCommand( command );
+		}
+	}
+	else
+	{
+		Log_ErrorF( gLC_Map, "Invalid Map Data: \"%s\"", path.c_str() );
+		return false;
+	}
+
+	// After all entities are parsed, copy them into the SiduryMap structure
+	gpMap               = new SiduryMap;
+	gpMap->aMapPath     = path;
+	gpMap->aMapEntities = GetEntitySystem()->aUsedEntities;
 
 	return true;
 }
@@ -302,6 +438,80 @@ bool MapManager_LoadMap( const std::string &path )
 SiduryMap* MapManager_CreateMap()
 {
 	return nullptr;
+}
+
+
+void MapManager_WriteMap( const std::string& srPath )
+{
+	// Must be in a map to save it
+	if ( !Game_InMap() )
+		return;
+
+	// Build Map Format Commands
+	std::vector< fb::FlatBufferBuilder >     commands;
+	std::vector< fb::Offset< SMF_Command > > commandsBuilt;
+	fb::FlatBufferBuilder                    rootBuilder;
+
+	MapManager_BuildCommand( rootBuilder, commandsBuilt, ESMF_Command_Skybox );
+	MapManager_BuildCommand( rootBuilder, commandsBuilt, ESMF_Command_EntityList );
+	MapManager_BuildCommand( rootBuilder, commandsBuilt, ESMF_Command_ComponentList );
+
+	// Build the main map format data table
+	auto                  commandListOffset = rootBuilder.CreateVector( commandsBuilt.data(), commandsBuilt.size() );
+
+	SMF_DataBuilder       mapDataBuilder( rootBuilder );
+	mapDataBuilder.add_commands( commandListOffset );
+	rootBuilder.Finish( mapDataBuilder.Finish() );
+
+	std::string outBuffer;
+
+	std::string basePath = srPath;
+	if ( FileSys_IsRelative( srPath.c_str() ) )
+	{
+		basePath = std::filesystem::current_path().string() + "/maps/" + srPath;
+	}
+
+	// Find an Empty Filename/Path to use so we don't overwrite anything
+	std::string outPath       = basePath;
+	size_t      renameCounter = 0;
+	// while ( FileSys_Exists( outPath ) )
+	// {
+	// 	outPath = vstring( "%s_%zd", basePath.c_str(), ++renameCounter );
+	// }
+
+	// Open the file handle
+	if ( !std::filesystem::create_directories( outPath ) )
+	{
+		Log_ErrorF( gLC_Map, "Failed to create directory for map: %s\n", outPath.c_str() );
+		return;
+	}
+
+	std::string mapDataPath = outPath + "/mapData.smf";
+
+	// Write the data
+	FILE*       fp          = fopen( mapDataPath.c_str(), "wb" );
+
+	if ( fp == nullptr )
+	{
+		Log_ErrorF( gLC_Map, "Failed to open file handle for mapData.smf: \"%s\"\n", mapDataPath.c_str() );
+		return;
+	}
+	
+	// Write Map Header
+	SiduryMapHeader_t mapHeader;
+	mapHeader.aVersion   = CH_MAP_VERSION;
+	mapHeader.aSignature = CH_MAP_SIGNATURE;
+	fwrite( &mapHeader, sizeof( SiduryMapHeader_t ), 1, fp );
+
+	// Write the commands
+	// fwrite( outBuffer.c_str(), sizeof( char ), outBuffer.size(), fp );
+	fwrite( rootBuilder.GetBufferPointer(), sizeof( u8 ), rootBuilder.GetSize(), fp );
+	fclose( fp );
+
+	// If we had to use a custom name for it, rename the old file, and rename the new file to what we wanted to save it as
+	if ( renameCounter > 0 )
+	{
+	}
 }
 
 
@@ -331,44 +541,39 @@ std::string_view MapManager_GetMapPath()
 
 bool MapManager_LoadWorldModel()
 {
-	if ( !( gpMap->aModel = Graphics_LoadModel( gpMap->aMapInfo->modelPath ) ) )
-		return false;
+	Entity worldEntity = GetEntitySystem()->CreateEntity();
 
-	PhysicsShapeInfo shapeInfo( PhysShapeType::Mesh );
-	
-	// for ( size_t i = 0; i < Graphics_GetSceneModelCount( gpMap->aScene ); i++ )
+	if ( worldEntity == CH_ENT_INVALID )
 	{
-		// Handle       model     = Graphics_GetModelData( gpMap->aScene, i );
-		// Renderable_t* modelDraw = Graphics_AddModelDraw( model );
-		// 
-		// if ( modelDraw )
-		// 	continue;
-		// 
-		// modelDraw->aModel       = model;
-		// modelDraw->aModelMatrix = modelMatrix;
-
-#if 1
-		// Phys_GetModelInd( model, shapeInfo.aConcaveData );
-		Phys_GetModelInd( gpMap->aModel, shapeInfo.aConcaveData );
-#endif
+		Log_ErrorF( gLC_Map, "Failed to create Legacy World Model Entity\n" );
+		return false;
 	}
 
-#if 1
-	IPhysicsShape* physShape = GetPhysEnv()->CreateShape( shapeInfo );
+	gpMap->aMapEntities.push_back( worldEntity );
 
-	if ( physShape == nullptr )
-		return false;
+	auto transform  = Ent_AddComponent< CTransform >( worldEntity, "transform" );
+	auto renderable = Ent_AddComponent< CRenderable >( worldEntity, "renderable" );
+	auto physShape  = Ent_AddComponent< CPhysShape >( worldEntity, "physShape" );
+	auto physObject = Ent_AddComponent< CPhysObject >( worldEntity, "physObject" );
 
+	Assert( transform );
+	Assert( renderable );
 	Assert( physShape );
+	Assert( physObject );
 
-	PhysicsObjectInfo physInfo;
-	physInfo.aAng           = glm::radians( gpMap->aMapInfo->physAng );
+	renderable->aPath = gpMap->aMapInfo->modelPath;
 
-	IPhysicsObject* physObj = GetPhysEnv()->CreateObject( physShape, physInfo );
+	// rotate the world model
+	transform->aAng = gpMap->aMapInfo->ang;
 
-	gpMap->aWorldPhysShapes.push_back( physShape );
-	gpMap->aWorldPhysObjs.push_back( physObj );
-#endif
+	// TODO: Have a root map entity with transform, and probably a physics shape for StaticCompound
+	// then in CPhysShape, add an option to use an entity and everything parented to that
+
+	physShape->aShapeType      = PhysShapeType::Mesh;
+	physShape->aPath           = gpMap->aMapInfo->modelPath;
+
+	physObject->aGravity       = false;
+	physObject->aTransformMode = EPhysTransformMode_Inherit;
 
 	return true;
 }
@@ -465,11 +670,13 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 		else if ( gMapInfoKeys.skybox == kv->key.string )
 			mapInfo->skybox = kv->value.string;
 
-		else if ( gMapInfoKeys.ang == kv->key.string )
-			mapInfo->ang = KV_GetVec3( kv->value.string );
+		// we skip this one cause it was made with incorrect matrix rotations
+		// else if ( gMapInfoKeys.ang == kv->key.string )
+		// 	continue;
 
+		// physAng contains the correct values, so we only use that now
 		else if ( gMapInfoKeys.physAng == kv->key.string )
-			mapInfo->physAng = KV_GetVec3( kv->value.string );
+			mapInfo->ang = KV_GetVec3( kv->value.string );
 
 		else if ( gMapInfoKeys.spawnPos == kv->key.string )
 			mapInfo->spawnPos = KV_GetVec3( kv->value.string );
@@ -482,6 +689,4 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 	return mapInfo;
 }
-
-
 

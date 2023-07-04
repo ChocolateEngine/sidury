@@ -889,7 +889,7 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder )
+void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sSavingMap )
 {
 	Assert( aEntityCount == aUsedEntities.size() );
 
@@ -905,7 +905,11 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 		if ( !IsNetworked( entity ) )
 			continue;
 
-		auto&  update = updateBuilderList.emplace_back( srBuilder );
+		// Make sure this entity is allowed to be saved to the map
+		if ( sSavingMap && !CanSaveToMap( entity ) )
+			continue;
+
+		auto& update = updateBuilderList.emplace_back( srBuilder );
 
 		update.add_id( entity );
 
@@ -1110,7 +1114,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 }
 
 
-bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
+bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate, bool sSavingMap )
 {
 	bool   wroteData = false;
 	size_t curOffset = 0;
@@ -1125,6 +1129,17 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 		auto IsVarDirty = [ & ]()
 		{
+			// Make the var is allowed to be saved to the map
+			if ( sSavingMap )
+			{
+				if ( !var.aSaveToMap )
+				{
+					srBuilder.Bool( false );
+					return false;
+				}
+			}
+
+			// We always write this if it's a full update
 			if ( sFullUpdate )
 			{
 				wroteData = true;
@@ -1334,7 +1349,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
+void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate, bool sSavingMap )
 {
 	PROF_SCOPE();
 
@@ -1381,18 +1396,27 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		size_t compListI = 0;
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			EEntityFlag entFlags     = aEntityFlags[ entity ];
-			EEntityFlag compFlags = pool->aComponentFlags[ index ];
+			EEntityFlag entFlags            = aEntityFlags[ entity ];
+			EEntityFlag compFlags           = pool->aComponentFlags[ index ];
 
 			bool        shouldSkipComponent = false;
-
-			// check if the entity isn't networked
-			shouldSkipComponent |= !IsNetworked( entity );
-			shouldSkipComponent |= compFlags & EEntityFlag_Local;
 
 			// check if the entity itself will be destroyed
 			// shouldSkipComponent |= ( (entFlags & EEntityFlag_Destroyed) && !sFullUpdate );
 			shouldSkipComponent |= entFlags & EEntityFlag_Destroyed;
+
+			if ( sSavingMap )
+			{
+				shouldSkipComponent |= compFlags & EEntityFlag_DontSaveToMap;
+				shouldSkipComponent |= !CanSaveToMap( entity );
+				shouldSkipComponent |= !regData->aSaveToMap;
+			}
+			else
+			{
+				// check if the entity isn't networked
+				shouldSkipComponent |= !IsNetworked( entity );
+				shouldSkipComponent |= compFlags & EEntityFlag_Local;
+			}
 
 			// Have we determined we should skip this component?
 			if ( shouldSkipComponent )
@@ -1406,7 +1430,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 			// Write Component Data
 			flexb::Builder flexBuilder;
-			wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate );
+			wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
 
 			// if ( !sFullUpdate && !wroteData )
 			// {
@@ -1479,6 +1503,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 			NetMsg_ComponentUpdateBuilder compUpdate( srRootBuilder );
 			compUpdate.add_name( compNameOffset );
+			compUpdate.add_hash( regData->aHash );
 
 			//if ( wroteData )
 				compUpdate.add_components( compVector );
@@ -1578,6 +1603,13 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		EntComponentData_t* regData = pool->GetRegistryData();
 
 		AssertMsg( regData, "Failed to find component registry data" );
+
+		if ( componentUpdate->hash() != regData->aHash )
+		{
+			Log_ErrorF( "Hash of component \"%s\" differs from what we have (got %zd, expected %zd)\n",
+				componentName, componentUpdate->hash(), regData->aHash );
+			continue;
+		}
 
 		// Tell the Component System this entity's component updated
 		IEntityComponentSystem* system = GetComponentSystem( regData->apName );
@@ -1817,7 +1849,15 @@ bool EntitySystem::CanSaveToMap( Entity entity )
 		return false;
 	}
 
-	return !( it->second & EEntityFlag_DontSaveToMap );
+	if ( it->second & EEntityFlag_DontSaveToMap )
+		return false;
+
+	// Check if our parent can be saved to a map
+	Entity parent = GetParent( entity );
+	if ( parent != CH_ENT_INVALID )
+		return CanSaveToMap( parent );
+
+	return true;
 }
 
 

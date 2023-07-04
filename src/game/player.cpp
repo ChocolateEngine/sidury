@@ -384,6 +384,8 @@ void PlayerManager::Init()
 
 void PlayerManager::Create( Entity player )
 {
+	GetEntitySystem()->SetAllowSavingToMap( player, false );
+
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
 	Assert( playerInfo );
 
@@ -521,7 +523,7 @@ void PlayerManager::Respawn( Entity player )
 	zoom->aOrigFov                = r_fov.GetFloat();
 	zoom->aNewFov                 = r_fov.GetFloat();
 
-	physObjComp->aUpdateTransform = false;
+	physObjComp->aTransformMode   = EPhysTransformMode_None;
 
 	physObj->SetLinearVelocity( { 0, 0, 0 } );
 

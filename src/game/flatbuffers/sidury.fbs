@@ -10,7 +10,7 @@ enum ESiduryProtocolVer : ushort
 
 enum ESiduryComponentProtocolVer : ushort
 {
-    Value = 1,
+    Value = 2,
 }
 
 // Base Types
@@ -193,6 +193,9 @@ table NetMsg_ComponentUpdate
     // Registered Component Name
     name :string;
 
+    // Hash of the component registry data
+    hash :ulong;
+
     // List of all component data
     components :[NetMsg_ComponentUpdateData];
 }
@@ -226,4 +229,44 @@ table NetMsg_ComponentUpdates
     // All Components to update
     update_list :[NetMsg_ComponentUpdate];
 }
+
+
+// --------------------------------------------------------
+// Sidury Map Format
+
+
+enum ESMF_Command : uint
+{
+	Invalid,
+	Skybox,
+	EntityList,
+	ComponentList,
+}
+
+
+table SMF_Command
+{
+    command  :ESMF_Command;
+    version  :ushort;
+    data     :[ubyte];
+}
+
+
+// the Sidury Map Format data is simply a list of commands
+table SMF_Data
+{
+    // All Map Commands
+    commands :[SMF_Command];
+}
+
+
+// --------------------------------------------------------
+// Sidury Map Format Command Tables
+
+
+table SMF_Skybox
+{
+    material :string;
+}
+
 

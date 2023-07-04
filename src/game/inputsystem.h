@@ -22,11 +22,21 @@ enum EBtnInput
 	EBtnInput_Zoom    = ( 1 << 8 ),
 };
 
+using InputContextHandle_t = int;
+
 
 constexpr float      IN_CVAR_JUST_RELEASED = -1.f;
 constexpr float      IN_CVAR_RELEASED      = 0.f;
 constexpr float      IN_CVAR_PRESSED       = 1.f;
 constexpr float      IN_CVAR_JUST_PRESSED  = 2.f;
+
+
+// Properties for the current input
+struct InputContext_t
+{
+	bool aCapturesMouse    = false;
+	bool aCapturesKeyboard = false;
+};
 
 
 void                 Input_Init();
@@ -50,7 +60,19 @@ void                 Input_BindKey( SDL_Scancode key, const std::string& cmd );
 //bool Input_KeyJustPressed( ButtonInput_t key );
 //bool Input_KeyJustReleased( ButtonInput_t key );
 
+InputContextHandle_t Input_CreateContext( InputContext_t sContext );
+void                 Input_FreeContext( InputContextHandle_t sContextHandle );
+
+InputContext_t&      Input_GetContextData( InputContext_t sContext );
+
+// Push a context to the top of the stack, this will be the currently enabled context
+// Returns true if the context was successfully pushed to the top of the stack
+bool                 Input_PushContext( InputContextHandle_t sContextHandle );
+void                 Input_PopContext();
+
+// Is the currently enabled context the enabled one?
+bool                 Input_IsCurrentContext( InputContextHandle_t sContextHandle );
+
 
 extern ButtonInput_t IN_FORWARD;
-
 

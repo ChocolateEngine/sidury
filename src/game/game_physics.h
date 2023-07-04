@@ -7,6 +7,20 @@
 
 using Entity = size_t;
 
+
+enum EPhysTransformMode : u8
+{
+	// Don't do anything with the transform component
+	EPhysTransformMode_None,
+
+	// Override the transform component's values with what we got from the physics object
+	EPhysTransformMode_Update,
+
+	// Have the physics object use the values from the transform component
+	EPhysTransformMode_Inherit,
+};
+
+
 // Physics Shape Component
 struct CPhysShape
 {
@@ -29,26 +43,26 @@ struct CPhysShape
 
 struct CPhysObject
 {
-	ComponentNetVar< bool >              aStartActive        = false;
-	ComponentNetVar< bool >              aAllowSleeping      = true;
+	ComponentNetVar< bool >               aStartActive        = false;
+	ComponentNetVar< bool >               aAllowSleeping      = true;
 
-	ComponentNetVar< float >             aMaxLinearVelocity  = 500.0f;                // Maximum linear velocity that this body can reach (m/s)
-	ComponentNetVar< float >             aMaxAngularVelocity = 0.25f * M_PI * 60.0f;  // Maximum angular velocity that this body can reach (rad/s)
+	ComponentNetVar< float >              aMaxLinearVelocity  = 500.0f;                // Maximum linear velocity that this body can reach (m/s)
+	ComponentNetVar< float >              aMaxAngularVelocity = 0.25f * M_PI * 60.0f;  // Maximum angular velocity that this body can reach (rad/s)
 
-	ComponentNetVar< PhysMotionType >    aMotionType         = PhysMotionType::Static;
-	ComponentNetVar< PhysMotionQuality > aMotionQuality      = PhysMotionQuality::Discrete;
+	ComponentNetVar< PhysMotionType >     aMotionType         = PhysMotionType::Static;
+	ComponentNetVar< PhysMotionQuality >  aMotionQuality      = PhysMotionQuality::Discrete;
 
-	ComponentNetVar< bool >              aIsSensor           = false;
+	ComponentNetVar< bool >               aIsSensor           = false;
 
-	ComponentNetVar< bool >              aCustomMass         = false;
-	ComponentNetVar< float >             aMass               = 0.f;
+	ComponentNetVar< bool >               aCustomMass         = false;
+	ComponentNetVar< float >              aMass               = 0.f;
 
 	// Custom stuff
-	ComponentNetVar< bool >              aGravity            = true;
-	ComponentNetVar< bool >              aUpdateTransform    = true;
-	ComponentNetVar< bool >              aEnableCollision    = true;
+	ComponentNetVar< bool >               aGravity            = true;
+	ComponentNetVar< bool >               aEnableCollision    = true;
+	ComponentNetVar< EPhysTransformMode > aTransformMode{};
 
-	IPhysicsObject*                      apObj               = nullptr;
+	IPhysicsObject*                       apObj = nullptr;
 };
 
 

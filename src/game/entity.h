@@ -192,6 +192,7 @@ struct EntComponentVarData_t
 	bool         aIsNetVar;
 	bool         aSaveToMap;
 	size_t       aSize;
+	size_t       aHash;
 	const char*  apName;
 };
 
@@ -205,6 +206,9 @@ struct EntComponentData_t
 	std::map< size_t, EntComponentVarData_t > aVars;
 
 	size_t                                    aSize;
+
+	// // auto generated hash of all variables in a component, useful for checking for version changes in maps
+	size_t                                    aHash;
 
 	bool                                      aSaveToMap;
 	bool                                      aOverrideClient;  // probably temporary until prediction
@@ -343,6 +347,7 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 	varData.aSize                  = sizeof( VAR_TYPE );
 	varData.aType                  = sVarType;
 	varData.aSaveToMap             = sSaveToMap;
+	varData.aHash                  = sVarHash;
 
 	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
 
@@ -355,6 +360,13 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 	else
 	{
 		varData.aIsNetVar = true;
+	}
+
+	// TODO: really should have this be done once, but im not adding a new function for this to add to every single component
+	data.aHash = 0;
+	for ( const auto& [ offset, var ] : data.aVars )
+	{
+		data.aHash ^= varData.aHash;
 	}
 }
 
@@ -665,10 +677,10 @@ class EntitySystem
 
 	// Read and write from the network
 	void                    ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
-	void                    WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
+	void                    WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sSavingMap = false );
 
 	void                    ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
-	void                    WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
+	void                    WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate, bool sSavingMap = false );
 
 	// Add a component to an entity
 	void*                   AddComponent( Entity entity, const char* spName );
