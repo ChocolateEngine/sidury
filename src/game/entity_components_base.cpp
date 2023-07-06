@@ -84,6 +84,12 @@ CH_STRUCT_REGISTER_COMPONENT( CLight, light, true, EEntComponentNetType_Both, CH
 }
 
 
+CH_STRUCT_REGISTER_COMPONENT( CHealth, health, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, int, aHealth, health, CH_ENT_SAVE_TO_MAP );
+}
+
+
 void Ent_RegisterBaseComponents()
 {
 	Ent_RegisterVarHandlers();

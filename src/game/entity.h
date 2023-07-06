@@ -1218,6 +1218,12 @@ struct CLight
 };
 
 
+struct CHealth
+{
+	ComponentNetVar< int >        aHealth       = 0;
+};
+
+
 // convinence
 // inline auto &GetDirection( Entity ent ) { return GetEntitySystem()->GetComponent< CDirection >( ent ); }
 
