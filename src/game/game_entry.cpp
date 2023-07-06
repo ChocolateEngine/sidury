@@ -56,37 +56,14 @@ extern IAudioSystem* audio;
 extern Ch_IPhysics*  ch_physics;
 
 
-static AppModules_t gAppModules[] = 
+static AppModule_t gAppModules[] = 
 {
-	{ (void**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (void**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_VER },
-	{ (void**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
-	{ (void**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_HASH },
-	{ (void**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_VER },
+	{ (ISystem**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_HASH },
+	{ (ISystem**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
 };
-
-
-// We load this separately because all modules loaded through Mod_AddSystems() are required and shuts down on failure,
-// and this is not required.
-static void LoadSteamAbstraction()
-{
-	if ( !Mod_Load( "ch_steam" ) )
-	{
-		Log_Error( "Failed to load module: ch_steam\n" );
-		return;
-	}
-
-	// add system we want from module
-	void* system = Mod_GetInterface( ISTEAM_NAME, ISTEAM_VER );
-	if ( system == nullptr )
-	{
-		Log_ErrorF( "Failed to load system from module: ch_steam - %s\n", ISTEAM_NAME );
-		return;
-	}
-
-	steam = static_cast< ISteamSystem* >( system );
-	Mod_AddLoadedSystem( steam );
-}
 
 
 extern "C"
@@ -111,7 +88,10 @@ extern "C"
 		}
 
 		if ( !gArgNoSteam )
-			LoadSteamAbstraction();
+		{
+			AppModule_t steamModule{ (ISystem**)&steam, "ch_steam", ISTEAM_NAME, ISTEAM_VER, false };
+			Mod_LoadSystem( steamModule );
+		}
 
 		Mod_InitSystems();
 
