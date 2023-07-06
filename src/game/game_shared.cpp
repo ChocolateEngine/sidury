@@ -186,6 +186,16 @@ void NetHelper_ReadVec4( const Vec4* spSource, glm::vec4& srVec )
 	srVec.w = spSource->w();
 }
 
+void NetHelper_ReadQuat( const Quat* spSource, glm::quat& srQuat )
+{
+	if ( !spSource )
+		return;
+
+	srQuat.x = spSource->x();
+	srQuat.y = spSource->y();
+	srQuat.z = spSource->z();
+	srQuat.w = spSource->w();
+}
 
 #if 0
 void NetHelper_WriteVec3( Vec2Builder& srBuilder, const glm::vec2& srVec )

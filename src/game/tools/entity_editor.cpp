@@ -4,7 +4,7 @@
 #include "imgui/imgui.h"
 
 
-static bool   gToolEntEditorEnabled = true;
+static bool   gToolEntEditorEnabled = false;
 static Entity gSelectedEntity       = CH_ENT_INVALID;
 extern Handle gLocalPlayer;
 
@@ -123,20 +123,34 @@ bool EntEditor_DrawComponentVarUI( void* spData, EntComponentVarData_t& srVarDat
 		case EEntNetField_Vec2:
 		{
 			auto value = static_cast< glm::vec2* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 2, 1.f, nullptr, nullptr, nullptr, 1.f );
+			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 2, 0.25f, nullptr, nullptr, nullptr, 1.f );
 
 		}
 		case EEntNetField_Vec3:
 		{
 			auto value = static_cast< glm::vec3* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
+			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
 		}
 		case EEntNetField_Vec4:
 		{
 			auto value = static_cast< glm::vec4* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 4, 1.f, nullptr, nullptr, nullptr, 1.f );
+			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 4, 0.25f, nullptr, nullptr, nullptr, 1.f );
 		}
-			
+		case EEntNetField_Quat:
+		{
+			auto value = static_cast< glm::quat* >( spData );
+			glm::vec3 euler = glm::degrees( glm::eulerAngles( *value ) );
+
+			bool modified = ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &euler.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
+
+			if ( modified )
+			{
+				*value = glm::radians( euler );
+			}
+
+			return modified;
+		}
+		
 		case EEntNetField_Color3:
 		{
 			auto value = static_cast< glm::vec3* >( spData );
@@ -160,6 +174,9 @@ void EntEditor_DrawEntityList()
 		ImGui::End();
 		return;
 	}
+
+	// TODO: make this create entity stuff into a context menu with plenty of presets
+	// also, create a duplicate entity option when selected on one, and move delete entity and clear parent to that
 
 	if ( ImGui::Button( "Create Entity" ) )
 	{

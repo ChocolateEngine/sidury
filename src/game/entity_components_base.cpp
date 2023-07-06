@@ -116,6 +116,7 @@ void Ent_RegisterBaseComponents()
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntNetField_Vec2;
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntNetField_Vec3;
 	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntNetField_Vec4;
+	gEntComponentRegistry.aVarTypes[ typeid( glm::quat ).hash_code() ]   = EEntNetField_Quat;
 
 	// Now Register Base Components
 	EntComp_RegisterComponent< CTransform >(

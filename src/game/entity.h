@@ -123,6 +123,7 @@ enum EEntNetField : u8
 	EEntNetField_Vec2,  // glm::vec2
 	EEntNetField_Vec3,  // glm::vec3
 	EEntNetField_Vec4,  // glm::vec4
+	EEntNetField_Quat,  // glm::quat
 
 	// Behaves the same as Vec3 and Vec4 for now, but has a different ui in the entity editor
 	EEntNetField_Color3,  // glm::vec3

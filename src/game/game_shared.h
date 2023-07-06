@@ -71,10 +71,5 @@ void                  Game_ExecCommandsSafe( ECommandSource sSource, std::string
 void                  NetHelper_ReadVec2( const Vec2* spReader, glm::vec2& srVec );
 void                  NetHelper_ReadVec3( const Vec3* spReader, glm::vec3& srVec );
 void                  NetHelper_ReadVec4( const Vec4* spReader, glm::vec4& srVec );
-
-#if 0
-void                  NetHelper_WriteVec2( Vec2Builder& srBuilder, const glm::vec2& srVec );
-void                  NetHelper_WriteVec3( Vec3Builder& srBuilder, const glm::vec3& srVec );
-void                  NetHelper_WriteVec4( Vec4Builder& srBuilder, const glm::vec4& srVec );
-#endif
+void                  NetHelper_ReadQuat( const Quat* spSource, glm::quat& srQuat );
 

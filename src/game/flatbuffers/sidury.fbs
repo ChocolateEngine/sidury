@@ -35,6 +35,14 @@ struct Vec4
     w : float;
 }
 
+struct Quat
+{
+    x : float;
+    y : float;
+    z : float;
+    w : float;
+}
+
 
 enum EPlayerMoveType : byte
 {

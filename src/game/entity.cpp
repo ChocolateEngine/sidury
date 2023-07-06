@@ -107,6 +107,7 @@ static const char* gEntVarTypeStr[] = {
 	"glm::vec2",
 	"glm::vec3",
 	"glm::vec4",
+	"glm::quat",
 
 	"glm::vec3",
 	"glm::vec4",
@@ -203,6 +204,10 @@ size_t EntComp_GetVarDirtyOffset( char* spData, EEntNetField sVarType )
 		case EEntNetField_Color4:
 		case EEntNetField_Vec4:
 			offset = sizeof( glm::vec4 );
+			break;
+
+		case EEntNetField_Quat:
+			offset = sizeof( glm::quat );
 			break;
 	}
 
@@ -314,6 +319,12 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType )
 		case EEntNetField_Vec4:
 		{
 			const glm::vec4* value = (const glm::vec4*)spData;
+			return vstring( "(%.4f, %.4f, %.4f, %.4f)", value->x, value->y, value->z, value->w );
+		}
+
+		case EEntNetField_Quat:
+		{
+			const glm::quat* value = (const glm::quat*)spData;
 			return vstring( "(%.4f, %.4f, %.4f, %.4f)", value->x, value->y, value->z, value->w );
 		}
 	}
@@ -1109,6 +1120,16 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 				value->w   = vector[ i++ ].AsFloat();
 				break;
 			}
+
+			case EEntNetField_Quat:
+			{
+				auto value = (glm::quat*)( data );
+				value->x   = vector[ i++ ].AsFloat();
+				value->y   = vector[ i++ ].AsFloat();
+				value->z   = vector[ i++ ].AsFloat();
+				value->w   = vector[ i++ ].AsFloat();
+				break;
+			}
 		}
 	}
 }
@@ -1160,6 +1181,9 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 		switch ( var.aType )
 		{
 			default:
+				srBuilder.Bool( false );
+				break;
+
 			case EEntNetField_Invalid:
 				break;
 
@@ -1330,6 +1354,20 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				if ( IsVarDirty() )
 				{
 					const glm::vec4* value = (const glm::vec4*)( data );
+					srBuilder.Add( value->x );
+					srBuilder.Add( value->y );
+					srBuilder.Add( value->z );
+					srBuilder.Add( value->w );
+				}
+
+				break;
+			}
+
+			case EEntNetField_Quat:
+			{
+				if ( IsVarDirty() )
+				{
+					const glm::quat* value = (const glm::quat*)( data );
 					srBuilder.Add( value->x );
 					srBuilder.Add( value->y );
 					srBuilder.Add( value->z );
