@@ -251,7 +251,11 @@ struct EntCompVarTypeToEnum_t
 
 
 // it would be funny if we changed this to "TheEntityComponentRegistry"
-extern EntComponentRegistry_t gEntComponentRegistry;
+inline EntComponentRegistry_t &GetEntComponentRegistry()
+{
+	static EntComponentRegistry_t entComponentRegistry;
+	return entComponentRegistry;
+}
 
 // void* EntComponentRegistry_Create( std::string_view sName );
 // void* EntComponentRegistry_GetVarHandler();
@@ -280,15 +284,15 @@ inline void EntComp_RegisterComponent(
 	bool sSaveToMap )
 {
 	size_t typeHash = typeid( T ).hash_code();
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it != gEntComponentRegistry.aComponents.end() )
+	if ( it != GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component already registered: \"%s\" - \"%s\"\n", typeid( T ).name(), spName );
 		return;
 	}
 
-	EntComponentData_t& data                        = gEntComponentRegistry.aComponents[ typeHash ];
+	EntComponentData_t& data                        = GetEntComponentRegistry().aComponents[ typeHash ];
 	data.apName                                     = spName;
 	data.aSize                                      = sizeof( T );
 	data.aOverrideClient                            = sOverrideClient;
@@ -297,7 +301,7 @@ inline void EntComp_RegisterComponent(
 	data.aFuncNew                                   = sFuncNew;
 	data.aFuncFree                                  = sFuncFree;
 
-	gEntComponentRegistry.aComponentNames[ spName ] = &data;
+	GetEntComponentRegistry().aComponentNames[ spName ] = &data;
 
 	// Run Callbacks
 	EntComp_RunRegisterCallbacks( spName );
@@ -309,9 +313,9 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 {
 	size_t typeHash = typeid( T ).hash_code();
 
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it == gEntComponentRegistry.aComponents.end() )
+	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component not registered, can't set system creation function: \"%s\"\n", typeid( T ).name() );
 		return;
@@ -326,9 +330,9 @@ template< typename T, typename VAR_TYPE >
 inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
 {
 	size_t typeHash = typeid( T ).hash_code();
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it == gEntComponentRegistry.aComponents.end() )
+	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component not registered, can't add var: \"%s\" - \"%s\"\n", typeid( T ).name() );
 		return;
@@ -377,9 +381,9 @@ template< typename T >
 inline void EntComp_RegisterComponentVarEx2( EEntNetField sVarType, const char* spVarName, const char* spName, size_t sOffset, size_t sVarHash )
 {
 	size_t typeHash = typeid( T ).hash_code();
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it == gEntComponentRegistry.aComponents.end() )
+	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component not registered, can't add var: \"%s\" - \"%s\"\n", typeid( T ).name() );
 		return;
@@ -421,9 +425,9 @@ inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, si
 {
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
-	auto   findEnum    = gEntComponentRegistry.aVarTypes.find( varTypeHash );
+	auto   findEnum    = GetEntComponentRegistry().aVarTypes.find( varTypeHash );
 
-	if ( findEnum == gEntComponentRegistry.aVarTypes.end() )
+	if ( findEnum == GetEntComponentRegistry().aVarTypes.end() )
 	{
 		Log_ErrorF( "Component Var Type not registered in EEntComponentVarType: \"%s\"\n", typeid( VAR_TYPE ).name() );
 		return;
@@ -438,9 +442,9 @@ template< typename T >
 inline void EntComp_RegisterVarReadWrite( FEntComp_ReadFunc* spRead, FEntComp_WriteFunc* spWrite )
 {
 	size_t typeHash = typeid( T ).hash_code();
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it == gEntComponentRegistry.aComponents.end() )
+	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component not registered, can't add read and write function: \"%s\" - \"%s\"\n", typeid( T ).name() );
 		return;
@@ -459,9 +463,9 @@ template< typename T >
 inline void EntComp_RegisterComponentReadWrite( FEntComp_ReadFunc* spRead, FEntComp_WriteFunc* spWrite )
 {
 	size_t typeHash = typeid( T ).hash_code();
-	auto   it       = gEntComponentRegistry.aComponents.find( typeHash );
+	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
-	if ( it == gEntComponentRegistry.aComponents.end() )
+	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
 		Log_ErrorF( "Component not registered, can't add read and write function: \"%s\" - \"%s\"\n", typeid( T ).name() );
 		return;

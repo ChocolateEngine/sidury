@@ -25,6 +25,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ent_suit.h"
+
 
 constexpr float DEFAULT_SPEED = 250.f;
 
@@ -401,11 +403,13 @@ void PlayerManager::Create( Entity player )
 	auto zoom         = Ent_AddComponent< CPlayerZoom >( player, "playerZoom" );
 	auto transform    = Ent_AddComponent< CTransform >( player, "transform" );
 	auto health       = Ent_AddComponent< CHealth >( player, "health" );
+	auto suit         = Ent_AddComponent< CSuit >( player, "suit" );
 
 	Assert( flashlight );
 	Assert( zoom );
 	Assert( transform );
 	Assert( health );
+	Assert( suit );
 
 	health->aHealth = 100;
 

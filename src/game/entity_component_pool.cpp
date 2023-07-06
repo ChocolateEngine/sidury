@@ -55,9 +55,9 @@ bool EntityComponentPool::Init( const char* spName )
 	apName  = spName;
 
 	// Get Creation and Free functions
-	auto it = gEntComponentRegistry.aComponentNames.find( apName );
+	auto it = GetEntComponentRegistry().aComponentNames.find( apName );
 
-	if ( it == gEntComponentRegistry.aComponentNames.end() )
+	if ( it == GetEntComponentRegistry().aComponentNames.end() )
 	{
 		Log_FatalF( gLC_Entity, "Component not registered: \"%s\"\n", apName );
 		return false;
@@ -82,7 +82,7 @@ EntComponentData_t* EntityComponentPool::GetRegistryData()
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 
-	return gEntComponentRegistry.aComponentNames[ apName ];
+	return GetEntComponentRegistry().aComponentNames[ apName ];
 }
 
 

@@ -292,7 +292,7 @@ void EntEditor_DrawEntityData()
 	// you might be able to hack it together if you add in an arrow button yourself and InputText()
 	if ( ImGui::BeginCombo( "Add Component", "transform" ) )
 	{
-		for ( auto& [ name, regData ] : gEntComponentRegistry.aComponentNames )
+		for ( auto& [ name, regData ] : GetEntComponentRegistry().aComponentNames )
 		{
 			if ( GetEntitySystem()->HasComponent( gSelectedEntity, name.data() ) )
 				continue;
@@ -311,7 +311,7 @@ void EntEditor_DrawEntityData()
 	// go through the component registry and check to see if the entity has this component (probably slow af)
 	size_t imguiID = 0;
 
-	for ( auto& [name, regData] : gEntComponentRegistry.aComponentNames )
+	for ( auto& [name, regData] : GetEntComponentRegistry().aComponentNames )
 	{
 		void* compData = GetEntitySystem()->GetComponent( gSelectedEntity, name.data() );
 

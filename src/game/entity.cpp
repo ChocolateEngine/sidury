@@ -17,8 +17,6 @@
 LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
 
 
-EntComponentRegistry_t gEntComponentRegistry;
-
 EntitySystem*          cl_entities                                     = nullptr;
 EntitySystem*          sv_entities                                     = nullptr;
 
@@ -31,9 +29,9 @@ CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
 
 // void* EntComponentRegistry_Create( std::string_view sName )
 // {
-// 	auto it = gEntComponentRegistry.aComponentNames.find( sName );
+// 	auto it = GetEntComponentRegistry().aComponentNames.find( sName );
 // 
-// 	if ( it == gEntComponentRegistry.aComponentNames.end() )
+// 	if ( it == GetEntComponentRegistry().aComponentNames.end() )
 // 	{
 // 		return nullptr;
 // 	}
@@ -348,16 +346,16 @@ void EntComp_AddRegisterCallback( EntitySystem* spSystem )
 		return;
 	}
 
-	gEntComponentRegistry.aCallbacks.push_back( spSystem );
+	GetEntComponentRegistry().aCallbacks.push_back( spSystem );
 }
 
 
 void EntComp_RemoveRegisterCallback( EntitySystem* spSystem )
 {
-	size_t index = vec_index( gEntComponentRegistry.aCallbacks, spSystem );
+	size_t index = vec_index( GetEntComponentRegistry().aCallbacks, spSystem );
 	if ( index != SIZE_MAX )
 	{
-		gEntComponentRegistry.aCallbacks.erase( gEntComponentRegistry.aCallbacks.begin() + index );
+		GetEntComponentRegistry().aCallbacks.erase( GetEntComponentRegistry().aCallbacks.begin() + index );
 	}
 	else
 	{
@@ -368,7 +366,7 @@ void EntComp_RemoveRegisterCallback( EntitySystem* spSystem )
 
 void EntComp_RunRegisterCallbacks( const char* spName )
 {
-	for ( auto system : gEntComponentRegistry.aCallbacks )
+	for ( auto system : GetEntComponentRegistry().aCallbacks )
 	{
 		system->CreateComponentPool( spName );
 	}
@@ -556,7 +554,7 @@ void EntitySystem::InitCreatedComponents()
 void EntitySystem::CreateComponentPools()
 {
 	// iterate through all registered components and create a component pool for them
-	for ( auto& [ name, componentData ] : gEntComponentRegistry.aComponentNames )
+	for ( auto& [ name, componentData ] : GetEntComponentRegistry().aComponentNames )
 	{
 		CreateComponentPool( name.data() );
 	}
@@ -1963,9 +1961,9 @@ CONCMD( ent_dump_registry )
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
 	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
-	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
-	for ( const auto& [ name, regData ] : gEntComponentRegistry.aComponentNames )
+	for ( const auto& [ name, regData ] : GetEntComponentRegistry().aComponentNames )
 	{
 		Assert( regData );
 
@@ -2005,7 +2003,7 @@ CONCMD( ent_dump )
 
 	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
 
-	Log_GroupF( group, "Registered Components: %zd\n", gEntComponentRegistry.aComponents.size() );
+	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
 	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
 	{

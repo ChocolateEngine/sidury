@@ -95,28 +95,28 @@ void Ent_RegisterBaseComponents()
 	Ent_RegisterVarHandlers();
 
 	// Setup Types, only used for registering variables without specifing the VarType
-	gEntComponentRegistry.aVarTypes[ typeid( bool ).hash_code() ]        = EEntNetField_Bool;
-	gEntComponentRegistry.aVarTypes[ typeid( float ).hash_code() ]       = EEntNetField_Float;
-	gEntComponentRegistry.aVarTypes[ typeid( double ).hash_code() ]      = EEntNetField_Double;
+	GetEntComponentRegistry().aVarTypes[ typeid( bool ).hash_code() ]        = EEntNetField_Bool;
+	GetEntComponentRegistry().aVarTypes[ typeid( float ).hash_code() ]       = EEntNetField_Float;
+	GetEntComponentRegistry().aVarTypes[ typeid( double ).hash_code() ]      = EEntNetField_Double;
 
-	gEntComponentRegistry.aVarTypes[ typeid( s8 ).hash_code() ]          = EEntNetField_S8;
-	gEntComponentRegistry.aVarTypes[ typeid( s16 ).hash_code() ]         = EEntNetField_S16;
-	gEntComponentRegistry.aVarTypes[ typeid( s32 ).hash_code() ]         = EEntNetField_S32;
-	gEntComponentRegistry.aVarTypes[ typeid( s64 ).hash_code() ]         = EEntNetField_S64;
+	GetEntComponentRegistry().aVarTypes[ typeid( s8 ).hash_code() ]          = EEntNetField_S8;
+	GetEntComponentRegistry().aVarTypes[ typeid( s16 ).hash_code() ]         = EEntNetField_S16;
+	GetEntComponentRegistry().aVarTypes[ typeid( s32 ).hash_code() ]         = EEntNetField_S32;
+	GetEntComponentRegistry().aVarTypes[ typeid( s64 ).hash_code() ]         = EEntNetField_S64;
 
-	gEntComponentRegistry.aVarTypes[ typeid( u8 ).hash_code() ]          = EEntNetField_U8;
-	gEntComponentRegistry.aVarTypes[ typeid( u16 ).hash_code() ]         = EEntNetField_U16;
-	gEntComponentRegistry.aVarTypes[ typeid( u32 ).hash_code() ]         = EEntNetField_U32;
-	gEntComponentRegistry.aVarTypes[ typeid( u64 ).hash_code() ]         = EEntNetField_U64;
+	GetEntComponentRegistry().aVarTypes[ typeid( u8 ).hash_code() ]          = EEntNetField_U8;
+	GetEntComponentRegistry().aVarTypes[ typeid( u16 ).hash_code() ]         = EEntNetField_U16;
+	GetEntComponentRegistry().aVarTypes[ typeid( u32 ).hash_code() ]         = EEntNetField_U32;
+	GetEntComponentRegistry().aVarTypes[ typeid( u64 ).hash_code() ]         = EEntNetField_U64;
 
 	// probably overrides type have of u64, hmmm
-	// gEntComponentRegistry.aVarTypes[ typeid( Entity ).hash_code() ]      = EEntNetField_Entity;
-	gEntComponentRegistry.aVarTypes[ typeid( std::string ).hash_code() ] = EEntNetField_StdString;
+	// GetEntComponentRegistry().aVarTypes[ typeid( Entity ).hash_code() ]      = EEntNetField_Entity;
+	GetEntComponentRegistry().aVarTypes[ typeid( std::string ).hash_code() ] = EEntNetField_StdString;
 
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntNetField_Vec2;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntNetField_Vec3;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntNetField_Vec4;
-	gEntComponentRegistry.aVarTypes[ typeid( glm::quat ).hash_code() ]   = EEntNetField_Quat;
+	GetEntComponentRegistry().aVarTypes[ typeid( glm::vec2 ).hash_code() ]   = EEntNetField_Vec2;
+	GetEntComponentRegistry().aVarTypes[ typeid( glm::vec3 ).hash_code() ]   = EEntNetField_Vec3;
+	GetEntComponentRegistry().aVarTypes[ typeid( glm::vec4 ).hash_code() ]   = EEntNetField_Vec4;
+	GetEntComponentRegistry().aVarTypes[ typeid( glm::quat ).hash_code() ]   = EEntNetField_Quat;
 
 	// Now Register Base Components
 	EntComp_RegisterComponent< CTransform >(
