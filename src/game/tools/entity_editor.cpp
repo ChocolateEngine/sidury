@@ -312,6 +312,7 @@ void EntEditor_DrawEntityData()
 			if ( ImGui::Button( "Remove Component" ) )
 			{
 				GetEntitySystem()->RemoveComponent( gSelectedEntity, name.data() );
+				ImGui::PopID();
 				continue;
 			}
 
