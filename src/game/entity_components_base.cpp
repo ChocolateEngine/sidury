@@ -92,6 +92,8 @@ CH_STRUCT_REGISTER_COMPONENT( CHealth, health, true, EEntComponentNetType_Both, 
 
 void Ent_RegisterBaseComponents()
 {
+	PROF_SCOPE();
+
 	Ent_RegisterVarHandlers();
 
 	// Setup Types, only used for registering variables without specifing the VarType

@@ -59,6 +59,8 @@ void Tools_Shutdown()
 
 void Tools_Update( float sFrameTime )
 {
+	PROF_SCOPE();
+
 	if ( !tool_enabled )
 		return;
 
@@ -70,6 +72,8 @@ void Tools_Update( float sFrameTime )
 
 void Tools_DrawUI()
 {
+	PROF_SCOPE();
+
 	if ( !tool_enabled )
 		return;
 

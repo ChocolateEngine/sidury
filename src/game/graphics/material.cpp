@@ -193,6 +193,8 @@ VertexFormat Mat_GetVertexFormat( Handle mat )
 template <typename T>
 void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 {
+	PROF_SCOPE();
+
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
 	{
@@ -326,6 +328,8 @@ const glm::vec4& Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4
 // Used in normal material loading, and eventually, live material reloading
 bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 {
+	PROF_SCOPE();
+
 	std::string fullPath;
 
 	if ( srPath.ends_with( ".cmt" ) )

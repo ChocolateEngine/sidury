@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <set>
 #include <array>
+#include <forward_list>
 
 #include "types/transform.h"
 #include "iaudio.h"
@@ -195,6 +196,7 @@ struct EntComponentVarData_t
 	size_t       aSize;
 	size_t       aHash;
 	const char*  apName;
+	size_t       aNameLen;
 };
 
 
@@ -202,6 +204,7 @@ struct EntComponentVarData_t
 struct EntComponentData_t
 {
 	const char*                               apName;
+	size_t                                    aNameLen;
 
 	// [Var Offset] = Var Data
 	std::map< size_t, EntComponentVarData_t > aVars;
@@ -283,6 +286,11 @@ inline void EntComp_RegisterComponent(
 	FEntComp_Free sFuncFree,
 	bool sSaveToMap )
 {
+	CH_ASSERT( spName );
+
+	if ( !spName )
+		return;
+
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
@@ -294,6 +302,7 @@ inline void EntComp_RegisterComponent(
 
 	EntComponentData_t& data                        = GetEntComponentRegistry().aComponents[ typeHash ];
 	data.apName                                     = spName;
+	data.aNameLen                                   = strlen( spName );
 	data.aSize                                      = sizeof( T );
 	data.aOverrideClient                            = sOverrideClient;
 	data.aNetType                                   = sNetType;
@@ -329,6 +338,11 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 template< typename T, typename VAR_TYPE >
 inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, size_t sVarHash, bool sSaveToMap )
 {
+	CH_ASSERT( spName );
+
+	if ( !spName )
+		return;
+
 	size_t typeHash = typeid( T ).hash_code();
 	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
@@ -349,6 +363,7 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 
 	EntComponentVarData_t& varData = data.aVars[ sOffset ];
 	varData.apName                 = spName;
+	varData.aNameLen               = strlen( spName );
 	varData.aSize                  = sizeof( VAR_TYPE );
 	varData.aType                  = sVarType;
 	varData.aSaveToMap             = sSaveToMap;
@@ -573,6 +588,8 @@ class EntityComponentPool
 	// size_t                                           aCount;
 	std::vector < ComponentID_t >                    aComponentIDs;
 
+	std::forward_list< ComponentID_t >               aNewComponents;
+
 	// Component Name
 	const char*                                      apName;
 
@@ -751,9 +768,6 @@ class EntitySystem
 	// TODO: CHANGE BACK TO QUEUE
 	// std::queue< Entity >                               aEntityPool{};
 	std::vector< Entity >                                        aEntityPool{};
-
-	// Entity ID's in use
-	std::vector< Entity >                                        aUsedEntities{};
 
 	// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
 	std::unordered_map< Entity, Entity >                         aEntityIDConvert;

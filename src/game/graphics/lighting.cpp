@@ -218,6 +218,8 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 
 void Graphics_UpdateLightDescSets( ELightType sLightType )
 {
+	PROF_SCOPE();
+
 	// update the descriptor sets
 	UpdateVariableDescSet_t update{};
 	update.aType = EDescriptorType_UniformBuffer;
@@ -342,6 +344,8 @@ void Graphics_DestroyLightBuffer( Light_t* spLight )
 
 void Graphics_UpdateLightBuffer( Light_t* spLight )
 {
+	PROF_SCOPE();
+
 	Handle buffer = InvalidHandle;
 
 	auto   it     = gLightBuffers.find( spLight );

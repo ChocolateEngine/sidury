@@ -144,6 +144,8 @@ void SV_Shutdown()
 
 void SV_Update( float frameTime )
 {
+	PROF_SCOPE();
+
 	if ( sv_pause )
 		return;
 
@@ -232,6 +234,8 @@ void SV_Update( float frameTime )
 
 void SV_GameUpdate( float frameTime )
 {
+	PROF_SCOPE();
+
 	GetEntitySystem()->InitCreatedComponents();
 
 	MapManager_Update();
@@ -311,6 +315,8 @@ void SV_StopServer()
 
 int SV_BroadcastMsgsToSpecificClients( std::vector< flatbuffers::FlatBufferBuilder >& srMessages, const ChVector< SV_Client_t* >& srClients )
 {
+	PROF_SCOPE();
+
 	int writeSize = 0;
 
 	for ( size_t i = 0; i < srMessages.size(); i++ )
@@ -347,6 +353,8 @@ int SV_BroadcastMsgsToSpecificClients( std::vector< flatbuffers::FlatBufferBuild
 
 int SV_BroadcastMsgs( std::vector< flatbuffers::FlatBufferBuilder >& srMessages )
 {
+	PROF_SCOPE();
+
 	int writeSize = 0;
 
 	for ( size_t i = 0; i < srMessages.size(); i++ )
@@ -380,6 +388,8 @@ int SV_BroadcastMsgs( std::vector< flatbuffers::FlatBufferBuilder >& srMessages 
 
 int SV_BroadcastMsg( flatbuffers::FlatBufferBuilder& srMessage )
 {
+	PROF_SCOPE();
+
 	for ( auto& client : gServerData.aClients )
 	{
 		// Kind of a hack
@@ -415,6 +425,8 @@ void SV_BuildServerInfo( flatbuffers::FlatBufferBuilder& srMessage )
 
 bool SV_BuildServerMsg( flatbuffers::FlatBufferBuilder& srBuilder, EMsgSrc_Server sSrcType, bool sFullUpdate )
 {
+	PROF_SCOPE();
+
 	flatbuffers::FlatBufferBuilder messageBuilder;
 	bool                           wroteData = false;
 
@@ -616,6 +628,8 @@ inline const T* SV_ReadMsg( EMsgSrc_Client sMsgType, flatbuffers::Verifier& srVe
 
 void SV_ProcessSocketMsgs()
 {
+	PROF_SCOPE();
+
 	while ( true )
 	{
 		ChVector< char > data( 8192 );
@@ -655,6 +669,8 @@ void SV_ProcessSocketMsgs()
 
 void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage )
 {
+	PROF_SCOPE();
+
 	// TODO: move this connection timer elsewhere
 #if 0
 	// Timer here for each client to make sure they are connected
@@ -889,6 +905,8 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 
 void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 {
+	PROF_SCOPE();
+
 	// Get Client Info
 	//NetMsg_ClientConnect       msgClientConnect();
 

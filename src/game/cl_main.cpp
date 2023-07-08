@@ -157,6 +157,8 @@ void CL_Shutdown()
 
 void CL_WriteMsgData( flatbuffers::FlatBufferBuilder& srRootBuilder, flatbuffers::FlatBufferBuilder& srDataBuffer, EMsgSrc_Client sType )
 {
+	PROF_SCOPE();
+
 	auto                 vector = srRootBuilder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
 
 	MsgSrc_ClientBuilder root( srRootBuilder );
@@ -169,6 +171,8 @@ void CL_WriteMsgData( flatbuffers::FlatBufferBuilder& srRootBuilder, flatbuffers
 // Same as CL_WriteMsgData, but also sends it to the server
 void CL_WriteMsgDataToServer( flatbuffers::FlatBufferBuilder& srDataBuffer, EMsgSrc_Client sType )
 {
+	PROF_SCOPE();
+
 	flatbuffers::FlatBufferBuilder builder;
 	auto                           vector = builder.CreateVector( srDataBuffer.GetBufferPointer(), srDataBuffer.GetSize() );
 
@@ -183,6 +187,8 @@ void CL_WriteMsgDataToServer( flatbuffers::FlatBufferBuilder& srDataBuffer, EMsg
 
 void CL_Update( float frameTime )
 {
+	PROF_SCOPE();
+
 	Game_SetClient( true );
 	Game_SetCommandSource( ECommandSource_Server );
 
@@ -280,6 +286,8 @@ void CL_Update( float frameTime )
 
 void CL_GameUpdate( float frameTime )
 {
+	PROF_SCOPE();
+
 	CL_UpdateMenuShown();
 
 	// Check connection timeout
@@ -443,6 +451,8 @@ extern void Net_NetadrToSockaddr( const NetAddr_t* spNetAddr, struct sockaddr* s
 
 void CL_Connect( const char* spAddress )
 {
+	PROF_SCOPE();
+
 	// Make sure we are not connected to a server already
 	CL_Disconnect();
 
@@ -513,6 +523,8 @@ bool CL_SendConVarIfClient( std::string_view sName, const std::vector< std::stri
 
 void CL_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs )
 {
+	PROF_SCOPE();
+
 	// We have to rebuild this command to a normal string, fun
 	// Allocate a command to send with the command name
 	std::string& newCmd = gCommandsToSend.emplace_back( sName.data() );
@@ -527,6 +539,8 @@ void CL_SendConVar( std::string_view sName, const std::vector< std::string >& sr
 
 void CL_SendConVars()
 {
+	PROF_SCOPE();
+
 	// Only send if we actually have commands to send
 	if ( gCommandsToSend.empty() )
 		return;
@@ -549,6 +563,8 @@ void CL_SendConVars()
 
 void CL_UpdateUserCmd()
 {
+	PROF_SCOPE();
+
 	// Get the transform component from the camera entity on the local player, and get the angles from it
 	auto playerInfo = Ent_GetComponent< CPlayerInfo >( gLocalPlayer, "playerInfo" );
 
@@ -593,6 +609,8 @@ void CL_UpdateUserCmd()
 
 void CL_BuildUserCmd( flatbuffers::FlatBufferBuilder& srBuilder )
 {
+	PROF_SCOPE();
+
 	flatbuffers::Offset< Vec3 > anglesOffset{};
 	// CH_NET_WRITE_VEC3( angles, gClientUserCmd.aAng );
 
@@ -618,6 +636,8 @@ void CL_BuildUserCmd( flatbuffers::FlatBufferBuilder& srBuilder )
 
 void CL_SendUserCmd()
 {
+	PROF_SCOPE();
+
 	flatbuffers::FlatBufferBuilder userCmdBuilder;
 	CL_BuildUserCmd( userCmdBuilder );
 	CL_WriteMsgDataToServer( userCmdBuilder, EMsgSrc_Client_UserCmd );
@@ -626,6 +646,8 @@ void CL_SendUserCmd()
 
 void CL_SendFullUpdateRequest()
 {
+	PROF_SCOPE();
+
 	flatbuffers::FlatBufferBuilder builder;
 	MsgSrc_ClientBuilder           root( builder );
 
@@ -641,6 +663,8 @@ void CL_SendMessageToServer( EMsgSrc_Client sSrcType )
 
 void CL_HandleMsg_ClientInfo( const NetMsg_ServerClientInfo* spMessage )
 {
+	PROF_SCOPE();
+
 	if ( !spMessage )
 		return;
 
@@ -957,6 +981,8 @@ void CL_UpdateMenuShown()
 
 void CL_DrawMainMenu()
 {
+	PROF_SCOPE();
+
 	if ( !ImGui::Begin( "MainMenu" ) )
 	{
 		ImGui::End();

@@ -133,6 +133,8 @@ CONCMD( r_reload_textures )
 
 void Graphics_CalcModelBBox( Handle sModel )
 {
+	PROF_SCOPE();
+
 	Model* model = Graphics_GetModelData( sModel );
 
 	if ( !model )
@@ -297,6 +299,8 @@ Handle Graphics_CreateModel( Model** spModel )
 
 void Graphics_FreeModel( Handle shModel )
 {
+	PROF_SCOPE();
+
 	if ( shModel == InvalidHandle )
 		return;
 
@@ -359,6 +363,8 @@ void Graphics_FreeModel( Handle shModel )
 
 Model* Graphics_GetModelData( Handle shModel )
 {
+	PROF_SCOPE();
+
 	Model* model = nullptr;
 	if ( !gModels.Get( shModel, &model ) )
 	{
@@ -1604,6 +1610,8 @@ Handle Graphics_CreateRenderable( Handle sModel )
 
 Renderable_t* Graphics_GetRenderableData( Handle sRenderable )
 {
+	PROF_SCOPE();
+
 	Renderable_t* renderable = nullptr;
 	if ( !gRenderables.Get( sRenderable, &renderable ) )
 	{
@@ -1626,6 +1634,8 @@ void Graphics_FreeRenderable( Handle sRenderable )
 
 void Graphics_UpdateRenderableAABB( Handle sRenderable )
 {
+	PROF_SCOPE();
+
 	if ( !sRenderable )
 		return;
 
@@ -1800,6 +1810,8 @@ const char* Graphics_GetVertexAttributeName( VertexAttribute attrib )
 // sBufferSize is sizeof(element) * count
 static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage )
 {
+	PROF_SCOPE();
+
 	Handle stagingBuffer = render->CreateBuffer( "Staging Model Buffer", sBufferSize, sUsage | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	// Copy Data to Buffer
@@ -1818,6 +1830,8 @@ static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBuffe
 
 void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
+	PROF_SCOPE();
+
 	if ( spVertexData == nullptr || spVertexData->aCount == 0 )
 	{
 		Log_Warn( gLC_ClientGraphics, "Trying to create Vertex Buffers for mesh with no vertices!\n" );
@@ -1883,6 +1897,8 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 
 void Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
+	PROF_SCOPE();
+
 	char* bufferName = nullptr;
 
 	if ( spVertexData->aIndices.empty() )

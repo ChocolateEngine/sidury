@@ -429,7 +429,10 @@ bool MapManager_LoadMap( const std::string &path )
 	// After all entities are parsed, copy them into the SiduryMap structure
 	gpMap               = new SiduryMap;
 	gpMap->aMapPath     = path;
-	gpMap->aMapEntities = GetEntitySystem()->aUsedEntities;
+	gpMap->aMapEntities.reserve( GetEntitySystem()->aEntityFlags.size() );
+
+	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
+		gpMap->aMapEntities.push_back( entity );
 
 	return true;
 }

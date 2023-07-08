@@ -48,6 +48,8 @@ EntityComponentPool::~EntityComponentPool()
 
 bool EntityComponentPool::Init( const char* spName )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -78,6 +80,8 @@ bool EntityComponentPool::Init( const char* spName )
 // Get Component Registry Data
 EntComponentData_t* EntityComponentPool::GetRegistryData()
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -89,6 +93,8 @@ EntComponentData_t* EntityComponentPool::GetRegistryData()
 // Does this pool contain a component for this entity?
 bool EntityComponentPool::Contains( Entity entity )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -100,6 +106,8 @@ bool EntityComponentPool::Contains( Entity entity )
 
 void EntityComponentPool::EntityDestroyed( Entity entity )
 {
+	PROF_SCOPE();
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it != aMapEntityToComponent.end() )
@@ -116,19 +124,14 @@ void EntityComponentPool::EntityDestroyed( Entity entity )
 // Adds This component to the entity
 void* EntityComponentPool::Create( Entity entity )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
 
 	// Is this a client or server component pool?
-	// Make sure this component can be created on it
-
-	// TEMP
-	if ( strcmp( apName, "transform" ) == 0 )
-	{
-		// breakpoint lmao
-		int fuck = 0;
-	}
+	// TODO: Make sure this component can be created on it
 
 	// Check if the component already exists
 	auto it = aMapEntityToComponent.find( entity );
@@ -156,16 +159,11 @@ void* EntityComponentPool::Create( Entity entity )
 	aComponents[ newID.aIndex ]     = data;
 
 	aComponentIDs.push_back( newID );
+	aNewComponents.push_front( newID );
 
-	// Add it to systems
-	// for ( auto system : aComponentSystems )
+	// Add it to system
 	if ( apComponentSystem )
-	{
 		apComponentSystem->aEntities.push_back( entity );
-
-		// call this later maybe?
-		// apComponentSystem->ComponentAdded( entity, data );
-	}
 
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
@@ -184,6 +182,8 @@ void* EntityComponentPool::Create( Entity entity )
 // Removes this component from the entity
 void EntityComponentPool::Remove( Entity entity )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -216,7 +216,6 @@ void EntityComponentPool::Remove( Entity entity )
 	aFuncFree( data );
 
 	vec_remove( aComponentIDs, index );
-	// aCount--;
 
 	Log_DevF( gLC_Entity, 2, "%s - Removed Component From Entity %zd - %s\n", GetProcessingName(), entity, apName );
 
@@ -229,6 +228,8 @@ void EntityComponentPool::Remove( Entity entity )
 // Removes this component by index
 void EntityComponentPool::RemoveByID( ComponentID_t sID )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -274,6 +275,8 @@ void EntityComponentPool::RemoveByID( ComponentID_t sID )
 // Removes this component from the entity later
 void EntityComponentPool::RemoveQueued( Entity entity )
 {
+	PROF_SCOPE();
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it == aMapEntityToComponent.end() )
@@ -294,6 +297,8 @@ void EntityComponentPool::RemoveQueued( Entity entity )
 // Removes components queued for deletion
 void EntityComponentPool::RemoveAllQueued()
 {
+	PROF_SCOPE();
+
 	std::vector< ComponentID_t > toRemove;
 
 	// for ( auto& [ index, state ] : aComponentFlags )
@@ -315,24 +320,30 @@ void EntityComponentPool::RemoveAllQueued()
 
 void EntityComponentPool::InitCreatedComponents()
 {
-	for ( auto it = aComponentFlags.begin(); it != aComponentFlags.end(); it++ )
-	{
-		if ( it->second & EEntityFlag_Created )
-		{
-			it->second &= ~EEntityFlag_Created;
+	PROF_SCOPE();
 
-			if ( apComponentSystem )
-			{
-				apComponentSystem->ComponentAdded( aMapComponentToEntity[ it->first ], aComponents[ it->first.aIndex ] );
-			}
+	if ( aNewComponents.empty() )
+		return;
+
+	for ( ComponentID_t id : aNewComponents )
+	{
+		aComponentFlags[ id ] &= ~EEntityFlag_Created;
+
+		if ( apComponentSystem )
+		{
+			apComponentSystem->ComponentAdded( aMapComponentToEntity.at( id ), aComponents.at( id.aIndex ) );
 		}
 	}
+
+	aNewComponents.clear();
 }
 
 
 // Gets the data for this component
 void* EntityComponentPool::GetData( Entity entity )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
 	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
@@ -380,6 +391,8 @@ void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
 
 bool EntityComponentPool::IsPredicted( Entity entity )
 {
+	PROF_SCOPE();
+
 	auto it = aMapEntityToComponent.find( entity );
 
 	if ( it == aMapEntityToComponent.end() )
@@ -388,7 +401,7 @@ bool EntityComponentPool::IsPredicted( Entity entity )
 		return false;
 	}
 
-	return aComponentFlags[ it->second ] & EEntityFlag_Predicted;
+	return aComponentFlags.at( it->second ) & EEntityFlag_Predicted;
 }
 
 

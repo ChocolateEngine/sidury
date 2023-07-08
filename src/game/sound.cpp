@@ -84,6 +84,8 @@ void EntSys_Sound::Update()
 	if ( !audio || Game_ProcessingServer() )
 		return;
 
+	PROF_SCOPE();
+
 	// blech
 	// audio->SetDopplerScale( snd_doppler_scale );
 	// audio->SetSoundTravelSpeed( snd_travel_speed );

@@ -445,9 +445,10 @@ void EntitySystem::DestroyServer()
 
 bool EntitySystem::Init()
 {
+	PROF_SCOPE();
+
 	aEntityCount = 0;
 	aEntityPool.clear();
-	aUsedEntities.clear();
 	aComponentPools.clear();
 	aEntityIDConvert.clear();
 
@@ -470,13 +471,15 @@ bool EntitySystem::Init()
 
 void EntitySystem::Shutdown()
 {
+	PROF_SCOPE();
+
 	// Remove callback
 	EntComp_RemoveRegisterCallback( this );
 
 	// Mark all entities as destroyed
-	for ( Entity entity : aUsedEntities )
+	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
-		aEntityFlags[ entity ] |= EEntityFlag_Destroyed;
+		flags |= EEntityFlag_Destroyed;
 	}
 
 	// Destroy entities marked as destroyed
@@ -506,7 +509,6 @@ void EntitySystem::Shutdown()
 
 	aEntityCount = 0;
 	aEntityPool.clear();
-	aUsedEntities.clear();
 	aComponentPools.clear();
 	aEntityIDConvert.clear();
 }
@@ -514,6 +516,8 @@ void EntitySystem::Shutdown()
 
 void EntitySystem::UpdateSystems()
 {
+	PROF_SCOPE();
+
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
 		if ( pool->apComponentSystem )
@@ -524,6 +528,8 @@ void EntitySystem::UpdateSystems()
 
 void EntitySystem::UpdateStates()
 {
+	PROF_SCOPE();
+
 	// Remove Components Queued for Deletion
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
@@ -543,6 +549,8 @@ void EntitySystem::UpdateStates()
 
 void EntitySystem::InitCreatedComponents()
 {
+	PROF_SCOPE();
+
 	// Remove Components Queued for Deletion
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
@@ -553,6 +561,8 @@ void EntitySystem::InitCreatedComponents()
 
 void EntitySystem::CreateComponentPools()
 {
+	PROF_SCOPE();
+
 	// iterate through all registered components and create a component pool for them
 	for ( auto& [ name, componentData ] : GetEntComponentRegistry().aComponentNames )
 	{
@@ -563,6 +573,8 @@ void EntitySystem::CreateComponentPools()
 
 void EntitySystem::CreateComponentPool( const char* spName )
 {
+	PROF_SCOPE();
+
 	EntityComponentPool* pool = new EntityComponentPool;
 
 	if ( !pool->Init( spName ) )
@@ -594,6 +606,8 @@ void EntitySystem::CreateComponentPool( const char* spName )
 
 IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
 {
+	PROF_SCOPE();
+
 	EntityComponentPool* pool = GetComponentPool( spName );
 
 	if ( pool == nullptr )
@@ -608,6 +622,8 @@ IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
 
 Entity EntitySystem::CreateEntity( bool sLocal )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT_MSG( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
 
 	// Take an ID from the front of the queue
@@ -618,11 +634,7 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 	++aEntityCount;
 
 	// SANITY CHECK
-	size_t findUsedIndex = vec_index( aUsedEntities, id );
-	CH_ASSERT( findUsedIndex == SIZE_MAX );
-
-	// Add this id to the used entity id list
-	aUsedEntities.push_back( id );
+	CH_ASSERT( !EntityExists( id ) );
 
 	// Create Entity Flags for this and add the Created Flag to tit
 	aEntityFlags[ id ] = EEntityFlag_Created;
@@ -639,6 +651,8 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 
 void EntitySystem::DeleteEntity( Entity sEntity )
 {
+	PROF_SCOPE();
+
 	CH_ASSERT_MSG( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
 
 	aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
@@ -659,17 +673,20 @@ void EntitySystem::DeleteEntity( Entity sEntity )
 
 void EntitySystem::DeleteQueuedEntities()
 {
-	for ( size_t i = 0; i < aUsedEntities.size(); )
+	PROF_SCOPE();
+
+	ChVector< Entity > deleteEntities;
+
+	// well this sucks
+	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
-		Entity entity = aUsedEntities[ i ];
-
 		// Check the entity's flags to see if it's marked as deleted
-		if ( !( aEntityFlags[ entity ] & EEntityFlag_Destroyed ) )
-		{
-			i++;
-			continue;
-		}
+		if ( flags & EEntityFlag_Destroyed )
+			deleteEntities.push_back( entity );
+	}
 
+	for ( auto entity : deleteEntities )
+	{
 		// Tell each Component Pool that this entity was destroyed
 		for ( auto& [ name, pool ] : aComponentPools )
 		{
@@ -697,8 +714,6 @@ void EntitySystem::DeleteQueuedEntities()
 		aEntityPool.insert( aEntityPool.begin(), entity );
 		--aEntityCount;
 
-		vec_remove( aUsedEntities, entity );
-
 		aEntityFlags.erase( entity );
 
 		Log_DevF( gLC_Entity, 2, "%s - Destroyed Entity %zd\n", aIsClient ? "CLIENT" : "SERVER", entity );
@@ -714,10 +729,12 @@ Entity EntitySystem::GetEntityCount()
 
 bool EntitySystem::EntityExists( Entity desiredId )
 {
-	size_t index = vec_index( aEntityPool, desiredId );
+	PROF_SCOPE();
 
-	// if the entity is not in the pool, it exists
-	return ( index == SIZE_MAX );
+	auto it = aEntityFlags.find( desiredId );
+
+	// if the entity does not have any flags, it exists
+	return it != aEntityFlags.end();
 }
 
 
@@ -752,6 +769,8 @@ Entity EntitySystem::GetParent( Entity sSelf )
 // Get the highest level parent for this entity, returns self if not parented
 Entity EntitySystem::GetRootParent( Entity sSelf )
 {
+	PROF_SCOPE();
+
 	auto it = aEntityParents.find( sSelf );
 
 	if ( it != aEntityParents.end() )
@@ -764,7 +783,9 @@ Entity EntitySystem::GetRootParent( Entity sSelf )
 // Recursively get all entities attached to this one (SLOW)
 void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren )
 {
-	for ( Entity otherEntity : aUsedEntities )
+	PROF_SCOPE();
+
+	for ( auto& [ otherEntity, flags ] : aEntityFlags )
 	{
 		Entity otherParent = GetParent( otherEntity );
 
@@ -780,6 +801,8 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChi
 // Returns a Model Matrix with parents applied in world space IF we have a transform component
 bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
+	PROF_SCOPE();
+
 	Entity    parent = GetParent( sEntity );
 	glm::mat4 parentMat( 1.f );
 
@@ -841,6 +864,8 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 
 Transform EntitySystem::GetWorldTransform( Entity sEntity )
 {
+	PROF_SCOPE();
+
 	Transform final{};
 
 	glm::mat4 matrix;
@@ -858,6 +883,8 @@ Transform EntitySystem::GetWorldTransform( Entity sEntity )
 // Read and write from the network
 void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 {
+	PROF_SCOPE();
+
 	auto entityUpdateList = spMsg->update_list();
 
 	if ( !entityUpdateList )
@@ -913,16 +940,15 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 // we can avoid those if we loop through the pools instead
 void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sSavingMap )
 {
-	Assert( aEntityCount == aUsedEntities.size() );
+	PROF_SCOPE();
+
+	Assert( aEntityCount == aEntityFlags.size() );
 
 	std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
 
-	for ( size_t i = 0; i < aEntityCount; i++ )
+	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
-		Entity      entity = aUsedEntities[ i ];
-		EEntityFlag flags  = aEntityFlags[ entity ];
-
 		// Make sure this and all the parents are networked
 		if ( !IsNetworked( entity ) )
 			continue;
@@ -963,6 +989,8 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 
 void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData )
 {
+	PROF_SCOPE();
+
 	// Get the vector i guess
 	auto   vector    = spSrc.AsVector();
 	size_t i         = 0;
@@ -1148,6 +1176,8 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 
 bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate, bool sSavingMap )
 {
+	PROF_SCOPE();
+
 	bool   wroteData = false;
 	size_t curOffset = 0;
 	size_t flexVec   = srBuilder.StartVector();
@@ -1157,10 +1187,13 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 		if ( !var.aIsNetVar )
 			continue;
 
-		// size_t offset = EntComp_GetVarDirtyOffset( (char*)spData, var.aType );
+		PROF_SCOPE();
+		CH_PROF_ZONE_NAME( var.apName, strlen( var.apName ) );
 
-		auto IsVarDirty = [ & ]()
+		auto IsVarDirty = [ & ]( bool isBool = false )
 		{
+			PROF_SCOPE_NAMED( "IsVarDirty" );
+
 			// Make the var is allowed to be saved to the map
 			if ( sSavingMap )
 			{
@@ -1175,7 +1208,10 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 			if ( sFullUpdate )
 			{
 				wroteData = true;
-				srBuilder.Bool( true );
+
+				if ( !isBool )
+					srBuilder.Bool( true );
+
 				return true;
 			}
 
@@ -1183,8 +1219,15 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 			bool isDirty  = *reinterpret_cast< bool* >( dataChar + var.aSize + offset );
 			
 			wroteData |= isDirty;
-			srBuilder.Bool( isDirty );
-			return isDirty;
+
+			if ( isBool )
+				return true;
+
+			{
+				srBuilder.Bool( isDirty );
+				return isDirty;
+			}
+
 		};
 
 		void* data = ( (char*)spData ) + offset;
@@ -1200,9 +1243,12 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 			case EEntNetField_Bool:
 			{
-				auto value = *(bool*)( data );
-				srBuilder.Bool( value );
-				wroteData = true;
+				if ( IsVarDirty( true ) )
+				{
+					auto value = *(bool*)( data );
+					srBuilder.Bool( value );
+					wroteData = true;
+				}
 				break;
 			}
 
@@ -1390,14 +1436,19 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 		}
 	}
 
-	srBuilder.EndVector( flexVec, false, false );
+	if ( !wroteData )
+		return false;
+
+	{
+		PROF_SCOPE_NAMED( "EndVector" );
+		srBuilder.EndVector( flexVec, false, false );
+	}
+
 	return wroteData;
 }
 
 
-// TODO: redo this by having it loop through component pools, and not entitys
-// right now, it's doing a lot of entirely unnecessary checks
-// we can avoid those if we loop through the pools instead
+
 void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate, bool sSavingMap )
 {
 	PROF_SCOPE();
@@ -1406,6 +1457,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 	std::vector< EntityComponentPool* >                 componentPools;
 	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
 
+	componentPools.reserve( aComponentPools.size() );
 	for ( auto& [ name, pool ] : aComponentPools )
 	{
 		// If there are no components in existence, don't even bother to send anything here
@@ -1420,6 +1472,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		gui->DebugMessage( "Sending \"%zd\" Component Types", componentPools.size() );
 	}
 
+	componentsBuilt.reserve( componentPools.size() );
 	size_t i = 0;
 
 	for ( auto pool : componentPools )
@@ -1428,7 +1481,10 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		if ( !pool->aMapComponentToEntity.size() )
 			continue;
 
+		PROF_SCOPE_NAMED( "Pool" );
+
 		EntComponentData_t* regData = pool->GetRegistryData();
+		CH_PROF_ZONE_NAME( regData->apName, regData->aNameLen );
 
 		if ( regData->aNetType != EEntComponentNetType_Both && regData->aNetType != EEntComponentNetType_Server )
 			continue;
@@ -1442,17 +1498,33 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		bool                                                    builtUpdateList = false;
 		bool                                                    wroteData       = false;
 
+		componentDataBuilt.reserve( pool->aMapComponentToEntity.size() );
+		componentDataBuilders.reserve( pool->aMapComponentToEntity.size() );
+
 		size_t compListI = 0;
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
-			EEntityFlag entFlags            = aEntityFlags[ entity ];
-			EEntityFlag compFlags           = pool->aComponentFlags[ index ];
+			PROF_SCOPE_NAMED( "Entity" );
+
+			//std::string scopeTest = vstring( "Entity %zd", entity );
+			//CH_PROF_ZONE_NAME( scopeTest.c_str(), scopeTest.size() );
+
+			EEntityFlag entFlags = aEntityFlags.at( entity );
+
+			// skip the IsNetworked or CanSaveToMap call
+			if ( entFlags & EEntityFlag_Destroyed )
+			{
+				// Don't bother sending data if we're about to be destroyed
+				compListI++;
+				continue;
+			}
+
+			EEntityFlag compFlags           = pool->aComponentFlags.at( index );
 
 			bool        shouldSkipComponent = false;
 
 			// check if the entity itself will be destroyed
 			// shouldSkipComponent |= ( (entFlags & EEntityFlag_Destroyed) && !sFullUpdate );
-			shouldSkipComponent |= entFlags & EEntityFlag_Destroyed;
 
 			if ( sSavingMap )
 			{
@@ -1470,7 +1542,6 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			// Have we determined we should skip this component?
 			if ( shouldSkipComponent )
 			{
-				// Don't bother sending data if we're about to be destroyed or we have no write function
 				compListI++;
 				continue;
 			}
@@ -1478,7 +1549,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			void*          data = pool->GetData( entity );
 
 			// Write Component Data
-			flexb::Builder flexBuilder;
+			flexb::Builder flexBuilder;  // regData->aSize as constrcutor argument?
 			wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
 
 			// if ( !sFullUpdate && !wroteData )
@@ -1487,7 +1558,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			// 	continue;
 			// }
 
-			fb::Offset< flatbuffers::Vector< u8 > > dataVector{};
+			fb::Offset< flatbuffers::Vector< u8 > > dataVector;
 
 			if ( wroteData )
 			{
@@ -1496,32 +1567,40 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			}
 
 			// Now after creating the data vector, we can make the update data builder
-
-			NetMsg_ComponentUpdateDataBuilder& compDataBuilder = componentDataBuilders.emplace_back( srRootBuilder );
-
-			compDataBuilder.add_id( entity );
-
-			// Set Destroyed
-			if ( compFlags & EEntityFlag_Destroyed )
-				compDataBuilder.add_destroyed( true );
-
-			if ( wroteData )
 			{
-				if ( Game_IsClient() && ent_show_component_net_updates )
+				PROF_SCOPE_NAMED( "ComponentUpdateData" )
+
+				NetMsg_ComponentUpdateDataBuilder& compDataBuilder = componentDataBuilders.emplace_back( srRootBuilder );
+
+				compDataBuilder.add_id( entity );
+
+				// Set Destroyed
+				if ( compFlags & EEntityFlag_Destroyed )
+					compDataBuilder.add_destroyed( true );
+
+				if ( wroteData )
 				{
-					// gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
-					gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, flexBuilder.GetSize() );
+					if ( Game_IsClient() && ent_show_component_net_updates )
+					{
+						// gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
+						gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, flexBuilder.GetSize() );
+					}
+
+					compDataBuilder.add_values( dataVector );
 				}
 
-				compDataBuilder.add_values( dataVector );
+				{
+					PROF_SCOPE_NAMED( "componentDataBuilt.push_back()" );
+					builtUpdateList = true;
+					componentDataBuilt.push_back( compDataBuilder.Finish() );
+				}
 			}
-
-			builtUpdateList = true;
-			componentDataBuilt.push_back( compDataBuilder.Finish() );
 
 			// Reset Component Var Dirty Values
 			if ( !ent_always_full_update )
 			{
+				PROF_SCOPE_NAMED( "Reset Var Dirty" );
+
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
 					if ( !var.aIsNetVar )
@@ -1542,6 +1621,8 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 		if ( componentDataBuilt.size() && builtUpdateList )
 		{
+			PROF_SCOPE_NAMED( "Building Component Update" );
+
 			// oh my god
 			fb::Offset< fb::Vector< fb::Offset< NetMsg_ComponentUpdateData > > > compVector{};
 
@@ -1625,6 +1706,8 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 	for ( size_t i = 0; i < componentUpdateList->size(); i++ )
 	{
+		PROF_SCOPE();
+
 		const NetMsg_ComponentUpdate* componentUpdate = componentUpdateList->Get( i );
 
 		if ( !componentUpdate )
@@ -1637,9 +1720,11 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		if ( !componentUpdate->components() )
 			continue;
 
-		const char*          componentName = componentUpdate->name()->string_view().data();
+		const char* componentName = componentUpdate->name()->string_view().data();
 
-		EntityComponentPool* pool          = GetComponentPool( componentName );
+		CH_PROF_ZONE_NAME( componentName, componentUpdate->name()->size() );
+
+		EntityComponentPool* pool = GetComponentPool( componentName );
 
 		AssertMsg( pool, "Failed to find component pool" );
 
@@ -1665,6 +1750,8 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
 		{
+			PROF_SCOPE();
+
 			const NetMsg_ComponentUpdateData* componentUpdateData = componentUpdate->components()->Get( c );
 
 			if ( !componentUpdateData )
@@ -1677,6 +1764,9 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );
 				continue;
 			}
+
+			// std::string scopeTest = vstring( "Entity %zd", entity );
+			// CH_PROF_ZONE_NAME( scopeTest.c_str(), scopeTest.size() );
 
 			// Check the component state, do we need to remove it, or add it to the entity?
 			if ( componentUpdateData->destroyed() )
@@ -1739,6 +1829,8 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 // Add a component to an entity
 void* EntitySystem::AddComponent( Entity entity, const char* spName )
 {
+	PROF_SCOPE();
+
 	auto pool = GetComponentPool( spName );
 
 	if ( pool == nullptr )
@@ -1761,6 +1853,8 @@ bool EntitySystem::HasComponent( Entity entity, const char* spName )
 // Get a component from an entity
 void* EntitySystem::GetComponent( Entity entity, const char* spName )
 {
+	PROF_SCOPE();
+
 	auto pool = GetComponentPool( spName );
 
 	if ( pool == nullptr )
@@ -1776,6 +1870,8 @@ void* EntitySystem::GetComponent( Entity entity, const char* spName )
 // Remove a component from an entity
 void EntitySystem::RemoveComponent( Entity entity, const char* spName )
 {
+	PROF_SCOPE();
+
 	auto pool = GetComponentPool( spName );
 
 	if ( pool == nullptr )
@@ -1852,6 +1948,8 @@ void EntitySystem::SetNetworked( Entity entity, bool sNetworked )
 // Is this Entity Networked?
 bool EntitySystem::IsNetworked( Entity entity )
 {
+	PROF_SCOPE();
+
 	auto it = aEntityFlags.find( entity );
 	if ( it == aEntityFlags.end() )
 	{
@@ -1891,6 +1989,8 @@ void EntitySystem::SetAllowSavingToMap( Entity entity, bool sSaveToMap )
 
 bool EntitySystem::CanSaveToMap( Entity entity )
 {
+	PROF_SCOPE();
+
 	auto it = aEntityFlags.find( entity );
 	if ( it == aEntityFlags.end() )
 	{
@@ -1912,6 +2012,8 @@ bool EntitySystem::CanSaveToMap( Entity entity )
 
 EntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
 {
+	PROF_SCOPE();
+
 	auto it = aComponentPools.find( spName );
 
 	if ( it == aComponentPools.end() )
@@ -1923,6 +2025,8 @@ EntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
 
 Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
 {
+	PROF_SCOPE();
+
 	if ( sEntity == CH_ENT_INVALID )
 		return CH_ENT_INVALID;
 
@@ -2030,10 +2134,8 @@ CONCMD( ent_dump )
 
 	Log_GroupF( group, "Components: %zd\n", GetEntitySystem()->aComponentPools.size() );
 
-	for ( Entity i = 0; i < GetEntitySystem()->aEntityCount; i++ )
+	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
 	{
-		Entity                              entity = GetEntitySystem()->aUsedEntities[ i ];
-
 		// this is the worst thing ever
 		std::vector< EntityComponentPool* > pools;
 

@@ -36,6 +36,8 @@ void LightSystem::ComponentRemoved( Entity sEntity, void* spData )
 
 static void UpdateLightData( Entity sEntity, CLight* spLight )
 {
+	PROF_SCOPE();
+
 	if ( !spLight || !spLight->apLight )
 		return;
 
@@ -69,6 +71,8 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 
 void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 		return;
 
@@ -105,6 +109,8 @@ void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 
 void LightSystem::Update()
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 		return;
 
@@ -141,6 +147,8 @@ LightSystem* GetLightEntSys()
 
 static bool UpdateModelHandle( CRenderable* modelInfo )
 {
+	PROF_SCOPE();
+
 	if ( !modelInfo )
 		return false;
 
@@ -209,6 +217,8 @@ void EntSys_Transform::ComponentUpdated( Entity sEntity, void* spData )
 
 void EntSys_Transform::Update()
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 		return;
 
@@ -267,6 +277,8 @@ void EntSys_Renderable::ComponentRemoved( Entity sEntity, void* spData )
 
 void EntSys_Renderable::ComponentUpdated( Entity sEntity, void* spData )
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 		return;
 
@@ -299,6 +311,8 @@ void EntSys_Renderable::ComponentUpdated( Entity sEntity, void* spData )
 
 void EntSys_Renderable::Update()
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 		return;
 

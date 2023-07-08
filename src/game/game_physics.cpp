@@ -303,6 +303,8 @@ void EntSys_PhysObject::ComponentRemoved( Entity sEntity, void* spData )
 
 void EntSys_PhysObject::ComponentUpdated( Entity sEntity, void* spData )
 {
+	PROF_SCOPE();
+
 	auto physObject = static_cast< CPhysObject* >( spData );
 
 	if ( !physObject->apObj )
@@ -321,6 +323,8 @@ void EntSys_PhysObject::ComponentUpdated( Entity sEntity, void* spData )
 
 void EntSys_PhysObject::Update()
 {
+	PROF_SCOPE();
+
 	for ( Entity entity : aEntities )
 	{
 		auto physShape = Ent_GetComponent< CPhysShape >( entity, "physShape" );

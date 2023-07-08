@@ -648,6 +648,9 @@ void PlayerManager::Update( float frameTime )
 		if ( !client )
 			continue;
 
+		PROF_SCOPE_NAMED( "Player" );
+		CH_PROF_ZONE_TEXT( client->aName.c_str(), client->aName.size() );
+
 		UserCmd_t& userCmd    = client->aUserCmd;
 
 		auto playerInfo = GetPlayerInfo( player );
@@ -685,6 +688,8 @@ void PlayerManager::Update( float frameTime )
 
 void PlayerManager::UpdateLocalPlayer()
 {
+	PROF_SCOPE();
+
 	Assert( Game_ProcessingClient() );
 	Assert( apMove );
 
@@ -694,6 +699,8 @@ void PlayerManager::UpdateLocalPlayer()
 
 	for ( Entity player : aEntities )
 	{
+		PROF_SCOPE_NAMED( vstring( "PlayerManager::UpdateLocalPlayer - Player Entity %zd", player ).c_str() );
+
 		auto playerInfo = GetPlayerInfo( player );
 		Assert( playerInfo );
 		Assert( playerInfo->aCamera );
@@ -1134,6 +1141,8 @@ void PlayerMovement::EnsureUserCmd( Entity player )
 
 void PlayerMovement::SetPlayer( Entity player )
 {
+	PROF_SCOPE();
+
 	aPlayer     = player;
 
 	CPlayerInfo* playerInfo = GetPlayerInfo( player );
@@ -1222,6 +1231,8 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 
 void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 {
+	PROF_SCOPE();
+
 	SetPlayer( player );
 
 	apUserCmd   = spUserCmd;
@@ -1385,6 +1396,8 @@ const glm::vec3& PlayerMovement::GetAng() const
 
 void PlayerMovement::UpdateInputs()
 {
+	PROF_SCOPE();
+
 	apRigidBody->aAccel.Set( { 0, 0, 0 } );
 
 	float moveScale = 1.0f;
@@ -1513,6 +1526,8 @@ float Math_EaseInOutCubic( float x )
 // VERY BUGGY STILL
 void PlayerMovement::DoSmoothDuck()
 {
+	PROF_SCOPE();
+
 	CPlayerInfo* playerInfo = GetPlayerInfo( aPlayer );
 	Assert( playerInfo );
 	Assert( playerInfo->aCamera );
@@ -1578,6 +1593,8 @@ CONVAR( phys_player_max_slope_ang, 40, 0, "The maximum angle of slope that chara
 
 bool PlayerMovement::CalcOnGround( bool sSetFlag )
 {
+	PROF_SCOPE();
+
 	if ( apMove->aMoveType != PlayerMoveType::Walk )
 		return false;
 
@@ -1846,6 +1863,8 @@ class PlayerStairsCheck : public PhysCollisionCollector
 
 void PlayerMovement::WalkMove()
 {
+	PROF_SCOPE();
+
 	glm::vec3 wishvel = apDir->aForward * apRigidBody->aAccel.Get().x + apDir->aRight * apRigidBody->aAccel.Get()[ W_RIGHT ];
 	wishvel[W_UP] = 0.f;
 
@@ -1920,6 +1939,8 @@ void PlayerMovement::WalkMovePostPhys()
 
 void PlayerMovement::DoSmoothLand( bool wasOnGround )
 {
+	PROF_SCOPE();
+
 	if ( Game_ProcessingServer() )
 	{
 		if ( sv_land_smoothing )

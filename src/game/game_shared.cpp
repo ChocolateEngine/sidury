@@ -107,6 +107,8 @@ void Game_SetCommandSource( ECommandSource sSource )
 
 void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 {
+	PROF_SCOPE();
+
 	std::string                commandName;
 	std::vector< std::string > args;
 

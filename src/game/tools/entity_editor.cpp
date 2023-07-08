@@ -234,7 +234,7 @@ void EntEditor_DrawEntityList()
 
 	ImGui::Separator();
 
-	for ( Entity entity : GetEntitySystem()->aUsedEntities )
+	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
 	{
 		std::string entName = vstring( "Entity %zd", entity );
 
@@ -252,7 +252,7 @@ void EntEditor_DrawEntityList()
 	{
 		Entity parent = GetEntitySystem()->GetParent( gSelectedEntity );
 
-		for ( Entity entity : GetEntitySystem()->aUsedEntities )
+		for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
 		{
 			if ( entity == gSelectedEntity )
 				continue;
