@@ -11,13 +11,13 @@ SuitSystem::SuitSystem()
 
 void SuitSystem::ComponentAdded( Entity sEntity, void* spData )
 {
-	CSuit* aSuit = static_cast< CSuit* >( spData ); // boolshit
-	CH_ASSERT( aSuit );
+	CSuit* aSuit = ch_pointer_cast< CSuit >( spData ); // boolshit
+
 	Log_Msg( "Suited up!\n" );
 	//CH_ASSERT( aLogonSound ); later ^^
 	if ( Game_ProcessingClient() )
 	{
-		aLogonSound = audio->LoadSound( "sound/fvox/flatline.ogg" );
+		aLogonSound = audio->OpenSound( "sound/fvox/flatline.ogg" );
 		audio->PlaySound( aLogonSound );
 	}
 }
@@ -33,3 +33,4 @@ CH_STRUCT_REGISTER_COMPONENT( CSuit, suit, true, EEntComponentNetType_Both, CH_E
 {
 	CH_REGISTER_COMPONENT_SYS2( SuitSystem, gSuitEntSystems );
 }
+

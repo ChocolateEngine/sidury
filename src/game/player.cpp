@@ -1091,11 +1091,18 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 		// i feel like there's gonna be a lot more here in the future...
 		Skybox_SetAng( transformView.aAng );
-		audio->SetListenerTransform( transformView.aPos, transform->aAng );
+
+		glm::vec3 listenerAng{
+			transformView.aAng.Get().x,
+			transformView.aAng.Get().z,
+			transformView.aAng.Get().y,
+		};
+
+		audio->SetListenerTransform( transformView.aPos, listenerAng );
 
 #if AUDIO_OPENAL
-		audio->SetListenerVelocity( rigidBody.aVel );
-		audio->SetListenerOrient( camera->aForward, camera->aUp );
+		audio->SetListenerVelocity( rigidBody->aVel );
+		// audio->SetListenerOrient( camDir->aForward, camDir->aUp );
 #endif
 	}
 }
@@ -1675,7 +1682,7 @@ Handle PlayerMovement::GetStepSound()
 	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
 
 	// audio system should auto free it i think?
-	if ( Handle stepSound = audio->LoadSound( soundName ) )
+	if ( Handle stepSound = audio->OpenSound( soundName ) )
 		// return audio->PreloadSound( stepSound ) ? stepSound : nullptr;
 		return stepSound;
 
@@ -1718,6 +1725,13 @@ void PlayerMovement::PlayStepSound()
 	{
 		audio->SetVolume( stepSound, speedFactor );
 		audio->PlaySound( stepSound );
+
+		// TODO: SPECTATING
+		if ( aPlayer != gLocalPlayer )
+		{
+			audio->AddEffects( stepSound, AudioEffect_World );
+			audio->SetEffectData( stepSound, EAudio_World_Pos, apTransform->aPos.Get() );
+		}
 
 		apMove->aLastStepTime = gCurTime;
 	}

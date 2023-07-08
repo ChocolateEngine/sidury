@@ -61,7 +61,7 @@ static AppModule_t gAppModules[] =
 	{ (ISystem**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
 	{ (ISystem**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_VER },
 	{ (ISystem**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
-	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_HASH },
+	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_VER },
 	{ (ISystem**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
 };
 
@@ -72,6 +72,8 @@ extern "C"
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
+
+		IMGUI_CHECKVERSION();
 
 #if CH_USE_MIMALLOC
 		Log_DevF( 1, "Using mimalloc version %d\n", mi_version() );

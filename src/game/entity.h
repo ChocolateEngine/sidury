@@ -609,11 +609,15 @@ class IEntityComponentSystem
 	// Called when the component data has been updated (ONLY ON CLIENT RIGHT NOW)
 	virtual void          ComponentUpdated( Entity sEntity, void* spData ){};
 
+	// Called when this component variable has been updated (NOT IMPLEMENTED)
+	//virtual void          ComponentVarUpdated( Entity sEntity, void* spData ){};
+
 	virtual void          Update(){};
 
 	// What if we stored a pointer to the component pool here
 	// Or changed this std::vector of entities to an unordered_map, or a tuple
 
+	EntityComponentPool*  apPool = nullptr;
 	std::vector< Entity > aEntities;
 };
 
@@ -782,7 +786,7 @@ inline void*  Ent_AddComponent( Entity sEnt, const char* spName )
 template< typename T >
 inline T* Ent_AddComponent( Entity sEnt, const char* spName )
 {
-	return static_cast< T* >( GetEntitySystem()->AddComponent( sEnt, spName ) );
+	return ch_pointer_cast< T >( GetEntitySystem()->AddComponent( sEnt, spName ) );
 }
 
 
@@ -795,14 +799,14 @@ inline void* Ent_GetComponent( Entity sEnt, const char* spName )
 template< typename T >
 inline T* Ent_GetComponent( Entity sEnt, const char* spName )
 {
-	return static_cast< T* >( GetEntitySystem()->GetComponent( sEnt, spName ) );
+	return ch_pointer_cast< T >( GetEntitySystem()->GetComponent( sEnt, spName ) );
 }
 
 // Gets a component system by type_hash()
 template< typename T >
 inline T* Ent_GetSystem()
 {
-	return static_cast< T* >( GetEntitySystem()->GetSystem< T >() );
+	return ch_pointer_cast< T >( GetEntitySystem()->GetSystem< T >() );
 }
 
 
@@ -1181,12 +1185,6 @@ struct CDirection
 struct CCamera
 {
 	ComponentNetVar< float > aFov = 90.f;
-};
-
-
-struct CSound
-{
-	ComponentNetVar< Handle > aStream = InvalidHandle;
 };
 
 

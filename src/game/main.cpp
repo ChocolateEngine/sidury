@@ -124,7 +124,7 @@ bool Game_Init()
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 
 #if AUDIO_OPENAL
-	hAudioMusic = audio->RegisterChannel( "Music" );
+	// hAudioMusic = audio->RegisterChannel( "Music" );
 #endif
 
 	Phys_Init();
@@ -242,7 +242,6 @@ void Game_UpdateGame( float frameTime )
 	CL_Update( gFrameTime );
 
 	Game_SetupModels( gFrameTime );
-	Game_UpdateAudio();
 }
 
 
@@ -284,15 +283,6 @@ void Game_CheckPaused()
 void Game_SetupModels( float frameTime )
 {
 	PROF_SCOPE();
-}
-
-
-void Game_UpdateAudio()
-{
-	if ( gPaused )
-		return;
-
-	TEST_UpdateAudio();
 }
 
 

@@ -6,6 +6,7 @@
 
 #include "cl_main.h"
 #include "sv_main.h"
+#include "sound.h"
 
 #include "imgui/imgui.h"
 
@@ -28,14 +29,13 @@ CONVAR( proto_look_at_entities, 1 );
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
 
-// extern Entity                 gLocalPlayer;
+extern Entity                 gLocalPlayer;
 
 // Audio Channels
 Handle                        hAudioMusic = InvalidHandle;
 
 // testing
-std::vector< Handle >         streams{};
-Model*                        g_streamModel = nullptr;
+std::vector< Entity >         gAudioTestEntities{};
 
 ConVar                        snd_cube_scale( "snd_cube_scale", "0.05" );
 
@@ -774,82 +774,79 @@ void TEST_SV_UpdateProtos( float frameTime )
 CONVAR( snd_test_vol, 0.25 );
 
 #if AUDIO_OPENAL
-// idk what these values should really be tbh
-// will require a lot of fine tuning tbh
-CONVAR_CMD( snd_doppler_scale, 0.2 )
-{
-	audio->SetDopplerScale( snd_doppler_scale );
-}
 
-CONVAR_CMD( snd_sound_speed, 6000 )
-{
-	audio->SetSoundSpeed( snd_sound_speed );
-}
+CONVAR( snd_test_falloff, 1.f );
 #endif
+
+
+// constexpr const char* SND_TEST_PATH = "sound/endymion_mono.ogg";
+constexpr const char* SND_TEST_PATH = "sound/fiery_no_ext.ogg";
+
 
 CONCMD( snd_test )
 {
-	Handle stream = streams.emplace_back( audio->LoadSound( "sound/endymion_mono.ogg" ) );
+	if ( !audio )
+		return;
 
-	/*if ( audio->IsValid( stream ) )
+	if ( !GetEntitySystem() )
+		return;
+
+	Handle soundHandle = audio->OpenSound( args.size() ? args[ 0 ] : SND_TEST_PATH );
+
+	if ( soundHandle == CH_INVALID_HANDLE )
+		return;
+
+	Entity soundEnt = GetEntitySystem()->CreateEntity( true );
+
+	if ( soundEnt == CH_ENT_INVALID )
 	{
-		audio->FreeSound( stream );
-	}*/
-	// test sound
-	//else if ( stream = audio->LoadSound("sound/rain2.ogg") )
-	if ( stream )
-	//else if ( stream = audio->LoadSound("sound/endymion_mono.ogg") )
-	//else if ( stream = audio->LoadSound("sound/endymion2.wav") )
-	//else if ( stream = audio->LoadSound("sound/endymion_mono.wav") )
-	//else if ( stream = audio->LoadSound("sound/robots_cropped.ogg") )
-	{
-		audio->SetVolume( stream, snd_test_vol );
-
-#if AUDIO_OPENAL
-		audio->AddEffect( stream, AudioEffect_Loop );  // on by default
-#endif
-
-		// play it where the player currently is
-		// audio->AddEffect( stream, AudioEffect_World );
-		// audio->SetEffectData( stream, Audio_World_Pos, transform.aPos );
-
-		audio->PlaySound( stream );
-
-		/*if ( g_streamModel == nullptr )
-		{
-			g_streamModel = graphics->LoadModel( "materials/models/cube.obj" );
-			//aModels.push_back( g_streamModel );
-		}
-
-		g_streamModel->SetPos( transform.aPos );*/
+		Log_Error( "Failed to create sound test entity\n" );
+		return;
 	}
+	
+	gAudioTestEntities.push_back( soundEnt );
+
+	auto transform           = Ent_AddComponent< CTransform >( soundEnt, "transform" );
+	auto sound               = Ent_AddComponent< CSound >( soundEnt, "sound" );
+
+	auto playerTransform     = Ent_GetComponent< CTransform >( gLocalPlayer, "transform" );
+
+	transform->aPos          = playerTransform->aPos;
+	transform->aAng          = playerTransform->aAng;
+
+	// purely debugging
+	transform->aScale.Edit() = { 20.f, 20.f, 20.f };
+
+	sound->aPath             = args.size() ? args[ 0 ] : SND_TEST_PATH;
+	sound->aVolume           = snd_test_vol.GetFloat();
+	sound->aFalloff          = snd_test_falloff.GetFloat();
+	sound->aStartPlayback    = true;
+	sound->aHandle           = soundHandle;
+
+	sound->aEffects.Edit() |= AudioEffect_Loop | AudioEffect_World;
 }
+
 
 CONCMD( snd_test_clear )
 {
-	for ( Handle stream : streams )
+	if ( !audio )
+		return;
+
+	for ( Entity entity : gAudioTestEntities )
 	{
-		if ( audio->IsValid( stream ) )
+		CSound* sound = Ent_GetComponent< CSound >( entity, "sound" );
+
+		if ( sound )
 		{
-			audio->FreeSound( stream );
+			if ( audio->IsValid( sound->aHandle ) )
+			{
+				audio->FreeSound( sound->aHandle );
+			}
 		}
+
+		GetEntitySystem()->DeleteEntity( entity );
 	}
 
-	streams.clear();
+	gAudioTestEntities.clear();
 }
-
-
-void TEST_UpdateAudio()
-{
-	// auto& transform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
-
-	for ( Handle stream : streams )
-	{
-		if ( audio->IsValid( stream ) )
-		{
-			audio->SetVolume( stream, snd_test_vol );
-		}
-	}
-}
-
 

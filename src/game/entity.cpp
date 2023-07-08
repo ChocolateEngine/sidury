@@ -114,7 +114,7 @@ static const char* gEntVarTypeStr[] = {
 };
 
 
-static_assert( ARR_SIZE( gEntVarTypeStr ) == EEntNetField_Count );
+static_assert( CH_ARR_SIZE( gEntVarTypeStr ) == EEntNetField_Count );
 
 
 const char* EntComp_VarTypeToStr( EEntNetField sVarType )
@@ -575,10 +575,19 @@ void EntitySystem::CreateComponentPool( const char* spName )
 	aComponentPools[ spName ] = pool;
 
 	// Create component system if it has one registered for it
-	if ( pool->apData->aFuncNewSystem )
+	if ( !pool->apData->aFuncNewSystem )
+		return;
+
+	pool->apComponentSystem = pool->apData->aFuncNewSystem();
+
+	if ( pool->apComponentSystem )
 	{
-		pool->apComponentSystem                                            = pool->apData->aFuncNewSystem();
+		pool->apComponentSystem->apPool                                    = pool;
 		aComponentSystems[ typeid( pool->apComponentSystem ).hash_code() ] = pool->apComponentSystem;
+	}
+	else
+	{
+		Log_ErrorF( gLC_Entity, "Failed to create component system for component \"%s\"\n", spName );
 	}
 }
 
@@ -612,10 +621,13 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 	size_t findUsedIndex = vec_index( aUsedEntities, id );
 	CH_ASSERT( findUsedIndex == SIZE_MAX );
 
+	// Add this id to the used entity id list
 	aUsedEntities.push_back( id );
 
-	aEntityFlags[ id ] |= EEntityFlag_Created;
+	// Create Entity Flags for this and add the Created Flag to tit
+	aEntityFlags[ id ] = EEntityFlag_Created;
 
+	// If we want the entity to be local on the client or server, add that flag to it
 	if ( sLocal )
 		aEntityFlags[ id ] |= EEntityFlag_Local;
 

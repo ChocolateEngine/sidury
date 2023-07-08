@@ -40,6 +40,7 @@ extern double           gCurTime;
 
 constexpr int           CH_MAX_USERNAME_LEN = 256;
 
+#define AUDIO_OPENAL 1
 
 enum class GameState
 {
@@ -63,7 +64,6 @@ void         Game_Update( float frameTime );
 void         Game_UpdateGame( float frameTime );  // epic name
 
 void         Game_SetupModels( float frameTime );
-void         Game_UpdateAudio();
 
 void         Game_HandleSystemEvents();
 
