@@ -780,15 +780,6 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChi
 // Returns a Model Matrix with parents applied in world space IF we have a transform component
 bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
-	// Check if we have a transform component first
-	auto transform = Ent_GetComponent< CTransform >( sEntity, "transform" );
-
-	if ( !transform )
-	{
-		srMat = glm::mat4( 1.f );
-		return false;
-	}
-
 	Entity    parent = GetParent( sEntity );
 	glm::mat4 parentMat( 1.f );
 
@@ -796,6 +787,16 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 	{
 		// Get the world matrix recursively
 		GetWorldMatrix( parentMat, parent );
+	}
+
+	// Check if we have a transform component
+	auto transform = static_cast< CTransform* >( GetComponent( sEntity, "transform" ) );
+
+	if ( !transform )
+	{
+		// Fallback to the parent world matrix
+		srMat = parentMat;
+		return ( parent != CH_ENT_INVALID );
 	}
 
 	// is this all the wrong order?
