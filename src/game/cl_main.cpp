@@ -979,41 +979,73 @@ void CL_UpdateMenuShown()
 }
 
 
+ConVarRef snd_volume( "snd_volume" );
+
+
 void CL_DrawMainMenu()
 {
 	PROF_SCOPE();
 
-	if ( !ImGui::Begin( "MainMenu" ) )
+	if ( !ImGui::Begin( "Chocolate Engine - Sidury" ) )
 	{
 		ImGui::End();
 		return;
 	}
-
-	ImGui::Text( "Chocolate Engine - Sidury" );
-
-	ImGui::Separator();
 
 	if ( ImGui::Button( "connect localhost" ) )
 	{
 		Con_QueueCommand( "connect localhost" );
 	}
 
+	const std::vector< std::string >& mapList    = MapManager_GetMapList();
+
 	ImGui::Separator();
 
-	ImGui::Text( "Quick Map List" );
+	const ImVec2      itemSize   = ImGui::GetItemRectSize();
+	const float       textHeight = ImGui::GetTextLineHeight();
+	const ImGuiStyle& style      = ImGui::GetStyle();
 
-	for ( const auto& file : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	// Quick Map List
 	{
-		if ( file.ends_with( ".." ) )
-			continue;
+		// ImGui::Text( "Quick Map List" );
 
-		std::string mapName = FileSys_GetFileName( file );
-		std::string command = vstring( "map \"%s\"", mapName.c_str() );
+		ImVec2 mapChildSize = itemSize;
+		mapChildSize.x -= ( style.FramePadding.x + style.ItemInnerSpacing.x ) * 2;
+		mapChildSize.y += ( style.FramePadding.y + style.ItemInnerSpacing.y );
+		mapChildSize.y += textHeight * 8.f;
 
-		if ( ImGui::Button( command.c_str() ) )
+		if ( ImGui::BeginChild( "Quick Map List", mapChildSize, true ) )
 		{
-			Con_QueueCommand( command );
+			for ( const std::string& map : mapList )
+			{
+				if ( ImGui::Selectable( map.c_str() ) )
+				{
+					Con_QueueCommand( vstring( "map \"%s\"", map.c_str() ) );
+				}
+			}
 		}
+
+		ImGui::EndChild();
+	}
+
+	// Quick Settings
+	{
+		ImVec2 childSize = itemSize;
+		childSize.x -= ( style.FramePadding.x + style.ItemInnerSpacing.x ) * 2;
+		childSize.y += ( style.FramePadding.y + style.ItemInnerSpacing.y );
+		childSize.y += textHeight * 2.f;
+	
+		// if ( ImGui::BeginChild( "Quick Settings", childSize, true ) )
+		if ( ImGui::BeginChild( "Quick Settings", {}, true ) )
+		{
+			float vol = snd_volume.GetFloat();
+			if ( ImGui::SliderFloat( "Volume", &vol, 0.f, 1.f ) )
+			{
+				snd_volume.SetValue( vol );
+			}
+		}
+	
+		ImGui::EndChild();
 	}
 
 	ImGui::End();

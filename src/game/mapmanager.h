@@ -88,27 +88,27 @@ struct CMapRoot
 };
 
 
-bool             MapManager_FindMap( const std::string& srPath );
-bool             MapManager_LoadMap( const std::string& srPath );
+bool                              MapManager_FindMap( const std::string& srPath );
+bool                              MapManager_LoadMap( const std::string& srPath );
 // SiduryMap*       MapManager_CreateMap();
-void             MapManager_WriteMap( const std::string& srPath );
-void             MapManager_CloseMap();
+void                              MapManager_WriteMap( const std::string& srPath );
+void                              MapManager_CloseMap();
 
-bool             MapManager_HasMap();
-std::string_view MapManager_GetMapName();
-std::string_view MapManager_GetMapPath();
+bool                              MapManager_HasMap();
+std::string_view                  MapManager_GetMapName();
+std::string_view                  MapManager_GetMapPath();
 
+void                              MapManager_Update();
+void                              MapManager_RebuildMapList();
+const std::vector< std::string >& MapManager_GetMapList();
 
-void             MapManager_Update();
-
-MapInfo*         MapManager_ParseMapInfo( const std::string& srPath );
+MapInfo*                          MapManager_ParseMapInfo( const std::string& srPath );
 
 // ------------------------------------------------------------------------
 // Functions to become obsolete for Sidury Map Format Version 2
 
-bool             MapManager_LoadWorldModel();
+bool                              MapManager_LoadWorldModel();
 // void            MapManager_ParseEntities( const std::string &path );
 
 // glm::vec3        MapManager_GetSpawnPos();
 // glm::vec3        MapManager_GetSpawnAng();
-

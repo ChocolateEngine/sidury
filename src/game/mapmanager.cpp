@@ -19,9 +19,21 @@
 
 LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
 
-SiduryMap*    gpMap      = nullptr;
+SiduryMap*                 gpMap = nullptr;
+std::vector< std::string > gMapList;
+static bool                gRebuildMapList = true;
+static float               gRebuildMapTimer = 0.f;
 
-extern Entity gLocalPlayer;
+extern Entity              gLocalPlayer;
+
+
+CONVAR( map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
+
+
+CONCMD_VA( map_list_rebuild, "Rebuild the map list now" )
+{
+	gRebuildMapList = true;
+}
 
 
 enum ESMF_CommandVersion : u16
@@ -37,17 +49,14 @@ void map_dropdown(
 	const std::vector< std::string >& args,  // arguments currently typed in by the user
 	std::vector< std::string >& results )      // results to populate the dropdown list with
 {
-	for ( const auto& file: FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	const std::vector< std::string >& mapList = MapManager_GetMapList();
+
+	for ( const auto& map : mapList )
 	{
-		if ( file.ends_with( ".." ) )
+		if ( args.size() && !map.starts_with( args[ 0 ] ) )
 			continue;
 
-		std::string mapName = FileSys_GetFileName( file );
-
-		if ( args.size() && !mapName.starts_with( args[0] ) )
-			continue;
-
-		results.push_back( mapName );
+		results.push_back( map );
 	}
 }
 
@@ -104,8 +113,42 @@ CONCMD( map_save )
 
 void MapManager_Update()
 {
-	if ( !gpMap )
-		return;
+	if ( gRebuildMapTimer > 0.f )
+		gRebuildMapTimer -= gFrameTime;
+	else
+		gRebuildMapList = true;
+}
+
+
+void MapManager_RebuildMapList()
+{
+	gMapList.clear();
+
+	for ( const auto& mapFolder : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	{
+		if ( mapFolder.ends_with( ".." ) )
+			continue;
+
+		// Check for legacy map file and new map file
+		if ( !FileSys_IsFile( mapFolder + "/mapInfo.smf", true ) && !FileSys_IsFile( mapFolder + "/mapData.smf", true ) )
+			continue;
+
+		std::string mapName = FileSys_GetFileName( mapFolder );
+		gMapList.push_back( mapName );
+	}
+}
+
+
+const std::vector< std::string >& MapManager_GetMapList()
+{
+	if ( gRebuildMapList )
+	{
+		MapManager_RebuildMapList();
+		gRebuildMapList  = false;
+		gRebuildMapTimer = map_list_rebuild_timer;
+	}
+
+	return gMapList;
 }
 
 

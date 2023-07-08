@@ -178,12 +178,12 @@ void EntEditor_DrawEntityList()
 	// TODO: make this create entity stuff into a context menu with plenty of presets
 	// also, create a duplicate entity option when selected on one, and move delete entity and clear parent to that
 
-	if ( ImGui::Button( "Create Entity" ) )
+	if ( ImGui::Button( "Create" ) )
 	{
 		gSelectedEntity = GetEntitySystem()->CreateEntity();
 	}
 
-	if ( ImGui::Button( "Create Entity At Camera Position" ) )
+	if ( ImGui::Button( "Create At Camera Position" ) )
 	{
 		gSelectedEntity = GetEntitySystem()->CreateEntity();
 
@@ -200,7 +200,7 @@ void EntEditor_DrawEntityList()
 		}
 	}
 
-	if ( ImGui::Button( "Create Entity At Camera" ) )
+	if ( ImGui::Button( "Create At Camera" ) )
 	{
 		gSelectedEntity = GetEntitySystem()->CreateEntity();
 
@@ -218,7 +218,7 @@ void EntEditor_DrawEntityList()
 		}
 	}
 
-	if ( ImGui::Button( "Delete Entity" ) )
+	if ( ImGui::Button( "Delete" ) )
 	{
 		if ( gSelectedEntity )
 			GetEntitySystem()->DeleteEntity( gSelectedEntity );
@@ -234,21 +234,11 @@ void EntEditor_DrawEntityList()
 
 	ImGui::Separator();
 
-	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
-	{
-		std::string entName = vstring( "Entity %zd", entity );
+	const ImVec2      itemSize   = ImGui::GetItemRectSize();
+	const float       textHeight = ImGui::GetTextLineHeight();
+	const ImGuiStyle& style      = ImGui::GetStyle();
 
-		ImGui::PushID( entity );
-
-		if ( ImGui::Selectable( entName.c_str(), gSelectedEntity == entity ) )
-		{
-			gSelectedEntity = entity;
-		}
-
-		ImGui::PopID();
-	}
-
-	if ( ImGui::BeginCombo( "Parent Entity", "" ) )
+	if ( ImGui::BeginCombo( "Parent", "" ) )
 	{
 		Entity parent = GetEntitySystem()->GetParent( gSelectedEntity );
 
@@ -270,6 +260,25 @@ void EntEditor_DrawEntityList()
 		ImGui::EndCombo();
 	}
 
+	// Entity List
+	if ( ImGui::BeginChild( "Entity List", {}, true ) )
+	{
+		for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
+		{
+			std::string entName = vstring( "Entity %zd", entity );
+
+			ImGui::PushID( entity );
+
+			if ( ImGui::Selectable( entName.c_str(), gSelectedEntity == entity ) )
+			{
+				gSelectedEntity = entity;
+			}
+
+			ImGui::PopID();
+		}
+	}
+
+	ImGui::EndChild();
 	ImGui::End();
 }
 
@@ -311,52 +320,57 @@ void EntEditor_DrawEntityData()
 	// go through the component registry and check to see if the entity has this component (probably slow af)
 	size_t imguiID = 0;
 
-	for ( auto& [name, regData] : GetEntComponentRegistry().aComponentNames )
+	if ( ImGui::BeginChild( "Entity Component Data" ) )
 	{
-		void* compData = GetEntitySystem()->GetComponent( gSelectedEntity, name.data() );
-
-		if ( !compData )
-			continue;
-
-		// TreeNode
-
-		IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( name.data() );
-
-		ImGui::PushID( regData );
-
-		if ( ImGui::CollapsingHeader( name.data(), ImGuiTreeNodeFlags_None ) )
+		for ( auto& [name, regData] : GetEntComponentRegistry().aComponentNames )
 		{
-			if ( ImGui::Button( "Remove Component" ) )
-			{
-				GetEntitySystem()->RemoveComponent( gSelectedEntity, name.data() );
-				ImGui::PopID();
+			void* compData = GetEntitySystem()->GetComponent( gSelectedEntity, name.data() );
+
+			if ( !compData )
 				continue;
-			}
 
-			// Draw Component Data
-			// TODO: allow a custom function to be registered for editing component data in imgui
-			for ( auto& [varOffset, varData] : regData->aVars )
+			// TreeNode
+
+			IEntityComponentSystem* system = GetEntitySystem()->GetComponentSystem( name.data() );
+
+			ImGui::PushID( regData );
+
+			if ( ImGui::CollapsingHeader( name.data(), ImGuiTreeNodeFlags_None ) )
 			{
-				char* dataChar   = static_cast< char* >( compData );
-				char* dataOffset = dataChar + varOffset;
-
-				if ( EntEditor_DrawComponentVarUI( dataOffset, varData ) && system )
+				if ( ImGui::Button( "Remove Component" ) )
 				{
-					// Mark variable as dirty
-					if ( varData.aIsNetVar )
-					{
-						char* dataChar = static_cast< char* >( compData );
-						bool* isDirty  = reinterpret_cast< bool* >( dataChar + varData.aSize + varOffset );
-						*isDirty       = true;
-					}
+					GetEntitySystem()->RemoveComponent( gSelectedEntity, name.data() );
+					ImGui::PopID();
+					continue;
+				}
 
-					system->ComponentUpdated( gSelectedEntity, compData );
+				// Draw Component Data
+				// TODO: allow a custom function to be registered for editing component data in imgui
+				for ( auto& [varOffset, varData] : regData->aVars )
+				{
+					char* dataChar   = static_cast< char* >( compData );
+					char* dataOffset = dataChar + varOffset;
+
+					if ( EntEditor_DrawComponentVarUI( dataOffset, varData ) && system )
+					{
+						// Mark variable as dirty
+						if ( varData.aIsNetVar )
+						{
+							char* dataChar = static_cast< char* >( compData );
+							bool* isDirty  = reinterpret_cast< bool* >( dataChar + varData.aSize + varOffset );
+							*isDirty       = true;
+						}
+
+						system->ComponentUpdated( gSelectedEntity, compData );
+					}
 				}
 			}
-		}
 
-		ImGui::PopID();
+			ImGui::PopID();
+		}
 	}
+
+	ImGui::EndChild();
 
 	ImGui::End();
 }
