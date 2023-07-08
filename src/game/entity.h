@@ -167,15 +167,18 @@ enum EEntityFlag_ : EEntityFlag
 	// Entity is not networked and is local only
 	EEntityFlag_Local     = ( 1 << 2 ),
 
+	// Entity is Parented to another Entity
+	EEntityFlag_Parented  = ( 1 << 3 ),
+
 	// Entity is Predicted
-	EEntityFlag_Predicted = ( 1 << 3 ),
+	EEntityFlag_Predicted = ( 1 << 4 ),
 
 	// Ignore data from the server on the client, useful for first person camera entity
 	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
-	EEntityFlag_IgnoreOnClient = ( 1 << 4 ),
+	EEntityFlag_IgnoreOnClient = ( 1 << 5 ),
 
 	// Don't save this Entity/Component To the Map
-	EEntityFlag_DontSaveToMap  = ( 1 << 5 ),
+	EEntityFlag_DontSaveToMap  = ( 1 << 6 ),
 };
 
 
@@ -681,6 +684,7 @@ class EntitySystem
 	// TODO: tackle parenting with physics objects
 	void                    ParentEntity( Entity sSelf, Entity sParent );
 	Entity                  GetParent( Entity sEntity );
+	bool                    IsParented( Entity sEntity );
 
 	// Get the highest level parent for this entity, returns self if not parented
 	Entity                  GetRootParent( Entity sEntity );

@@ -740,17 +740,19 @@ bool EntitySystem::EntityExists( Entity desiredId )
 
 void EntitySystem::ParentEntity( Entity sSelf, Entity sParent )
 {
-	if ( sSelf == sParent )
+	if ( sSelf == CH_ENT_INVALID || sSelf == sParent )
 		return;
 
 	if ( sParent == CH_ENT_INVALID )
 	{
 		// Clear the parent
+		aEntityFlags[ sSelf ] |= EEntityFlag_Parented;
 		aEntityParents.erase( sSelf );
 	}
 	else
 	{
 		aEntityParents[ sSelf ] = sParent;
+		aEntityFlags[ sSelf ] &= ~EEntityFlag_Parented;
 	}
 }
 
@@ -763,6 +765,17 @@ Entity EntitySystem::GetParent( Entity sSelf )
 		return it->second;
 
 	return CH_ENT_INVALID;
+}
+
+
+bool EntitySystem::IsParented( Entity sSelf )
+{
+	auto it = aEntityFlags.find( sSelf );
+
+	if ( it != aEntityFlags.end() )
+		return it->second & EEntityFlag_Parented;
+
+	return false;
 }
 
 
@@ -787,6 +800,9 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChi
 
 	for ( auto& [ otherEntity, flags ] : aEntityFlags )
 	{
+		if ( !( flags & EEntityFlag_Parented ) )
+			continue;
+
 		Entity otherParent = GetParent( otherEntity );
 
 		if ( otherParent == sEntity )
@@ -803,7 +819,7 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
 	PROF_SCOPE();
 
-	Entity    parent = GetParent( sEntity );
+	Entity    parent = IsParented( sEntity ) ? GetParent( sEntity ) : CH_ENT_INVALID;
 	glm::mat4 parentMat( 1.f );
 
 	if ( parent != CH_ENT_INVALID )
@@ -946,6 +962,9 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 
 	std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
+
+	updateBuilderList.reserve( aEntityCount );
+	updateOut.reserve( aEntityCount );
 
 	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
@@ -1192,8 +1211,6 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 		auto IsVarDirty = [ & ]( bool isBool = false )
 		{
-			PROF_SCOPE_NAMED( "IsVarDirty" );
-
 			// Make the var is allowed to be saved to the map
 			if ( sSavingMap )
 			{
@@ -1453,29 +1470,13 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 {
 	PROF_SCOPE();
 
-	// Make a list of component pools with a component that need updating
-	std::vector< EntityComponentPool* >                 componentPools;
 	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
+	componentsBuilt.reserve( aComponentPools.size() );
 
-	componentPools.reserve( aComponentPools.size() );
-	for ( auto& [ name, pool ] : aComponentPools )
-	{
-		// If there are no components in existence, don't even bother to send anything here
-		if ( !pool->aMapComponentToEntity.size() )
-			continue;
-
-		componentPools.push_back( pool );
-	} 
-
-	if ( Game_IsClient() && ent_show_component_net_updates )
-	{
-		gui->DebugMessage( "Sending \"%zd\" Component Types", componentPools.size() );
-	}
-
-	componentsBuilt.reserve( componentPools.size() );
 	size_t i = 0;
+	size_t poolCount = 0;
 
-	for ( auto pool : componentPools )
+	for ( auto& [ poolName, pool ] : aComponentPools )
 	{
 		// If there are no components in existence, don't even bother to send anything here
 		if ( !pool->aMapComponentToEntity.size() )
@@ -1489,11 +1490,10 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		if ( regData->aNetType != EEntComponentNetType_Both && regData->aNetType != EEntComponentNetType_Server )
 			continue;
 
+		poolCount++;
+
 		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
-
 		std::vector< NetMsg_ComponentUpdateDataBuilder >        componentDataBuilders;
-
-		// auto                                                             compNameOffset = srRootBuilder.CreateString( pool->apName );
 
 		bool                                                    builtUpdateList = false;
 		bool                                                    wroteData       = false;
@@ -1505,9 +1505,6 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
 		{
 			PROF_SCOPE_NAMED( "Entity" );
-
-			//std::string scopeTest = vstring( "Entity %zd", entity );
-			//CH_PROF_ZONE_NAME( scopeTest.c_str(), scopeTest.size() );
 
 			EEntityFlag entFlags = aEntityFlags.at( entity );
 
@@ -1546,24 +1543,28 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 				continue;
 			}
 
-			void*          data = pool->GetData( entity );
+			fb::Offset< fb::Vector< u8 > > dataVector;
+			void*                          data = pool->GetData( entity );
 
-			// Write Component Data
-			flexb::Builder flexBuilder;  // regData->aSize as constrcutor argument?
-			wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
-
-			// if ( !sFullUpdate && !wroteData )
-			// {
-			// 	compListI++;
-			// 	continue;
-			// }
-
-			fb::Offset< flatbuffers::Vector< u8 > > dataVector;
-
-			if ( wroteData )
+			// Constructing flexBuilder is slow, so only do that if we have variables on this component
+			if ( regData->aVars.size() )
 			{
-				flexBuilder.Finish();
-				dataVector = srRootBuilder.CreateVector( flexBuilder.GetBuffer().data(), flexBuilder.GetSize() );
+				PROF_SCOPE_NAMED( "FlexBuilder" )
+
+				// Write Component Data
+				flexb::Builder flexBuilder;  // regData->aSize as constrcutor argument?
+				wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
+
+				if ( wroteData )
+				{
+					flexBuilder.Finish();
+					dataVector = srRootBuilder.CreateVector( flexBuilder.GetBuffer().data(), flexBuilder.GetSize() );
+
+					if ( Game_IsClient() && ent_show_component_net_updates )
+					{
+						gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, flexBuilder.GetSize() );
+					}
+				}
 			}
 
 			// Now after creating the data vector, we can make the update data builder
@@ -1579,28 +1580,15 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 					compDataBuilder.add_destroyed( true );
 
 				if ( wroteData )
-				{
-					if ( Game_IsClient() && ent_show_component_net_updates )
-					{
-						// gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, outputStream.aBuffer.size_bytes() );
-						gui->DebugMessage( "Sending Component Write Update to Clients: \"%s\" - %zd bytes", regData->apName, flexBuilder.GetSize() );
-					}
-
 					compDataBuilder.add_values( dataVector );
-				}
 
-				{
-					PROF_SCOPE_NAMED( "componentDataBuilt.push_back()" );
-					builtUpdateList = true;
-					componentDataBuilt.push_back( compDataBuilder.Finish() );
-				}
+				builtUpdateList = true;
+				componentDataBuilt.push_back( compDataBuilder.Finish() );
 			}
 
 			// Reset Component Var Dirty Values
 			if ( !ent_always_full_update )
 			{
-				PROF_SCOPE_NAMED( "Reset Var Dirty" );
-
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
 					if ( !var.aIsNetVar )
@@ -1617,14 +1605,12 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			compListI++;
 		}
 
-		// srRootBuilder.Finish();
-
 		if ( componentDataBuilt.size() && builtUpdateList )
 		{
 			PROF_SCOPE_NAMED( "Building Component Update" );
 
 			// oh my god
-			fb::Offset< fb::Vector< fb::Offset< NetMsg_ComponentUpdateData > > > compVector{};
+			fb::Offset< fb::Vector< fb::Offset< NetMsg_ComponentUpdateData > > > compVector;
 
 			//if ( wroteData )
 				compVector = srRootBuilder.CreateVector( componentDataBuilt.data(), componentDataBuilt.size() );
@@ -1668,6 +1654,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 	if ( Game_IsClient() && ent_show_component_net_updates )
 	{
+		gui->DebugMessage( "Sending \"%zd\" Component Types", poolCount );
 		gui->DebugMessage( "Total Size of Component Write Update: %zd bytes", srRootBuilder.GetSize() );
 	}
 }
@@ -1962,7 +1949,11 @@ bool EntitySystem::IsNetworked( Entity entity )
 		return false;
 
 	// Check if we have a parent entity
+	if ( !( it->second & EEntityFlag_Parented ) )
+		return true;
+
 	Entity parent = GetParent( entity );
+	CH_ASSERT( parent != CH_ENT_INVALID );
 	if ( parent == CH_ENT_INVALID )
 		return true;
 
@@ -2001,10 +1992,13 @@ bool EntitySystem::CanSaveToMap( Entity entity )
 	if ( it->second & EEntityFlag_DontSaveToMap )
 		return false;
 
-	// Check if our parent can be saved to a map
-	Entity parent = GetParent( entity );
-	if ( parent != CH_ENT_INVALID )
-		return CanSaveToMap( parent );
+	if ( it->second & EEntityFlag_Parented )
+	{
+		// Check if our parent can be saved to a map
+		Entity parent = GetParent( entity );
+		if ( parent != CH_ENT_INVALID )
+			return CanSaveToMap( parent );
+	}
 
 	return true;
 }
