@@ -35,6 +35,7 @@ CH_STRUCT_REGISTER_COMPONENT( CSound, sound, true, EEntComponentNetType_Both, tr
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, true );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVolume, volume, true );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aFalloff, falloff, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aRadius, radius, true );
 	//CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVelocity, velocity, true );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartPlayback, startPlayback, true );
 
@@ -142,25 +143,20 @@ void EntSys_Sound::Update()
 
 		if ( sound->aEffects & AudioEffect_World )
 		{
-			auto transform = Ent_GetComponent< CTransform >( entity, "transform" );
+			glm::mat4 matrix;
+			GetEntitySystem()->GetWorldMatrix( matrix, entity );
 
-			if ( transform )
-			{
-				if ( !audio->HasEffects( sound->aHandle, AudioEffect_World ) )
-					audio->AddEffects( sound->aHandle, AudioEffect_World );
+			if ( !audio->HasEffects( sound->aHandle, AudioEffect_World ) )
+				audio->AddEffects( sound->aHandle, AudioEffect_World );
 
-				audio->SetEffectData( sound->aHandle, EAudio_World_Pos, transform->aPos );
-				audio->SetEffectData( sound->aHandle, EAudio_World_Falloff, sound->aFalloff );
+			audio->SetEffectData( sound->aHandle, EAudio_World_Pos, Util_GetMatrixPosition( matrix ) );
+			audio->SetEffectData( sound->aHandle, EAudio_World_Falloff, sound->aFalloff );
+			audio->SetEffectData( sound->aHandle, EAudio_World_Radius, sound->aRadius );
 
-				// TODO: auto calculate velocity
-				// maybe have the entity system do it, and add GetWorldVelocity() and GetLocalVelocity()
-				// though, why not just have the audio system do it? hmm
-				// audio->SetEffectData( sound->aHandle, EAudio_World_Velocity, sound->aVelocity );
-			}
-			else
-			{
-				Log_Error( "Sound has World Effect, but no transform component found!\n" );
-			}
+			// TODO: auto calculate velocity
+			// maybe have the entity system do it, and add GetWorldVelocity() and GetLocalVelocity()
+			// though, why not just have the audio system do it? hmm
+			// audio->SetEffectData( sound->aHandle, EAudio_World_Velocity, sound->aVelocity );
 		}
 		else
 		{

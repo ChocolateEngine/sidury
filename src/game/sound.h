@@ -18,6 +18,7 @@ struct CSound
 	// Sound Controls
 	ComponentNetVar< float >       aVolume        = 1.f;
 	ComponentNetVar< float >       aFalloff       = 1.f;
+	ComponentNetVar< float >       aRadius        = 1000.f;
 	//ComponentNetVar< float >       aVelocity = 0.f;
 	ComponentNetVar< u32 >         aEffects       = AudioEffect_None;
 
