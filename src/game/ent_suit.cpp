@@ -17,7 +17,7 @@ void SuitSystem::ComponentAdded( Entity sEntity, void* spData )
 	//CH_ASSERT( aLogonSound ); later ^^
 	if ( Game_ProcessingClient() )
 	{
-		aLogonSound = audio->OpenSound( "sound/fvox/flatline.ogg" );
+		aLogonSound = audio->OpenSound( "sound/fvox/hev_logon.ogg" );
 		audio->PlaySound( aLogonSound );
 	}
 }
