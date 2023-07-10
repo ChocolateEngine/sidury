@@ -1556,6 +1556,9 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 				// check if the entity isn't networked
 				shouldSkipComponent |= !IsNetworked( entity, entFlags );
 				shouldSkipComponent |= compFlags & EEntityFlag_Local;
+
+				if ( !sFullUpdate && !( compFlags & EEntityFlag_Created ) )
+					shouldSkipComponent |= regData->aVars.empty();
 			}
 
 			// Have we determined we should skip this component?
