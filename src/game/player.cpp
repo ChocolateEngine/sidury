@@ -699,7 +699,7 @@ void PlayerManager::UpdateLocalPlayer()
 
 	for ( Entity player : aEntities )
 	{
-		PROF_SCOPE_NAMED( vstring( "PlayerManager::UpdateLocalPlayer - Player Entity %zd", player ).c_str() );
+		PROF_SCOPE();
 
 		auto playerInfo = GetPlayerInfo( player );
 		Assert( playerInfo );

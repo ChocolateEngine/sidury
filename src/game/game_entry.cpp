@@ -118,8 +118,7 @@ extern "C"
 
 		while ( gRunning )
 		{
-			// ZoneScoped
-			PROF_SCOPE();
+			PROF_SCOPE_NAMED( "Main Loop" );
 
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
@@ -155,8 +154,10 @@ extern "C"
 			// gTaskScheduler.WaitForCounter( &taskCounter );
 
 			startTime = currentTime;
-			
-			profile_end_frame();
+
+#ifdef TRACY_ENABLE
+			FrameMark;
+#endif
 		}
 
 		Game_Shutdown();

@@ -913,8 +913,6 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 		if ( !entityUpdate )
 			continue;
 
-		// NetMsg_EntityUpdate
-
 		Entity entId = entityUpdate->id();
 
 		if ( entityUpdate->destroyed() )
@@ -960,32 +958,40 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 
 	Assert( aEntityCount == aEntityFlags.size() );
 
-	std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
+	//std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
 
-	updateBuilderList.reserve( aEntityCount );
+	//updateBuilderList.reserve( aEntityCount );
 	updateOut.reserve( aEntityCount );
 
 	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
 		// Make sure this and all the parents are networked
-		if ( !IsNetworked( entity ) )
+		if ( !IsNetworked( entity, flags ) )
 			continue;
 
 		// Make sure this entity is allowed to be saved to the map
 		if ( sSavingMap && !CanSaveToMap( entity ) )
 			continue;
 
-		auto& update = updateBuilderList.emplace_back( srBuilder );
+		// NetMsg_EntityUpdateBuilder& update = updateBuilderList.emplace_back( srBuilder );
+		NetMsg_EntityUpdateBuilder update( srBuilder );
 
 		update.add_id( entity );
 
 		// Get Entity State
 		if ( flags & EEntityFlag_Destroyed )
+		{
 			update.add_destroyed( true );
-
-		// doesn't matter if it returns CH_ENT_INVALID
-		update.add_parent( GetParent( entity ) );
+		}
+		else
+		{
+			// doesn't matter if it returns CH_ENT_INVALID
+			if ( flags & EEntityFlag_Parented )
+				update.add_parent( GetParent( entity ) );
+			else
+				update.add_parent( CH_ENT_INVALID );
+		}
 
 		updateOut.push_back( update.Finish() );
 		// srBuilder.Finish( update.Finish() );
@@ -1163,6 +1169,14 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 			case EEntNetField_Vec3:
 			{
 				auto value = (glm::vec3*)( data );
+
+				// auto typedVector = vector[ i++ ].AsTypedVector();
+				// CH_ASSERT( typedVector.size() == 3 );
+				// 
+				// value->x = typedVector[ 0 ].AsFloat();
+				// value->y = typedVector[ 1 ].AsFloat();
+				// value->z = typedVector[ 2 ].AsFloat();
+
 				value->x   = vector[ i++ ].AsFloat();
 				value->y   = vector[ i++ ].AsFloat();
 				value->z   = vector[ i++ ].AsFloat();
@@ -1207,7 +1221,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 			continue;
 
 		PROF_SCOPE();
-		CH_PROF_ZONE_NAME( var.apName, strlen( var.apName ) );
+		CH_PROF_ZONE_NAME( var.apName, var.aNameLen );
 
 		auto IsVarDirty = [ & ]( bool isBool = false )
 		{
@@ -1389,8 +1403,8 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 			{
 				if ( IsVarDirty() )
 				{
-					auto value = *(const std::string*)( data );
-					srBuilder.Add( value );
+					auto value = (const std::string*)( data );
+					srBuilder.Add( value->c_str() );
 				}
 
 				break;
@@ -1415,6 +1429,15 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 				if ( IsVarDirty() )
 				{
 					const glm::vec3* value = (const glm::vec3*)( data );
+
+					// no idea if this is better or worse
+					// std::vector< float > float3;
+					// float3.reserve( 3 );
+					// float3.push_back( value->x );
+					// float3.push_back( value->y );
+					// float3.push_back( value->z );
+					// srBuilder.Add( float3 );
+
 					srBuilder.Add( value->x );
 					srBuilder.Add( value->y );
 					srBuilder.Add( value->z );
@@ -1465,7 +1488,6 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 }
 
 
-
 void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate, bool sSavingMap )
 {
 	PROF_SCOPE();
@@ -1475,6 +1497,8 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 	size_t i = 0;
 	size_t poolCount = 0;
+
+	flexb::Builder flexBuilder;
 
 	for ( auto& [ poolName, pool ] : aComponentPools )
 	{
@@ -1493,16 +1517,14 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		poolCount++;
 
 		std::vector< fb::Offset< NetMsg_ComponentUpdateData > > componentDataBuilt;
-		std::vector< NetMsg_ComponentUpdateDataBuilder >        componentDataBuilders;
 
 		bool                                                    builtUpdateList = false;
 		bool                                                    wroteData       = false;
 
 		componentDataBuilt.reserve( pool->aMapComponentToEntity.size() );
-		componentDataBuilders.reserve( pool->aMapComponentToEntity.size() );
 
 		size_t compListI = 0;
-		for ( auto& [ index, entity ] : pool->aMapComponentToEntity )
+		for ( auto& [ componentID, entity ] : pool->aMapComponentToEntity )
 		{
 			PROF_SCOPE_NAMED( "Entity" );
 
@@ -1516,7 +1538,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 				continue;
 			}
 
-			EEntityFlag compFlags           = pool->aComponentFlags.at( index );
+			EEntityFlag compFlags           = pool->aComponentFlags.at( componentID );
 
 			bool        shouldSkipComponent = false;
 
@@ -1532,7 +1554,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			else
 			{
 				// check if the entity isn't networked
-				shouldSkipComponent |= !IsNetworked( entity );
+				shouldSkipComponent |= !IsNetworked( entity, entFlags );
 				shouldSkipComponent |= compFlags & EEntityFlag_Local;
 			}
 
@@ -1544,15 +1566,16 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			}
 
 			fb::Offset< fb::Vector< u8 > > dataVector;
-			void*                          data = pool->GetData( entity );
+			void*                          data = pool->aComponents[ componentID.aIndex ];
 
 			// Constructing flexBuilder is slow, so only do that if we have variables on this component
-			if ( regData->aVars.size() )
+			// Also make sure the component isn't being destroyed
+			if ( regData->aVars.size() && !( compFlags & EEntityFlag_Destroyed ) )
 			{
 				PROF_SCOPE_NAMED( "FlexBuilder" )
 
 				// Write Component Data
-				flexb::Builder flexBuilder;  // regData->aSize as constrcutor argument?
+				flexBuilder.Clear();
 				wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
 
 				if ( wroteData )
@@ -1569,9 +1592,10 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 			// Now after creating the data vector, we can make the update data builder
 			{
-				PROF_SCOPE_NAMED( "ComponentUpdateData" )
+				PROF_SCOPE_NAMED( "ComponentUpdateData" );
 
-				NetMsg_ComponentUpdateDataBuilder& compDataBuilder = componentDataBuilders.emplace_back( srRootBuilder );
+				// NetMsg_ComponentUpdateDataBuilder& compDataBuilder = componentDataBuilders.emplace_back( srRootBuilder );
+				NetMsg_ComponentUpdateDataBuilder compDataBuilder( srRootBuilder );
 
 				compDataBuilder.add_id( entity );
 
@@ -1615,7 +1639,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			//if ( wroteData )
 				compVector = srRootBuilder.CreateVector( componentDataBuilt.data(), componentDataBuilt.size() );
 
-			auto                           compNameOffset = srRootBuilder.CreateString( pool->apName );
+			auto                          compNameOffset = srRootBuilder.CreateString( poolName );
 
 			NetMsg_ComponentUpdateBuilder compUpdate( srRootBuilder );
 			compUpdate.add_name( compNameOffset );
@@ -1707,9 +1731,9 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		if ( !componentUpdate->components() )
 			continue;
 
-		const char* componentName = componentUpdate->name()->string_view().data();
+		std::string_view componentName = componentUpdate->name()->string_view();
 
-		CH_PROF_ZONE_NAME( componentName, componentUpdate->name()->size() );
+		CH_PROF_ZONE_NAME_STR( componentName );
 
 		EntityComponentPool* pool = GetComponentPool( componentName );
 
@@ -1717,7 +1741,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 		if ( !pool )
 		{
-			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName );
+			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName.data() );
 			continue;
 		}
 
@@ -1728,12 +1752,11 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		if ( componentUpdate->hash() != regData->aHash )
 		{
 			Log_ErrorF( "Hash of component \"%s\" differs from what we have (got %zd, expected %zd)\n",
-				componentName, componentUpdate->hash(), regData->aHash );
+				componentName.data(), componentUpdate->hash(), regData->aHash );
 			continue;
 		}
 
-		// Tell the Component System this entity's component updated
-		IEntityComponentSystem* system = GetComponentSystem( regData->apName );
+		IEntityComponentSystem* system = pool->apComponentSystem;
 
 		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
 		{
@@ -1764,18 +1787,30 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				continue;
 			}
 
-			void* componentData = GetComponent( entity, componentName );
+			// We don't use the component pool functions to reduce calls to aMapEntityToComponent
+			// We only need to find the componentID once (or twice when creating the component), and gain some speed up
+			ComponentID_t componentID{ SIZE_MAX };
 
-			if ( !componentData )
+			void*         componentData = nullptr;
+			auto          entToCompIt   = pool->aMapEntityToComponent.find( entity );
+
+			if ( entToCompIt != pool->aMapEntityToComponent.end() )
+			{
+				componentID = entToCompIt->second;
+				componentData = pool->aComponents[ entToCompIt->second.aIndex ];
+			}
+			else
 			{
 				// Create the component
-				componentData = AddComponent( entity, componentName );
+				componentData = pool->Create( entity );
 
 				if ( componentData == nullptr )
 				{
 					Log_ErrorF( "Failed to create component\n" );
 					continue;
 				}
+
+				componentID = pool->aMapEntityToComponent.at( entity );
 			}
 
 			// Now, update component data
@@ -1784,8 +1819,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				continue;
 
 			// a bit of a hack and not implemented properly
-			bool predicted = IsComponentPredicted( entity, componentName );
-			if ( predicted )
+			if ( pool->aComponentFlags.at( componentID ) & EEntityFlag_Predicted )
 				continue;
 
 			if ( componentUpdateData->values() )
@@ -1808,21 +1842,16 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 }
 
 
-// void EntitySystem::MarkComponentNetworked( Entity ent, const char* spName )
-// {
-// }
-
-
 // Add a component to an entity
-void* EntitySystem::AddComponent( Entity entity, const char* spName )
+void* EntitySystem::AddComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( spName );
+	auto pool = GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( gLC_Entity, "Failed to create component - no component pool found: \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Failed to create component - no component pool found: \"%s\"\n", sName.data() );
 		return nullptr;
 	}
 
@@ -1831,22 +1860,32 @@ void* EntitySystem::AddComponent( Entity entity, const char* spName )
 
 
 // Does this entity have this component?
-bool EntitySystem::HasComponent( Entity entity, const char* spName )
+bool EntitySystem::HasComponent( Entity entity, std::string_view sName )
 {
-	return GetComponent( entity, spName ) != nullptr;
+	PROF_SCOPE();
+
+	auto pool = GetComponentPool( sName );
+
+	if ( pool == nullptr )
+	{
+		Log_ErrorF( gLC_Entity, "Failed to get component - no component pool found: \"%s\"\n", sName.data() );
+		return false;
+	}
+
+	return pool->Contains( entity );
 }
 
 
 // Get a component from an entity
-void* EntitySystem::GetComponent( Entity entity, const char* spName )
+void* EntitySystem::GetComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( spName );
+	auto pool = GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( gLC_Entity, "Failed to get component - no component pool found: \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Failed to get component - no component pool found: \"%s\"\n", sName.data() );
 		return nullptr;
 	}
 
@@ -1855,15 +1894,15 @@ void* EntitySystem::GetComponent( Entity entity, const char* spName )
 
 
 // Remove a component from an entity
-void EntitySystem::RemoveComponent( Entity entity, const char* spName )
+void EntitySystem::RemoveComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( spName );
+	auto pool = GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( gLC_Entity, "Failed to remove component - no component pool found: \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Failed to remove component - no component pool found: \"%s\"\n", sName.data() );
 		return;
 	}
 
@@ -1872,20 +1911,20 @@ void EntitySystem::RemoveComponent( Entity entity, const char* spName )
 
 
 // Sets Prediction on this component
-void EntitySystem::SetComponentPredicted( Entity entity, const char* spName, bool sPredicted )
+void EntitySystem::SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted )
 {
-	if ( this == sv_entities )
+	if ( !aIsClient )
 	{
 		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( gLC_Entity, "Tried to mark entity component as predicted on server - \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Tried to mark entity component as predicted on server - \"%s\"\n", sName.data() );
 		return;
 	}
 
-	auto pool = GetComponentPool( spName );
+	auto pool = GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( gLC_Entity, "Failed to set component prediction - no component pool found: \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Failed to set component prediction - no component pool found: \"%s\"\n", sName.data() );
 		return;
 	}
 
@@ -1894,20 +1933,20 @@ void EntitySystem::SetComponentPredicted( Entity entity, const char* spName, boo
 
 
 // Is this component predicted for this Entity?
-bool EntitySystem::IsComponentPredicted( Entity entity, const char* spName )
+bool EntitySystem::IsComponentPredicted( Entity entity, std::string_view sName )
 {
-	if ( this == sv_entities )
+	if ( !aIsClient )
 	{
 		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( gLC_Entity, "Tried to find a predicted entity component on server - \"%s\"\n", spName );
+		Log_ErrorF( gLC_Entity, "Tried to find a predicted entity component on server - \"%s\"\n", sName.data() );
 		return false;
 	}
 
-	auto pool = GetComponentPool( spName );
+	auto pool = GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
-		Log_FatalF( gLC_Entity, "Failed to get component prediction - no component pool found: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Failed to get component prediction - no component pool found: \"%s\"\n", sName.data() );
 		return false;
 	}
 
@@ -1933,11 +1972,11 @@ void EntitySystem::SetNetworked( Entity entity, bool sNetworked )
 
 
 // Is this Entity Networked?
-bool EntitySystem::IsNetworked( Entity entity )
+bool EntitySystem::IsNetworked( Entity sEntity )
 {
 	PROF_SCOPE();
 
-	auto it = aEntityFlags.find( entity );
+	auto it = aEntityFlags.find( sEntity );
 	if ( it == aEntityFlags.end() )
 	{
 		Log_Error( gLC_Entity, "Failed to get Entity Networked State - Entity not found\n" );
@@ -1952,7 +1991,29 @@ bool EntitySystem::IsNetworked( Entity entity )
 	if ( !( it->second & EEntityFlag_Parented ) )
 		return true;
 
-	Entity parent = GetParent( entity );
+	Entity parent = GetParent( sEntity );
+	CH_ASSERT( parent != CH_ENT_INVALID );
+	if ( parent == CH_ENT_INVALID )
+		return true;
+
+	// We make sure the parents are also networked before networking this one
+	return IsNetworked( parent );
+}
+
+
+bool EntitySystem::IsNetworked( Entity sEntity, EEntityFlag sFlags )
+{
+	PROF_SCOPE();
+
+	// If we have the local flag, we aren't networked
+	if ( sFlags & EEntityFlag_Local )
+		return false;
+
+	// Check if we have a parent entity
+	if ( !( sFlags & EEntityFlag_Parented ) )
+		return true;
+
+	Entity parent = GetParent( sEntity );
 	CH_ASSERT( parent != CH_ENT_INVALID );
 	if ( parent == CH_ENT_INVALID )
 		return true;
@@ -2004,7 +2065,7 @@ bool EntitySystem::CanSaveToMap( Entity entity )
 }
 
 
-EntityComponentPool* EntitySystem::GetComponentPool( const char* spName )
+EntityComponentPool* EntitySystem::GetComponentPool( std::string_view spName )
 {
 	PROF_SCOPE();
 

@@ -361,6 +361,24 @@ void* EntityComponentPool::GetData( Entity entity )
 }
 
 
+void* EntityComponentPool::GetData( ComponentID_t sComponentID )
+{
+	PROF_SCOPE();
+
+	CH_ASSERT( aMapComponentToEntity.size() == aMapEntityToComponent.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentFlags.size() );
+	CH_ASSERT( aMapComponentToEntity.size() == aComponentIDs.size() );
+
+	if ( sComponentID.aIndex > aComponentIDs.size() )
+	{
+		Log_ErrorF( "Invalid Component ID: %zd\n", sComponentID.aIndex );
+		return nullptr;
+	}
+
+	return aComponents[ sComponentID.aIndex ];
+}
+
+
 // Marks this component as predicted
 void EntityComponentPool::SetPredicted( Entity entity, bool sPredicted )
 {
@@ -402,6 +420,20 @@ bool EntityComponentPool::IsPredicted( Entity entity )
 	}
 
 	return aComponentFlags.at( it->second ) & EEntityFlag_Predicted;
+}
+
+
+bool EntityComponentPool::IsPredicted( ComponentID_t sComponentID )
+{
+	PROF_SCOPE();
+
+	if ( sComponentID.aIndex > aComponentIDs.size() )
+	{
+		Log_ErrorF( "Invalid Component ID: %zd\n", sComponentID.aIndex );
+		return false;
+	}
+
+	return aComponentFlags.at( sComponentID ) & EEntityFlag_Predicted;
 }
 
 

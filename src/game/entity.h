@@ -559,12 +559,14 @@ class EntityComponentPool
 
 	// Gets the data for this component
 	void*                                     GetData( Entity entity );
+	void*                                     GetData( ComponentID_t sComponentID );
 
 	// Marks this component as predicted
 	void                                      SetPredicted( Entity entity, bool sPredicted );
 
 	// Is this component predicted for this Entity?
 	bool                                      IsPredicted( Entity entity );
+	bool                                      IsPredicted( ComponentID_t sComponentID );
 
 	// How Many Components are in this Pool?
 	size_t                                    GetCount();
@@ -713,31 +715,34 @@ class EntitySystem
 	void                    WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate, bool sSavingMap = false );
 
 	// Add a component to an entity
-	void*                   AddComponent( Entity entity, const char* spName );
+	void*                   AddComponent( Entity entity, std::string_view sName );
 
 	// Does this entity have this component?
-	bool                    HasComponent( Entity entity, const char* spName );
+	bool                    HasComponent( Entity entity, std::string_view sName );
 
 	// Get a component from an entity
-	void*                   GetComponent( Entity entity, const char* spName );
+	void*                   GetComponent( Entity entity, std::string_view sName );
 
 	// Remove a component from an entity
-	void                    RemoveComponent( Entity entity, const char* spName );
+	void                    RemoveComponent( Entity entity, std::string_view sName );
 
 	// Sets Prediction on this component
-	void                    SetComponentPredicted( Entity entity, const char* spName, bool sPredicted );
+	void                    SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted );
 
 	// Is this component predicted for this Entity?
-	bool                    IsComponentPredicted( Entity entity, const char* spName );
+	bool                    IsComponentPredicted( Entity entity, std::string_view sName );
 
 	// Enables/Disables Networking on this Entity
 	void                    SetNetworked( Entity entity, bool sNetworked = true );
 
 	// Is this Entity Networked?
-	bool                    IsNetworked( Entity entity );
+	bool                    IsNetworked( Entity sEntity );
+
+	// Faster version of IsNetworked with the option to pass in the entity flags if you already have them
+	bool                    IsNetworked( Entity sEntity, EEntityFlag sFlags );
 
 	// Sets whether this entity can be saved to a map or not
-	void                    SetAllowSavingToMap( Entity entity, bool sSaveToMap = true );
+	void                    SetAllowSavingToMap( Entity sEntity, bool sSaveToMap = true );
 
 	// Is this Entity able to be saved to a map?
 	bool                    CanSaveToMap( Entity entity );
@@ -745,7 +750,7 @@ class EntitySystem
 	// void                    SetComponentNetworked( Entity ent, const char* spName );
 
 	// Get the Component Pool for this Component
-	EntityComponentPool*    GetComponentPool( const char* spName );
+	EntityComponentPool*    GetComponentPool( std::string_view sName );
 
 	Entity                  TranslateEntityID( Entity sEntity, bool sCreate = false );
 
