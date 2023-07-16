@@ -4,21 +4,63 @@
 
 SuitSystem* gSuitEntSystems[ 2 ] = { 0, 0 };
 
+CONVAR( cl_suit_sound_offset_z, -4 );
+
 SuitSystem::SuitSystem()
 {
-	aLogonSound = CH_INVALID_HANDLE;  //audio->LoadSound( "sound/fvox/hev_logon.ogg" ); later
 }
 
 void SuitSystem::ComponentAdded( Entity sEntity, void* spData )
 {
-	CSuit* aSuit = ch_pointer_cast< CSuit >( spData ); // boolshit
+	CSuit* suit = ch_pointer_cast< CSuit >( spData ); // boolshit
 
 	Log_Msg( "Suited up!\n" );
 	//CH_ASSERT( aLogonSound ); later ^^
 	if ( Game_ProcessingClient() )
 	{
-		aLogonSound = audio->OpenSound( "sound/fvox/hev_logon.ogg" );
-		audio->PlaySound( aLogonSound );
+		suit->aLogonSound = audio->OpenSound( "sound/fvox/hev_logon.ogg" );
+
+		if ( audio->IsValid( suit->aLogonSound ) )
+		{
+			glm::mat4 matrix;
+			GetEntitySystem()->GetWorldMatrix( matrix, sEntity );
+
+			glm::vec3 pos = Util_GetMatrixPosition( matrix );
+			pos.z += cl_suit_sound_offset_z;
+
+			audio->AddEffects( suit->aLogonSound, AudioEffect_World );
+			audio->SetEffectData( suit->aLogonSound, EAudio_World_Pos, pos );
+			audio->PlaySound( suit->aLogonSound );
+		}
+	}
+}
+
+void SuitSystem::Update()
+{
+	for ( Entity entity : aEntities )
+	{
+		CSuit* suit = Ent_GetComponent< CSuit >( entity, "suit" );  // boolshit
+
+		if ( !suit )
+			continue;
+
+		if ( suit->aLogonSound )
+		{
+			if ( audio->IsValid( suit->aLogonSound ) )
+			{
+				glm::mat4 matrix;
+				GetEntitySystem()->GetWorldMatrix( matrix, entity );
+
+				glm::vec3 pos = Util_GetMatrixPosition( matrix );
+				pos.z += cl_suit_sound_offset_z;
+
+				audio->SetEffectData( suit->aLogonSound, EAudio_World_Pos, pos );
+			}
+			else
+			{
+				suit->aLogonSound = CH_INVALID_HANDLE;
+			}
+		}
 	}
 }
 

@@ -4,6 +4,8 @@
 
 struct CSuit
 {
+	// temp
+	Handle aLogonSound = CH_INVALID_HANDLE;
 };
 
 class SuitSystem : public IEntityComponentSystem
@@ -13,9 +15,7 @@ public:
 	~SuitSystem() {}
 
 	void ComponentAdded( Entity sEntity, void* spData ) override; // Only some will know
-
-private:
-	Handle aLogonSound = CH_INVALID_HANDLE;
+	void Update() override;
 };
 
 SuitSystem*        GetSuitEntSys();
