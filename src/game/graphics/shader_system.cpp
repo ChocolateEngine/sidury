@@ -48,6 +48,7 @@ CONCMD( shader_dump )
 // Shaders
 
 extern ShaderCreate_t gShaderCreate_Basic3D;
+extern ShaderCreate_t gShaderCreate_Unlit;
 extern ShaderCreate_t gShaderCreate_Debug;
 extern ShaderCreate_t gShaderCreate_DebugLine;
 extern ShaderCreate_t gShaderCreate_Skybox;
@@ -239,6 +240,12 @@ void Shader_Destroy( Handle sShader )
 
 bool Graphics_ShaderInit( bool sRecreate )
 {
+	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Unlit ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to create unlit shader\n" );
+		return false;
+	}
+
 	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Basic3D ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create basic_3d shader\n" );
