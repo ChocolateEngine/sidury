@@ -12,6 +12,7 @@
 #include <forward_list>
 #include <stack>
 #include <set>
+#include <unordered_set>
 
 
 LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::Green )
@@ -71,7 +72,7 @@ UniformBufferArray_t                              gUniformViewInfo;
 UniformBufferArray_t                              gUniformMaterialBasic3D;
 constexpr u32                                     MAX_MATERIALS_BASIC3D = 500;
 
-extern std::set< Handle >                         gDirtyMaterials;
+extern std::unordered_set< Handle >               gDirtyMaterials;
 
 static Handle                                     gSkyboxShader = InvalidHandle;
 

@@ -5,7 +5,7 @@
 #include "core/json5.h"
 #include "core/string.hpp"
 
-#include <set>
+#include <unordered_set>
 
 #if __unix__
 #include <limits.h>
@@ -106,7 +106,7 @@ static std::unordered_map< Handle, Handle >           gMaterialShaders;
 static Handle                                         gInvalidMaterial;
 static std::string                                    gStrEmpty;
 
-std::set< Handle >                                    gDirtyMaterials;
+std::unordered_set< Handle >                          gDirtyMaterials;
 
 
 const char* Mat_GetName( Handle shMat )
