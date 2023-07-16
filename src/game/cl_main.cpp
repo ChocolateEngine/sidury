@@ -442,7 +442,8 @@ void CL_Disconnect( bool sSendReason, const char* spReason )
 	gClientWait_ComponentList = false;
 	gClientWait_ServerInfo    = false;
 
-	GetEntitySystem()->Shutdown();
+	if ( GetEntitySystem() )
+		GetEntitySystem()->Shutdown();
 }
 
 
