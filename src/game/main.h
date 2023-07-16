@@ -20,7 +20,7 @@ const glm::vec3 vec3_up(0, 0, 1);
 
 #include "game_physics.h"
 #include "entity.h"
-#include "game_rules.h"
+//#include "game_rules.h"
 
 class IGuiSystem;
 class IRender;
