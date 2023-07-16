@@ -82,19 +82,21 @@ namespace std
 
 
 // Functions for creating and freeing components
-using FEntComp_New      = std::function< void*() >;
-using FEntComp_Free     = std::function< void( void* spData ) >;
+using FEntComp_New          = std::function< void*() >;
+using FEntComp_Free         = std::function< void( void* spData ) >;
 
 // Functions for creating component systems
-using FEntComp_NewSys   = std::function< IEntityComponentSystem*() >;
+using FEntComp_NewSys       = std::function< IEntityComponentSystem*() >;
 
 // Callback Function for when a new component is registered at runtime
 // Used for creating a new component pool for client and/or server entity system
-using FEntComp_Register = void( const char* spName );
+using FEntComp_Register     = void( const char* spName );
 
 // Used for custom defined variables
-using FEntComp_VarRead  = void( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData );
-using FEntComp_VarWrite = bool( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate );
+using FEntComp_VarRead      = void( flexb::Reference& spSrc, EntComponentData_t* spRegData, void* spData );
+using FEntComp_VarWrite     = bool( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate );
+
+using FEntSys_EventListener = void( Entity sEntity, void* spData );
 
 
 // TODO: Rename this to EEntNetField
@@ -156,22 +158,22 @@ using EEntityFlag = int;
 enum EEntityFlag_ : EEntityFlag
 {
 	// Entity still exists
-	EEntityFlag_None      = 0,
+	EEntityFlag_None           = 0,
 
 	// Entity was just created
-	EEntityFlag_Created   = ( 1 << 0 ),
+	EEntityFlag_Created        = ( 1 << 0 ),
 
 	// Entity was destroyed and is queued for removal
-	EEntityFlag_Destroyed = ( 1 << 1 ),
+	EEntityFlag_Destroyed      = ( 1 << 1 ),
 
 	// Entity is not networked and is local only
-	EEntityFlag_Local     = ( 1 << 2 ),
+	EEntityFlag_Local          = ( 1 << 2 ),
 
 	// Entity is Parented to another Entity
-	EEntityFlag_Parented  = ( 1 << 3 ),
+	EEntityFlag_Parented       = ( 1 << 3 ),
 
 	// Entity is Predicted
-	EEntityFlag_Predicted = ( 1 << 4 ),
+	EEntityFlag_Predicted      = ( 1 << 4 ),
 
 	// Ignore data from the server on the client, useful for first person camera entity
 	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
@@ -200,6 +202,23 @@ struct EntComponentVarData_t
 	size_t       aHash;
 	const char*  apName;
 	size_t       aNameLen;
+};
+
+
+struct EntComponentVarNetData_t
+{
+	EEntNetField aType;
+	bool         aIsNetVar;
+	bool         aSaveToMap;
+	size_t       aSize;
+	size_t       aHash;
+	const char*  apName;
+	size_t       aNameLen;
+};
+
+
+struct EntComponentNetData_t
+{
 };
 
 
@@ -649,6 +668,23 @@ class IEntityComponentSystem
 // ====================================================================================================
 
 
+struct EntityEventListener_t
+{
+	Entity                 aEntity;
+	std::string_view       aComponent;
+	std::string_view       aEvent;
+	FEntSys_EventListener* apCallback = nullptr;
+};
+
+
+struct EntityData_t
+{
+	EEntityFlag aFlags;
+	Entity      aParent;
+	std::string aName;
+};
+
+
 class EntitySystem
 {
   public:
@@ -692,7 +728,7 @@ class EntitySystem
 	Entity                  GetRootParent( Entity sEntity );
 
 	// Recursively get all entities attached to this one (SLOW)
-	void                    GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren );
+	void                    GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren );
 
 	// Returns a Model Matrix with parents applied in world space IF we have a transform component
 	bool                    GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
@@ -754,7 +790,39 @@ class EntitySystem
 
 	Entity                  TranslateEntityID( Entity sEntity, bool sCreate = false );
 
+	// ---------------------------------------------------------
+	// Entity Names
+
+	void                    SetName( Entity sEntity, std::string_view sName );
+	std::string_view        GetName( Entity sEntity );
+
+	// Multiple Entities can have the same name
+	void                    GetEntitiesByName( std::string_view sName, ChVector< Entity >& sEntities );
+
+	// ---------------------------------------------------------
+	// Entity Event System
+
+	// void                    ProcessEventQueue();
+	// 
+	// // Fire an event (Server Only, Event's will be networked to the client)
+	// // We also pass in the component name to avoid event name clashing
+	// void                    FireEvent( Entity sEntity, std::string_view sComponent, std::string_view sName, void* spData = nullptr );
+	// 
+	// // Add a listener to listen for an event
+	// // If CH_ENT_INVALID is passed in, it will listen globally for this event
+	// // If an entity is passed in, it will only listen for events from that entity
+	// // We also pass in the component name to avoid event name clashing
+	// Handle                  AddEventListener( Entity sEntity, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+	// 
+	// // Same as above, but with an entity name
+	// Handle                  AddEventListener( std::string_view sEntityName, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+	// 
+	// // how tf will this work, will AddEventListener return a handle? idfk
+	// void                    RemoveEventListener( Handle sListenerHandle );
+
+	// ---------------------------------------------------------
 	// Gets a component system by type_hash()
+
 	template< typename T >
 	inline T* GetSystem()
 	{
@@ -770,6 +838,9 @@ class EntitySystem
 		return nullptr;
 	}
 
+	// ---------------------------------------------------------
+	// Variables
+	
 	// TEMP DEBUG
 	bool                                                         aIsClient = false;
 
@@ -781,8 +852,14 @@ class EntitySystem
 	// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
 	std::unordered_map< Entity, Entity >                         aEntityIDConvert;
 
-	// Total living entities - used to keep limits on how many exist (TODO: remove this now that aUsedEntities exists)
-	Entity                                                       aEntityCount = 0;
+	// Entity Flags
+	std::unordered_map< Entity, EEntityFlag >                    aEntityFlags;
+
+	// Entity Parents
+	std::unordered_map< Entity, Entity >                         aEntityParents;
+
+	// Entity Names (needs to be ordered because of parenting)
+	std::map< Entity, std::string >                              aEntityNames;
 
 	// Component Pools - Pool of all of this type of component in existence
 	std::unordered_map< std::string_view, EntityComponentPool* > aComponentPools;
@@ -791,11 +868,9 @@ class EntitySystem
 	// NOTE: it's a bit strange to have them be stored here and one in each component pool
 	std::unordered_map< size_t, IEntityComponentSystem* >        aComponentSystems;
 
-	// Entity Flags
-	std::unordered_map< Entity, EEntityFlag >                    aEntityFlags;
-
-	// Entity Parents
-	std::unordered_map< Entity, Entity >                         aEntityParents;
+	// Event Listeners
+	// std::vector< EntityEventListener_t >                         aEventListeners;
+	ResourceList< EntityEventListener_t >                        aEventListeners;
 };
 
 

@@ -633,10 +633,10 @@ void TEST_SV_UpdateProtos( float frameTime )
 				protoLook.aLookTarget = 0;
 
 				// Don't look at yourself or the world, only pick the world if there are no other entities to pick
-				if ( GetEntitySystem()->aEntityCount > 2 )
+				if ( GetEntitySystem()->GetEntityCount() > 2 )
 				{
 					while ( protoLook.aLookTarget == 0 || protoLook.aLookTarget == proto )
-						protoLook.aLookTarget = RandomInt( 0, GetEntitySystem()->aEntityCount - 1 );
+						protoLook.aLookTarget = RandomInt( 0, GetEntitySystem()->GetEntityCount() - 1 );
 				}
 			}
 			else
@@ -665,8 +665,6 @@ void TEST_SV_UpdateProtos( float frameTime )
 		}
 
 		auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
-
-		Assert( protoTransform );
 
 		// glm::length( renderable->aModelMatrix ) == 0.f
 

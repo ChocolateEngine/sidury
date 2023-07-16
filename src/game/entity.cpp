@@ -338,9 +338,7 @@ std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNe
 
 void EntComp_AddRegisterCallback( EntitySystem* spSystem )
 {
-	AssertMsg( spSystem, "Trying to register nullptr for a Entity Component Register Callback\n" );
-
-	if ( !spSystem )
+	if ( CH_IF_ASSERT_MSG( spSystem, "Trying to register nullptr for a Entity Component Register Callback\n" ) )
 	{
 		Log_Warn( gLC_Entity, "Trying to register nullptr for a Entity Component Register Callback\n" );
 		return;
@@ -447,7 +445,6 @@ bool EntitySystem::Init()
 {
 	PROF_SCOPE();
 
-	aEntityCount = 0;
 	aEntityPool.clear();
 	aComponentPools.clear();
 	aEntityIDConvert.clear();
@@ -507,7 +504,6 @@ void EntitySystem::Shutdown()
 		delete pool;
 	}
 
-	aEntityCount = 0;
 	aEntityPool.clear();
 	aComponentPools.clear();
 	aEntityIDConvert.clear();
@@ -624,14 +620,16 @@ Entity EntitySystem::CreateEntity( bool sLocal )
 {
 	PROF_SCOPE();
 
-	CH_ASSERT_MSG( aEntityCount < CH_MAX_ENTITIES, "Hit Entity Limit!" );
+	if ( CH_IF_ASSERT_MSG( GetEntityCount() < CH_MAX_ENTITIES, "Hit Entity Limit!" ) )
+		return CH_ENT_INVALID;
+	
+	CH_ASSERT_MSG( GetEntityCount() + aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
 
 	// Take an ID from the front of the queue
 	// Entity id = aEntityPool.front();
 	Entity id = aEntityPool.back();
 	// aEntityPool.pop();
 	aEntityPool.pop_back();
-	++aEntityCount;
 
 	// SANITY CHECK
 	CH_ASSERT( !EntityExists( id ) );
@@ -655,11 +653,13 @@ void EntitySystem::DeleteEntity( Entity sEntity )
 
 	CH_ASSERT_MSG( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
 
+	CH_ASSERT_MSG( GetEntityCount() + aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
+
 	aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
 	Log_DevF( gLC_Entity, 2, "%s - Marked Entity to be Destroyed: %zd\n", aIsClient ? "CLIENT" : "SERVER", sEntity );
 
 	// Get all children attached to this entity
-	std::set< Entity > children;
+	ChVector< Entity > children;
 	GetChildrenRecurse( sEntity, children );
 
 	// Mark all of them as destroyed
@@ -712,7 +712,6 @@ void EntitySystem::DeleteQueuedEntities()
 		// aEntityPool.push( ent );
 		// aEntityPool.push_back( ent );
 		aEntityPool.insert( aEntityPool.begin(), entity );
-		--aEntityCount;
 
 		aEntityFlags.erase( entity );
 
@@ -723,7 +722,7 @@ void EntitySystem::DeleteQueuedEntities()
 
 Entity EntitySystem::GetEntityCount()
 {
-	return aEntityCount;
+	return aEntityFlags.size();
 }
 
 
@@ -794,7 +793,7 @@ Entity EntitySystem::GetRootParent( Entity sSelf )
 
 
 // Recursively get all entities attached to this one (SLOW)
-void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChildren )
+void EntitySystem::GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren )
 {
 	PROF_SCOPE();
 
@@ -807,7 +806,7 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, std::set< Entity >& srChi
 
 		if ( otherParent == sEntity )
 		{
-			srChildren.emplace( otherEntity );
+			srChildren.push_back( otherEntity );
 			GetChildrenRecurse( otherEntity, srChildren );
 		}
 	}
@@ -956,13 +955,10 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 {
 	PROF_SCOPE();
 
-	Assert( aEntityCount == aEntityFlags.size() );
+	Assert( GetEntityCount() == aEntityFlags.size() );
 
-	//std::vector< NetMsg_EntityUpdateBuilder > updateBuilderList;
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
-
-	//updateBuilderList.reserve( aEntityCount );
-	updateOut.reserve( aEntityCount );
+	updateOut.reserve( GetEntityCount() );
 
 	for ( auto& [ entity, flags ] : aEntityFlags )
 	{
@@ -1736,19 +1732,18 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 		std::string_view componentName = componentUpdate->name()->string_view();
 
-		CH_PROF_ZONE_NAME_STR( componentName );
-
 		EntityComponentPool* pool = GetComponentPool( componentName );
 
-		AssertMsg( pool, "Failed to find component pool" );
-
-		if ( !pool )
+		if ( CH_IF_ASSERT_MSG( pool, "Failed to find component pool" ) )
 		{
 			Log_ErrorF( "Failed to find component pool for component: \"%s\"\n", componentName.data() );
 			continue;
 		}
 
-		EntComponentData_t* regData = pool->GetRegistryData();
+		CH_PROF_ZONE_NAME_STR( componentName );
+
+		IEntityComponentSystem* system  = pool->apComponentSystem;
+		EntComponentData_t*     regData = pool->GetRegistryData();
 
 		AssertMsg( regData, "Failed to find component registry data" );
 
@@ -1758,8 +1753,6 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				componentName.data(), componentUpdate->hash(), regData->aHash );
 			continue;
 		}
-
-		IEntityComponentSystem* system = pool->apComponentSystem;
 
 		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
 		{
@@ -2101,7 +2094,7 @@ Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
 		}
 
 		if ( ent_show_translations.GetBool() )
-			Log_DevF( gLC_Entity, 2, "Translating Entity ID %zd -> %zd\n", sEntity, it->second );
+			Log_DevF( gLC_Entity, 3, "Translating Entity ID %zd -> %zd\n", sEntity, it->second );
 
 		return it->second;
 	}
@@ -2135,7 +2128,7 @@ CONCMD( ent_dump_registry )
 {
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->GetEntityCount() );
 	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
 	for ( const auto& [ name, regData ] : GetEntComponentRegistry().aComponentNames )
@@ -2176,7 +2169,7 @@ CONCMD( ent_dump )
 
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->aEntityCount );
+	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->GetEntityCount() );
 
 	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
