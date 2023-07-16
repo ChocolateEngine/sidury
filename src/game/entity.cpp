@@ -1123,7 +1123,7 @@ EntityComponentPool* EntitySystem::GetComponentPool( std::string_view spName )
 	auto it = aComponentPools.find( spName );
 
 	if ( it == aComponentPools.end() )
-		Log_FatalF( gLC_Entity, "Component not registered before use: \"%s\"\n", spName );
+		Log_FatalF( gLC_Entity, "Component not registered before use: \"%s\"\n", spName.data() );
 
 	return it->second;
 }
