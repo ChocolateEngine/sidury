@@ -620,6 +620,7 @@ class EntityComponentPool
 	std::vector < ComponentID_t >                    aComponentIDs;
 
 	std::forward_list< ComponentID_t >               aNewComponents;
+	std::forward_list< ComponentID_t >               aComponentsUpdated;
 
 	// Component Name
 	const char*                                      apName;

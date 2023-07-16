@@ -957,7 +957,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 				if ( system )
 				{
-					system->ComponentUpdated( entity, componentData );
+					pool->aComponentsUpdated.push_front( componentID );
 				}
 			}
 		}

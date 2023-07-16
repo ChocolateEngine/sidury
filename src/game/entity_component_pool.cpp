@@ -322,20 +322,26 @@ void EntityComponentPool::InitCreatedComponents()
 {
 	PROF_SCOPE();
 
-	if ( aNewComponents.empty() )
+	if ( !apComponentSystem )
+	{
+		aNewComponents.clear();
+		aComponentsUpdated.clear();
 		return;
+	}
 
 	for ( ComponentID_t id : aNewComponents )
 	{
 		aComponentFlags[ id ] &= ~EEntityFlag_Created;
+		apComponentSystem->ComponentAdded( aMapComponentToEntity.at( id ), aComponents.at( id.aIndex ) );
+	}
 
-		if ( apComponentSystem )
-		{
-			apComponentSystem->ComponentAdded( aMapComponentToEntity.at( id ), aComponents.at( id.aIndex ) );
-		}
+	for ( ComponentID_t id : aComponentsUpdated )
+	{
+		apComponentSystem->ComponentUpdated( aMapComponentToEntity.at( id ), aComponents.at( id.aIndex ) );
 	}
 
 	aNewComponents.clear();
+	aComponentsUpdated.clear();
 }
 
 
