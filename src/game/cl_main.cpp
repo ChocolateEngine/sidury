@@ -919,6 +919,16 @@ void CL_GetServerMessages()
 				break;
 			}
 
+			case EMsgSrc_Server_Paused:
+			{
+				if ( auto msg = CL_ReadMsg< NetMsg_Paused >( msgType, msgDataVerify, msgData ) )
+				{
+					Game_SetPaused( msg->paused() );
+					audio->SetPaused( msg->paused() );
+				}
+				break;
+			}
+
 			default:
 				Log_WarnF( gLC_Client, "Unknown Message Type from Server: %s\n", SV_MsgToString( msgType ) );
 				break;
