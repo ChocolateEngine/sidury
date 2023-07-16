@@ -221,13 +221,8 @@ void Game_UpdateGame( float frameTime )
 
 	Input_Update();
 
-	Game_CheckPaused();
-
 	if ( gPaused )
 	{
-		//ResetInputs(  );
-		//players->Update( 0.f );
-		//return;
 		gFrameTime = 0.f;
 	}
 
@@ -240,8 +235,6 @@ void Game_UpdateGame( float frameTime )
 
 	// when do i call these lol
 	CL_Update( gFrameTime );
-
-	Game_SetupModels( gFrameTime );
 }
 
 
@@ -254,35 +247,6 @@ void Game_SetPaused( bool paused )
 bool Game_IsPaused()
 {
 	return gPaused;
-}
-
-
-void Game_CheckPaused()
-{
-	// TODO: reenable this for when in single player, or we allow server pausing
-#if 0
-	bool wasPaused = gPaused;
-	gPaused = gui->IsConsoleShown();
-
-	if ( wasPaused != gPaused )
-	{
-		SDL_SetRelativeMouseMode( (SDL_bool)!gPaused );
-
-		if ( gPaused )
-		{
-			CenterMouseOnScreen();
-		}
-	}
-
-	audio->SetPaused( gPaused );
-#endif
-}
-
-
-// will be used in the future for when updating bones and stuff
-void Game_SetupModels( float frameTime )
-{
-	PROF_SCOPE();
 }
 
 

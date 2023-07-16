@@ -20,6 +20,7 @@ const glm::vec3 vec3_up(0, 0, 1);
 
 #include "game_physics.h"
 #include "entity.h"
+#include "game_rules.h"
 
 class IGuiSystem;
 class IRender;
@@ -55,15 +56,12 @@ bool         Game_InMap();
 
 void         Game_SetPaused( bool paused );
 bool         Game_IsPaused();
-void         Game_CheckPaused();
 
 bool         Game_Init();
 void         Game_Shutdown();
 
 void         Game_Update( float frameTime );
 void         Game_UpdateGame( float frameTime );  // epic name
-
-void         Game_SetupModels( float frameTime );
 
 void         Game_HandleSystemEvents();
 
