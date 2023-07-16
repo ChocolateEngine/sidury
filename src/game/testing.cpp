@@ -40,6 +40,27 @@ std::vector< Entity >         gAudioTestEntities{};
 ConVar                        snd_cube_scale( "snd_cube_scale", "0.05" );
 
 
+CONCMD( help_quick )
+{
+	Log_Msg(
+	  "convars/commands you can mess around with:\n"
+	  "\tcl_username - your username, steam username will override this if the steam dll is compiled and steam is running, can be turned off though\n"
+	  "\tsnd_test - pass in a path to an ogg to create an entity playing that sound where the player was\n"
+	  "\tcreate_proto\n"
+	  "\tcreate_look_entity - pass in a model path\n"
+	  "\tmap - load a map\n"
+	  "\tmap_save - save a map to a file\n"
+	  "\ttool_ent_editor - entity editor\n"
+	  "\ttool_light_editor - light editor - will be removed soon when fully merged into entity editor\n"
+	  "\tm_sensitivity - change mouse sensitivity\n"
+	  "\tbind - bind a key to a command or input convar\n"
+	  "\tskybox_set - set the skybox material by path, only works if the material is using the skybox shader\n"
+	  "\tsnd_* - sound commands\n"
+	  "\tr_debug_draw - globally enables debug drawing, check out the other r_debug_* convars\n"
+	);
+}
+
+
 // Was for an old multithreading test
 #if 0
 struct ProtoLookData_t
