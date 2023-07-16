@@ -9,6 +9,8 @@
 #include "testing.h"
 #include "igui.h"
 
+#include <unordered_set>
+
 //
 // The Server, only runs if the engine is a dedicated server, or hosting on the client
 //
@@ -46,7 +48,7 @@ CONVAR_CMD_EX( sv_max_clients, 32, CVARF_SERVER, "Max Clients the Server Allows"
 	}
 }
 
-static std::set< ConVarBase* > gReplicatedCmds;
+static std::unordered_set< ConVarBase* > gReplicatedCmds;
 
 bool CvarFReplicatedCallback( ConVarBase* spBase, const std::vector< std::string >& args )
 {
@@ -731,10 +733,7 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 
 	auto msgData = spMessage->data();
 
-	Assert( msgData );
-	Assert( msgData->size() );
-
-	if ( !msgData || !msgData->size() )
+	if ( CH_IF_ASSERT( msgData && msgData->size() ) )
 	{
 		Log_ErrorF( gLC_Server, "Invalid Message with no data attached - %s\n", CL_MsgToString( msgType ) );
 		return;
@@ -759,7 +758,7 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 
 					if ( playerInfo == nullptr )
 					{
-						Log_MsgF( gLC_Server, "Failed to Connect Client - Failed to create a playerInfo component: \"%s\"\n", Net_AddrToString( srClient.aAddr ) );
+						Log_ErrorF( gLC_Server, "Failed to Connect Client - Failed to create a playerInfo component: \"%s\"\n", Net_AddrToString( srClient.aAddr ) );
 						GetEntitySystem()->DeleteEntity( srClient.aEntity );
 						srClient.aState = ESV_ClientState_Disconnected;
 						return;
