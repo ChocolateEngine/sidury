@@ -20,6 +20,7 @@ enum class PlayerMoveType;
 EXT_CVAR_FLAG( CVARF_CL_EXEC );
 EXT_CVAR_FLAG( CVARF_SV_EXEC );
 
+#define CVARF_CHEAT CVARF( CHEAT )
 
 enum ECommandSource
 {

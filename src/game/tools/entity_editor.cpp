@@ -354,7 +354,7 @@ void EntEditor_DrawEntityData()
 					if ( EntEditor_DrawComponentVarUI( dataOffset, varData ) && system )
 					{
 						// Mark variable as dirty
-						if ( varData.aIsNetVar )
+						if ( varData.aFlags & ECompRegFlag_IsNetVar )
 						{
 							char* dataChar = static_cast< char* >( compData );
 							bool* isDirty  = reinterpret_cast< bool* >( dataChar + varData.aSize + varOffset );

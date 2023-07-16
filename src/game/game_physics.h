@@ -41,6 +41,16 @@ struct CPhysShape
 };
 
 
+struct CPhysObjectEvent_ContactStart
+{
+};
+
+
+struct CPhysObjectEvent_TransformUpdated
+{
+};
+
+
 struct CPhysObject
 {
 	ComponentNetVar< bool >               aStartActive        = false;

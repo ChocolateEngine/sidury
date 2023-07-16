@@ -30,14 +30,14 @@ EntSys_Sound* GetSoundSystem()
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CSound, sound, true, EEntComponentNetType_Both, true )
+CH_STRUCT_REGISTER_COMPONENT( CSound, sound, EEntComponentNetType_Both, ECompRegFlag_None )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVolume, volume, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aFalloff, falloff, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aRadius, radius, true );
-	//CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVelocity, velocity, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartPlayback, startPlayback, true );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVolume, volume, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aFalloff, falloff, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aRadius, radius, ECompRegFlag_None );
+	//CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVelocity, velocity, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartPlayback, startPlayback, ECompRegFlag_None );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_Sound, gEntSys_SoundSystem );
 }

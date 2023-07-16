@@ -344,7 +344,7 @@ CONCMD_VA( create_phys_ent, CVARF( CL_EXEC ) )
 
 void TEST_Init()
 {
-	CH_REGISTER_COMPONENT( CProtogen, protogen, false, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_FL( CProtogen, protogen, EEntComponentNetType_Both, ECompRegFlag_DontOverrideClient );
 	CH_REGISTER_COMPONENT_SYS( CProtogen, ProtogenSystem, gProtoSystems );
 
 	if ( IsSteamLoaded() )

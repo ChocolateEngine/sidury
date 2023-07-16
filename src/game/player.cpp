@@ -240,35 +240,35 @@ PlayerManager::~PlayerManager()
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, true, EEntComponentNetType_Both, false )
+CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, EEntComponentNetType_Both, ECompRegFlag_DontSaveToMap )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, EPlayerMoveType, aMoveType, moveType, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPlayerFlags, playerFlags, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, EPlayerMoveType, aMoveType, moveType, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPlayerFlags, playerFlags, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, ECompRegFlag_DontSaveToMap );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxSpeed, maxSpeed, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxSpeed, maxSpeed, ECompRegFlag_DontSaveToMap );
 
 	// View Bobbing
 	//CH_REGISTER_COMPONENT_VAR( EEntNetField_Float, float, aWalkTime, walkTime, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aBobOffsetAmount, bobOffsetAmount, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewTilt, prevViewTilt, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aBobOffsetAmount, bobOffsetAmount, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewTilt, prevViewTilt, ECompRegFlag_DontSaveToMap );
 
 	// Smooth Land
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandPower, landPower, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandTime, landTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandPower, landPower, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandTime, landTime, ECompRegFlag_DontSaveToMap );
 
 	// Smooth Duck
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewHeight, prevViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aTargetViewHeight, targetViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOutViewHeight, outViewHeight, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckDuration, duckDuration, false );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewHeight, prevViewHeight, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aTargetViewHeight, targetViewHeight, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOutViewHeight, outViewHeight, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckDuration, duckDuration, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, ECompRegFlag_DontSaveToMap );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, false );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, ECompRegFlag_DontSaveToMap );
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetType_Both, true )
+CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Both, ECompRegFlag_None )
 {
 	CH_REGISTER_COMPONENT_SYS2( PlayerSpawnManager, playerSpawn );
 }
@@ -276,20 +276,20 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, true, EEntComponentNetT
 
 void PlayerManager::RegisterComponents()
 {
-	CH_REGISTER_COMPONENT( CPlayerInfo, playerInfo, true, EEntComponentNetType_Both, false );
+	CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_DontSaveToMap );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, false );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, false );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, false );  // don't mess with this
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_DontSaveToMap );  // don't mess with this
 
-	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, false, false );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, false );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov, false );
+	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, ECompRegFlag_DontSaveToMap | ECompRegFlag_DontOverrideClient );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov, ECompRegFlag_DontSaveToMap );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed, false );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed, ECompRegFlag_DontSaveToMap );
 
 	// GetEntitySystem()->RegisterComponent< Model* >();
 	// GetEntitySystem()->RegisterComponent< Model >();

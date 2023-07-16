@@ -1019,7 +1019,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 
 	for ( const auto& [ offset, var ] : spRegData->aVars )
 	{
-		if ( !var.aIsNetVar )
+		if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
 		{
 			curOffset += var.aSize + offset;
 			continue;
@@ -1213,7 +1213,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 	for ( const auto& [ offset, var ] : spRegData->aVars )
 	{
-		if ( !var.aIsNetVar )
+		if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
 			continue;
 
 		PROF_SCOPE();
@@ -1224,7 +1224,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 			// Make the var is allowed to be saved to the map
 			if ( sSavingMap )
 			{
-				if ( !var.aSaveToMap )
+				if ( !( var.aFlags & ECompRegFlag_DontSaveToMap ) )
 				{
 					srBuilder.Bool( false );
 					return false;
@@ -1545,7 +1545,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			{
 				shouldSkipComponent |= compFlags & EEntityFlag_DontSaveToMap;
 				shouldSkipComponent |= !CanSaveToMap( entity );
-				shouldSkipComponent |= !regData->aSaveToMap;
+				shouldSkipComponent |= regData->aFlags & ECompRegFlag_DontSaveToMap;
 			}
 			else
 			{
@@ -1614,7 +1614,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			{
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
-					if ( !var.aIsNetVar )
+					if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
 						continue;
 
 					char* dataChar = static_cast< char* >( data );
@@ -1699,7 +1699,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 			// Reset Component Var Dirty Values
 			for ( const auto& [ offset, var ] : regData->aVars )
 			{
-				if ( !var.aIsNetVar )
+				if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
 					continue;
 
 				char* dataChar = static_cast< char* >( componentData );
@@ -1811,7 +1811,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 
 			// Now, update component data
 			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
-			if ( !regData->aOverrideClient && entity == gLocalPlayer )
+			if ( ( regData->aFlags & ECompRegFlag_DontOverrideClient ) && entity == gLocalPlayer )
 				continue;
 
 			// a bit of a hack and not implemented properly
@@ -2139,7 +2139,7 @@ CONCMD( ent_dump_registry )
 			continue;
 
 		Log_GroupF( group, "\nComponent: %s\n", regData->apName );
-		Log_GroupF( group, "   Override Client: %s\n", regData->aOverrideClient ? "TRUE" : "FALSE" );
+		Log_GroupF( group, "   Override Client: %s\n", ( regData->aFlags & ECompRegFlag_DontOverrideClient ) ? "TRUE" : "FALSE" );
 		Log_GroupF( group, "   Networking Type: %s\n", EntComp_NetTypeToStr( regData->aNetType ) );
 		Log_GroupF( group, "   Variable Count:  %zd\n", regData->aVars.size() );
 

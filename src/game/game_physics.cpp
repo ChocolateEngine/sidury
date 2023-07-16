@@ -65,11 +65,11 @@ static std::unordered_map< Handle, Handle >       gPhysRenderables;
 // }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
+CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, EEntComponentNetType_Both, ECompRegFlag_None )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysShapeType, aShapeType, shapeType, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aBounds, bounds, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysShapeType, aShapeType, shapeType, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_StdString, std::string, aPath, path, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aBounds, bounds, ECompRegFlag_None );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysShape, gEntSys_PhysShape );
 
@@ -81,26 +81,69 @@ CH_STRUCT_REGISTER_COMPONENT( CPhysShape, physShape, true, EEntComponentNetType_
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
+struct CPlayerUse_Event_t
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartActive, startActive, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aAllowSleeping, allowSleeping, CH_ENT_SAVE_TO_MAP );
+	glm::vec3 aPos;
+	glm::vec3 aAng;
+};
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxLinearVelocity, maxLinearVelocity, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxAngularVelocity, maxAngularVelocity, CH_ENT_SAVE_TO_MAP );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysMotionType, aMotionType, motionType, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysMotionQuality, aMotionQuality, motionQuality, CH_ENT_SAVE_TO_MAP );
+CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, EEntComponentNetType_Both, ECompRegFlag_None )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartActive, startActive, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aAllowSleeping, allowSleeping, ECompRegFlag_None );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aIsSensor, isSensor, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxLinearVelocity, maxLinearVelocity, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxAngularVelocity, maxAngularVelocity, ECompRegFlag_None );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aCustomMass, customMass, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMass, mass, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysMotionType, aMotionType, motionType, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, PhysMotionQuality, aMotionQuality, motionQuality, ECompRegFlag_None );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aGravity, gravity, CH_ENT_SAVE_TO_MAP );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, EPhysTransformMode, aTransformMode, transformMode, CH_ENT_SAVE_TO_MAP );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aIsSensor, isSensor, ECompRegFlag_None );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aCustomMass, customMass, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMass, mass, ECompRegFlag_None );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aGravity, gravity, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, EPhysTransformMode, aTransformMode, transformMode, ECompRegFlag_None );
 
 	CH_REGISTER_COMPONENT_SYS2( EntSys_PhysObject, gEntSys_PhysObject );
+
+
+
+	// Events
+	// CH_REGISTER_COMPONENT_EVENT( CPhysObjectEvent_ContactStart, ContactStart );
+	// CH_REGISTER_COMPONENT_EVENT( CPhysObjectEvent_TransformUpdated, TransformUpdated );
+	// 
+	// CH_REGISTER_COMPONENT_EVENT( CPlayerUse_Event_t, Use );
+	// 
+	// // example
+	// CPhysObjectEvent_OnContactStart onContactStartData{};
+	// GetEntitySystem()->FireEvent( physObject, "ContactStart", onContactStartData );
+	// 
+	// // Event Firing Example
+	// CPlayerUse_Event_t* onUseEvent = new CPlayerUse_Event_t;
+	// onUseEvent->aPos               = PLAYER_VIEW_POS;
+	// onUseEvent->aAng               = PLAYER_VIEW_ANG;
+	// 
+	// GetEntitySystem()->FireEvent( playerEntity, "playerUse", "Use", onUseEvent );
+	// 
+	// // somewhere else (thinking of having the component name here to avoid event name clashing)
+	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "ContactStart", CallbackFunction );
+	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction2 );
+	// 
+	// 
+	// // On a renderable component
+	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction );
+	// 
+	// // On a physics component - pass in CH_ENT_INVALID to listen for this event on all entities
+	// GetEntitySystem()->AddEventListener( CH_ENT_INVALID, "playerUse", "Use", CallbackFunction );
+
+	
+
+	// GameRules()->SetBool( "canSpawnNPCs", true );
+	// 
+	// bool canSpawnNPCs = GameRules()->GetBool( "canSpawnNPCs" );
 }
 
 

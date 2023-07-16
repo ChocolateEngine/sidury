@@ -29,7 +29,7 @@ SuitSystem* GetSuitEntSys()
 	return gSuitEntSystems[ i ];
 }
 
-CH_STRUCT_REGISTER_COMPONENT( CSuit, suit, true, EEntComponentNetType_Both, CH_ENT_SAVE_TO_MAP )
+CH_STRUCT_REGISTER_COMPONENT( CSuit, suit, EEntComponentNetType_Both, ECompRegFlag_None )
 {
 	CH_REGISTER_COMPONENT_SYS2( SuitSystem, gSuitEntSystems );
 }
