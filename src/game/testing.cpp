@@ -35,7 +35,8 @@ extern Entity                 gLocalPlayer;
 Handle                        hAudioMusic = InvalidHandle;
 
 // testing
-std::vector< Entity >         gAudioTestEntities{};
+std::vector< Entity >         gAudioTestEntitiesCl{};
+std::vector< Entity >         gAudioTestEntitiesSv{};
 
 ConVar                        snd_cube_scale( "snd_cube_scale", "0.05" );
 
@@ -802,7 +803,7 @@ CONVAR( snd_test_falloff, 1.f );
 constexpr const char* SND_TEST_PATH = "sound/fiery_no_ext.ogg";
 
 
-CONCMD( snd_test )
+static void cmd_sound_test( const std::string& srPath, bool sServer )
 {
 	if ( !audio )
 		return;
@@ -810,20 +811,23 @@ CONCMD( snd_test )
 	if ( !GetEntitySystem() )
 		return;
 
-	Handle soundHandle = audio->OpenSound( args.size() ? args[ 0 ] : SND_TEST_PATH );
+	Handle soundHandle = audio->OpenSound( srPath );
 
 	if ( soundHandle == CH_INVALID_HANDLE )
 		return;
 
-	Entity soundEnt = GetEntitySystem()->CreateEntity( true );
+	Entity soundEnt = GetEntitySystem()->CreateEntity( !sServer );
 
 	if ( soundEnt == CH_ENT_INVALID )
 	{
 		Log_Error( "Failed to create sound test entity\n" );
 		return;
 	}
-	
-	gAudioTestEntities.push_back( soundEnt );
+
+	if ( sServer )
+		gAudioTestEntitiesSv.push_back( soundEnt );
+	else
+		gAudioTestEntitiesCl.push_back( soundEnt );
 
 	auto transform           = Ent_AddComponent< CTransform >( soundEnt, "transform" );
 	auto sound               = Ent_AddComponent< CSound >( soundEnt, "sound" );
@@ -836,7 +840,7 @@ CONCMD( snd_test )
 	// purely debugging
 	transform->aScale.Edit() = { 20.f, 20.f, 20.f };
 
-	sound->aPath             = args.size() ? args[ 0 ] : SND_TEST_PATH;
+	sound->aPath             = srPath;
 	sound->aVolume           = snd_test_vol.GetFloat();
 	sound->aFalloff          = snd_test_falloff.GetFloat();
 	sound->aStartPlayback    = true;
@@ -846,12 +850,27 @@ CONCMD( snd_test )
 }
 
 
-CONCMD( snd_test_clear )
+CONCMD( snd_test_cl )
+{
+	cmd_sound_test( args.size() ? args[ 0 ] : SND_TEST_PATH, false );
+}
+
+
+CONCMD_VA( snd_test_sv, CVARF( CL_EXEC ) )
+{
+	if ( CL_SendConVarIfClient( "snd_test_sv", args ) )
+		return;
+
+	cmd_sound_test( args.size() ? args[ 0 ] : SND_TEST_PATH, true );
+}
+
+
+CONCMD( snd_test_cl_clear )
 {
 	if ( !audio )
 		return;
 
-	for ( Entity entity : gAudioTestEntities )
+	for ( Entity entity : gAudioTestEntitiesCl )
 	{
 		CSound* sound = Ent_GetComponent< CSound >( entity, "sound" );
 
@@ -866,6 +885,33 @@ CONCMD( snd_test_clear )
 		GetEntitySystem()->DeleteEntity( entity );
 	}
 
-	gAudioTestEntities.clear();
+	gAudioTestEntitiesCl.clear();
+}
+
+
+CONCMD_VA( snd_test_sv_clear, CVARF( CL_EXEC ) )
+{
+	if ( CL_SendConVarIfClient( "snd_test_sv_clear", args ) )
+		return;
+
+	if ( !audio )
+		return;
+
+	for ( Entity entity : gAudioTestEntitiesSv )
+	{
+		CSound* sound = Ent_GetComponent< CSound >( entity, "sound" );
+
+		if ( sound )
+		{
+			if ( audio->IsValid( sound->aHandle ) )
+			{
+				audio->FreeSound( sound->aHandle );
+			}
+		}
+
+		GetEntitySystem()->DeleteEntity( entity );
+	}
+
+	gAudioTestEntitiesSv.clear();
 }
 

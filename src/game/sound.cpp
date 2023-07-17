@@ -36,6 +36,7 @@ CH_STRUCT_REGISTER_COMPONENT( CSound, sound, EEntComponentNetType_Both, ECompReg
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVolume, volume, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aFalloff, falloff, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aRadius, radius, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U32, u32, aEffects, effects, ECompRegFlag_None );
 	//CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aVelocity, velocity, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Bool, bool, aStartPlayback, startPlayback, ECompRegFlag_None );
 

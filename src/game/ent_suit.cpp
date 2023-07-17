@@ -10,6 +10,7 @@ SuitSystem::SuitSystem()
 {
 }
 
+
 void SuitSystem::ComponentAdded( Entity sEntity, void* spData )
 {
 	CSuit* suit = ch_pointer_cast< CSuit >( spData ); // boolshit
@@ -34,6 +35,22 @@ void SuitSystem::ComponentAdded( Entity sEntity, void* spData )
 		}
 	}
 }
+
+
+void SuitSystem::ComponentRemoved( Entity sEntity, void* spData )
+{
+	CSuit* suit = ch_pointer_cast< CSuit >( spData ); // boolshit
+
+	if ( Game_ProcessingClient() )
+	{
+		if ( suit->aLogonSound != CH_INVALID_HANDLE && audio->IsValid( suit->aLogonSound ) )
+		{
+			audio->FreeSound( suit->aLogonSound );
+			suit->aLogonSound = CH_INVALID_HANDLE;
+		}
+	}
+}
+
 
 void SuitSystem::Update()
 {
@@ -64,12 +81,14 @@ void SuitSystem::Update()
 	}
 }
 
+
 SuitSystem* GetSuitEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
 	Assert( gSuitEntSystems[ i ] );
 	return gSuitEntSystems[ i ];
 }
+
 
 CH_STRUCT_REGISTER_COMPONENT( CSuit, suit, EEntComponentNetType_Both, ECompRegFlag_None )
 {

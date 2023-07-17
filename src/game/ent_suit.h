@@ -15,6 +15,7 @@ public:
 	~SuitSystem() {}
 
 	void ComponentAdded( Entity sEntity, void* spData ) override; // Only some will know
+	void ComponentRemoved( Entity sEntity, void* spData ) override;
 	void Update() override;
 };
 
