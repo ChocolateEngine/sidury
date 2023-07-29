@@ -20,11 +20,17 @@ constexpr EShaderFlags      gShaderFlags =
   EShaderFlags_Lights;
 
 
+bool gArgPCF = Args_Register( "Enable PCF Shadow Filtering", "-pcf" );
+
+
 struct Basic3D_Push
 {
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
 	alignas( 16 ) int aMaterial = 0;         // material index
 	int aProjView = 0;         // projection * view index
+
+	// Hack for GTX 1050 Ti until I figure this out properly
+	bool aPCF = false;
 
 	// debugging
 	int aDebugDraw;
@@ -73,7 +79,7 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	// IDEA: since materials shouldn't be updated very often,
 	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
 
-	Handle newBuffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
+	Handle newBuffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( newBuffer == InvalidHandle )
 	{
@@ -90,7 +96,7 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 0 ] );
 	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 1 ] );
 
-	update.aType = EDescriptorType_UniformBuffer;
+	update.aType = EDescriptorType_StorageBuffer;
 
 	int i = 0;
 	for ( auto& [ mat, buffer ] : gMaterialBuffers )
@@ -141,11 +147,11 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	mat->aAlphaTest    = Mat_GetBool( sMat, "alphaTest" );
 
 	if ( !gStagingBuffer )
-		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
+		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Storage | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	if ( gStagingBuffer == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to Create Staging Material Uniform Buffer\n" );
+		Log_Error( gLC_ClientGraphics, "Failed to Create Staging Material Storage Buffer\n" );
 		return;
 	}
 
@@ -223,6 +229,7 @@ static void Shader_Basic3D_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw
 
 	Basic3D_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix  = spModelDraw->aModelMatrix;
+	push.aPCF          = gArgPCF;
 
 	Handle mat         = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 	// push.aMaterial     = std::distance( std::begin( gMaterialBuffers ), gMaterialBuffers.find( mat ) );

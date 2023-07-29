@@ -98,7 +98,7 @@ enum : ELightType
 	ELightType_Directional,  // World
 	ELightType_Point,
 	ELightType_Cone,
-	ELightType_Capsule,
+	// ELightType_Capsule,
 	ELightType_Count,
 };
 

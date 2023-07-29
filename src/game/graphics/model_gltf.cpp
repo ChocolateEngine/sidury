@@ -65,23 +65,23 @@ static std::string GetBaseDir( const std::string &srPath )
 }
 
 
-constexpr const char* gDefaultShader       = "basic_3d";
+constexpr const char*   gDefaultShader       = "basic_3d";
 
-static std::string MatVar_Diffuse       = "diffuse";
-static std::string MatVar_Emissive      = "emissive";
-static std::string MatVar_EmissivePower = "emissive_power";
-static std::string MatVar_Normal        = "normal";
+static std::string_view MatVar_Diffuse       = "diffuse";
+static std::string_view MatVar_Emissive      = "emissive";
+static std::string_view MatVar_EmissivePower = "emissive_power";
+static std::string_view MatVar_Normal        = "normal";
 
 
 // lazy string comparisons lol
-static std::string Attrib_Position  = "POSITION";
-static std::string Attrib_Normal    = "NORMAL";
-static std::string Attrib_Tangent   = "TANGENT";
+static std::string_view Attrib_Position      = "POSITION";
+static std::string_view Attrib_Normal        = "NORMAL";
+static std::string_view Attrib_Tangent       = "TANGENT";
 
-static std::string Attrib_TexCoord0 = "TEXCOORD_0";
-static std::string Attrib_Color0    = "COLOR_0";
-static std::string Attrib_Joints0   = "JOINTS_0";
-static std::string Attrib_Weights0  = "WEIGHTS_0";
+static std::string_view Attrib_TexCoord0     = "TEXCOORD_0";
+static std::string_view Attrib_Color0        = "COLOR_0";
+static std::string_view Attrib_Joints0       = "JOINTS_0";
+static std::string_view Attrib_Weights0      = "WEIGHTS_0";
 
 
 static void* GetBufferData( cgltf_accessor* accessor )
@@ -247,7 +247,7 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			createData.aFilter = EImageFilter_Linear;
 
 			// auto SetTexture = [&]( const std::string& param, const std::string &texname )
-			auto SetTexture = [&]( const std::string& param, cgltf_texture* texture )
+			auto SetTexture = [&]( std::string_view param, cgltf_texture* texture )
 			{
 				if ( !texture || !texture->image || !texture->image->uri )
 					return;
@@ -261,7 +261,7 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 				else
 					render->LoadTexture( handle, texName, createData );
 
-				Mat_SetVar( material, param, handle );
+				Mat_SetVar( material, param.data(), handle );
 			};
 
 			if ( gltfMat.has_pbr_metallic_roughness )
@@ -271,7 +271,7 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			SetTexture( MatVar_Normal,   gltfMat.normal_texture.texture );
 
 			if ( gltfMat.has_emissive_strength )
-				Mat_SetVar( material, MatVar_EmissivePower, gltfMat.emissive_strength.emissive_strength );
+				Mat_SetVar( material, MatVar_EmissivePower.data(), gltfMat.emissive_strength.emissive_strength );
 		}
 
 		meshBuilder.SetCurrentSurface( i );

@@ -640,7 +640,7 @@ bool Graphics_CreateVariableUniformLayout( UniformBufferArray_t& srBuffer, const
 {
 	CreateVariableDescLayout_t createLayout{};
 	createLayout.apName   = spLayoutName;
-	createLayout.aType    = EDescriptorType_UniformBuffer;
+	createLayout.aType    = EDescriptorType_StorageBuffer;
 	createLayout.aStages  = ShaderStage_Vertex | ShaderStage_Fragment;
 	createLayout.aBinding = 0;
 	createLayout.aCount   = sCount;
@@ -674,7 +674,7 @@ bool Graphics_CreateUniformBuffers( UniformBufferArray_t& srUniform, std::vector
 	// create buffers for it
 	for ( size_t i = 0; i < srBuffers.size(); i++ )
 	{
-		Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
+		Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Storage, EBufferMemory_Host );
 
 		if ( buffer == InvalidHandle )
 		{
@@ -691,7 +691,7 @@ bool Graphics_CreateUniformBuffers( UniformBufferArray_t& srUniform, std::vector
 	for ( size_t i = 0; i < srUniform.aSets.size(); i++ )
 		update.aDescSets.push_back( srUniform.aSets[ i ] );
 
-	update.aType    = EDescriptorType_UniformBuffer;
+	update.aType    = EDescriptorType_StorageBuffer;
 	update.aBuffers = srBuffers;
 	render->UpdateVariableDescSet( update );
 
@@ -718,7 +718,7 @@ bool Graphics_CreateDescriptorSets()
 		// (NOTE: not changing this from a std::vector cause you could use this for multiple views in the future probably)
 		for ( u32 i = 0; i < gViewInfoBuffers.size(); i++ )
 		{
-			Handle buffer = render->CreateBuffer( "View Info Buffer", sizeof( UBO_ViewInfo_t ), EBufferFlags_Uniform, EBufferMemory_Host );
+			Handle buffer = render->CreateBuffer( "View Info Buffer", sizeof( UBO_ViewInfo_t ), EBufferFlags_Storage, EBufferMemory_Host );
 
 			if ( buffer == InvalidHandle )
 			{
@@ -736,7 +736,7 @@ bool Graphics_CreateDescriptorSets()
 		update.aDescSets.push_back( gUniformViewInfo.aSets[ 0 ] );
 		update.aDescSets.push_back( gUniformViewInfo.aSets[ 1 ] );
 
-		update.aType    = EDescriptorType_UniformBuffer;
+		update.aType    = EDescriptorType_StorageBuffer;
 		update.aBuffers = gViewInfoBuffers;
 		render->UpdateVariableDescSet( update );
 	}

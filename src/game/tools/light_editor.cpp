@@ -348,9 +348,9 @@ void LightEditor_DrawEditor()
 					name = "Cone Light";
 					break;
 
-				case ELightType_Capsule:
-					name = "Capsule Light";
-					break;
+				//case ELightType_Capsule:
+				//	name = "Capsule Light";
+				//	break;
 			}
 
 			ImGui::PushID( i );
@@ -414,9 +414,9 @@ void LightEditor_DrawEditor()
 		updateLight |= ImGui::SliderFloat( "Inner FOV", &gpSelectedLight->aInnerFov, 0, 180 );
 		updateLight |= ImGui::SliderFloat( "Outer FOV", &gpSelectedLight->aOuterFov, 0, 180 );
 	}
-	else if ( gpSelectedLight->aType == ELightType_Capsule )
-	{
-	}
+	//else if ( gpSelectedLight->aType == ELightType_Capsule )
+	//{
+	//}
 
 	if ( updateLight )
 		Graphics_UpdateLight( gpSelectedLight );

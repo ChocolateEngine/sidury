@@ -77,8 +77,8 @@ bool Graphics_CreateLightDescriptorSets()
 	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Cone ], "Light Cone Layout", "Light Cone Set", MAX_LIGHTS ) )
 		return false;
 
-	if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Capsule ], "Light Capsule Layout", "Light Capsule Set", MAX_LIGHTS ) )
-		return false;
+	//if ( !Graphics_CreateVariableUniformLayout( gUniformLights[ ELightType_Capsule ], "Light Capsule Layout", "Light Capsule Set", MAX_LIGHTS ) )
+	//	return false;
 
 	// ------------------------------------------------------
 	// Create Shadow Map Layout
@@ -90,8 +90,8 @@ bool Graphics_CreateLightDescriptorSets()
 	// ------------------------------------------------------
 	// Create Light Info Buffer
 
-	gLightInfoStagingBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
-	gLightInfoBuffer        = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
+	gLightInfoStagingBuffer = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Storage | EBufferFlags_TransferSrc, EBufferMemory_Host );
+	gLightInfoBuffer        = render->CreateBuffer( "Light Info Buffer", sizeof( LightInfo_t ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( !gLightInfoBuffer || !gLightInfoStagingBuffer )
 	{
@@ -105,7 +105,7 @@ bool Graphics_CreateLightDescriptorSets()
 	for ( size_t i = 0; i < gUniformLightInfo.aSets.size(); i++ )
 		update.aDescSets.push_back( gUniformLightInfo.aSets[ i ] );
 
-	update.aType = EDescriptorType_UniformBuffer;
+	update.aType = EDescriptorType_StorageBuffer;
 	update.aBuffers.push_back( gLightInfoBuffer );
 	render->UpdateVariableDescSet( update );
 
@@ -240,7 +240,7 @@ void Graphics_UpdateLightDescSets( ELightType sLightType )
 
 Handle Graphics_AddLightBuffer( const char* spBufferName, size_t sBufferSize, Light_t* spLight )
 {
-	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Uniform, EBufferMemory_Host );
+	Handle buffer = render->CreateBuffer( spBufferName, sBufferSize, EBufferFlags_Storage, EBufferMemory_Host );
 
 	if ( buffer == InvalidHandle )
 	{
@@ -252,7 +252,7 @@ Handle Graphics_AddLightBuffer( const char* spBufferName, size_t sBufferSize, Li
 
 	// update the descriptor sets
 	UpdateVariableDescSet_t update{};
-	update.aType = EDescriptorType_UniformBuffer;
+	update.aType = EDescriptorType_StorageBuffer;
 
 	for ( size_t i = 0; i < gUniformLights[ spLight->aType ].aSets.size(); i++ )
 		update.aDescSets.push_back( gUniformLights[ spLight->aType ].aSets[ i ] );
@@ -319,9 +319,9 @@ void Graphics_DestroyLightBuffer( Light_t* spLight )
 		case ELightType_Cone:
 			gLightInfo.aCountCone--;
 			break;
-		case ELightType_Capsule:
-			gLightInfo.aCountCapsule--;
-			break;
+		//case ELightType_Capsule:
+		//	gLightInfo.aCountCapsule--;
+		//	break;
 	}
 
 	for ( size_t i = 0; i < buffer->aSets.size(); i++ )
@@ -366,10 +366,10 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 				buffer = Graphics_AddLightBuffer( "Light Cone Buffer", sizeof( UBO_LightCone_t ), spLight );
 				gLightInfo.aCountCone++;
 				break;
-			case ELightType_Capsule:
-				buffer = Graphics_AddLightBuffer( "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
-				gLightInfo.aCountCapsule++;
-				break;
+			//case ELightType_Capsule:
+			//	buffer = Graphics_AddLightBuffer( "Light Capsule Buffer", sizeof( UBO_LightCapsule_t ), spLight );
+			//	gLightInfo.aCountCapsule++;
+			//	break;
 		}
 
 		if ( buffer == InvalidHandle )
@@ -535,28 +535,28 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			render->BufferWrite( buffer, sizeof( light ), &light );
 			break;
 		}
-		case ELightType_Capsule:
-		{
-			UBO_LightCapsule_t light;
-			light.aColor.x   = spLight->aColor.x;
-			light.aColor.y   = spLight->aColor.y;
-			light.aColor.z   = spLight->aColor.z;
-			light.aColor.w   = spLight->aEnabled ? spLight->aColor.w : 0.f;
-
-			light.aPos       = spLight->aPos;
-			light.aLength    = spLight->aLength;
-			light.aThickness = spLight->aRadius;
-
-			glm::mat4 matrix;
-			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
-			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
-
-			// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
-			// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
-
-			render->BufferWrite( buffer, sizeof( light ), &light );
-			break;
-		}
+		//case ELightType_Capsule:
+		//{
+		//	UBO_LightCapsule_t light;
+		//	light.aColor.x   = spLight->aColor.x;
+		//	light.aColor.y   = spLight->aColor.y;
+		//	light.aColor.z   = spLight->aColor.z;
+		//	light.aColor.w   = spLight->aEnabled ? spLight->aColor.w : 0.f;
+		//
+		//	light.aPos       = spLight->aPos;
+		//	light.aLength    = spLight->aLength;
+		//	light.aThickness = spLight->aRadius;
+		//
+		//	glm::mat4 matrix;
+		//	Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+		//	Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
+		//
+		//	// Util_GetDirectionVectors( spLight->aAng, nullptr, nullptr, &light.aDir );
+		//	// Util_GetDirectionVectors( spLight->aAng, &light.aDir );
+		//
+		//	render->BufferWrite( buffer, sizeof( light ), &light );
+		//	break;
+		//}
 	}
 }
 
@@ -687,6 +687,21 @@ void Graphics_RenderShadowMap( Handle cmd, Light_t* spLight, const ShadowMap_t& 
 void Graphics_DrawShadowMaps( Handle cmd )
 {
 	PROF_SCOPE();
+
+	// make sure we have the shadow map shader
+	static Handle shadowMapShader = Graphics_GetShader( "__shadow_map" );
+	static bool   warn            = false;
+
+	if ( shadowMapShader == CH_INVALID_HANDLE )
+	{
+		if ( !warn )
+		{
+			Log_Error( gLC_ClientGraphics, "Missing ShadowMap Shader\n" );
+			warn = true;
+		}
+
+		return;
+	}
 
 	RenderPassBegin_t renderPassBegin{};
 	renderPassBegin.aClear.resize( 1 );

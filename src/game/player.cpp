@@ -447,6 +447,7 @@ void PlayerManager::Create( Entity player )
 	zoom->aOrigFov             = r_fov.GetFloat();
 	zoom->aNewFov              = r_fov.GetFloat();
 
+	flashlight->aEnabled       = false;
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
@@ -1355,10 +1356,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	CTransform* camTransform = GetTransform( playerInfo->aCamera );
 	CCamera*    camera       = GetCamera( playerInfo->aCamera );
 
-	Assert( rigidBody );
-	Assert( transform );
-	Assert( camTransform );
-	Assert( camera );
+	auto        flashlight   = Ent_GetComponent< CLight >( player, "light" );
 
 	float speed        = glm::length( glm::vec2( rigidBody->aVel.Get().x, rigidBody->aVel.Get().y ) );
 
@@ -1370,6 +1368,8 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov.Get() );
 	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform->aPos.Get()).c_str() );
 	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform->aAng.Get()).c_str() );
+
+	gui->DebugMessage( "Flashlight:    %s", flashlight->aEnabled ? "Enabled" : "Disabled" );
 }
 
 
