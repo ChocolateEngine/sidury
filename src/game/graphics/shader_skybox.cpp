@@ -15,7 +15,6 @@ static std::unordered_map< SurfaceDraw_t*, Skybox_Push > gSkyboxPushData;
 
 static void Shader_Skybox_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_Sampler );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ) );
 }
 
@@ -39,7 +38,7 @@ static void Shader_Skybox_ResetPushData()
 }
 
 
-static void Shader_Skybox_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_Skybox_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	PROF_SCOPE();
 
@@ -71,7 +70,7 @@ ShaderCreate_t gShaderCreate_Skybox = {
 	.apName           = "skybox",
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_Sampler | EShaderFlags_PushConstant,
+	.aFlags           = EShaderFlags_PushConstant,
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position,
 	.apInit           = nullptr,
@@ -80,4 +79,7 @@ ShaderCreate_t gShaderCreate_Skybox = {
 	.apGraphicsCreate = Shader_Skybox_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_Skybox,
 };
+
+
+// CH_REGISTER_SHADER( gShaderCreate_Skybox );
 

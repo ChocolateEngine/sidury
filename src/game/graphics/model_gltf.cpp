@@ -257,9 +257,9 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 				Handle handle = InvalidHandle;
 
 				if ( FileSys_IsRelative( texName.data() ) )
-					render->LoadTexture( handle, baseDir2 + "/" + texName, createData );
+					Graphics_LoadTexture( handle, baseDir2 + "/" + texName, createData );
 				else
-					render->LoadTexture( handle, texName, createData );
+					Graphics_LoadTexture( handle, texName, createData );
 
 				Mat_SetVar( material, param.data(), handle );
 			};

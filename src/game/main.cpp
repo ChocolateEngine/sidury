@@ -114,6 +114,9 @@ bool Game_Init()
 
 	Steam_Init();
 
+	// Create the Main Viewport - TODO: use this more across the game code
+	size_t viewIndex = Graphics_CreateViewport();
+
 	Game_UpdateProjection();
 
 	if ( !Graphics_Init() )
@@ -312,6 +315,7 @@ void Game_HandleSystemEvents()
 }
 
 
+// weird old functions that need to be re-thought
 void Game_SetView( const glm::mat4& srViewMat )
 {
 	PROF_SCOPE();
@@ -322,14 +326,20 @@ void Game_SetView( const glm::mat4& srViewMat )
 	gView.aViewMat = srViewMat;
 	gView.ComputeProjection( width, height );
 
+	ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+
+	if ( !viewport )
+		return;
+
 	// um
-	gViewInfo[ 0 ].aProjection = gView.aProjMat;
-	gViewInfo[ 0 ].aView       = gView.aViewMat;
-	gViewInfo[ 0 ].aNearZ      = gView.aNearZ;
-	gViewInfo[ 0 ].aFarZ       = gView.aFarZ;
+	viewport->aProjView   = gView.aProjViewMat;
+	viewport->aProjection = gView.aProjMat;
+	viewport->aView       = gView.aViewMat;
+	viewport->aNearZ      = gView.aNearZ;
+	viewport->aFarZ       = gView.aFarZ;
 
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
-	gViewInfoUpdate  = true;
+	Graphics_SetViewportUpdate( true );
 
 	auto& io         = ImGui::GetIO();
 	io.DisplaySize.x = width;
@@ -345,14 +355,20 @@ void Game_UpdateProjection()
 	render->GetSurfaceSize( width, height );
 	gView.ComputeProjection( width, height );
 
+	ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+
+	if ( !viewport )
+		return;
+
 	// um
-	gViewInfo[ 0 ].aProjection = gView.aProjMat;
-	gViewInfo[ 0 ].aView       = gView.aViewMat;
-	gViewInfo[ 0 ].aNearZ      = gView.aNearZ;
-	gViewInfo[ 0 ].aFarZ       = gView.aFarZ;
+	viewport->aProjView   = gView.aProjViewMat;
+	viewport->aProjection = gView.aProjMat;
+	viewport->aView       = gView.aViewMat;
+	viewport->aNearZ      = gView.aNearZ;
+	viewport->aFarZ       = gView.aFarZ;
 
 	Graphics_SetViewProjMatrix( gView.aProjViewMat );
-	gViewInfoUpdate  = true;
+	Graphics_SetViewportUpdate( true );
 
 	auto& io = ImGui::GetIO();
 	io.DisplaySize.x = width;

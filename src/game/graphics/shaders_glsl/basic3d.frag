@@ -2,77 +2,23 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#define CH_FRAG_SHADER 1
+
+#include "core.glsl"
 #include "common_shadow.glsl"
+
+#define VIEWPORT 0
+#define MATERIAL 1
 
 layout(push_constant) uniform Push
 {
-	mat4 model;
-    int material;
-	int aViewInfo;
-
-	bool aPCF;
-	int aDebugDraw;
+	uint aSurface;
+	uint aViewport;
+	uint aDebugDraw;
 } push;
 
-layout(set = 0, binding = 0) uniform sampler2D[] texSamplers;
-
-// view info
-layout(set = 1, binding = 0) buffer readonly UBO_ViewInfo
-{
-	mat4 aProjView;
-	mat4 aProjection;
-	mat4 aView;
-	vec3 aViewPos;
-	float aNearZ;
-	float aFarZ;
-} gViewInfo[];
-
-// TODO: THIS SHOULD NOT BE VARIABLE
-layout(set = 2, binding = 0) buffer readonly UBO_LightInfo
-{
-	int aCountWorld;
-	int aCountPoint;
-	int aCountCone;
-	int aCountCapsule;
-} gLightInfoTmp[];
-
-#define gLightInfo gLightInfoTmp[0]
-
-layout(set = 3, binding = 0) buffer readonly UBO_LightWorld
-{
-    vec4 aColor;
-    vec3 aDir;
-	int  aViewInfo;  // view info for light/shadow
-	int  aShadow;  // shadow texture index
-} gLightsWorld[];
-
-layout(set = 4, binding = 0) buffer readonly UBO_LightPoint
-{
-	vec4  aColor;
-	vec3  aPos;
-	float aRadius;  // TODO: look into using constant, linear, and quadratic lighting, more customizable than this
-} gLightsPoint[];
-
-layout(set = 5, binding = 0) buffer readonly UBO_LightCone
-{
-	vec4 aColor;
-	vec3 aPos;
-	vec3 aDir;
-	vec2 aFov;  // x is inner FOV, y is outer FOV
-	int  aViewInfo;  // view info for light/shadow
-	int  aShadow;  // shadow texture index
-} gLightsCone[];
-
-// layout(set = 6, binding = 0) buffer readonly UBO_LightCapsule
-// {
-// 	vec4  aColor;
-// 	vec3  aDir;
-// 	float aLength;
-// 	float aThickness;
-// } gLightsCapsule[];
-
 // Material Info
-layout(set = 6, binding = 0) buffer readonly UBO_Material
+layout(set = CH_DESC_SET_PER_SHADER, binding = 0) buffer readonly Buffer_Material
 {
     int albedo;
     int ao;
@@ -93,12 +39,12 @@ layout(location = 5) in vec3 inTangent;
 
 layout(location = 0) out vec4 outColor;
 
-#define mat materials[push.material]
+#define mat materials[ surface.aMaterial ]
 // #define mat materials[0]
 
-#define texDiffuse  texSamplers[mat.albedo]
-#define texAO       texSamplers[mat.ao]
-#define texEmissive texSamplers[mat.emissive]
+#define texDiffuse  texSamplers[ mat.albedo ]
+#define texAO       texSamplers[ mat.ao ]
+#define texEmissive texSamplers[ mat.emissive ]
 
 
 const mat4 gBiasMat = mat4(
@@ -120,6 +66,9 @@ float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
 
 void main()
 {
+	SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
+	Renderable_t  renderable = gCore.aRenderables[ surface.aRenderable ];
+
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
     vec4 albedo = texture( texDiffuse, fragTexCoord );
 
@@ -160,10 +109,14 @@ void main()
 
 	outColor = vec4(0, 0, 0, albedo.a);
 
-	//if ( gLightInfo.aCountWorld == 0 )
+	// if ( gCore.aNumLightWorld == 0 )
 		outColor = albedo;
 
-	for ( int i = 0; i < gLightInfo.aCountWorld; i++ )
+#if 0
+	// ----------------------------------------------------------------------------
+	// Add World Lights
+
+	for ( int i = 0; i < gCore.aNumLightWorld; i++ )
 	{
 		if ( gLightsWorld[ i ].aColor.w == 0.f )
 			continue;
@@ -179,22 +132,25 @@ void main()
 			diff = gLightsWorld[ i ].aColor.rgb * gLightsWorld[ i ].aColor.a * max( intensity, 0.15 ) * albedo.rgb;
 
 		// shadow
-		//if ( gLightsWorld[ i ].aShadow != -1 )
-		//{
-		//	mat4 depthBiasMVP = gBiasMat * gViewInfo[ gLightsWorld[ i ].aViewInfo ].aProjView;
-		//	// mat4 depthBiasMVP = gBiasMat * gViewInfo[ 0 ].aProjView;
-		//	vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
-		//
-		//	// float shadow = SampleShadowMapPCF( gLightsWorld[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
-		//	float shadow = SampleShadowMapPCF( 0, shadowCoord.xyz / shadowCoord.w );
-		//	diff *= shadow;
-		//	// diff = shadow;
-		//}
+		if ( gLightsWorld[ i ].aShadow != -1 )
+		{
+			mat4 depthBiasMVP = gBiasMat * gLightsWorld[ i ].aProjView;
+			// mat4 depthBiasMVP = gBiasMat * gViewport[ 0 ].aProjView;
+			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
+
+			// float shadow = SampleShadowMapPCF( gLightsWorld[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
+			float shadow = SampleShadowMapPCF( 0, shadowCoord.xyz / shadowCoord.w );
+			diff *= shadow;
+			// diff = shadow;
+		}
 
 		outColor.rgb += diff;
 	}
 
-	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
+	// ----------------------------------------------------------------------------
+	// Add Point Lights
+
+	for ( int i = 0; i < gCore.aNumLightPoint; i++ )
 	{
 		if ( gLightsPoint[ i ].aColor.w == 0.f )
 			continue;
@@ -221,11 +177,14 @@ void main()
 		}
 	}
 
+	// ----------------------------------------------------------------------------
+	// Add Cone Lights
+
 	#define CONSTANT 1
 	#define LINEAR 1
 	#define QUADRATIC 1
 
-	for ( int i = 0; i < gLightInfo.aCountCone; i++ )
+	for ( int i = 0; i < gCore.aNumLightCone; i++ )
 	{
 		if ( gLightsCone[ i ].aColor.w == 0.f )
 			continue;
@@ -254,32 +213,20 @@ void main()
 		// shadow
 		if ( gLightsCone[ i ].aShadow != -1 )
 		{
-			mat4 depthBiasMVP = gBiasMat * gViewInfo[ gLightsCone[ i ].aViewInfo ].aProjView;
+			mat4 depthBiasMVP = gBiasMat * gLightsCone[ i ].aProjView;
 			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
 
 			// TODO: this could go out of bounds and lose the device
 			// maybe add a check here to make sure we don't go out of bounds?
-
-			// TODO: For some reason, SampleShadowMapPCF causes the GTX 1050 Ti I have to return VK_ERROR_DEVICE_LOST here
-			// and the original way i did it doesn't
-			float shadow = 1.0;
-			if ( push.aPCF )
-			{
-				shadow = SampleShadowMapPCF( gLightsCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
-			}
-			else
-			{
-				shadow = SampleShadowMapBasic( gLightsCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
-			}
-
-			// float shadow = SampleShadowMapPCF( gLightsCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
-			// float shadow = SampleShadowMapPCF( 0, shadowCoord.xyz / shadowCoord.w );
-			// float shadow = SampleShadowMapBasic( 0, vec4( shadowCoord / shadowCoord.w ) );
+			float shadow = SampleShadowMapPCF( gLightsCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
 			diff *= shadow;
 		}
 
 		outColor.rgb += diff;
 	}
+#endif
+
+	// ----------------------------------------------------------------------------
 
 	// add ambient occlusion (only one channel is needed here, so just use red)
     if ( mat.aoPower > 0.0 )

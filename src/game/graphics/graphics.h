@@ -18,13 +18,6 @@ extern IRender* render;
 
 using Entity = size_t;
 
-constexpr int   MAX_VIEW_INFO_BUFFERS = 32;
-
-// hack for bad entity system
-struct HModel
-{
-	Handle handle;
-};
 
 enum EModelData
 {
@@ -83,12 +76,16 @@ using EShaderFlags = int;
 enum : EShaderFlags
 {
 	EShaderFlags_None             = 0,
-	EShaderFlags_Sampler          = ( 1 << 0 ),  // Shader Uses Texture Sampler Array
-	EShaderFlags_ViewInfo         = ( 1 << 1 ),  // Shader Uses View Info UBO's
-	EShaderFlags_VertexAttributes = ( 1 << 2 ),  // Shader Uses Vertex Attributes
-	EShaderFlags_PushConstant     = ( 1 << 3 ),  // Shader Uses a Push Constant
-	EShaderFlags_MaterialUniform  = ( 1 << 4 ),  // Shader Uses Material Uniform Buffers
-	EShaderFlags_Lights           = ( 1 << 5 ),  // Shader Uses Light UBO's
+	EShaderFlags_VertexAttributes = ( 1 << 0 ),  // Shader Uses Vertex Attributes
+	EShaderFlags_PushConstant     = ( 1 << 1 ),  // Shader Uses a Push Constant
+};
+
+
+enum ERenderPass
+{
+	ERenderPass_Graphics, 
+	ERenderPass_Shadow, 
+	ERenderPass_Count, 
 };
 
 
@@ -114,6 +111,24 @@ enum : ERenderableFlags
 };
 
 
+enum EShaderSlot
+{
+	// Global Resources usable by all shaders and render passes (ex. Textures)
+	EShaderSlot_Global,
+
+	// Resources bound once per render pass (ex. Viewport Info)
+	// EShaderSlot_PerPass,
+
+	// Resources bound on each shader bind (ex. Materials)
+	EShaderSlot_PerShader,  // PerMaterial
+
+	// Per Object Resources (ex. Lights)
+	// EShaderSlot_PerObject,
+
+	EShaderSlot_Count,
+};
+
+
 // ======================================================
 
 
@@ -132,14 +147,8 @@ struct ViewportCamera_t
 {
 	void ComputeProjection( float sWidth, float sHeight )
 	{
-		float hAspect = (float)sWidth / (float)sHeight;
-		float vAspect = (float)sHeight / (float)sWidth;
-
-		float V       = 2.0f * atanf( tanf( glm::radians( aFOV ) / 2.0f ) * vAspect );
-
-		aProjMat      = glm::perspective( V, hAspect, aNearZ, aFarZ );
-
-		aProjViewMat  = aProjMat * aViewMat;
+		aProjMat     = Util_ComputeProjection( sWidth, sHeight, aNearZ, aFarZ, aFOV );
+		aProjViewMat = aProjMat * aViewMat;
 	}
 
 	float     aNearZ;
@@ -183,8 +192,8 @@ struct MeshBlendShapeData_t
 
 struct MeshBlendShapeDrawData_t
 {
-	std::vector< Handle > aBuffers;  // all mesh blend shape buffers
-	std::vector< float >  aValues;
+	std::vector< ChHandle_t > aBuffers;  // all mesh blend shape buffers
+	std::vector< float >      aValues;
 };
 
 
@@ -219,8 +228,8 @@ struct VertexData_t : public RefCounted
 
 struct ModelBuffers_t : public RefCounted
 {
-	ChVector< Handle > aVertex;
-	Handle             aIndex = InvalidHandle;
+	ChVector< ChHandle_t > aVertex;
+	ChHandle_t             aIndex = CH_INVALID_HANDLE;
 
 	~ModelBuffers_t()
 	{
@@ -238,13 +247,13 @@ struct ModelBuffers_t : public RefCounted
 // It is intended to be part of a Model struct, where the buffers and vertex data are
 struct Mesh
 {
-	u32    aVertexOffset;
-	u32    aVertexCount;
+	u32        aVertexOffset;
+	u32        aVertexCount;
 
-	u32    aIndexOffset;
-	u32    aIndexCount;
+	u32        aIndexOffset;
+	u32        aIndexCount;
 
-	Handle aMaterial;
+	ChHandle_t aMaterial;
 };
 
 
@@ -281,18 +290,22 @@ struct Renderable_t
 
 	// used for calculating render lists
 	ModelBBox_t aAABB;
+
+	// I don't like these bools that have to be checked every frame
 	bool        aTestVis;
 	bool        aCastShadow;
 	bool        aVisible;
 };
 
 
-// Surface Draw contains drawing information on how to draw parts of a renderable
+// Surface Draw contains drawing information on how to draw a surface of a renderable
 // It contains draw data and a mesh surface index
+// Unique for each viewport
 struct SurfaceDraw_t
 {
-	Handle aDrawData;
+	Handle aRenderable;
 	size_t aSurface;
+	u32    aShaderSlot;  // index into core data shader draw
 };
 
 
@@ -328,53 +341,12 @@ struct RenderLayer_t
 };
 
 
-// TODO: use descriptor indexing on forward rendering
-// would allow you to do all lighting on a model in one draw call
-struct LightInfo_t
+struct RenderPassData_t
 {
-	int aCountWorld   = 0;
-	int aCountPoint   = 0;
-	int aCountCone    = 0;
-	int aCountCapsule = 0;
+	ChVector< ChHandle_t > aSets;
 };
 
-// Light Types
-struct UBO_LightDirectional_t
-{
-	alignas( 16 ) glm::vec4 aColor{};
-	alignas( 16 ) glm::vec3 aDir{};
-	int aViewInfo = -1;
-	int aShadow   = -1;
-};
 
-struct UBO_LightPoint_t
-{
-	alignas( 16 ) glm::vec4 aColor{};
-	alignas( 16 ) glm::vec3 aPos{};
-	float aRadius = 0.f;
-	// int   aShadow = -1;
-};
-
-struct UBO_LightCone_t
-{
-	alignas( 16 ) glm::vec4 aColor{};
-	alignas( 16 ) glm::vec3 aPos{};
-	alignas( 16 ) glm::vec3 aDir{};
-	alignas( 16 ) glm::vec2 aFov{};
-	int aViewInfo = -1;
-	int aShadow = -1;
-};
-
-struct UBO_LightCapsule_t
-{
-	alignas( 16 ) glm::vec4 aColor{};
-	alignas( 16 ) glm::vec3 aPos{};
-	alignas( 16 ) glm::vec3 aDir{};
-	float     aLength    = 0.f;
-	float     aThickness = 0.f;
-};
-
-// maybe use this instead? would be easier to manage
 struct Light_t
 {
 	ELightType aType = ELightType_Directional;
@@ -389,23 +361,48 @@ struct Light_t
 	bool       aEnabled  = true;
 };
 
-struct UniformBufferArray_t
+
+struct ShaderBinding_t
 {
-	Handle                aLayout = InvalidHandle;
-	std::vector< Handle > aSets;
+	ChHandle_t aDescSet;  // useless?
+	int        aBinding;
+	ChHandle_t aShaderData;  // get slot from this?
 };
 
-struct UBO_ViewInfo_t
+
+struct ShaderDescriptor_t
 {
-	glm::mat4 aProjView{};
-	glm::mat4 aProjection{};
-	glm::mat4 aView{};
-	glm::vec3 aViewPos{};
-	float     aNearZ = 0.f;
-	float     aFarZ  = 0.f;
+	// these sets should be associated with the area this data is used
+	// like when doing a shader bind, the specifc sets we want to bind should be there
+	// don't store all of them here
+	// what we did before was store 2 sets, which was a set for each swapchain image
+	ChHandle_t* apSets = nullptr;
+	u32         aCount = 0;
 };
 
-struct ViewInfo_t
+
+struct ShaderRequirement_t
+{
+	std::string_view     aShader;
+	CreateDescBinding_t* apBindings    = nullptr;
+	u32                  aBindingCount = 0;
+};
+
+
+struct ShaderRequirmentsList_t
+{
+	// vector of shader bindings
+	std::vector< ShaderRequirement_t > aItems;
+};
+
+
+struct RenderFrameData_t
+{
+
+};
+
+
+struct ViewportShader_t
 {
 	glm::mat4  aProjView{};
 	glm::mat4  aProjection{};
@@ -418,25 +415,23 @@ struct ViewInfo_t
 	bool       aActive = true;
 
 	// HACK: if this is set, it overrides the shader used for all renderables in this view
-	Handle     aShaderOverride = InvalidHandle;
+	ChHandle_t aShaderOverride = CH_INVALID_HANDLE;
 };
+
 
 struct ShadowMap_t
 {
-	Handle     aTexture     = InvalidHandle;
-	Handle     aFramebuffer = InvalidHandle;
+	ChHandle_t aTexture     = CH_INVALID_HANDLE;
+	ChHandle_t aFramebuffer = CH_INVALID_HANDLE;
 	glm::ivec2 aSize{};
 	int        aViewInfoIndex = 0;
 };
 
-extern std::vector< ViewInfo_t > gViewInfo;
-extern bool                      gViewInfoUpdate;
-
 
 // Push Constant Function Pointers
 using FShader_ResetPushData = void();
-using FShader_SetupPushData = void( Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
-using FShader_PushConstants = void( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo );
+using FShader_SetupPushData = void( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
+using FShader_PushConstants = void( ChHandle_t cmd, ChHandle_t sLayout, SurfaceDraw_t& srDrawInfo );
 
 using FShader_Init = bool();
 using FShader_Destroy = void();
@@ -444,6 +439,10 @@ using FShader_Destroy = void();
 using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeline );
 using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srGraphics );
 
+using FShader_DescriptorData = void();
+
+// blech
+using FShader_MaterialData = u32( u32 sRenderableIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
 
 struct IShaderPush
 {
@@ -455,32 +454,59 @@ struct IShaderPush
 
 struct ShaderCreate_t
 {
-	const char*                        apName           = nullptr;
-	ShaderStage                        aStages          = ShaderStage_None;
-	EPipelineBindPoint                 aBindPoint       = EPipelineBindPoint_Graphics;
-	EShaderFlags                       aFlags           = EShaderFlags_None;
-	EDynamicState                      aDynamicState    = EDynamicState_None;
-	VertexFormat                       aVertexFormat    = VertexFormat_None;
+	const char*                        apName              = nullptr;
+	ShaderStage                        aStages             = ShaderStage_None;
+	EPipelineBindPoint                 aBindPoint          = EPipelineBindPoint_Graphics;
+	EShaderFlags                       aFlags              = EShaderFlags_None;
+	EDynamicState                      aDynamicState       = EDynamicState_None;
+	VertexFormat                       aVertexFormat       = VertexFormat_None;
+	ERenderPass                        aRenderPass         = ERenderPass_Graphics;
 
-	FShader_Init*                      apInit           = nullptr;
-	FShader_Destroy*                   apDestroy        = nullptr;
+	FShader_Init*                      apInit              = nullptr;
+	FShader_Destroy*                   apDestroy           = nullptr;
 
-	FShader_GetPipelineLayoutCreate*   apLayoutCreate   = nullptr;
-	FShader_GetGraphicsPipelineCreate* apGraphicsCreate = nullptr;
+	FShader_GetPipelineLayoutCreate*   apLayoutCreate      = nullptr;
+	FShader_GetGraphicsPipelineCreate* apGraphicsCreate    = nullptr;
 
-	IShaderPush*                       apShaderPush     = nullptr;
+	IShaderPush*                       apShaderPush        = nullptr;
+	FShader_MaterialData*              apMaterialData      = nullptr;
+
+	CreateDescBinding_t*               apBindings          = nullptr;
+	u32                                aBindingCount       = 0;
 };
 
 
 // stored data internally
 struct ShaderData_t
 {
-	ShaderStage   aStages       = ShaderStage_None;
-	EShaderFlags  aFlags        = EShaderFlags_None;
-	EDynamicState aDynamicState = EDynamicState_None;
-	Handle        aLayout       = InvalidHandle;
-	IShaderPush*  apPush        = nullptr;
+	ShaderStage           aStages         = ShaderStage_None;
+	EShaderFlags          aFlags          = EShaderFlags_None;
+	EDynamicState         aDynamicState   = EDynamicState_None;
+	ChHandle_t            aLayout         = CH_INVALID_HANDLE;
+	IShaderPush*          apPush          = nullptr;
+	FShader_MaterialData* apMaterialIndex = nullptr;
 };
+
+
+struct ShaderSets_t
+{
+	ChVector< ChHandle_t > aSets;
+};
+
+
+std::vector< ShaderCreate_t* >& Shader_GetCreateList();
+
+
+struct ShaderStaticRegistration
+{
+	ShaderStaticRegistration( ShaderCreate_t& srCreate )
+	{
+		Shader_GetCreateList().push_back( &srCreate );
+	}
+};
+
+
+#define CH_REGISTER_SHADER( srShaderCreate ) static ShaderStaticRegistration __gRegister__##srShaderCreate( srShaderCreate );
 
 
 // ---------------------------------------------------------------------------------------
@@ -491,7 +517,8 @@ Handle             Graphics_CreateModel( Model** spModel );
 void               Graphics_FreeModel( Handle hModel );
 Model*             Graphics_GetModelData( Handle hModel );
 std::string_view   Graphics_GetModelPath( Handle sModel );
-void               Graphics_CalcModelBBox( Handle sModel );
+ModelBBox_t        Graphics_CalcModelBBox( Handle sModel );
+bool               Graphics_GetModelBBox( Handle sModel, ModelBBox_t& srBBox );
 
 void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat );
 Handle             Model_GetMaterial( Handle shModel, size_t sSurface );
@@ -535,6 +562,15 @@ Handle             Graphics_GetSceneModel( Handle sScene, size_t sIndex );
 // how would this work with immediate mode style drawing? good for a rythem like game
 // and how would it work for VR, or multiple viewports in a level editor or something?
 // and shadowmapping? overthinking this? probably
+
+// ---------------------------------------------------------------------------------------
+// Textures
+
+ChHandle_t         Graphics_LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData );
+
+ChHandle_t         Graphics_CreateTexture( const TextureCreateInfo_t& srTextureCreateInfo, const TextureCreateData_t& srCreateData );
+
+void               Graphics_FreeTexture( ChHandle_t shTexture );
 
 // ---------------------------------------------------------------------------------------
 // Materials
@@ -593,18 +629,22 @@ const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::ve
 // ---------------------------------------------------------------------------------------
 // Shaders
 
+bool               Shader_ParseRequirements( ShaderRequirmentsList_t& srOutput );
 bool               Graphics_ShaderInit( bool sRecreate );
 Handle             Graphics_GetShader( std::string_view sName );
 const char*        Graphics_GetShaderName( Handle sShader );
-void               Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags );
 
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
-bool               Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
+bool               Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
 bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable );
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
 ShaderData_t*      Shader_GetData( Handle sShader );
+ShaderSets_t*      Shader_GetSets( Handle sShader );
+ShaderSets_t*      Shader_GetSets( std::string_view sShader );
+
+Handle             Shader_RegisterDescriptorData( EShaderSlot sSlot, FShader_DescriptorData* sCallback );
 
 // Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 // bool               Shader_IsMaterialTransparent( Handle sMat );
@@ -636,17 +676,26 @@ void               Graphics_NewFrame();
 void               Graphics_Reset();
 void               Graphics_Present();
 
+// ChHandle_t         Graphics_CreateRenderPass();
+// void               Graphics_UpdateRenderPass( ChHandle_t sRenderPass );
+
 void               Graphics_SetViewProjMatrix( const glm::mat4& srMat );
 const glm::mat4&   Graphics_GetViewProjMatrix();
 
-void               Graphics_PushViewInfo( const ViewInfo_t& srViewInfo );
-void               Graphics_PopViewInfo();
-ViewInfo_t&        Graphics_GetViewInfo();
+// Returns the Viewport Index
+size_t             Graphics_CreateViewport();
 
-Handle             Graphics_CreateRenderable( Handle sModel );
-Renderable_t*      Graphics_GetRenderableData( Handle sRenderable );
-void               Graphics_FreeRenderable( Handle sRenderable );
-void               Graphics_UpdateRenderableAABB( Handle sRenderable );
+ViewportShader_t*  Graphics_GetViewportData( size_t sViewportIndex );
+void               Graphics_SetViewportUpdate( bool sUpdate );
+
+// void               Graphics_PushViewInfo( const ViewportShader_t& srViewInfo );
+// void               Graphics_PopViewInfo();
+// ViewportShader_t&  Graphics_GetViewInfo();
+
+ChHandle_t         Graphics_CreateRenderable( ChHandle_t sModel );
+Renderable_t*      Graphics_GetRenderableData( ChHandle_t sRenderable );
+void               Graphics_FreeRenderable( ChHandle_t sRenderable );
+void               Graphics_UpdateRenderableAABB( ChHandle_t sRenderable );
 void               Graphics_ConsolidateRenderables();
 
 ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox );
@@ -659,7 +708,7 @@ void               Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sA
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );
 void               Graphics_DrawFrustum( const Frustum_t& srFrustum );
-void               Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix );
+void               Graphics_DrawNormals( ChHandle_t sModel, const glm::mat4& srMatrix );
 
 // ---------------------------------------------------------------------------------------
 // Vertex Format/Attributes

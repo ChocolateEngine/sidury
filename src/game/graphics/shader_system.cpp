@@ -1,27 +1,24 @@
 #include "util.h"
 #include "render/irender.h"
 #include "graphics.h"
+#include "graphics_int.h"
 
 
-static std::unordered_map< std::string_view, Handle >   gShaderNames;
+static std::unordered_map< std::string_view, Handle >       gShaderNames;
+static std::unordered_map< std::string_view, ShaderSets_t > gShaderSets;  // [shader name] = descriptor sets for this shader
 
-static std::unordered_map< Handle, EPipelineBindPoint > gShaderBindPoint;  // [shader] = bind point
-static std::unordered_map< Handle, Handle >             gShaderMaterials;  // [shader] = uniform layout
-static std::unordered_map< Handle, VertexFormat >       gShaderVertFormat; // [shader] = vertex format
-static std::unordered_map< Handle, FShader_Destroy* >   gShaderDestroy;    // [shader] = shader destroy function
-static std::unordered_map< Handle, ShaderData_t >       gShaderData;       // [shader] = assorted shader data
-
-extern Handle                                           gRenderPassGraphics;
-extern Handle                                           gRenderPassShadow;
+static std::unordered_map< Handle, EPipelineBindPoint >     gShaderBindPoint;   // [shader] = bind point
+static std::unordered_map< Handle, VertexFormat >           gShaderVertFormat;  // [shader] = vertex format
+static std::unordered_map< Handle, FShader_Destroy* >       gShaderDestroy;     // [shader] = shader destroy function
+static std::unordered_map< Handle, ShaderData_t >           gShaderData;        // [shader] = assorted shader data
 
 // descriptor set layouts
-extern UniformBufferArray_t                             gUniformSampler;
-extern UniformBufferArray_t                             gUniformViewInfo;
-extern UniformBufferArray_t                             gUniformMaterialBasic3D;
-extern UniformBufferArray_t                             gUniformLightInfo;
-extern UniformBufferArray_t                             gUniformLights[ ELightType_Count ];
+// extern ShaderBufferArray_t                              gUniformSampler;
+// extern ShaderBufferArray_t                              gUniformViewInfo;
+// extern ShaderBufferArray_t                              gUniformMaterialBasic3D;
+// extern ShaderBufferArray_t                              gUniformLights;
 
-static std::unordered_map< SurfaceDraw_t*, void* > gShaderPushData;
+static std::unordered_map< SurfaceDraw_t*, void* >          gShaderPushData;
 
 CONCMD( shader_reload )
 {
@@ -45,16 +42,13 @@ CONCMD( shader_dump )
 
 
 // --------------------------------------------------------------------------------------
-// Shaders
 
-extern ShaderCreate_t gShaderCreate_Basic3D;
-extern ShaderCreate_t gShaderCreate_Unlit;
-extern ShaderCreate_t gShaderCreate_Debug;
-extern ShaderCreate_t gShaderCreate_DebugLine;
-extern ShaderCreate_t gShaderCreate_Skybox;
-extern ShaderCreate_t gShaderCreate_ShadowMap;
 
-// --------------------------------------------------------------------------------------
+std::vector< ShaderCreate_t* >& Shader_GetCreateList()
+{
+	static std::vector< ShaderCreate_t* > create;
+	return create;
+}
 
 
 Handle Graphics_GetShader( std::string_view sName )
@@ -83,27 +77,23 @@ const char* Graphics_GetShaderName( Handle sShader )
 }
 
 
-void Graphics_AddPipelineLayouts( PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags )
+bool Graphics_AddPipelineLayouts( std::string_view sName, PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags )
 {
-	if ( sFlags & EShaderFlags_Sampler )
-		srPipeline.aLayouts.push_back( gUniformSampler.aLayout );
+	srPipeline.aLayouts.reserve( srPipeline.aLayouts.capacity() + EShaderSlot_Count );
+	srPipeline.aLayouts.push_back( gShaderDescriptorData.aGlobalLayout );
 
-	if ( sFlags & EShaderFlags_ViewInfo )
-		srPipeline.aLayouts.push_back( gUniformViewInfo.aLayout );
-
-	if ( sFlags & EShaderFlags_Lights )
+	auto find = gShaderDescriptorData.aPerShaderLayout.find( sName );
+	if ( find == gShaderDescriptorData.aPerShaderLayout.end() )
 	{
-		srPipeline.aLayouts.push_back( gUniformLightInfo.aLayout );
-
-		for ( int i = 0; i < ELightType_Count; i++ )
-			srPipeline.aLayouts.push_back( gUniformLights[ i ].aLayout );
+		Log_ErrorF( "No Shader Descriptor Set Layout made for shader \"%s\"\n", sName.data() );
+		return false;
 	}
 
-	// if ( sFlags & EShaderFlags_MaterialUniform )
+	srPipeline.aLayouts.push_back( find->second );
 }
 
 
-bool Shader_CreatePipelineLayout( Handle& srLayout, FShader_GetPipelineLayoutCreate fCreate )
+bool Shader_CreatePipelineLayout( std::string_view sName, Handle& srLayout, FShader_GetPipelineLayoutCreate fCreate )
 {
 	if ( fCreate == nullptr )
 	{
@@ -112,6 +102,12 @@ bool Shader_CreatePipelineLayout( Handle& srLayout, FShader_GetPipelineLayoutCre
 	}
 
 	PipelineLayoutCreate_t pipelineCreate{};
+	if ( !Graphics_AddPipelineLayouts( sName, pipelineCreate, EShaderFlags_None ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to add Descriptor Set Layouts for Pipeline\n" );
+		return false;
+	}
+
 	fCreate( pipelineCreate );
 
 	if ( !render->CreatePipelineLayout( srLayout, pipelineCreate ) )
@@ -171,7 +167,7 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 		}
 	}
 
-	if ( !Shader_CreatePipelineLayout( shaderData.aLayout, srCreate.apLayoutCreate ) )
+	if ( !Shader_CreatePipelineLayout( srCreate.apName, shaderData.aLayout, srCreate.apLayoutCreate ) )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create Pipeline Layout\n" );
 		return false;
@@ -193,6 +189,9 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 
 	if ( srCreate.apShaderPush )
 		shaderData.apPush = srCreate.apShaderPush;
+
+	if ( srCreate.apMaterialData )
+		shaderData.apMaterialIndex = srCreate.apMaterialData;
 
 	gShaderData[ pipeline ] = shaderData;
 
@@ -240,40 +239,18 @@ void Shader_Destroy( Handle sShader )
 
 bool Graphics_ShaderInit( bool sRecreate )
 {
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Unlit ) )
+	for ( ShaderCreate_t* shaderCreate : Shader_GetCreateList() )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create unlit shader\n" );
-		return false;
-	}
+		Handle renderPass = gGraphicsData.aRenderPassGraphics;
 
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Basic3D ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create basic_3d shader\n" );
-		return false;
-	}
+		if ( shaderCreate->aRenderPass == ERenderPass_Shadow )
+			renderPass = gGraphicsData.aRenderPassShadow;
 
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Debug ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create debug shader\n" );
-		return false;
-	}
-
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_DebugLine ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create debug_line shader\n" );
-		return false;
-	}
-
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassGraphics, gShaderCreate_Skybox ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create skybox shader\n" );
-		return false;
-	}
-
-	if ( !Graphics_CreateShader( sRecreate, gRenderPassShadow, gShaderCreate_ShadowMap ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to create shadow_map shader\n" );
-		return false;
+		if ( !Graphics_CreateShader( sRecreate, renderPass, *shaderCreate ) )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "Failed to create shader \"%s\"\n", shaderCreate->apName );
+			return false;
+		}
 	}
 
 	return true;
@@ -311,21 +288,59 @@ ShaderData_t* Shader_GetData( Handle sShader )
 }
 
 
-Handle* Shader_GetMaterialUniform( Handle sShader )
+bool Shader_ParseRequirements( ShaderRequirmentsList_t& srOutput )
 {
-	// HACK HACK HACK
-	// if ( sShader == gTempShader )
-	return gUniformMaterialBasic3D.aSets.data();
+	for ( ShaderCreate_t* shaderCreate : Shader_GetCreateList() )
+	{
+		// create the per shader descriptor sets for this shader
+		ShaderSets_t& shaderSets = gShaderSets[ shaderCreate->apName ];
 
-	// Log_Error( gLC_ClientGraphics, "TODO: PROPERLY IMPLEMENT GETTING SHADER MATERIAL UNIFORM BUFFER!\n" );
-	// return nullptr;
+		for ( u32 i = 0; i < shaderCreate->aBindingCount; i++ )
+		{
+			ShaderRequirement_t require{};
+			require.aShader       = shaderCreate->apName;
+			require.apBindings    = shaderCreate->apBindings;
+			require.aBindingCount = shaderCreate->aBindingCount;
 
-	// auto it = gShaderMaterials.find( sShader );
-	// if ( it != gShaderMaterials.end() )
-	// 	return it->second;
-	// 
-	// Log_Error( gLC_ClientGraphics, "Unable to find Shader Material Uniform Layout!\n" );
-	// return nullptr;
+			srOutput.aItems.push_back( require );
+		}
+	}
+
+	return true;
+}
+
+
+// Handle Shader_RegisterDescriptorData( EShaderSlot sSlot, FShader_DescriptorData* sCallback )
+// {
+// 
+// }
+
+
+bool Shader_BindSlots( Handle sCmd, u32 sIndex, Handle sShader, ChVector< EShaderSlot >& srSlots )
+{
+	PROF_SCOPE();
+
+	ShaderData_t* shaderData = Shader_GetData( sShader );
+	if ( !shaderData )
+		return false;
+
+	ChVector< Handle > descSets;
+	descSets.reserve( srSlots.size() * 2 );
+
+	// TODO: Should only be done once per frame
+	descSets.push_back( gShaderDescriptorData.aGlobalSets.apSets[ sIndex ] );
+
+	// AAAA
+	std::string_view shaderName = Graphics_GetShaderName( sShader );
+	descSets.push_back( gShaderDescriptorData.aPerShaderSets[ shaderName ].apSets[ sIndex ] );
+
+	if ( descSets.size() )
+	{
+		EPipelineBindPoint bindPoint = Shader_GetPipelineBindPoint( sShader );
+		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), descSets.size() );
+	}
+
+	return true;
 }
 
 
@@ -340,6 +355,8 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	if ( !render->CmdBindPipeline( sCmd, sShader ) )
 		return false;
 
+	// NOTE: this probably needs to handle binding global stuff and per pass stuff
+#if 0
 	ChVector< Handle > descSets;
 	descSets.reserve( 8 );
 
@@ -352,14 +369,8 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 
 	if ( shaderData->aFlags & EShaderFlags_Lights )
 	{
-		for ( const auto& set : gUniformLightInfo.aSets )
+		for ( const auto& set : gUniformLights.aSets )
 			descSets.push_back( set );
-
-		for ( int i = 0; i < ELightType_Count; i++ )
-		{
-			for ( const auto& set : gUniformLights[ i ].aSets )
-				descSets.push_back( set );
-		}
 	}
 
 	if ( shaderData->aFlags & EShaderFlags_MaterialUniform )
@@ -375,10 +386,18 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	{
 		EPipelineBindPoint bindPoint = Shader_GetPipelineBindPoint( sShader );
 
-		render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), descSets.size() );
+		// render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), descSets.size() );
+		render->CmdBindDescriptorSets(
+		  sCmd, sIndex, bindPoint, shaderData->aLayout,
+		  gShaderDescriptorSets[ EShaderSlot_PerShader ].aSets.data(),
+		  gShaderDescriptorSets[ EShaderSlot_PerShader ].aSets.size() );
 	}
+#endif
 
-	return true;
+	ChVector< EShaderSlot > slots;
+	slots.push_back( EShaderSlot_Global );
+	slots.push_back( EShaderSlot_PerShader );
+	return Shader_BindSlots( sCmd, sIndex, sShader, slots );
 }
 
 
@@ -402,7 +421,7 @@ void Shader_ResetPushData()
 }
 
 
-bool Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
+bool Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
 {
 	PROF_SCOPE();
 
@@ -414,7 +433,7 @@ bool Shader_SetupRenderableDrawData( Renderable_t* spModelDraw, ShaderData_t* sp
 		if ( !spShaderData->apPush )
 			return false;
 
-		spShaderData->apPush->apSetup( spModelDraw, srRenderable );
+		spShaderData->apPush->apSetup( sRenderableIndex, sViewportIndex, spModelDraw, srRenderable );
 	}
 
 	return true;

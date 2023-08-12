@@ -428,7 +428,7 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				createData.aFilter = EImageFilter_Linear;
 
 				Handle texture     = InvalidHandle;
-				Mat_SetVar( handle, cur.apName, render->LoadTexture( texture, cur.apString, createData ) );
+				Mat_SetVar( handle, cur.apName, Graphics_LoadTexture( texture, cur.apString, createData ) );
 				break;
 			}
 

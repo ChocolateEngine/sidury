@@ -16,13 +16,12 @@ static std::unordered_map< SurfaceDraw_t*, ShaderUnlit_Push >  gPushData;
 
 constexpr EShaderFlags Shader_ShaderUnlit_Flags()
 {
-	return EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant;
+	return EShaderFlags_PushConstant;
 }
 
 
 static void Shader_ShaderUnlit_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, Shader_ShaderUnlit_Flags() );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShaderUnlit_Push ) );
 }
 
@@ -46,7 +45,7 @@ static void Shader_ShaderUnlit_ResetPushData()
 }
 
 
-static void Shader_ShaderUnlit_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_ShaderUnlit_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	PROF_SCOPE();
 
@@ -92,4 +91,7 @@ ShaderCreate_t gShaderCreate_Unlit = {
 	.apGraphicsCreate = Shader_ShaderUnlit_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_Unlit,
 };
+
+
+// CH_REGISTER_SHADER( gShaderCreate_Unlit );
 

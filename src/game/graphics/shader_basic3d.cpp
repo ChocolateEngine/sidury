@@ -1,39 +1,38 @@
 #include "util.h"
 #include "render/irender.h"
 #include "graphics.h"
+#include "graphics_int.h"
 
 
-static Handle               gFallbackAO            = InvalidHandle;
-static Handle               gFallbackEmissive      = InvalidHandle;
+// TODO: rename this file and shader to "standard" or "generic"?
 
-constexpr const char*       gpFallbackAOPath       = "materials/base/white.ktx";
-constexpr const char*       gpFallbackEmissivePath = "materials/base/black.ktx";
+static bool                gArgPCF                  = false;  // Args_Register( "Enable PCF Shadow Filtering", "-pcf" );
 
-// descriptor set layouts
-extern UniformBufferArray_t gUniformMaterialBasic3D;
+static Handle              gFallbackAO              = InvalidHandle;
+static Handle              gFallbackEmissive        = InvalidHandle;
 
-constexpr EShaderFlags      gShaderFlags =
-  EShaderFlags_Sampler |
-  EShaderFlags_ViewInfo |
-  EShaderFlags_PushConstant |
-  EShaderFlags_MaterialUniform |
-  EShaderFlags_Lights;
+constexpr const char*      gpFallbackAOPath         = "materials/base/white.ktx";
+constexpr const char*      gpFallbackEmissivePath   = "materials/base/black.ktx";
 
 
-bool gArgPCF = Args_Register( "Enable PCF Shadow Filtering", "-pcf" );
+constexpr u32              CH_BASIC3D_MAX_MATERIALS = 2048;
+
+
+static CreateDescBinding_t gBasic3D_Bindings[]      = {
+		 { EDescriptorType_StorageBuffer, ShaderStage_Vertex | ShaderStage_Fragment, 0, CH_BASIC3D_MAX_MATERIALS },
+};
 
 
 struct Basic3D_Push
 {
-	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
-	alignas( 16 ) int aMaterial = 0;         // material index
-	int aProjView = 0;         // projection * view index
-
+	u32 aSurface  = 0;
+	u32 aViewport = 0;
+	
 	// Hack for GTX 1050 Ti until I figure this out properly
-	bool aPCF = false;
+	// bool aPCF = false;
 
 	// debugging
-	int aDebugDraw;
+	u32 aDebugDraw;
 };
 
 
@@ -50,19 +49,14 @@ struct Basic3D_Material
 };
 
 
-struct Basic3D_MaterialBuf_t
-{
-	Handle aBuffer;
-	int    aIndex;
-};
-
 // Material Handle, Buffer
-static std::unordered_map< Handle, Basic3D_MaterialBuf_t >     gMaterialBuffers;
-static std::unordered_map< SurfaceDraw_t*, Basic3D_Push > gPushData;
-static std::unordered_map< Handle, Basic3D_Material >          gMaterialData;
+static std::unordered_map< Handle, ChHandle_t >       gMaterialBuffers;
+static std::unordered_map< Handle, u32 >              gMaterialBufferIndex;
+static std::unordered_map< u32, Basic3D_Push >        gPushData;
+static std::unordered_map< Handle, Basic3D_Material > gMaterialData;
 
 
-static Handle                                                  gStagingBuffer = InvalidHandle;
+static Handle                                         gStagingBuffer = InvalidHandle;
 
 
 CONVAR( r_basic3d_dbg_mode, 0 );
@@ -70,7 +64,8 @@ CONVAR( r_basic3d_dbg_mode, 0 );
 
 EShaderFlags Shader_Basic3D_Flags()
 {
-	return EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights;
+	// return EShaderFlags_PushConstant | EShaderFlags_SlotPerShader | EShaderFlags_SlotPerObject | EShaderFlags_Lights;
+	return EShaderFlags_PushConstant;
 }
 
 
@@ -87,37 +82,55 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 		return false;
 	}
 
-	gMaterialBuffers[ sMat ] = { newBuffer, 0 };
+	gMaterialBuffers[ sMat ] = newBuffer;
 
-	// update the material descriptor sets
-	UpdateVariableDescSet_t update{};
+	// TODO: this should probably be moved to the shader system
+	// update the descriptor sets
+	WriteDescSet_t update{};
 
-	// what
-	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 0 ] );
-	update.aDescSets.push_back( gUniformMaterialBasic3D.aSets[ 1 ] );
+	update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ "basic_3d" ].aCount;
+	update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ "basic_3d" ].apSets;
 
-	update.aType = EDescriptorType_StorageBuffer;
+	update.aBindingCount = CH_ARR_SIZE( gBasic3D_Bindings );
+	update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
 
-	int i = 0;
-	for ( auto& [ mat, buffer ] : gMaterialBuffers )
+	size_t i             = 0;
+	for ( size_t binding = 0; binding < update.aBindingCount; binding++ )
 	{
-		buffer.aIndex = i++;
-		update.aBuffers.push_back( buffer.aBuffer );
+		update.apBindings[ i ].aBinding = gBasic3D_Bindings[ binding ].aBinding;
+		update.apBindings[ i ].aType    = gBasic3D_Bindings[ binding ].aType;
+		update.apBindings[ i ].aCount   = gBasic3D_Bindings[ binding ].aCount;
+		i++;
 	}
 
-	render->UpdateVariableDescSet( update );
+	update.apBindings[ 0 ].apData = ch_calloc_count< ChHandle_t >( CH_BASIC3D_MAX_MATERIALS );
+	update.apBindings[ 0 ].aCount = gMaterialBuffers.size();
+
+	// GOD
+	i                             = 0;
+	for ( const auto& [ mat, buffer ] : gMaterialBuffers )
+	{
+		gMaterialBufferIndex[ mat ]          = i;
+		update.apBindings[ 0 ].apData[ i++ ] = buffer;
+	}
+
+	// update.aImages = gViewportBuffers;
+	render->UpdateDescSets( &update, 1 );
+
+	free( update.apBindings[ 0 ].apData );
+	free( update.apBindings );
 
 	return true;
 }
 
 
 // TODO: this doesn't handle shaders being changed on materials, or materials being freed
-void Shader_Basic3D_UpdateMaterialData( Handle sMat )
+u32 Shader_Basic3D_UpdateMaterialData( ChHandle_t sMat )
 {
 	PROF_SCOPE();
 
 	if ( sMat == 0 )
-		return;
+		return 0;
 
 	Basic3D_Material* mat = nullptr;
 
@@ -131,7 +144,7 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	{
 		// New Material Using this shader
 		if ( !Shader_Basic3D_CreateMaterialBuffer( sMat ) )
-			return;
+			return 0;
 
 		// create new material data
 		mat = &gMaterialData[ sMat ];
@@ -147,20 +160,23 @@ void Shader_Basic3D_UpdateMaterialData( Handle sMat )
 	mat->aAlphaTest    = Mat_GetBool( sMat, "alphaTest" );
 
 	if ( !gStagingBuffer )
-		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Storage | EBufferFlags_TransferSrc, EBufferMemory_Host );
+		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
 
 	if ( gStagingBuffer == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to Create Staging Material Storage Buffer\n" );
-		return;
+		Log_Error( gLC_ClientGraphics, "Failed to Create Staging Material Uniform Buffer\n" );
+		return 0;
 	}
 
 	render->BufferWrite( gStagingBuffer, sizeof( Basic3D_Material ), mat );
 
 	// write new material data to the buffer
-	Handle buffer = gMaterialBuffers[ sMat ].aBuffer;
+	ChHandle_t& buffer = gMaterialBuffers[ sMat ];
+
 	// render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
 	render->BufferCopy( gStagingBuffer, buffer, sizeof( Basic3D_Material ) );
+
+	return gMaterialBufferIndex[ sMat ];
 }
 
 
@@ -171,8 +187,8 @@ static bool Shader_Basic3D_Init()
 	createData.aUsage  = EImageUsage_Sampled;
 
 	// create fallback textures
-	render->LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
-	render->LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
+	Graphics_LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
+	Graphics_LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
 
 	return true;
 }
@@ -180,8 +196,8 @@ static bool Shader_Basic3D_Init()
 
 static void Shader_Basic3D_Destroy()
 {
-	render->FreeTexture( gFallbackAO );
-	render->FreeTexture( gFallbackEmissive );
+	Graphics_FreeTexture( gFallbackAO );
+	Graphics_FreeTexture( gFallbackEmissive );
 	
 	if ( gStagingBuffer )
 		render->DestroyBuffer( gStagingBuffer );
@@ -198,8 +214,8 @@ static void Shader_Basic3D_Destroy()
 
 static void Shader_Basic3D_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, Shader_Basic3D_Flags() );
-	srPipeline.aLayouts.push_back( gUniformMaterialBasic3D.aLayout );
+	// NOTE: maybe create the descriptor set layout for this shader here, then add it? idk
+
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
 }
 
@@ -217,39 +233,40 @@ static void Shader_Basic3D_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& 
 }
 
 
+static u32 Shader_Basic3D_GetMaterialIndex( u32 sRenderableIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+{
+	Handle mat = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+
+	if ( !mat )
+		return 0;
+
+	auto it = gMaterialBufferIndex.find( mat );
+	if ( it == gMaterialBufferIndex.end() )
+	{
+		return Shader_Basic3D_UpdateMaterialData( mat );
+	}
+
+	return it->second;
+}
+
+
 static void Shader_Basic3D_ResetPushData()
 {
 	gPushData.clear();
 }
 
 
-static void Shader_Basic3D_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	PROF_SCOPE();
 
-	Basic3D_Push& push = gPushData[ &srDrawInfo ];
-	push.aModelMatrix  = spModelDraw->aModelMatrix;
-	push.aPCF          = gArgPCF;
+	Basic3D_Push& push = gPushData[ srDrawInfo.aShaderSlot ];
+	// push.aModelMatrix  = spModelDraw->aModelMatrix;
+	push.aSurface      = srDrawInfo.aShaderSlot;
+	push.aViewport     = sViewportIndex;
 
-	Handle mat         = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
-	// push.aMaterial     = std::distance( std::begin( gMaterialBuffers ), gMaterialBuffers.find( mat ) );
-
-	if ( !mat )
-		return;
-
-	auto it = gMaterialBuffers.find( mat );
-	if ( it == gMaterialBuffers.end() )
-	{
-		push.aMaterial = 0;
-		Shader_Basic3D_UpdateMaterialData( mat );
-	}
-	else
-	{
-		push.aMaterial = it->second.aIndex;
-	}
-
-	push.aProjView     = 0;
 	push.aDebugDraw    = r_basic3d_dbg_mode;
+	// push.aPCF          = gArgPCF;
 }
 
 
@@ -257,7 +274,7 @@ static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, SurfaceDra
 {
 	PROF_SCOPE();
 
-	Basic3D_Push& push = gPushData.at( &srDrawInfo );
+	Basic3D_Push& push = gPushData.at( srDrawInfo.aShaderSlot );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ), &push );
 }
 
@@ -273,13 +290,21 @@ ShaderCreate_t gShaderCreate_Basic3D = {
 	.apName           = "basic_3d",
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant | EShaderFlags_MaterialUniform | EShaderFlags_Lights,
+	.aFlags           = Shader_Basic3D_Flags(),
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord,
+
 	.apInit           = Shader_Basic3D_Init,
 	.apDestroy        = Shader_Basic3D_Destroy,
 	.apLayoutCreate   = Shader_Basic3D_GetPipelineLayoutCreate,
 	.apGraphicsCreate = Shader_Basic3D_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_Basic3D,
+	.apMaterialData   = Shader_Basic3D_GetMaterialIndex,
+
+	.apBindings       = gBasic3D_Bindings,
+	.aBindingCount    = CH_ARR_SIZE( gBasic3D_Bindings ),
 };
+
+
+CH_REGISTER_SHADER( gShaderCreate_Basic3D );
 

@@ -1060,7 +1060,12 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 		if ( info->aIsLocalPlayer )
 		{
-			gViewInfo[ 0 ].aViewPos = thirdPerson.aPos;
+			ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+
+			if ( viewport )
+				viewport->aViewPos = thirdPerson.aPos;
+
+			// TODO: PERF: this also queues the viewport data
 			Game_SetView( viewMat );
 			// audio->SetListenerTransform( thirdPerson.aPos, transformView.aAng );
 		}
@@ -1076,8 +1081,13 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 		{
 			// wtf broken??
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
+			
+			ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
 
-			gViewInfo[ 0 ].aViewPos = transformView.aPos;
+			if ( viewport )
+				viewport->aViewPos = transformView.aPos;
+
+			// TODO: PERF: this also queues the viewport data
 			Game_SetView( viewMat );
 		}
 

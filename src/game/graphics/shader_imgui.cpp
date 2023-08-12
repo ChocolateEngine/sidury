@@ -2,6 +2,7 @@
 #include "render/irender.h"
 #include "graphics.h"
 
+#if 0
 
 extern IRender*             render;
 
@@ -14,7 +15,7 @@ static Handle               gPipelineLayout = InvalidHandle;
 constexpr const char*       gpVertShader    = "shaders/imgui.vert.spv";
 constexpr const char*       gpFragShader    = "shaders/imgui.frag.spv";
 
-extern UniformBufferArray_t gUniformSampler;
+extern ShaderBufferArray_t gUniformSampler;
 
 struct UI_Push
 {
@@ -106,3 +107,4 @@ void Shader_UI_Draw( Handle cmd, size_t sCmdIndex, Handle shColor )
 	render->CmdDraw( cmd, 3, 1, 0, 0 );
 }
 
+#endif

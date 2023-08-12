@@ -8,8 +8,8 @@ layout(push_constant) uniform Push{
     int  aDiffuse;
 } push;
 
-// view info
-layout(set = 1, binding = 0) buffer readonly UBO_ViewInfo
+// viewport
+layout(set = 1, binding = 0) buffer Storage_Viewport
 {
 	mat4 aProjView;
 	mat4 aProjection;
@@ -17,7 +17,7 @@ layout(set = 1, binding = 0) buffer readonly UBO_ViewInfo
 	vec3 aViewPos;
 	float aNearZ;
 	float aFarZ;
-} gViewInfo[];
+} gViewport[];
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;
@@ -26,7 +26,7 @@ layout(location = 0) out vec2 fragTexCoord;
 
 void main()
 {
-	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.aModelMatrix * vec4(inPosition, 1.0);
+	gl_Position = gViewport[push.aViewInfo].aProjView * push.aModelMatrix * vec4(inPosition, 1.0);
 	fragTexCoord = inTexCoord;
 }
 

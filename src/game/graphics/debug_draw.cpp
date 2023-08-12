@@ -14,11 +14,6 @@ ChVector< glm::vec3 >                  gDebugLineVertPos;
 static ChVector< glm::vec3 >           gDebugLineVertColor;
 static size_t                          gDebugLineBufferSize = 0;
 
-// --------------------------------------------------------------------------------------
-
-extern std::vector< ViewRenderList_t > gViewRenderLists;
-extern ResourceList< Model >           gModels;
-// extern ResourceList< Renderable_t >    gRenderables;
 
 // --------------------------------------------------------------------------------------
 
@@ -72,7 +67,7 @@ void Graphics_DebugDrawNewFrame()
 	if ( !gDebugLineModel )
 	{
 		Model* model    = nullptr;
-		gDebugLineModel = gModels.Create( &model );
+		gDebugLineModel = gGraphicsData.aModels.Create( &model );
 
 		if ( !gDebugLineModel )
 		{
@@ -134,41 +129,41 @@ void Graphics_UpdateDebugDraw()
 
 	if ( r_debug_aabb || r_debug_normals )
 	{
-		ViewRenderList_t& viewList   = gViewRenderLists[ 0 ];
+		ViewRenderList_t& viewList   = gGraphicsData.aViewRenderLists[ 0 ];
 
 		glm::mat4         lastMatrix = glm::mat4( 0.f );
 		glm::mat4         invMatrix  = glm::mat4( 1.f );
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
 		{
-			for ( auto& surfaceDraw : modelList )
+			for ( SurfaceDraw_t& surfaceDraw : modelList )
 			{
 				// hack to not draw this AABB multiple times, need to change this render list system
 				if ( surfaceDraw.aSurface == 0 )
 				{
 					// Graphics_DrawModelAABB( renderable->apDraw );
 
-					Renderable_t* modelDraw = Graphics_GetRenderableData( surfaceDraw.aDrawData );
+					Renderable_t* renderable = Graphics_GetRenderableData( surfaceDraw.aRenderable );
 
-					if ( !modelDraw )
+					if ( !renderable )
 					{
 						Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 						return;
 					}
 
 					if ( r_debug_aabb )
-						Graphics_DrawBBox( modelDraw->aAABB.aMin, modelDraw->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+						Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
 
 					if ( r_debug_normals )
 					{
 						// slight hack
-						if ( lastMatrix != modelDraw->aModelMatrix )
+						if ( lastMatrix != renderable->aModelMatrix )
 						{
-							lastMatrix = modelDraw->aModelMatrix;
-							invMatrix  = glm::inverse( modelDraw->aModelMatrix );
+							lastMatrix = renderable->aModelMatrix;
+							invMatrix  = glm::inverse( renderable->aModelMatrix );
 						}
 
-						Graphics_DrawNormals( modelDraw->aModel, invMatrix );
+						Graphics_DrawNormals( renderable->aModel, invMatrix );
 					}
 
 					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
@@ -189,7 +184,7 @@ void Graphics_UpdateDebugDraw()
 		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
 
 		Model* model = nullptr;
-		if ( !gModels.Get( gDebugLineModel, &model ) )
+		if ( !gGraphicsData.aModels.Get( gDebugLineModel, &model ) )
 		{
 			Log_Error( gLC_ClientGraphics, "Failed to get Debug Draw Model!\n" );
 			gDebugLineModel = InvalidHandle;

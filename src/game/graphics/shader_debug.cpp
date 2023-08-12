@@ -7,9 +7,6 @@ constexpr const char*       gpVertColShader = "shaders/debug_col.vert.spv";
 constexpr const char*       gpVertShader    = "shaders/debug.vert.spv";
 constexpr const char*       gpFragShader    = "shaders/debug.frag.spv";
 
-// descriptor set layouts
-extern UniformBufferArray_t gUniformViewInfo;
-
 
 struct Debug_Push
 {
@@ -23,7 +20,7 @@ static std::unordered_map< SurfaceDraw_t*, Debug_Push > gDebugPushData;
 
 static void Shader_Debug_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_ViewInfo );
+	//Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_PushConstant );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
 }
 
@@ -48,7 +45,7 @@ static void Shader_Debug_ResetPushData()
 }
 
 
-static void Shader_Debug_SetupPushData( Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
 	push.aModelMatrix = spDrawData->aModelMatrix;
@@ -75,7 +72,7 @@ ShaderCreate_t gShaderCreate_Debug = {
 	.apName           = "debug",
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aFlags           = EShaderFlags_PushConstant,
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth,
 	.aVertexFormat    = VertexFormat_Position,
 	.apInit           = nullptr,
@@ -88,7 +85,6 @@ ShaderCreate_t gShaderCreate_Debug = {
 
 static void Shader_DebugLine_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_ViewInfo );
 }
 
 
@@ -108,7 +104,7 @@ static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t
 ShaderCreate_t gShaderCreate_DebugLine = {
 	.apName           = "debug_line",
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_ViewInfo,
+	.aFlags           = 0,
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_Color,
 	.apInit           = nullptr,
@@ -116,4 +112,8 @@ ShaderCreate_t gShaderCreate_DebugLine = {
 	.apLayoutCreate   = Shader_DebugLine_GetPipelineLayoutCreate,
 	.apGraphicsCreate = Shader_DebugLine_GetGraphicsPipelineCreate,
 };
+
+
+// CH_REGISTER_SHADER( gShaderCreate_Debug );
+// CH_REGISTER_SHADER( gShaderCreate_DebugLine );
 

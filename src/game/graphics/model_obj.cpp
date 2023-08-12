@@ -86,9 +86,9 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 				Handle texture = InvalidHandle;
 
 				if ( FileSys_IsRelative( texname ) )
-					render->LoadTexture( texture, baseDir2 + "/" + texname, createData );
+					Graphics_LoadTexture( texture, baseDir2 + "/" + texname, createData );
 				else
-					render->LoadTexture( texture, texname, createData );
+					Graphics_LoadTexture( texture, texname, createData );
 
 				Mat_SetVar( material, param, texture );
 			};
@@ -237,9 +237,9 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 				Handle texture = InvalidHandle;
 
 				if ( FileSys_IsRelative( texname ) )
-					render->LoadTexture( texture, baseDir2 + "/" + texname, createData );
+					Graphics_LoadTexture( texture, baseDir2 + "/" + texname, createData );
 				else
-					render->LoadTexture( texture, texname, createData );
+					Graphics_LoadTexture( texture, texname, createData );
 
 				Mat_SetVar( material, param, texture );
 			};

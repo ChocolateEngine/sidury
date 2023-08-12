@@ -17,7 +17,6 @@ static int                                                  gShadowViewInfoIndex
 
 static void Shader_ShadowMap_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ) );
 }
 
@@ -47,7 +46,7 @@ static void Shader_ShadowMap_ResetPushData()
 }
 
 
-static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_ShadowMap_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	PROF_SCOPE();
 
@@ -65,8 +64,10 @@ static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDr
 	if ( texture == InvalidHandle )
 		return;
 
+	bool alphaTest = Mat_GetBool( mat, "alphaTest" );
+
+#if 0
 	GraphicsFmt format   = render->GetTextureFormat( texture );
-	bool        hasAlpha = false;
 
 	// Check the texture format to see if it has an alpha channel
 	switch ( format )
@@ -77,10 +78,11 @@ static void Shader_ShadowMap_SetupPushData( Renderable_t* spModelDraw, SurfaceDr
 		case GraphicsFmt::BC1_RGBA_SRGB_BLOCK:
 		case GraphicsFmt::BC3_SRGB_BLOCK:
 		case GraphicsFmt::BC7_SRGB_BLOCK:
-			hasAlpha = true;
+			alphaTest = true;
 	}
+#endif
 
-	if ( hasAlpha )
+	if ( alphaTest )
 		push.aAlbedo = render->GetTextureIndex( texture );
 }
 
@@ -106,13 +108,17 @@ ShaderCreate_t gShaderCreate_ShadowMap = {
 	.apName           = "__shadow_map",
 	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = EShaderFlags_Sampler | EShaderFlags_ViewInfo | EShaderFlags_PushConstant,
+	.aFlags           = EShaderFlags_PushConstant,
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_TexCoord,
+	.aRenderPass      = ERenderPass_Shadow,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,
 	.apLayoutCreate   = Shader_ShadowMap_GetPipelineLayoutCreate,
 	.apGraphicsCreate = Shader_ShadowMap_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_ShadowMap,
 };
+
+
+// CH_REGISTER_SHADER( gShaderCreate_ShadowMap );
 

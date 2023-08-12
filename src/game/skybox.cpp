@@ -240,7 +240,7 @@ void SkyboxSystem::ComponentUpdated( Entity sEntity, void* spData )
 
 void SkyboxSystem::Update()
 {
-	// gViewInfo[ 0 ]
+	// gViewport[ 0 ]
 	// Skybox_SetAng()
 }
 

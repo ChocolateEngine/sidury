@@ -2,58 +2,16 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#define CH_VERT_SHADER 1
+
+#include "core.glsl"
+
 layout(push_constant) uniform Push
 {
-	mat4 model;
-    int material;
-	int aViewInfo;
-
-	bool aPCF;
-	bool dbgShowDiffuse;
+	uint aSurface;
+	uint aViewport;
+	uint aDebugDraw;
 } push;
-
-// view info
-layout(set = 1, binding = 0) buffer readonly UBO_ViewInfo
-{
-	mat4 aProjView;
-	mat4 aProjection;
-	mat4 aView;
-	vec3 aViewPos;
-	float aNearZ;
-	float aFarZ;
-} gViewInfo[];
-
-// TODO: THIS SHOULD NOT BE VARIABLE
-layout(set = 2, binding = 0) buffer readonly UBO_LightInfo
-{
-	int aCountWorld;
-	int aCountPoint;
-	int aCountCone;
-	int aCountCapsule;
-} gLightInfoTmp[];
-
-// Material Info
-layout(set = 7, binding = 0) buffer readonly UBO_Material
-{
-    int albedo;
-    int ao;
-    int emissive;
-
-    float aoPower;
-    float emissivePower;
-
-	bool aAlphaTest;
-} materials[];
-
-layout(set = 5, binding = 0) buffer readonly UBO_LightCone
-{
-	vec4 aColor;
-	vec3 aPos;
-	vec3 aDir;
-	vec2 aFov;  // x is inner FOV, y is outer FOV
-	int  aViewInfo;  // view info for light/shadow
-	int  aShadow;  // shadow texture index
-} gLightsCone[];
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
@@ -94,15 +52,18 @@ void main()
 	// or, for each blend shape
 	// for ( int i = 0; i < ubo.morphCount; i++ )
 
+	SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
+	Renderable_t  renderable = gCore.aRenderables[ surface.aRenderable ];
+
 	outPosition = inPosition;
-	outPositionWorld = (push.model * vec4(inPosition, 1.0)).rgb;
+	outPositionWorld = (renderable.aModel * vec4(inPosition, 1.0)).rgb;
 
 	// newPos += (ubo.morphWeight * inMorphPos);
 
-	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.model * vec4(inPosition, 1.0);
+	gl_Position = gCore.aViewports[ push.aViewport ].aProjView * renderable.aModel * vec4(inPosition, 1.0);
 	// gl_Position = projView[push.projView].projView * vec4(inPosition, 1.0);
 
-	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
+	vec3 normalWorldSpace = normalize(mat3(renderable.aModel) * inNormal);
 
 	if ( isnan( normalWorldSpace.x ) )
 	{

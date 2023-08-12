@@ -785,7 +785,7 @@ static void ConvertVMT( ParsedVMF_t& srMap, Handle sMaterial, const std::string&
 	createInfo.aFilter = EImageFilter_Linear;
 
 	Handle texture     = CH_INVALID_HANDLE;
-	texture            = render->LoadTexture( texture, vmt.aBaseTextureAbs, createInfo );
+	texture            = Graphics_LoadTexture( texture, vmt.aBaseTextureAbs, createInfo );
 	Mat_SetVar( sMaterial, "diffuse", texture );
 
 	if ( texture != CH_INVALID_HANDLE )

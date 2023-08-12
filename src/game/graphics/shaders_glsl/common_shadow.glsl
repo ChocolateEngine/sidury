@@ -2,7 +2,7 @@
 #define _COMMON_SHADOW_GLSL
 
 //! Sampler array containing the shadowmaps in the scene.
-layout(set = 0, binding = 0) uniform sampler2DShadow[] texShadowMaps;   // TODO: Separate binding?
+layout(set = 0, binding = 0) uniform sampler2DShadow[] texShadowMaps;
 
 //! 5x5 Gaussian Kernel.
 /*!
@@ -40,25 +40,5 @@ float SampleShadowMapPCF( int shadowMapID, vec3 shadowCoord )
 
 	return shadow;
 }
-
-
-// Simple Shadow Sampling - the original way i was doing it
-float SampleShadowMapBasic( int shadowMapID, vec3 shadowCoord )
-{
-	float shadow = 1.0;
-	// if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
-	{
-		// float depth = texture( texShadowMaps[ shadowMapID ], shadowCoord.st ).r;
-		float depth = texture( texShadowMaps[ shadowMapID ], shadowCoord.xyz ).r;
-		// if ( shadowCoord.w > 0.0 && depth < shadowCoord.z )
-		if ( depth < shadowCoord.z )
-		{
-			shadow = 0.f;
-		}
-	}
-
-	return shadow;
-}
-
 
 #endif  // !_COMMON_SHADOW_GLSL
