@@ -677,6 +677,12 @@ void Graphics_RenderShadowMap( Handle cmd, size_t sIndex, Light_t* spLight, cons
 	// HACK: need to setup a view push and pop system?
 	Shader_ShadowMap_SetViewInfo( srShadowMap.aViewInfoIndex );
 
+	if ( gGraphicsData.aViewRenderLists.size() <= srShadowMap.aViewInfoIndex )
+	{
+		Log_Error( gLC_ClientGraphics, "Invalid Viewport Index for Shadow Map Rendering\n" );
+		return;
+	}
+
 	ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ srShadowMap.aViewInfoIndex ];
 
 	for ( auto& [ shader, renderList ] : viewList.aRenderLists )
