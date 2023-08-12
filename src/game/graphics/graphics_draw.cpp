@@ -1,0 +1,810 @@
+#include "core/core.h"
+#include "igui.h"
+#include "render/irender.h"
+#include "graphics.h"
+#include "graphics_int.h"
+#include "lighting.h"
+#include "debug_draw.h"
+#include "mesh_builder.h"
+#include "imgui/imgui.h"
+#include "../main.h"
+
+#include <forward_list>
+#include <stack>
+#include <set>
+#include <unordered_set>
+
+// --------------------------------------------------------------------------------------
+// TODO: GET RID OF ALL THESE EXTERNS !!!!!
+
+extern IGuiSystem*           gui;
+extern IRender*              render;
+
+// shaders, fun
+u32                          Shader_Basic3D_UpdateMaterialData( Handle sMat );
+
+
+// --------------------------------------------------------------------------------------
+// Other
+
+size_t                       gModelDrawCalls = 0;
+size_t                       gVertsDrawn     = 0;
+
+extern ChVector< glm::vec3 > gDebugLineVertPos;
+
+CONVAR( r_vis, 1 );
+CONVAR( r_vis_lock, 0 );
+
+CONVAR( r_line_thickness, 2 );
+
+CONVAR( r_show_draw_calls, 0 );
+
+
+bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
+{
+	PROF_SCOPE();
+
+	if ( !spModelDraw )
+		return false;
+
+	if ( gGraphicsData.aViewData.aViewports.size() <= sViewportIndex || !r_vis || !spModelDraw->aTestVis )
+		return true;
+
+	if ( !spModelDraw->aVisible )
+		return false;
+
+	ViewportShader_t& viewInfo = gGraphicsData.aViewData.aViewports[ sViewportIndex ];
+
+	if ( !viewInfo.aActive )
+		return false;
+
+	Frustum_t& frustum = gGraphicsData.aViewData.aFrustums[ sViewportIndex ];
+
+	return frustum.IsBoxVisible( spModelDraw->aAABB.aMin, spModelDraw->aAABB.aMax );
+}
+
+
+void Graphics_Reset()
+{
+	PROF_SCOPE();
+
+	render->Reset();
+}
+
+
+void Graphics_NewFrame()
+{
+	PROF_SCOPE();
+
+	render->NewFrame();
+
+	Graphics_DebugDrawNewFrame();
+}
+
+
+// TODO: experiment with instanced drawing
+void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
+{
+	PROF_SCOPE();
+
+	Mesh& mesh = spModel->aMeshes[ sSurface ];
+
+	// TODO: figure out a way to use vertex and index offsets with this vertex format stuff
+	// ideally, it would be less vertex buffer binding, but would be harder to pull off
+	if ( spModel->apBuffers->aIndex )
+		render->CmdDrawIndexed(
+		  cmd,
+		  mesh.aIndexCount,
+		  1,                  // instance count
+		  mesh.aIndexOffset,
+		  0, // mesh.aVertexOffset,
+		  0 );
+
+	else
+		render->CmdDraw(
+		  cmd,
+		  mesh.aVertexCount,
+		  1,
+		  mesh.aVertexOffset,
+		  0 );
+
+	gModelDrawCalls++;
+	gVertsDrawn += mesh.aVertexCount;
+}
+
+
+bool Graphics_BindModel( Handle cmd, VertexFormat sVertexFormat, Model* spModel, SurfaceDraw_t& srDrawInfo )
+{
+	PROF_SCOPE();
+
+	// Bind the mesh's vertex and index buffers
+
+	// Get Vertex Buffers the shader wants
+	// TODO: what about if we don't have an attribute the shader wants???
+	ChVector< Handle > vertexBuffers;
+
+	// TODO: THIS CAN BE DONE WHEN ADDING THE MODEL TO THE MAIN DRAW LIST, AND PUT IN SurfaceDraw_t
+	for ( size_t i = 0; i < spModel->apVertexData->aData.size(); i++ )
+	{
+		VertAttribData_t& data = spModel->apVertexData->aData[ i ];
+
+		if ( sVertexFormat & ( 1 << data.aAttrib ) )
+			vertexBuffers.push_back( spModel->apBuffers->aVertex[ i ] );
+	}
+
+	size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * vertexBuffers.size() );
+	if ( offsets == nullptr )
+	{
+		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: Failed to allocate vertex buffer offsets!\n" );
+		return false;
+	}
+
+	// TODO: i could probably use offsets here, i imagine it might actually be faster?
+	memset( offsets, 0, sizeof( size_t ) * vertexBuffers.size() );
+
+	render->CmdBindVertexBuffers( cmd, 0, vertexBuffers.size(), vertexBuffers.data(), offsets );
+
+	// TODO: store index type here somewhere
+	if ( spModel->apBuffers->aIndex )
+		render->CmdBindIndexBuffer( cmd, spModel->apBuffers->aIndex, 0, EIndexType_U32 );
+
+	// SHADER: update and bind per object descriptor set?
+
+	CH_STACK_FREE( offsets );
+	return true;
+}
+
+
+void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, size_t sViewIndex, ChVector< SurfaceDraw_t >& srRenderList )
+{
+	PROF_SCOPE();
+
+	if ( !Shader_Bind( cmd, sIndex, shader ) )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", Graphics_GetShaderName( shader ) );
+		return;
+	}
+
+	SurfaceDraw_t* prevSurface = nullptr;
+	Model*         prevModel   = nullptr;
+
+	ShaderData_t*  shaderData  = Shader_GetData( shader );
+	if ( !shaderData )
+		return;
+
+	if ( shaderData->aDynamicState & EDynamicState_LineWidth )
+		render->CmdSetLineWidth( cmd, r_line_thickness );
+
+	VertexFormat vertexFormat = Shader_GetVertexFormat( shader );
+
+	for ( uint32_t i = 0; i < srRenderList.size(); )
+	{
+		SurfaceDraw_t& surfaceDraw = srRenderList[ i ];
+
+		Renderable_t* renderable = nullptr;
+		if ( !gGraphicsData.aRenderables.Get( surfaceDraw.aRenderable, &renderable ) )
+		{
+			Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+			srRenderList.remove( i );
+			continue;
+		}
+
+		// get model and check if it's nullptr
+		if ( renderable->aModel == InvalidHandle )
+		{
+			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model handle is InvalidHandle\n" );
+			srRenderList.remove( i );
+			continue;
+		}
+
+		// get model data
+		Model* model = Graphics_GetModelData( renderable->aModel );
+		if ( !model )
+		{
+			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
+			srRenderList.remove( i );
+			continue;
+		}
+
+		// make sure this model has valid vertex buffers
+		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
+		{
+			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
+			srRenderList.remove( i );
+			continue;
+		}
+
+		bool bindModel = !prevSurface;
+
+		if ( prevSurface )
+		{
+			// bindModel |= prevSurface->apDraw->aModel != renderable->apDraw->aModel;
+			// bindModel |= prevSurface->aSurface != renderable->aSurface;
+
+			if ( prevModel )
+			{
+				bindModel |= prevModel->apBuffers != model->apBuffers;
+				bindModel |= prevModel->apVertexData != model->apVertexData;
+			}
+		}
+
+		if ( bindModel )
+		{
+			prevModel   = model;
+			prevSurface = &surfaceDraw;
+			if ( !Graphics_BindModel( cmd, vertexFormat, model, surfaceDraw ) )
+				continue;
+		}
+
+		// NOTE: not needed if the material is the same i think
+		if ( !Shader_PreRenderableDraw( cmd, sIndex, shader, surfaceDraw ) )
+			continue;
+
+		Graphics_CmdDrawSurface( cmd, model, surfaceDraw.aSurface );
+		i++;
+	}
+}
+
+
+// Do Rendering with shader system and user land meshes
+void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRenderList_t& srViewList )
+{
+	PROF_SCOPE();
+
+	// here we go again
+	static Handle skybox    = Graphics_GetShader( "skybox" );
+
+	bool          hasSkybox = false;
+
+	int width = 0, height = 0;
+	render->GetSurfaceSize( width, height );
+
+	Rect2D_t rect{};
+	rect.aOffset.x = 0;
+	rect.aOffset.y = 0;
+	rect.aExtent.x = width;
+	rect.aExtent.y = height;
+
+	render->CmdSetScissor( cmd, 0, &rect, 1 );
+
+	// flip viewport
+	Viewport_t viewPort{};
+	viewPort.x        = 0.f;
+	viewPort.y        = height;
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 1.f;
+	viewPort.width    = width;
+	viewPort.height   = height * -1.f;
+
+	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+	for ( auto& [ shader, renderList ] : srViewList.aRenderLists )
+	{
+		if ( shader == InvalidHandle )
+		{
+			Log_Warn( gLC_ClientGraphics, "Invalid Shader Handle (0) in View RenderList\n" );
+			continue;
+		}
+
+		if ( shader == skybox )
+		{
+			hasSkybox = true;
+			continue;
+		}
+
+		Graphics_DrawShaderRenderables( cmd, sIndex, shader, sViewIndex, renderList );
+	}
+
+	// Draw Skybox - and set depth for skybox
+	if ( hasSkybox )
+	{
+		viewPort.minDepth = 0.999f;
+		viewPort.maxDepth = 1.f;
+
+		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+		Graphics_DrawShaderRenderables( cmd, sIndex, skybox, sViewIndex, srViewList.aRenderLists[ skybox ] );
+	}
+}
+
+
+void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
+{
+	PROF_SCOPE();
+
+	// render->CmdBindDescriptorSets( sCmd, sIndex, EPipelineBindPoint_Graphics, PIPELINE_LAYOUT, SETS, SET_COUNT );
+
+	for ( size_t i = 0; i < gGraphicsData.aViewRenderLists.size(); i++ )
+	{
+		// HACK HACK !!!!
+		// don't render views with shader overrides here, the only override is the shadow map shader
+		// and that is rendered in a separate render pass
+		if ( gGraphicsData.aViewData.aViewports[ i ].aShaderOverride )
+			continue;
+
+		Graphics_RenderView( sCmd, sIndex, i, gGraphicsData.aViewRenderLists[ i ] );
+	}
+}
+
+
+void Graphics_AddToViewRenderList()
+{
+}
+
+
+void Graphics_UpdateShaderRenderableData()
+{
+	// TODO: THREADING
+
+	// for each renderable
+	//   get renderable gpu index
+	//   write model matrix, material index, and vertex/index buffer indexes
+	// 
+	//   --- IDEA: Calcuate this in a computer shader, so we can do this in parallel way more than we could on the cpu ---
+	//   clear previous light list
+	//   for each light
+	//     if renderable in light radius
+	//       add to light list
+	// 
+	//   sort light list from smallest to greatest index
+	//
+}
+
+
+void Graphics_UpdateCoreData()
+{
+}
+
+
+void Graphics_PrepareDrawData()
+{
+	PROF_SCOPE();
+
+	// fun
+	static Handle        shadow_map       = Graphics_GetShader( "__shadow_map" );
+	static ShaderData_t* shadowShaderData = Shader_GetData( shadow_map );
+
+	render->PreRenderPass();
+	// Update Textures
+
+	if ( r_show_draw_calls )
+	{
+		gui->DebugMessage( "Model Draw Calls: %zd", gModelDrawCalls );
+		gui->DebugMessage( "Verts Drawn: %zd", gVertsDrawn );
+		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVertPos.size() );
+	}
+
+	{
+		PROF_SCOPE_NAMED( "Imgui Render" );
+		ImGui::Render();
+	}
+
+	gModelDrawCalls = 0;
+	gVertsDrawn     = 0;
+
+	for ( const auto& mat : gGraphicsData.aDirtyMaterials )
+	{
+		Handle shader = Mat_GetShader( mat );
+
+		// HACK HACK
+		if ( Graphics_GetShader( "basic_3d" ) == shader )
+			Shader_Basic3D_UpdateMaterialData( mat );
+	}
+
+	gGraphicsData.aDirtyMaterials.clear();
+
+	// update renderable AABB's
+	for ( auto& [ renderHandle, bbox ] : gGraphicsData.aRenderAABBUpdate )
+	{
+		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+		{
+			if ( glm::length( bbox.aMin ) == 0 && glm::length( bbox.aMax ) == 0 )
+			{
+				Log_Warn( gLC_ClientGraphics, "Model Bounding Box not calculated, length of min and max is 0\n" );
+				bbox = Graphics_CalcModelBBox( renderable->aModel );
+			}
+
+			renderable->aAABB = Graphics_CreateWorldAABB( renderable->aModelMatrix, bbox );
+		}
+	}
+
+	gGraphicsData.aRenderAABBUpdate.clear();
+
+	// Update Light Data
+	Graphics_PrepareLights();
+
+	// if ( gGraphicsData.aViewData.aUpdate )
+	// {
+	// 	gGraphicsData.aViewData.aUpdate = false;
+	// 	// for ( size_t i = 0; i < gViewportBuffers.size(); i++ )
+	// 	for ( size_t i = 0; i < 1; i++ )
+	// 	{
+	// 		render->BufferWrite( gGraphicsData.aViewData.aBuffers[ i ], sizeof( UBO_Viewport_t ), &gGraphicsData.aViewData.aViewports[ i ] );
+	// 	}
+	// }
+
+	// update view frustums (CHANGE THIS, SHOULD NOT UPDATE EVERY SINGLE ONE PER FRAME  !!!!)
+	if ( !r_vis_lock.GetBool() || gGraphicsData.aViewData.aFrustums.size() != gGraphicsData.aViewData.aViewports.size() )
+	{
+		gGraphicsData.aViewData.aFrustums.resize( gGraphicsData.aViewData.aViewports.size() );
+
+		for ( size_t i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		{
+			Graphics_CreateFrustum( gGraphicsData.aViewData.aFrustums[ i ], gGraphicsData.aViewData.aViewports[ i ].aProjView );
+			Graphics_DrawFrustum( gGraphicsData.aViewData.aFrustums[ i ] );
+		}
+	}
+
+	// --------------------------------------------------------------------
+
+	Shader_ResetPushData();
+
+	bool usingShadow = Graphics_IsUsingShadowMaps();
+
+	// --------------------------------------------------------------------
+	// Prepare View Render Lists
+
+	bool visLocked   = r_vis_lock.GetBool();
+
+	if ( !visLocked )
+	{
+		// Reset Render Lists
+		for ( ViewRenderList_t& viewList : gGraphicsData.aViewRenderLists )
+			for ( auto& [ handle, vec ] : viewList.aRenderLists )
+				vec.clear();
+
+		gGraphicsData.aViewRenderLists.resize( gGraphicsData.aViewData.aViewports.size() );
+	}
+
+	Graphics_UpdateDebugDraw();
+
+	ShaderArrayAllocator_t& surfAllocator = gGraphicsData.aFreeSurfaceDraws;
+	surfAllocator.aUsed                   = 0;
+
+	for ( uint32_t i = 0; i < gGraphicsData.aRenderables.size(); )
+	{
+		PROF_SCOPE_NAMED( "Update Renderables" );
+
+		Renderable_t* renderable = nullptr;
+		if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aRenderables.aHandles[ i ], &renderable ) )
+		{
+			Log_Warn( gLC_ClientGraphics, "Renderable handle is invalid!\n" );
+			gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
+			continue;
+		}
+
+		if ( !renderable->aVisible )
+		{
+			i++;
+			continue;
+		}
+
+		Model* model = Graphics_GetModelData( renderable->aModel );
+		if ( !model )
+		{
+			Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
+			gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
+			continue;
+		}
+
+		// update data on gpu
+		// NOTE: we actually use the handle index for this and not the allocator
+		// if this works well, we could just get rid of the allocator entirely and use handle indexes
+		u32 renderIndex = CH_GET_HANDLE_INDEX( gGraphicsData.aRenderables.aHandles[ i ] );
+
+		if ( renderIndex >= CH_R_MAX_RENDERABLES )
+		{
+			Log_WarnF( gLC_ClientGraphics, "Renderable Index %zd is greater than max shader renderable count of %zd\n", renderIndex, CH_R_MAX_RENDERABLES );
+			i++;
+			continue;
+		}
+
+		Shader_Renderable_t& shaderRenderable = gGraphicsData.aCoreData.aRenderables[ renderIndex ];
+
+		// write model matrix, and vertex/index buffer indexes
+		shaderRenderable.aModel               = renderable->aModelMatrix;
+
+		// update light lists
+
+		if ( visLocked )
+		{
+			i++;
+			continue;
+		}
+
+		// check if we need this in any views
+		for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
+		{
+			PROF_SCOPE_NAMED( "Viewport Testing" );
+
+			// HACK: kind of of hack with the shader override check
+			// If we don't want to cast a shadow and are in a shadowmap view, don't add to the view's render list
+			if ( !renderable->aCastShadow && gGraphicsData.aViewData.aViewports[ viewIndex ].aShaderOverride )
+				continue;
+
+			// Is this model visible in this view?
+			if ( !Graphics_ViewFrustumTest( renderable, viewIndex ) )
+				continue;
+
+			ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewIndex ];
+
+			// Add each surface to the shader draw list
+			for ( uint32_t surf = 0; surf < model->aMeshes.size(); surf++ )
+			{
+				Handle mat = model->aMeshes[ surf ].aMaterial;
+
+				// TODO: add Mat_IsValid()
+				if ( mat == InvalidHandle )
+				{
+					Log_ErrorF( gLC_ClientGraphics, "Model part \"%d\" has no material!\n", surf );
+					// gModelDrawList.remove( i );
+					continue;
+				}
+
+				// Handle shader = InvalidHandle;
+				Handle shader = gGraphicsData.aViewData.aViewports[ viewIndex ].aShaderOverride;
+
+				if ( !shader )
+					shader = Mat_GetShader( mat );
+
+				ShaderData_t* shaderData = Shader_GetData( shader );
+				if ( !shaderData )
+					continue;
+
+				if ( CH_IF_ASSERT( surfAllocator.aUsed < surfAllocator.aAllocated ) )
+					continue;
+
+				// add a SurfaceDraw_t to this render list
+				SurfaceDraw_t& surfDraw  = gGraphicsData.aViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
+				surfDraw.aRenderable     = gGraphicsData.aRenderables.aHandles[ i ];
+				surfDraw.aSurface        = surf;
+
+				// more unique use of this lol
+				u32                   surfIndex      = surfAllocator.aUsed++; 
+				Shader_SurfaceDraw_t& shaderSurfDraw = gGraphicsData.aSurfaceDraws[ surfIndex ];
+				shaderSurfDraw.aMaterial             = 0;
+				shaderSurfDraw.aRenderable           = renderIndex;
+
+				surfDraw.aShaderSlot                 = surfIndex;
+
+				Shader_SetupRenderableDrawData( renderIndex, viewIndex, renderable, shaderData, surfDraw );
+
+				if ( !renderable->aCastShadow )
+					continue;
+
+				// if ( shaderData->aFlags & EShaderFlags_Lights && usingShadow && shadowShaderData )
+				// 	Shader_SetupRenderableDrawData( renderable, shadowShaderData, renderable );
+				
+				if ( !shaderData->apMaterialIndex )
+					continue;
+
+				shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
+			}
+		}
+
+		i++;
+	}
+
+	// --------------------------------------------------------------------
+	// Update Renderables on the GPU and Calculate Light Lists
+
+	Graphics_UpdateShaderRenderableData();
+
+	// --------------------------------------------------------------------
+	// Update Shader Draw Data
+	// TODO: can this be merged into the above for loop for viewports and renderables?
+
+#if 0
+	for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
+	{
+		PROF_SCOPE_NAMED( "Update Shader Draw Data" );
+
+		ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewIndex ];
+
+		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
+		{
+			ShaderData_t* shaderData = Shader_GetData( shader );
+			if ( !shaderData )
+				continue;
+
+			for ( auto& renderable : modelList )
+			{
+				Renderable_t* renderable = nullptr;
+				if ( !gGraphicsData.aRenderables.Get( renderable.aDrawData, &renderable ) )
+				{
+					Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
+					continue;
+				}
+
+				u64 renderableIndex = CH_GET_HANDLE_INDEX( renderable.aDrawData );
+				Shader_SetupRenderableDrawData( renderableIndex, viewIndex, renderable, shaderData, renderable );
+
+				if ( !renderable->aCastShadow )
+					continue;
+
+				// if ( shaderData->aFlags & EShaderFlags_Lights && usingShadow && shadowShaderData )
+				// 	Shader_SetupRenderableDrawData( renderable, shadowShaderData, renderable );
+			}
+		}
+	}
+#endif
+
+	// Update Core Data SSBO
+	if ( gGraphicsData.aCoreDataStaging.aDirty )
+	{
+		gGraphicsData.aCoreDataStaging.aDirty = false;
+		render->BufferWrite( gGraphicsData.aCoreDataStaging.aStagingBuffer, sizeof( Buffer_Core_t ), &gGraphicsData.aCoreData );
+		render->BufferCopy( gGraphicsData.aCoreDataStaging.aStagingBuffer, gGraphicsData.aCoreDataStaging.aBuffer, sizeof( Buffer_Core_t ) );
+	}
+
+	// Update Shader Draws Data SSBO
+	// if ( gGraphicsData.aSurfaceDrawsStaging.aDirty )
+	// {
+	// 	gGraphicsData.aSurfaceDrawsStaging.aDirty = false;
+	// 	render->BufferWrite( gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer, sizeof( gGraphicsData.aSurfaceDraws ), &gGraphicsData.aSurfaceDraws );
+	// 	render->BufferCopy( gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer, gGraphicsData.aSurfaceDrawsStaging.aBuffer, sizeof( gGraphicsData.aSurfaceDraws ) );
+	// }
+}
+
+
+void Graphics_Present()
+{
+	PROF_SCOPE();
+
+	// render->LockGraphicsMutex();
+	render->WaitForQueues();
+	render->ResetCommandPool();
+
+	Graphics_PrepareDrawData();
+
+	ChHandle_t* commandBuffers     = gGraphicsData.aCommandBuffers;
+	size_t      commandBufferCount = gGraphicsData.aCommandBufferCount;
+
+	// For each framebuffer, begin a primary
+	// command buffer, and record the commands.
+	for ( size_t cmdIndex = 0; cmdIndex < commandBufferCount; cmdIndex++ )
+	{
+		PROF_SCOPE_NAMED( "Primary Command Buffer" );
+
+		ChHandle_t c = commandBuffers[ cmdIndex ];
+
+		render->BeginCommandBuffer( c );
+
+		// Draw Shadow Maps
+		Graphics_DrawShadowMaps( c, cmdIndex );
+
+		// ----------------------------------------------------------
+		// Main RenderPass
+
+		RenderPassBegin_t renderPassBegin{};
+		renderPassBegin.aRenderPass  = gGraphicsData.aRenderPassGraphics;
+		renderPassBegin.aFrameBuffer = gGraphicsData.aBackBuffer[ cmdIndex ];
+		renderPassBegin.aClear.resize( 2 );
+		renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 0.f };
+		renderPassBegin.aClear[ 0 ].aIsDepth = false;
+		renderPassBegin.aClear[ 1 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
+		renderPassBegin.aClear[ 1 ].aIsDepth = true;
+
+		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
+
+		Graphics_Render( c, cmdIndex, ERenderPass_Graphics );
+		render->DrawImGui( ImGui::GetDrawData(), c );
+
+		render->EndRenderPass( c );
+
+		render->EndCommandBuffer( c );
+	}
+
+	render->Present();
+	// render->UnlockGraphicsMutex();
+}
+
+
+ChHandle_t Graphics_CreateRenderPass( EDescriptorType sType )
+{
+	RenderPassData_t passData{};
+
+	return CH_INVALID_HANDLE;
+}
+
+
+#if 0
+void Graphics_UpdateRenderPass( ChHandle_t sRenderPass )
+{
+	// update the descriptor sets
+	WriteDescSet_t update{};
+
+	update.aDescSets.push_back( gShaderDescriptorData.aPerPassSets[ sRenderPass ][ 0 ] );
+	update.aDescSets.push_back( gShaderDescriptorData.aPerPassSets[ sRenderPass ][ 1 ] );
+
+	update.aType    = EDescriptorType_StorageBuffer;
+	update.aBuffers = gViewportBuffers;
+	render->UpdateDescSet( update );
+}
+
+
+void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
+{
+	// update the descriptor sets
+	WriteDescSet_t update{};
+
+	update.aDescSets.push_back( gShaderDescriptorData.aPerPassSets[ sRenderPass ][ 0 ] );
+	update.aDescSets.push_back( gShaderDescriptorData.aPerPassSets[ sRenderPass ][ 1 ] );
+
+	update.aType    = EDescriptorType_StorageBuffer;
+	update.aBuffers = gViewportBuffers;
+	render->UpdateDescSet( update );
+}
+#endif
+
+
+// awful function
+void Graphics_SetViewProjMatrix( const glm::mat4& srMat )
+{
+	gGraphicsData.aViewData.aViewports[ 0 ].aProjView = srMat;
+	gGraphicsData.aViewData.aViewProjMat              = srMat;
+
+	// HACK
+	gGraphicsData.aCoreData.aViewports[ 0 ].aProjView = srMat;
+	gGraphicsData.aCoreDataStaging.aDirty             = true;
+}
+
+
+size_t Graphics_CreateViewport()
+{
+	// TODO: allocate viewport slots like the entity system allocates and frees entities
+	gGraphicsData.aViewData.aViewports.resize( gGraphicsData.aViewData.aViewports.size() + 1 );
+	return gGraphicsData.aViewData.aViewports.size() - 1;
+}
+
+
+ViewportShader_t* Graphics_GetViewportData( size_t sViewportIndex )
+{
+	if ( sViewportIndex > gGraphicsData.aViewData.aViewports.size() )
+	{
+		Log_ErrorF( "Invalid Viewport Index: %zd, only allocated %zd\n", sViewportIndex, gGraphicsData.aViewData.aViewports.size() );
+		return nullptr;
+	}
+
+	return &gGraphicsData.aViewData.aViewports[ sViewportIndex ];
+}
+
+
+void Graphics_SetViewportUpdate( bool sUpdate )
+{
+	gGraphicsData.aCoreDataStaging.aDirty = sUpdate;
+}
+
+
+const glm::mat4& Graphics_GetViewProjMatrix()
+{
+	return gGraphicsData.aViewData.aViewProjMat;
+}
+
+
+void Graphics_PushViewInfo( const ViewportShader_t& srViewInfo )
+{
+	// gViewportStack.push( srViewInfo );
+}
+
+
+void Graphics_PopViewInfo()
+{
+	// if ( gViewportStack.empty() )
+	// {
+	// 	Log_Error( "Misplaced View Info Pop!\n" );
+	// 	return;
+	// }
+	// 
+	// gViewportStack.pop();
+}
+
+
+// ViewportShader_t& Graphics_GetViewInfo()
+// {
+// 	// if ( gViewportStack.empty() )
+// 	// 	return gViewport[ 0 ];
+// 	// 
+// 	// return gViewportStack.top();
+// }
+
