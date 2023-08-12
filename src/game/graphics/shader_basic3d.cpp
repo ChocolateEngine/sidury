@@ -25,14 +25,15 @@ static CreateDescBinding_t gBasic3D_Bindings[]      = {
 
 struct Basic3D_Push
 {
-	u32 aSurface  = 0;
-	u32 aViewport = 0;
-	
+	u32 aRenderable = 0;
+	u32 aMaterial   = 0;
+	u32 aViewport   = 0;
+
 	// Hack for GTX 1050 Ti until I figure this out properly
 	// bool aPCF = false;
 
 	// debugging
-	u32 aDebugDraw;
+	u32 aDebugDraw  = 0;
 };
 
 
@@ -250,6 +251,8 @@ static u32 Shader_Basic3D_GetMaterialIndex( u32 sRenderableIndex, Renderable_t* 
 }
 
 
+// TODO: Move this push constant management into the shader system
+// we should only need the SetupPushData function
 static void Shader_Basic3D_ResetPushData()
 {
 	gPushData.clear();
@@ -262,7 +265,8 @@ static void Shader_Basic3D_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex,
 
 	Basic3D_Push& push = gPushData[ srDrawInfo.aShaderSlot ];
 	// push.aModelMatrix  = spModelDraw->aModelMatrix;
-	push.aSurface      = srDrawInfo.aShaderSlot;
+	push.aRenderable   = CH_GET_HANDLE_INDEX( srDrawInfo.aRenderable );
+	push.aMaterial     = Shader_Basic3D_GetMaterialIndex( sSurfaceIndex, spModelDraw, srDrawInfo );
 	push.aViewport     = sViewportIndex;
 
 	push.aDebugDraw    = r_basic3d_dbg_mode;

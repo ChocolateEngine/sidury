@@ -8,7 +8,8 @@
 
 layout(push_constant) uniform Push
 {
-	uint aSurface;
+	uint aRenderable;
+	uint aMaterial;
 	uint aViewport;
 	uint aDebugDraw;
 } push;
@@ -52,8 +53,7 @@ void main()
 	// or, for each blend shape
 	// for ( int i = 0; i < ubo.morphCount; i++ )
 
-	SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
-	Renderable_t  renderable = gCore.aRenderables[ surface.aRenderable ];
+	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
 
 	outPosition = inPosition;
 	outPositionWorld = (renderable.aModel * vec4(inPosition, 1.0)).rgb;

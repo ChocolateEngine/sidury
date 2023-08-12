@@ -12,7 +12,8 @@
 
 layout(push_constant) uniform Push
 {
-	uint aSurface;
+	uint aRenderable;
+	uint aMaterial;
 	uint aViewport;
 	uint aDebugDraw;
 } push;
@@ -39,7 +40,7 @@ layout(location = 5) in vec3 inTangent;
 
 layout(location = 0) out vec4 outColor;
 
-#define mat materials[ surface.aMaterial ]
+#define mat materials[ push.aMaterial ]
 // #define mat materials[0]
 
 #define texDiffuse  texSamplers[ mat.albedo ]
@@ -66,8 +67,8 @@ float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
 
 void main()
 {
-	SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
-	Renderable_t  renderable = gCore.aRenderables[ surface.aRenderable ];
+	// SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
+	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
 
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
     vec4 albedo = texture( texDiffuse, fragTexCoord );
