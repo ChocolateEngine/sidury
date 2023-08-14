@@ -413,6 +413,7 @@ struct ViewportShader_t
 
 	glm::uvec2 aSize{};
 	bool       aActive = true;
+	bool       aAllocated = false;
 
 	// HACK: if this is set, it overrides the shader used for all renderables in this view
 	ChHandle_t aShaderOverride = CH_INVALID_HANDLE;
@@ -424,7 +425,7 @@ struct ShadowMap_t
 	ChHandle_t aTexture     = CH_INVALID_HANDLE;
 	ChHandle_t aFramebuffer = CH_INVALID_HANDLE;
 	glm::ivec2 aSize{};
-	int        aViewInfoIndex = 0;
+	u32        aViewInfoIndex = UINT32_MAX;
 };
 
 
@@ -679,13 +680,11 @@ void               Graphics_Present();
 // ChHandle_t         Graphics_CreateRenderPass();
 // void               Graphics_UpdateRenderPass( ChHandle_t sRenderPass );
 
-void               Graphics_SetViewProjMatrix( const glm::mat4& srMat );
-const glm::mat4&   Graphics_GetViewProjMatrix();
-
 // Returns the Viewport Index
-size_t             Graphics_CreateViewport();
+u32                Graphics_CreateViewport( ViewportShader_t* spViewport = nullptr );
+void               Graphics_FreeViewport( u32 sViewportIndex );
 
-ViewportShader_t*  Graphics_GetViewportData( size_t sViewportIndex );
+ViewportShader_t*  Graphics_GetViewportData( u32 sViewportIndex );
 void               Graphics_SetViewportUpdate( bool sUpdate );
 
 // void               Graphics_PushViewInfo( const ViewportShader_t& srViewInfo );

@@ -768,8 +768,11 @@ static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u
 	srAllocator.apFree     = ch_calloc_count< u32 >( sCount );
 
 	// Fill the free list with indexes
-	for ( u32 index = srAllocator.aAllocated - 1, slot = 0; index > 0; --index, ++slot )
-		srAllocator.apFree[ slot ] = index;
+	// for ( u32 index = srAllocator.aAllocated - 1, slot = 0; index > 0; --index, ++slot )
+	// 	srAllocator.apFree[ slot ] = index;
+
+	for ( u32 index = 0; index < srAllocator.aAllocated; index++ )
+		srAllocator.apFree[ index ] = index;
 }
 
 
@@ -1048,10 +1051,6 @@ bool Graphics_Init()
 		Log_Fatal( gLC_ClientGraphics, "Failed to get Back Buffer Handles!\n" );
 		return false;
 	}
-
-	int width, height;
-	render->GetSurfaceSize( width, height );
-	gGraphicsData.aViewData.aViewports[ 0 ].aSize = { width, height };
 
 	if ( !Graphics_CreateRenderPasses() )
 	{

@@ -1,5 +1,6 @@
 #include "core/resources.hh"
 #include "graphics.h"
+#include "graphics_int.h"
 #include "render/irender.h"
 
 #include "core/json5.h"
@@ -106,8 +107,6 @@ static std::unordered_map< Handle, Handle >           gMaterialShaders;
 static Handle                                         gInvalidMaterial;
 static std::string                                    gStrEmpty;
 
-std::unordered_set< Handle >                          gDirtyMaterials;
-
 
 const char* Mat_GetName( Handle shMat )
 {
@@ -170,7 +169,7 @@ void Mat_SetShader( Handle mat, Handle shShader )
 	if ( it != gMaterialShaders.end() )
 	{
 		it->second = shShader;
-		gDirtyMaterials.emplace( mat );
+		gGraphicsData.aDirtyMaterials.emplace( mat );
 	}
 	else
 	{
@@ -202,7 +201,7 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 		return;
 	}
 
-	gDirtyMaterials.emplace( mat );
+	gGraphicsData.aDirtyMaterials.emplace( mat );
 
 	for ( MaterialVar& var : data->aVars )
 	{
@@ -550,8 +549,8 @@ void Graphics_FreeMaterial( Handle shMaterial )
 		}
 
 		// make sure it's not in the dirty materials list
-		if ( gDirtyMaterials.contains( shMaterial ) )
-			gDirtyMaterials.erase( shMaterial );
+		if ( gGraphicsData.aDirtyMaterials.contains( shMaterial ) )
+			gGraphicsData.aDirtyMaterials.erase( shMaterial );
 	}
 }
 
@@ -596,11 +595,11 @@ const std::string& Graphics_GetMaterialPath( Handle sMaterial )
 // Tell all materials to rebuild
 void Graphics_SetAllMaterialsDirty()
 {
-	if ( gMaterialShaders.size() == gDirtyMaterials.size() )
+	if ( gMaterialShaders.size() == gGraphicsData.aDirtyMaterials.size() )
 		return;
 
 	for ( const auto& [ mat, shader ] : gMaterialShaders )
-		gDirtyMaterials.emplace( mat );
+		gGraphicsData.aDirtyMaterials.emplace( mat );
 }
 
 

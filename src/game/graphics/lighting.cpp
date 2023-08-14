@@ -83,14 +83,22 @@ bool Graphics_CreateShadowRenderPass()
 
 void Graphics_AddShadowMap( Light_t* spLight )
 {
+	ViewportShader_t* viewport = nullptr;
+	u32               viewportIndex = Graphics_CreateViewport( viewport );
+
+	if ( viewport == nullptr )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to allocate viewport for shadow map\n" );
+		return;
+	}
+
 	ShadowMap_t& shadowMap     = gLightShadows[ spLight ];
 	shadowMap.aSize            = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
-	shadowMap.aViewInfoIndex   = gGraphicsData.aViewData.aViewports.size() + 1;
+	shadowMap.aViewInfoIndex   = viewportIndex;
 
-	// gViewport.resize( gViewportCount );
-	// Viewport_t& viewInfo     = gViewport.at( shadowMap.aViewInfoIndex );
-	ViewportShader_t& viewInfo = gGraphicsData.aViewData.aViewports.emplace_back();
-	viewInfo.aShaderOverride   = Graphics_GetShader( "__shadow_map" );
+	viewport->aShaderOverride  = Graphics_GetShader( "__shadow_map" );
+	viewport->aSize            = shadowMap.aSize;
+	viewport->aActive          = true;
 
 	// Create Textures
 	TextureCreateInfo_t texCreate{};
@@ -140,13 +148,9 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 	if ( it->second.aTexture )
 		Graphics_FreeTexture( it->second.aTexture );
 
-	if ( it->second.aViewInfoIndex )
+	if ( it->second.aViewInfoIndex != UINT32_MAX )
 	{
-		if ( gGraphicsData.aViewData.aViewports.size() > it->second.aViewInfoIndex )
-		{
-			vec_remove_index( gGraphicsData.aViewData.aViewports, it->second.aViewInfoIndex );
-			gGraphicsData.aCoreDataStaging.aDirty = true;
-		}
+		Graphics_FreeViewport( it->second.aViewInfoIndex );
 	}
 
 	gLightShadows.erase( spLight );

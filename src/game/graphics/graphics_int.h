@@ -187,7 +187,6 @@ struct ModelAABBUpdate_t
 
 struct GraphicsViewData_t
 {
-	glm::mat4                       aViewProjMat;
 	// std::vector< ChHandle_t >       aBuffers;
 	std::vector< ViewportShader_t > aViewports;  // Get rid of thus and only use the one in core data for the gpu
 	std::vector< Frustum_t >        aFrustums;

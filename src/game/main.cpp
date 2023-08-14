@@ -49,6 +49,9 @@ extern bool      gRunning;
 extern ConVar    r_nearz, r_farz, r_fov;
 extern ConVar    host_timescale;
 
+// blech
+static u32       gMainViewportIndex = UINT32_MAX;
+
 CONVAR( phys_friction, 10 );
 CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
@@ -114,13 +117,13 @@ bool Game_Init()
 
 	Steam_Init();
 
-	// Create the Main Viewport - TODO: use this more across the game code
-	size_t viewIndex = Graphics_CreateViewport();
-
-	Game_UpdateProjection();
-
 	if ( !Graphics_Init() )
 		return false;
+
+	// Create the Main Viewport - TODO: use this more across the game code
+	gMainViewportIndex = Graphics_CreateViewport();
+
+	Game_UpdateProjection();
 
 	Sys_SetResizeCallback( WindowResizeCallback );
 
@@ -315,38 +318,14 @@ void Game_HandleSystemEvents()
 }
 
 
-// weird old functions that need to be re-thought
+// TODO: this will not work for multiple camera viewports
 void Game_SetView( const glm::mat4& srViewMat )
 {
-	PROF_SCOPE();
-
-	int width = 0, height = 0;
-	render->GetSurfaceSize( width, height );
-
 	gView.aViewMat = srViewMat;
-	gView.ComputeProjection( width, height );
-
-	ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
-
-	if ( !viewport )
-		return;
-
-	// um
-	viewport->aProjView   = gView.aProjViewMat;
-	viewport->aProjection = gView.aProjMat;
-	viewport->aView       = gView.aViewMat;
-	viewport->aNearZ      = gView.aNearZ;
-	viewport->aFarZ       = gView.aFarZ;
-
-	Graphics_SetViewProjMatrix( gView.aProjViewMat );
-	Graphics_SetViewportUpdate( true );
-
-	auto& io         = ImGui::GetIO();
-	io.DisplaySize.x = width;
-	io.DisplaySize.y = height;
 }
 
 
+// TODO: this will not work for multiple camera viewports
 void Game_UpdateProjection()
 {
 	PROF_SCOPE();
@@ -355,7 +334,7 @@ void Game_UpdateProjection()
 	render->GetSurfaceSize( width, height );
 	gView.ComputeProjection( width, height );
 
-	ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+	ViewportShader_t* viewport = Graphics_GetViewportData( gMainViewportIndex );
 
 	if ( !viewport )
 		return;
@@ -366,8 +345,8 @@ void Game_UpdateProjection()
 	viewport->aView       = gView.aViewMat;
 	viewport->aNearZ      = gView.aNearZ;
 	viewport->aFarZ       = gView.aFarZ;
+	viewport->aSize       = { width, height };
 
-	Graphics_SetViewProjMatrix( gView.aProjViewMat );
 	Graphics_SetViewportUpdate( true );
 
 	auto& io = ImGui::GetIO();

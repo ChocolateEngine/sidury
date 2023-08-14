@@ -55,7 +55,7 @@ bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
 
 	ViewportShader_t& viewInfo = gGraphicsData.aViewData.aViewports[ sViewportIndex ];
 
-	if ( !viewInfo.aActive )
+	if ( !viewInfo.aActive || !viewInfo.aAllocated )
 		return false;
 
 	Frustum_t& frustum = gGraphicsData.aViewData.aFrustums[ sViewportIndex ];
@@ -314,8 +314,13 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 
 	// render->CmdBindDescriptorSets( sCmd, sIndex, EPipelineBindPoint_Graphics, PIPELINE_LAYOUT, SETS, SET_COUNT );
 
+	// TODO: add in some dependency thing here, when you add camera's in the game, you'll need to render those first before the final viewports (VR maybe)
 	for ( size_t i = 0; i < gGraphicsData.aViewRenderLists.size(); i++ )
 	{
+		// blech
+		if ( !gGraphicsData.aViewData.aViewports[ i ].aAllocated || !gGraphicsData.aViewData.aViewports[ i ].aActive )
+			continue;
+
 		// HACK HACK !!!!
 		// don't render views with shader overrides here, the only override is the shadow map shader
 		// and that is rendered in a separate render pass
@@ -632,6 +637,20 @@ void Graphics_PrepareDrawData()
 	// Update Core Data SSBO
 	if ( gGraphicsData.aCoreDataStaging.aDirty )
 	{
+		// Update Viewports (this looks stupid)
+		for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		{
+			ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
+			Shader_Viewport_t& viewportBuffer = gGraphicsData.aCoreData.aViewports[ i ];
+
+			viewportBuffer.aProjView          = viewport.aProjView;
+			viewportBuffer.aProjection        = viewport.aProjection;
+			viewportBuffer.aView              = viewport.aView;
+			viewportBuffer.aViewPos           = viewport.aViewPos;
+			viewportBuffer.aNearZ             = viewport.aNearZ;
+			viewportBuffer.aFarZ              = viewport.aFarZ;
+		}
+
 		gGraphicsData.aCoreDataStaging.aDirty = false;
 		render->BufferWrite( gGraphicsData.aCoreDataStaging.aStagingBuffer, sizeof( Buffer_Core_t ), &gGraphicsData.aCoreData );
 
@@ -749,47 +768,70 @@ void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
 #endif
 
 
-// awful function
-void Graphics_SetViewProjMatrix( const glm::mat4& srMat )
+u32 Graphics_CreateViewport( ViewportShader_t* spViewport )
 {
-	gGraphicsData.aViewData.aViewports[ 0 ].aProjView = srMat;
-	gGraphicsData.aViewData.aViewProjMat              = srMat;
+	u32 index = Graphics_AllocateCoreSlot( EShaderCoreArray_Viewports );
 
-	// HACK
-	gGraphicsData.aCoreData.aViewports[ 0 ].aProjView = srMat;
-	gGraphicsData.aCoreDataStaging.aDirty             = true;
+	if ( index == UINT32_MAX )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to allocate viewport\n" );
+		return index;
+	}
+
+	if ( index + 1 > gGraphicsData.aViewData.aViewports.size() )
+		gGraphicsData.aViewData.aViewports.resize( index + 1 );
+
+	if ( spViewport )
+	{
+		spViewport             = &gGraphicsData.aViewData.aViewports[ index ];
+		spViewport->aAllocated = true;
+		spViewport->aActive    = true;
+	}
+	else
+	{
+		gGraphicsData.aViewData.aViewports[ index ].aAllocated = true;
+	}
+
+	return index;
 }
 
 
-size_t Graphics_CreateViewport()
+void Graphics_FreeViewport( u32 sViewportIndex )
 {
-	// TODO: allocate viewport slots like the entity system allocates and frees entities
-	gGraphicsData.aViewData.aViewports.resize( gGraphicsData.aViewData.aViewports.size() + 1 );
-	return gGraphicsData.aViewData.aViewports.size() - 1;
+	Graphics_FreeCoreSlot( EShaderCoreArray_Viewports, sViewportIndex );
+
+	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Invalid Viewport Index to Free, only %zd allocated, tried to free slot %zd\n",
+		            gGraphicsData.aViewData.aViewports.size(), sViewportIndex );
+
+		return;
+	}
+
+	memset( &gGraphicsData.aViewData.aViewports[ sViewportIndex ], 0, sizeof( ViewportShader_t ) );
 }
 
 
-ViewportShader_t* Graphics_GetViewportData( size_t sViewportIndex )
+ViewportShader_t* Graphics_GetViewportData( u32 sViewportIndex )
 {
-	if ( sViewportIndex > gGraphicsData.aViewData.aViewports.size() )
+	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
 	{
 		Log_ErrorF( "Invalid Viewport Index: %zd, only allocated %zd\n", sViewportIndex, gGraphicsData.aViewData.aViewports.size() );
 		return nullptr;
 	}
 
-	return &gGraphicsData.aViewData.aViewports[ sViewportIndex ];
+	ViewportShader_t* viewport = &gGraphicsData.aViewData.aViewports[ sViewportIndex ];
+
+	if ( !viewport->aAllocated )
+		return nullptr;
+
+	return viewport;
 }
 
 
 void Graphics_SetViewportUpdate( bool sUpdate )
 {
 	gGraphicsData.aCoreDataStaging.aDirty = sUpdate;
-}
-
-
-const glm::mat4& Graphics_GetViewProjMatrix()
-{
-	return gGraphicsData.aViewData.aViewProjMat;
 }
 
 
