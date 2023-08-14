@@ -773,6 +773,12 @@ static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u
 }
 
 
+// writes data in regions to a staging host buffer, and then copies those regions to the device buffer
+void Graphics_WriteDeviceBufferRegions()
+{
+}
+
+
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 {
 	// ------------------------------------------------------
@@ -927,6 +933,8 @@ u32 Graphics_AllocateCoreSlot( EShaderCoreArray sSlot )
 	u32 index = allocator.apFree[ 0 ];
 	allocator.aUsed++;
 
+	CH_ASSERT( index != CH_SHADER_CORE_SLOT_INVALID );
+
 	// shift everything down by one
 	memcpy( &allocator.apFree[ 0 ], &allocator.apFree[ 1 ], sizeof( u32 ) * ( allocator.aAllocated - 1 ) );
 
@@ -961,7 +969,6 @@ void Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex )
 	}
 
 	CH_ASSERT( allocator.apFree );
-
 	CH_ASSERT( allocator.apFree[ allocator.aAllocated - allocator.aUsed ] == CH_SHADER_CORE_SLOT_INVALID );
 
 	// write this free index
@@ -1477,7 +1484,12 @@ static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBuffe
 	Handle deviceBuffer = render->CreateBuffer( spName, sBufferSize, sUsage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	// Copy Local Buffer data to Device
-	render->BufferCopy( stagingBuffer, deviceBuffer, sBufferSize );
+	BufferRegionCopy_t copy;
+	copy.aSrcOffset = 0;
+	copy.aDstOffset = 0;
+	copy.aSize      = sBufferSize;
+
+	render->BufferCopy( stagingBuffer, deviceBuffer, &copy, 1 );
 
 	render->DestroyBuffer( stagingBuffer );
 

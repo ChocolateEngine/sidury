@@ -634,7 +634,13 @@ void Graphics_PrepareDrawData()
 	{
 		gGraphicsData.aCoreDataStaging.aDirty = false;
 		render->BufferWrite( gGraphicsData.aCoreDataStaging.aStagingBuffer, sizeof( Buffer_Core_t ), &gGraphicsData.aCoreData );
-		render->BufferCopy( gGraphicsData.aCoreDataStaging.aStagingBuffer, gGraphicsData.aCoreDataStaging.aBuffer, sizeof( Buffer_Core_t ) );
+
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = sizeof( Buffer_Core_t );
+
+		render->BufferCopyQueued( gGraphicsData.aCoreDataStaging.aStagingBuffer, gGraphicsData.aCoreDataStaging.aBuffer, &copy, 1 );
 	}
 
 	// Update Shader Draws Data SSBO
@@ -644,6 +650,8 @@ void Graphics_PrepareDrawData()
 	// 	render->BufferWrite( gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer, sizeof( gGraphicsData.aSurfaceDraws ), &gGraphicsData.aSurfaceDraws );
 	// 	render->BufferCopy( gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer, gGraphicsData.aSurfaceDrawsStaging.aBuffer, sizeof( gGraphicsData.aSurfaceDraws ) );
 	// }
+
+	render->CopyQueuedBuffers();
 }
 
 
@@ -660,10 +668,13 @@ void Graphics_Present()
 	ChHandle_t* commandBuffers     = gGraphicsData.aCommandBuffers;
 	size_t      commandBufferCount = gGraphicsData.aCommandBufferCount;
 
+	u32         imageIndex         = render->GetFlightImageIndex();
+
 	// For each framebuffer, begin a primary
 	// command buffer, and record the commands.
-	for ( size_t cmdIndex = 0; cmdIndex < commandBufferCount; cmdIndex++ )
+	// for ( size_t cmdIndex = 0; cmdIndex < commandBufferCount; cmdIndex++ )
 	{
+		size_t cmdIndex = imageIndex;
 		PROF_SCOPE_NAMED( "Primary Command Buffer" );
 
 		ChHandle_t c = commandBuffers[ cmdIndex ];
@@ -695,7 +706,7 @@ void Graphics_Present()
 		render->EndCommandBuffer( c );
 	}
 
-	render->Present();
+	render->Present( imageIndex );
 	// render->UnlockGraphicsMutex();
 }
 

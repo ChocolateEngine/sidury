@@ -395,6 +395,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 	gGraphicsData.aCoreDataStaging.aDirty = true;
 
+#if 0
 	switch ( spLight->aType )
 	{
 		default:
@@ -568,6 +569,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		// 	break;
 		// }
 	}
+#endif
 }
 
 

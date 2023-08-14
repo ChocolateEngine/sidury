@@ -174,8 +174,13 @@ u32 Shader_Basic3D_UpdateMaterialData( ChHandle_t sMat )
 	// write new material data to the buffer
 	ChHandle_t& buffer = gMaterialBuffers[ sMat ];
 
+	BufferRegionCopy_t copy;
+	copy.aSrcOffset = 0;
+	copy.aDstOffset = 0;
+	copy.aSize      = sizeof( Basic3D_Material );
+
 	// render->MemWriteBuffer( buffer, sizeof( Basic3D_Material ), mat );
-	render->BufferCopy( gStagingBuffer, buffer, sizeof( Basic3D_Material ) );
+	render->BufferCopy( gStagingBuffer, buffer, &copy, 1 );
 
 	return gMaterialBufferIndex[ sMat ];
 }

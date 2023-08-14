@@ -156,17 +156,17 @@ struct Buffer_Core_t
 	u32                    aNumViewports     = 0;
 	u32                    aNumVertexBuffers = 0;
 	u32                    aNumIndexBuffers  = 0;
-
+	
 	u32                    aNumLights[ ELightType_Count ];
 
 	Shader_Renderable_t    aRenderables[ CH_R_MAX_RENDERABLES ];
 	Shader_Viewport_t      aViewports[ CH_R_MAX_VIEWPORTS ];
 
 	// NOTE: this could probably be brought down to one light struct, with packed data to unpack in the shader
-	UBO_LightDirectional_t aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
-	UBO_LightPoint_t       aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
-	UBO_LightCone_t        aLightCone[ CH_R_MAX_LIGHT_TYPE ];
-	UBO_LightCapsule_t     aLightCapsule[ CH_R_MAX_LIGHT_TYPE ];
+	//UBO_LightDirectional_t aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
+	//UBO_LightPoint_t       aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
+	//UBO_LightCone_t        aLightCone[ CH_R_MAX_LIGHT_TYPE ];
+	//UBO_LightCapsule_t     aLightCapsule[ CH_R_MAX_LIGHT_TYPE ];
 };
 
 
@@ -205,7 +205,7 @@ struct ShaderArrayAllocator_t
 };
 
 
-enum EShaderCoreArray
+enum EShaderCoreArray : u32
 {
 	EShaderCoreArray_Viewports    = 0,
 	// EShaderCoreArray_Renderables  = 1,
@@ -246,12 +246,12 @@ struct GraphicsData_t
 	// Descriptor Sets
 
 	ShaderDescriptorData_t                        aShaderDescriptorData;
-	ResourceList< RenderPassData_t >              aRenderPassData;
+	// ResourceList< RenderPassData_t >              aRenderPassData;
 
 	// --------------------------------------------------------------------------------------
 	// Textures
 
-	std::vector< ChHandle_t >                     aTextureBuffers;
+	// std::vector< ChHandle_t >                     aTextureBuffers;
 	// bool                                          aTexturesDirty = true;
 
 	// --------------------------------------------------------------------------------------
@@ -270,7 +270,7 @@ struct GraphicsData_t
 	std::unordered_map< std::string, ChHandle_t > aScenePaths;
 
 	// --------------------------------------------------------------------------------------
-	// Other
+	// Shader Buffers
 
 	Buffer_Core_t                                 aCoreData;
 	DeviceBufferStaging_t                         aCoreDataStaging;

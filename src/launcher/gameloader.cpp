@@ -40,7 +40,16 @@ int load_object( Module* mod, const char* path )
 // ensure mimalloc is loaded
 struct ForceMiMalloc_t
 {
-	ForceMiMalloc_t() { mi_version(); }
+	ForceMiMalloc_t()
+	{
+		mi_version();
+
+  #if _DEBUG
+		mi_option_enable( mi_option_show_errors );
+		mi_option_enable( mi_option_show_stats );
+		mi_option_enable( mi_option_verbose );
+  #endif
+	}
 };
 
 static ForceMiMalloc_t forceMiMalloc;

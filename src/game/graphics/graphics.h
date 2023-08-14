@@ -285,7 +285,7 @@ struct ModelBBox_t
 struct Renderable_t
 {
 	// used in actual drawing
-	Handle      aModel;
+	ChHandle_t  aModel;
 	glm::mat4   aModelMatrix;
 
 	// used for calculating render lists
