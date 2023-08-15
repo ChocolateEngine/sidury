@@ -67,7 +67,7 @@ void Graphics_DebugDrawNewFrame()
 	if ( !gDebugLineModel )
 	{
 		Model* model    = nullptr;
-		gDebugLineModel = gGraphicsData.aModels.Create( &model );
+		gDebugLineModel = Graphics_CreateModel( &model );
 
 		if ( !gDebugLineModel )
 		{
@@ -79,9 +79,6 @@ void Graphics_DebugDrawNewFrame()
 
 		model->apVertexData = new VertexData_t;
 		model->apBuffers    = new ModelBuffers_t;
-
-		model->apVertexData->AddRef();
-		model->apBuffers->AddRef();
 
 		// gpDebugLineModel->apBuffers->aVertex.resize( 2, true );
 		model->apVertexData->aData.resize( 2, true );
@@ -192,16 +189,10 @@ void Graphics_UpdateDebugDraw()
 		}
 
 		if ( !model->apVertexData )
-		{
 			model->apVertexData = new VertexData_t;
-			model->apVertexData->AddRef();
-		}
 
 		if ( !model->apBuffers )
-		{
 			model->apBuffers = new ModelBuffers_t;
-			model->apBuffers->AddRef();
-		}
 
 		// Is our current buffer size too small? If so, free the old ones
 		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )

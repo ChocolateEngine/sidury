@@ -700,6 +700,9 @@ void Graphics_Present()
 
 		render->BeginCommandBuffer( c );
 
+		// Animate Materials in a Compute Shader
+		// Run Skinning Compute Shader
+
 		// Draw Shadow Maps
 		Graphics_DrawShadowMaps( c, cmdIndex );
 
@@ -718,6 +721,9 @@ void Graphics_Present()
 		render->BeginRenderPass( c, renderPassBegin );  // VK_SUBPASS_CONTENTS_INLINE
 
 		Graphics_Render( c, cmdIndex, ERenderPass_Graphics );
+
+		// Run Bloom Compute Shader
+
 		render->DrawImGui( ImGui::GetDrawData(), c );
 
 		render->EndRenderPass( c );

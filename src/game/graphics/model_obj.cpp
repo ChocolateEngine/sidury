@@ -128,8 +128,7 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 			{
 				// NOTE: mesh->indices holds each face "fastObjIndex" as three
 				// seperate index objects contiguously laid out one after the other
-				// fastObjIndex objIndex = obj->indices[totalIndexOffset + faceVertIndex];
-				fastObjIndex objIndex = obj->indices[totalIndexOffset + faceVertIndex];
+				fastObjIndex objVertIndex = obj->indices[ totalIndexOffset + faceVertIndex ];
 
 				if ( faceVertIndex >= 3 )
 				{
@@ -143,9 +142,9 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 					meshBuilder.NextVertex();
 				}
 
-				const u32 position_index = objIndex.p * 3;
-				const u32 texcoord_index = objIndex.t * 2;
-				const u32 normal_index   = objIndex.n * 3;
+				const u32 position_index = objVertIndex.p * 3;
+				const u32 texcoord_index = objVertIndex.t * 2;
+				const u32 normal_index   = objVertIndex.n * 3;
 
 				meshBuilder.SetPos(
 				  obj->positions[ position_index ],
@@ -268,9 +267,6 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 		spScene->aModels.push_back( Graphics_CreateModel( &model ) );
 		model->apBuffers    = modelBuffers;
 		model->apVertexData = vertData;
-
-		model->apBuffers->AddRef();
-		model->apVertexData->AddRef();
 
 		char* groupName = nullptr;
 

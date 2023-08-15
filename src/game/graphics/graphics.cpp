@@ -161,8 +161,8 @@ Handle Graphics_LoadModel( const std::string& srPath )
 
 	if ( it != gGraphicsData.aModelPaths.end() )
 	{
-		// We have, use that model instead
-		// Increment the ref counters
+		// We did load this already, use that model instead
+		// Increment the ref count
 		Model* model = nullptr;
 		if ( !gGraphicsData.aModels.Get( it->second, &model ) )
 		{
@@ -170,14 +170,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 			return InvalidHandle;
 		}
 
-		if ( model->apBuffers )
-			model->apBuffers->AddRef();
-
-		if ( model->apVertexData )
-			model->apVertexData->AddRef();
-
 		model->AddRef();
-
 		return it->second;
 	}
 
@@ -278,6 +271,9 @@ void Graphics_FreeModel( Handle shModel )
 	// Resource_IncrementRefCount( gModels, &model );
 	// 
 
+	// more urgent issue to do
+	#pragma message( "TODO: Make Materials and Textures Ref Counted, and Free Materials on Freeing Models" )
+
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
 	{
@@ -285,14 +281,14 @@ void Graphics_FreeModel( Handle shModel )
 		return;
 	}
 
-	if ( model->apVertexData )
-	{
-		model->apVertexData->Release();
-	}
-
-	if ( model->apBuffers )
-	{
-		model->apBuffers->Release();
+	//if ( model->apVertexData )
+	//{
+	//	model->apVertexData->Release();
+	//}
+	//
+	//if ( model->apBuffers )
+	//{
+	//	model->apBuffers->Release();
 	// 	for ( auto& buf : model->apBuffers->aVertex )
 	// 		render->DestroyBuffer( buf );
 	// 
@@ -301,11 +297,31 @@ void Graphics_FreeModel( Handle shModel )
 	// 
 	// 	model->apBuffers->aVertex.clear();
 	// 	model->apBuffers->aIndex = InvalidHandle;
-	}
+	//}
 
 	model->aRefCount--;
 	if ( model->aRefCount == 0 )
 	{
+		// Free Materials attached to this model
+		for ( Mesh& mesh : model->aMeshes )
+		{
+			if ( mesh.aMaterial )
+				Graphics_FreeMaterial( mesh.aMaterial );
+		}
+
+		// Free Vertex Data
+		if ( model->apVertexData )
+		{
+			delete model->apVertexData;
+		}
+
+		// Free Vertex and Index Buffers
+		if ( model->apBuffers )
+		{
+			delete model->apBuffers;
+		}
+		
+		// If this model was loaded from disk, remove the stored model path
 		for ( auto& [ path, modelHandle ] : gGraphicsData.aModelPaths )
 		{
 			if ( modelHandle == shModel )
@@ -782,6 +798,9 @@ void Graphics_WriteDeviceBufferRegions()
 }
 
 
+constexpr auto what = sizeof( Buffer_Core_t );
+
+
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 {
 	// ------------------------------------------------------
@@ -799,7 +818,7 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create Core Data Buffer
 
-	gGraphicsData.aCoreDataStaging.aStagingBuffer = render->CreateBuffer( "Core Staging Buffer", sizeof( Buffer_Core_t ), EBufferFlags_Storage | EBufferFlags_TransferSrc, EBufferMemory_Host );
+	gGraphicsData.aCoreDataStaging.aStagingBuffer = render->CreateBuffer( "Core Staging Buffer", sizeof( Buffer_Core_t ), EBufferFlags_TransferSrc, EBufferMemory_Host );
 	gGraphicsData.aCoreDataStaging.aBuffer        = render->CreateBuffer( "Core Buffer", sizeof( Buffer_Core_t ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( !gGraphicsData.aCoreDataStaging.aBuffer || !gGraphicsData.aCoreDataStaging.aStagingBuffer )
@@ -811,7 +830,7 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create SurfaceDraw Buffer
 
-	gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer = render->CreateBuffer( "Surface Draw Staging Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_Storage | EBufferFlags_TransferSrc, EBufferMemory_Host );
+	gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer = render->CreateBuffer( "Surface Draw Staging Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_TransferSrc, EBufferMemory_Host );
 	gGraphicsData.aSurfaceDrawsStaging.aBuffer        = render->CreateBuffer( "Surface Draw Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( !gGraphicsData.aSurfaceDrawsStaging.aBuffer || !gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer )

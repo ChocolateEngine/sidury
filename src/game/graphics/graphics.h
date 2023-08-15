@@ -143,6 +143,7 @@ inline glm::mat4 Util_ComputeProjection( float sWidth, float sHeight, float sNea
 }
 
 
+// TODO: Get rid of this, merge it with the ViewportShader_t struct, it's the same thing
 struct ViewportCamera_t
 {
 	void ComputeProjection( float sWidth, float sHeight )
@@ -217,7 +218,7 @@ private:
 };
 
 
-struct VertexData_t : public RefCounted
+struct VertexData_t // : public RefCounted
 {
 	VertexFormat                 aFormat = VertexFormat_None;
 	u32                          aCount  = 0;
@@ -226,7 +227,7 @@ struct VertexData_t : public RefCounted
 };
 
 
-struct ModelBuffers_t : public RefCounted
+struct ModelBuffers_t // : public RefCounted
 {
 	ChVector< ChHandle_t > aVertex;
 	ChHandle_t             aIndex = CH_INVALID_HANDLE;
@@ -280,13 +281,24 @@ struct ModelBBox_t
 };
 
 
-// A Renderable contains a model handle, a model matrix
+// A Renderable is an instance of a model for drawing to the screen
+// You can have multiple renderables point to one model, this is how you draw many instances of a single tree model, or etc.
+// It contains a model handle, a model matrix
 // It also contains an AABB, and bools for testing vis, casting a shadow, and whether it's visible or not
 struct Renderable_t
 {
 	// used in actual drawing
 	ChHandle_t  aModel;
 	glm::mat4   aModelMatrix;
+
+	// TODO: store the materials for each mesh here so you can override them for this renderable
+	// ChVector< ChHandle_t > aMaterials
+	// or
+	// u32         aMeshCount;
+	// ChHandle_t* apMaterials;
+
+	// technically we could have this here for skinning results if needed
+	// ChHandle_t aOutVertexBuffer;
 
 	// used for calculating render lists
 	ModelBBox_t aAABB;
@@ -576,7 +588,7 @@ void               Graphics_FreeTexture( ChHandle_t shTexture );
 // ---------------------------------------------------------------------------------------
 // Materials
 
-// Load a cmt file from disk
+// Load a cmt file from disk, increments ref count
 Handle             Graphics_LoadMaterial( const std::string& srPath );
 
 // Create a new material with a name and a shader
@@ -609,6 +621,12 @@ Handle             Mat_GetShader( Handle mat );
 void               Mat_SetShader( Handle mat, Handle shShader );
 
 VertexFormat       Mat_GetVertexFormat( Handle mat );
+
+// Increments Reference Count for material
+void               Mat_AddRef( ChHandle_t sMat );
+
+// Decrements Reference Count for material - returns true if the material is deleted
+bool               Mat_RemoveRef( ChHandle_t sMat );
 
 void               Mat_SetVar( Handle mat, const std::string& name, Handle texture );
 void               Mat_SetVar( Handle mat, const std::string& name, float data );

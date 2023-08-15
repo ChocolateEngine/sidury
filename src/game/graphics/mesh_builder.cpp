@@ -61,8 +61,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 	}
 	else if ( !vertData )
 	{
-		vertData = new VertexData_t;
-		vertData->AddRef();
+		vertData             = new VertexData_t;
 		apMesh->apVertexData = vertData;
 	}
 
@@ -181,12 +180,12 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 #if MESH_BUILDER_USE_IND
 		// Now Copy Indices
-		ChVector< u32 >& ind       = vertData->aIndices;
-		size_t              origSize = ind.size();
+		ChVector< u32 >& ind      = vertData->aIndices;
+		size_t           origSize = ind.size();
 
-		mesh.aIndexOffset            = origSize;
+		mesh.aIndexOffset         = origSize;
 		// mesh.aVertexOffset           = 0;
-		mesh.aIndexCount             = surf.aIndices.size();
+		mesh.aIndexCount          = surf.aIndices.size();
 
 		ind.resize( ind.size() + surf.aIndices.size() );
 
@@ -200,7 +199,6 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 		// apMesh->SetVertexDataLocked( i, true );
 		apMesh->aMeshes[ i ].aMaterial = surf.aMaterial;
-		apMesh->aMeshes[ i ].aMaterial = surf.aMaterial;
 	}
 
 	if ( !sCreateBuffers )
@@ -208,8 +206,6 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 	if ( apMesh->apBuffers == nullptr )
 		apMesh->apBuffers = new ModelBuffers_t;
-
-	apMesh->apBuffers->AddRef();
 
 	Graphics_CreateVertexBuffers( apMesh->apBuffers, vertData, apDebugName );
 

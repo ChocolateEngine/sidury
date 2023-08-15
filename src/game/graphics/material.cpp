@@ -96,6 +96,7 @@ struct MaterialData_t
 {
 	// std::vector< MaterialVar > aVars;
 	ChVector< MaterialVar > aVars;
+	u32                     aRefCount = 0;
 };
 
 
@@ -186,6 +187,68 @@ VertexFormat Mat_GetVertexFormat( Handle mat )
 		return VertexFormat_None;
 
 	return Shader_GetVertexFormat( shader );
+}
+
+
+// Increments Reference Count for material
+void Mat_AddRef( ChHandle_t sMat )
+{
+	MaterialData_t* data = nullptr;
+	if ( !gMaterials.Get( sMat, &data ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Mat_AddRef: Material not found, material must of been freed or never loaded\n" );
+		return;
+	}
+
+	Log_DevF( gLC_ClientGraphics, 2, "Incremented Ref Count for Material \"%zd\" from %u to %u\n", data->aRefCount, data->aRefCount + 1 );
+	data->aRefCount++;
+}
+
+
+// Decrements Reference Count for material - returns true if the material is deleted
+bool Mat_RemoveRef( ChHandle_t sMat )
+{
+	MaterialData_t* data = nullptr;
+	if ( !gMaterials.Get( sMat, &data ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Mat_RemoveRef: Material not found, material must of been freed or never loaded\n" );
+		return true;  // we can't find it, so technically it's deleted or never existed, so return true
+	}
+
+	// TODO: when you implement a new resource system
+	// have that implement reference counting itself
+	CH_ASSERT( data->aRefCount != 0 );
+
+	Log_DevF( gLC_ClientGraphics, 2, "Decremented Ref Count for Material \"%zd\" from %u to %u\n", sMat, data->aRefCount, data->aRefCount - 1 );
+
+	data->aRefCount--;
+
+	if ( data->aRefCount != 0 )
+		return false;
+
+	delete data;
+	gMaterials.Remove( sMat );
+
+	bool foundMatName = false;
+	for ( auto& [ name, mat ] : gMaterialNames )
+	{
+		if ( mat == sMat )
+		{
+			foundMatName = true;
+			Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%s\" - Handle \"%zd\"\n", name.data(), sMat );
+			gMaterialNames.erase( name );  // name is freed here
+			break;
+		}
+	}
+
+	if ( !foundMatName )
+		Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%zd\"\n", sMat );
+
+	// make sure it's not in the dirty materials list
+	if ( gGraphicsData.aDirtyMaterials.contains( sMat ) )
+		gGraphicsData.aDirtyMaterials.erase( sMat );
+
+	return true;
 }
 
 
@@ -388,10 +451,11 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 			MaterialData_t* matData = nullptr;
 			if ( handle == InvalidHandle )
 			{
-				matData    = new MaterialData_t;
-				handle     = gMaterials.Add( matData );
+				matData            = new MaterialData_t;
+				matData->aRefCount = 1;
+				handle             = gMaterials.Add( matData );
 
-				char* name = new char[ srPath.size() + 1 ];
+				char* name         = new char[ srPath.size() + 1 ];
 				strncpy( name, srPath.c_str(), srPath.size() );
 				name[ srPath.size() ]  = '\0';
 
@@ -489,7 +553,8 @@ Handle Graphics_LoadMaterial( const std::string& srPath )
 	auto nameIt = gMaterialNames.find( srPath.c_str() );
 	if ( nameIt != gMaterialNames.end() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Material Already Loaded: \"%s\"\n", srPath.c_str() );
+		Log_DevF( gLC_ClientGraphics, 2, "Incrementing Ref Count for Material \"%s\" - \"%zd\"\n", srPath.c_str(), nameIt->second );
+		Mat_AddRef( nameIt->second );
 		return nameIt->second;
 	}
 
@@ -497,6 +562,7 @@ Handle Graphics_LoadMaterial( const std::string& srPath )
 	if ( !Graphics_ParseMaterial( srPath, handle ) )
 		return InvalidHandle;
 
+	Log_DevF( gLC_ClientGraphics, 1, "Loaded Material \"%s\"\n", srPath.c_str() );
 	gMaterialPaths[ srPath ] = handle;
 	return handle;
 }
@@ -508,11 +574,15 @@ Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
 	auto nameIt = gMaterialNames.find( srName.c_str() );
 	if ( nameIt != gMaterialNames.end() )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Graphics_CreateMaterial(): Material with this name already exists: \"%s\"\n", srName.c_str() );
+		Log_DevF( gLC_ClientGraphics, 2, "Incrementing Ref Count for Material \"%s\" - \"%zd\"\n", srName.c_str(), nameIt->second );
+		Mat_AddRef( nameIt->second );
 		return nameIt->second;
 	}
 
-	Handle handle = gMaterials.Add( new MaterialData_t );
+	auto matData       = new MaterialData_t;
+	matData->aRefCount = 1;
+
+	Handle handle      = gMaterials.Add( matData );
 
 	char*  name   = new char[ srName.size() + 1 ];
 	strncpy( name, srName.c_str(), srName.size() );
@@ -526,32 +596,9 @@ Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
 
 
 // Free a material
-void Graphics_FreeMaterial( Handle shMaterial )
+void Graphics_FreeMaterial( ChHandle_t shMaterial )
 {
-	MaterialData_t* data = nullptr;
-	if ( !gMaterials.Get( shMaterial, &data ) )
-	{
-		Log_Error( gLC_ClientGraphics, "Graphics_FreeMaterial: No Data Found\n" );
-		return;
-	}
-	else
-	{
-		delete data;
-		gMaterials.Remove( shMaterial );
-
-		for ( auto& [ name, mat ] : gMaterialNames )
-		{
-			if ( mat == shMaterial )
-			{
-				gMaterialNames.erase( name ); // name is freed here
-				break;
-			}
-		}
-
-		// make sure it's not in the dirty materials list
-		if ( gGraphicsData.aDirtyMaterials.contains( shMaterial ) )
-			gGraphicsData.aDirtyMaterials.erase( shMaterial );
-	}
+	Mat_RemoveRef( shMaterial );
 }
 
 
@@ -559,13 +606,16 @@ void Graphics_FreeMaterial( Handle shMaterial )
 // Name is a full path to the cmt file
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 // NAME: dev/grid01
-Handle Graphics_FindMaterial( const char* spName )
+ChHandle_t Graphics_FindMaterial( const char* spName )
 {
 	auto nameIt = gMaterialNames.find( spName );
 	if ( nameIt != gMaterialNames.end() )
+	{
+		Mat_AddRef( nameIt->second );
 		return nameIt->second;
+	}
 
-	return InvalidHandle;
+	return CH_INVALID_HANDLE;
 }
 
 
