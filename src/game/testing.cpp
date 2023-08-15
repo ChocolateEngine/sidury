@@ -197,11 +197,11 @@ void CreateProtogen_f( const std::string& path )
 
 	Ent_AddComponent( proto, "protogen" );
 
-	Handle       model          = Graphics_LoadModel( path );
+	// Handle       model          = Graphics_LoadModel( path );
 
 	CRenderable* renderable     = Ent_AddComponent< CRenderable >( proto, "renderable" );
 	renderable->aPath           = path;
-	renderable->aModel          = model;
+	// renderable->aModel          = model;
 
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
 	// renderComp->aHandle        = Graphics_CreateRenderable( model );
