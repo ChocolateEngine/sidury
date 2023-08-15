@@ -696,9 +696,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 up;
 			Util_GetDirectionVectors( playerTransform->aAng, nullptr, nullptr, &up );
 
-			glm::vec3        protoView           = protoTransform->aPos;
-			glm::vec3        direction           = protoView - playerTransform->aPos.Get();
-			glm::vec3        rotationAxis        = Util_VectorToAngles( direction, up );
+			glm::vec3 protoView    = protoTransform->aPos;
+			glm::vec3 direction    = protoView - playerTransform->aPos.Get();
+			glm::vec3 rotationAxis = Util_VectorToAngles( direction, up );
 
 			if ( targetChanged )
 			{
@@ -712,10 +712,11 @@ void TEST_SV_UpdateProtos( float frameTime )
 				protoLook.aTurnEndTime = std::min( protoLook.aTurnEndTime, protoLook.aTimeToDuel );
 			}
 
+			// this is weird
 			protoLook.aGoalAng          = rotationAxis;
-			protoLook.aGoalAng[ PITCH ] = 0.f;
-			protoLook.aGoalAng[ YAW ] -= 90.f;
-			protoLook.aGoalAng[ ROLL ] = ( -rotationAxis[ PITCH ] ) + 90.f;
+			protoLook.aGoalAng[ PITCH ] = -rotationAxis[ PITCH ] + 90.f;
+			protoLook.aGoalAng[ YAW ]   = 0.f;
+			protoLook.aGoalAng[ ROLL ]  = rotationAxis[ YAW ] - 90.f;
 
 			protoLook.aTurnCurTime += frameTime;
 
