@@ -117,9 +117,6 @@ constexpr float PLAYER_MASS = 200.f;
 
 CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 {
-	if ( CL_SendConVarIfClient( "respawn", args ) )
-		return;
-
 	Entity player = SV_GetCommandClientEntity();
 
 	GetPlayers()->Respawn( player );
@@ -128,9 +125,6 @@ CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 
 CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 {
-	if ( CL_SendConVarIfClient( "reset_velocity", args ) )
-		return;
-
 	Entity player  = SV_GetCommandClientEntity();
 	auto rigidBody = GetRigidBody( player );
 
@@ -167,9 +161,6 @@ static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 
 CONCMD_VA( noclip, CVARF( CL_EXEC ) )
 {
-	if ( CL_SendConVarIfClient( "noclip" ) )
-		return;
-
 	Entity player = SV_GetCommandClientEntity();
 
 	if ( !player )
@@ -181,10 +172,6 @@ CONCMD_VA( noclip, CVARF( CL_EXEC ) )
 
 CONCMD_VA( fly, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "fly" ) )
-		return;
-
 	Entity player = SV_GetCommandClientEntity();
 
 	if ( !player )

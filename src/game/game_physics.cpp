@@ -29,10 +29,12 @@ IPhysicsEnvironment*     GetPhysEnv()
 	return sv_physenv;
 }
 
-CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
+CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ) | CVARF( CL_EXEC ), "Physics Engine Gravity" )
 {
-	if ( Game_GetCommandSource() != ECommandSource_Console && CL_SendConVarIfClient( "phys_gravity", args ) )
-		return;
+	// if ( Game_GetCommandSource() != ECommandSource_Console )
+	// 	return;
+
+	// TODO: maybe make some convar permission system here, and check if the client has permissions to execute this command?
 
 	GetPhysEnv()->SetGravityZ( phys_gravity );
 }

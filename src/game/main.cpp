@@ -64,6 +64,16 @@ CONVAR( r_render, 1 );
 // }
 
 
+bool CvarF_ClientExecuteCallback( ConVarBase* spBase, const std::vector< std::string >& args )
+{
+	// Forward to server if we are the client
+	if ( CL_SendConVarIfClient( spBase->aName, args ) )
+		return false;
+
+	return true;
+}
+
+
 void Game_Shutdown()
 {
 	TEST_Shutdown();
@@ -146,6 +156,8 @@ bool Game_Init()
 		Log_Error( "Failed to init networking\n" );
 		return false;
 	}
+
+	Con_SetCvarFlagCallback( CVARF_CL_EXEC, CvarF_ClientExecuteCallback );
 
 	// TODO: is this actually even needed if we are only connecting to other servers?
 	if ( !SV_Init() )

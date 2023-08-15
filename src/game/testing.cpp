@@ -277,10 +277,6 @@ void CreatePhysEntity( const std::string& path )
 
 CONCMD_VA( create_proto, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_proto" ) )
-		return;
-
 	CreateProtogen_f( DEFAULT_PROTOGEN_PATH );
 }
 
@@ -306,10 +302,6 @@ static void model_dropdown(
 
 CONCMD_DROP_VA( create_look_entity, model_dropdown, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_look_entity", args ) )
-		return;
-
 	if ( args.size() )
 		CreateProtogen_f( args[ 0 ] );
 }
@@ -317,10 +309,6 @@ CONCMD_DROP_VA( create_look_entity, model_dropdown, CVARF( CL_EXEC ) )
 
 CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "delete_protos" ) )
-		return;
-
 	// while ( GetProtogenSys()->aEntities.size() )
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
@@ -334,30 +322,18 @@ CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 #if 0
 CONCMD_VA( create_phys_test, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_phys_test" ) )
-		return;
-
 	CreatePhysEntity( "materials/models/riverhouse/riverhouse.obj" );
 }
 
 
 CONCMD_VA( create_phys_proto, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_phys_proto") )
-		return;
-
 	CreatePhysEntity( "materials/models/protogen_wip_25d/protogen_wip_25d_big.obj" );
 }
 
 
 CONCMD_VA( create_phys_ent, CVARF( CL_EXEC ) )
 {
-	// Forward to server if we are the client
-	if ( CL_SendConVarIfClient( "create_phys_ent", args ) )
-		return;
-
 	if ( args.size() )
 		CreatePhysEntity( args[ 0 ] );
 }
@@ -858,9 +834,6 @@ CONCMD( snd_test_cl )
 
 CONCMD_VA( snd_test_sv, CVARF( CL_EXEC ) )
 {
-	if ( CL_SendConVarIfClient( "snd_test_sv", args ) )
-		return;
-
 	cmd_sound_test( args.size() ? args[ 0 ] : SND_TEST_PATH, true );
 }
 
@@ -891,9 +864,6 @@ CONCMD( snd_test_cl_clear )
 
 CONCMD_VA( snd_test_sv_clear, CVARF( CL_EXEC ) )
 {
-	if ( CL_SendConVarIfClient( "snd_test_sv_clear", args ) )
-		return;
-
 	if ( !audio )
 		return;
 
