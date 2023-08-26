@@ -1062,9 +1062,7 @@ bool SV_BuildConVarMsg( flatbuffers::FlatBufferBuilder& srMessage, bool sFullUpd
 	for ( auto& cmd : gReplicatedCmds )
 	{
 		ConVar* cvar = static_cast< ConVar* >( cmd );
-
-		command += cvar->aName;
-		command += " " + cvar->aValue + ";";
+		command += vstring( "%s %s;", cvar->aName, cvar->apValue );
 	}
 
 	// Clear it
