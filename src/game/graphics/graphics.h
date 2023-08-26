@@ -218,19 +218,50 @@ private:
 };
 
 
-struct VertexData_t // : public RefCounted
+struct VertFormatData_t
 {
-	VertexFormat                 aFormat = VertexFormat_None;
-	u32                          aCount  = 0;
-	ChVector< VertAttribData_t > aData;
-	ChVector< uint32_t >         aIndices;
+	VertexFormat aFormat = VertexFormat_None;
+	void*        apData  = nullptr;
+
+	VertFormatData_t()
+	{
+	}
+
+	~VertFormatData_t()
+	{
+		if ( apData )
+			free( apData );
+	}
+
+private:
+	VertFormatData_t( const VertFormatData_t& other );
 };
 
 
-struct ModelBuffers_t // : public RefCounted
+struct VertexData_t
 {
+	VertexFormat                             aFormat = VertexFormat_None;
+	u32                                      aCount  = 0;
+	ChVector< VertAttribData_t >             aData;
+	ChVector< uint32_t >                     aIndices;
+
+	// ChVector< ChVector< VertAttribData_t > > aBlendShapeData;
+	u32                                      aBlendShapeCount = 0;
+	VertFormatData_t                         aBlendShapeData;  // size of data is (blend shape count) * (vertex count)
+};
+
+
+struct ModelBuffers_t
+{
+	// TODO: only have one vertex buffer again, and add an attributes and skin buffer, like godot does
 	ChVector< ChHandle_t > aVertex;
-	ChHandle_t             aIndex = CH_INVALID_HANDLE;
+	ChHandle_t             aIndex  = CH_INVALID_HANDLE;
+
+	// Contains Morph Information
+	ChHandle_t             aMorphs = CH_INVALID_HANDLE;
+
+	// Contains Bones and Bone Weights
+	ChHandle_t             aSkin   = CH_INVALID_HANDLE;
 
 	~ModelBuffers_t()
 	{
@@ -240,6 +271,9 @@ struct ModelBuffers_t // : public RefCounted
 
 		if ( aIndex )
 			render->DestroyBuffer( aIndex );
+
+		if ( aSkin )
+			render->DestroyBuffer( aSkin );
 	}
 };
 
@@ -288,8 +322,8 @@ struct ModelBBox_t
 struct Renderable_t
 {
 	// used in actual drawing
-	ChHandle_t  aModel;
-	glm::mat4   aModelMatrix;
+	ChHandle_t             aModel;
+	glm::mat4              aModelMatrix;
 
 	// TODO: store the materials for each mesh here so you can override them for this renderable
 	// ChVector< ChHandle_t > aMaterials
@@ -298,15 +332,20 @@ struct Renderable_t
 	// ChHandle_t* apMaterials;
 
 	// technically we could have this here for skinning results if needed
-	// ChHandle_t aOutVertexBuffer;
+	// I don't like this here as only very few models will use skinning
+	ChVector< ChHandle_t > aOutVertexBuffers;
 
 	// used for calculating render lists
-	ModelBBox_t aAABB;
+	ModelBBox_t            aAABB;
+
+	// used for blend shapes, i don't like this here because very few models will have blend shapes
+	ChVector< float >      aBlendShapeWeights;
 
 	// I don't like these bools that have to be checked every frame
-	bool        aTestVis;
-	bool        aCastShadow;
-	bool        aVisible;
+	bool                   aTestVis;
+	bool                   aCastShadow;
+	bool                   aVisible;
+	bool                   aBlendShapesDirty;  // AAAAAAA
 };
 
 

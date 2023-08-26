@@ -12,9 +12,6 @@ struct MeshBuilderVertex
 	// glm::vec2 texCoord2;
 	glm::vec3   color{};
 
-	// only one thing for morph data at the moment
-	glm::vec3   morphPos{};
-
 	// bones and weights
 	// std::vector<int> bones;
 	// std::vector<float> weights;
@@ -34,10 +31,10 @@ struct MeshBuilderVertex
 struct MeshBuilderMorphVertex
 {
 	// Vertex Index to affect
-	int         vert;
+	u32         vert;
 
 	// Morph Target it came from
-	int         morph;
+	u32         morph;
 
 	// Position and Normal deltas
 	glm::vec3   pos{};
@@ -48,14 +45,14 @@ struct MeshBuilderMorphVertex
 		if ( vert != srOther.vert )
 			return false;
 
-		if ( morph != srOther.morph )
-			return false;
+		// if ( morph != srOther.morph )
+		// 	return false;
 
 		if ( pos != srOther.pos )
 			return false;
 
-		if ( normal != srOther.normal )
-			return false;
+		// if ( normal != srOther.normal )
+		// 	return false;
 
 		return true;
 	}
@@ -106,14 +103,8 @@ struct MeshBuilder
 {
 	struct BlendShape
 	{
-		std::string aName;
-	};
-
-	struct BlendShapeData
-	{
-		size_t                                aIndex;
-		std::vector< MeshBuilderMorphVertex > aVertices;
-		MeshBuilderVertex                     aVertex;
+		std::string                   aName;
+		ChVector< MeshBuilderVertex > aVertices;
 	};
 
 	struct Surface
@@ -121,25 +112,22 @@ struct MeshBuilder
 		ChVector< MeshBuilderVertex > aVertices;
 		ChVector< u32 >               aIndices;
 
-		MeshBuilderVertex               aVertex;
-		VertexFormat                    aFormat   = VertexFormat_None;
-		Handle                          aMaterial = InvalidHandle;
-
-		// is this a per surface thing? i would imagine so
-		std::vector< BlendShapeData >   aBlendShapes;
+		MeshBuilderVertex             aVertex;
+		VertexFormat                  aFormat   = VertexFormat_None;
+		ChHandle_t                    aMaterial = CH_INVALID_HANDLE;
 	};
 
-	const char*                                                 apDebugName  = nullptr;
+	const char*                                                     apDebugName  = nullptr;
 
-	Model*                                                      apMesh       = nullptr;
-	ModelBuffers_t*                                             apBuffers    = nullptr;
-	VertexData_t*                                               apVertexData = nullptr;
+	Model*                                                          apMesh       = nullptr;
+	ModelBuffers_t*                                                 apBuffers    = nullptr;
+	VertexData_t*                                                   apVertexData = nullptr;
 
-	ChVector< BlendShape >                                    aBlendShapes;
-	ChVector< Surface >                                       aSurfaces;
-	std::vector< std::unordered_map< MeshBuilderVertex, u32 > > aSurfacesInd;  // kinda weird, but can't put it in ChVector cause of constructor garbage
-	uint32_t                                                    aSurf  = 0;
-	Surface*                                                    apSurf = 0;  // pointer to current surface
+	ChVector< BlendShape >                                          aBlendShapes;
+	ChVector< Surface >                                             aSurfaces;
+	std::vector< std::unordered_map< MeshBuilderVertex, u32 > > aSurfacesInd;  // kinda weird
+	uint32_t                                                        aSurf  = 0;
+	Surface*                                                        apSurf = 0;  // pointer to current surface
 
 	// ------------------------------------------------------------------------
 
@@ -190,4 +178,109 @@ struct MeshBuilder
 	void                     CalculateNormals( size_t sIndex );
 	void                     CalculateAllNormals();
 };
+
+
+// =============================================================================================
+// Mesh Builder 2
+// Helper System for loading models, not really meant for creating meshes from scratch in code
+
+
+struct MeshBuildFormatData_t
+{
+	VertexFormat aFormat = VertexFormat_None;
+	void*        apData  = nullptr;
+
+//	VertAttribData_t()
+//	{
+//	}
+//
+//	~VertAttribData_t()
+//	{
+//		if ( apData )
+//			free( apData );
+//	}
+//
+//   private:
+//	VertAttribData_t( const VertAttribData_t& other );
+};
+
+
+struct MeshBuildBlendShapeElement_t
+{
+	glm::vec3 aPos;
+	glm::vec3 aNorm;
+	glm::vec2 aUV;
+};
+
+
+struct MeshBuildBlendShape_t
+{
+	// glm::vec3* apPos;
+	// glm::vec3* apNorm;
+	// glm::vec2* apUV;
+
+	// Blend Shape Data is interleaved - POS|NORM|UV|POS|NORM|UV, instead of POS|POS|POS NORM|NORM|NORM UV|UV|UV
+	MeshBuildBlendShapeElement_t* apData;
+};
+
+
+struct MeshBuildMaterial_t
+{
+	glm::vec3*                        apPos;
+	glm::vec3*                        apNorm;
+	glm::vec2*                        apUV;
+
+	u32                               aVertexCount;
+	ChHandle_t                        aMaterial = CH_INVALID_HANDLE;
+
+	ChVector< MeshBuildBlendShape_t > aBlendShapes;
+};
+
+
+// the reason why i stored vertices in each surface was to organize them by material
+// then i combine them all together at the end
+// when iterating through the model, they could just be all fragmented out
+// we need them grouped together like this so we can use vertex offsets for each material
+// 
+//  material 0 verts           material 1 verts
+// |==========================|==========================================|
+// 
+// remember we draw each surface with a vertex offset, so we need to group vertices by material in a contiguous list or something
+// current mesh builder takes care of this by putting each vertex in a different list depending on the surface
+// then when we finish the mesh, we just append the finished lists one by one in the final vertex data
+// however, blend shapes don't care about materials at all
+// and neither does skeleton bone data, so we can store blend shapes and skeleton data with the same method
+// but storing standard vertices would be a bit weird
+// 
+// this is how i imagine blend shapes will be stored in the single storage buffer we make for it
+// 
+//   morph 0 - pos       morph 0 - normal     morph 1 - pos       morph 1 - normal
+// []===================|===================[]===================|===================[]
+// 
+// same with skeleton data, whatever data goes in there, maybe this? i know i need 2 buffers
+// and one buffer to write to a bunch for updating the position and rotation of each joint somehow
+// 
+//  bone 0 weights      bone 1 weights      bone 2 weights      bone 3 weights
+// |===================|===================|===================|===================|
+// 
+
+
+struct MeshBuildData_t
+{
+	ChVector< MeshBuildMaterial_t >   aMaterials;
+	VertexFormat                      aVertexFormat;
+
+	ChVector< std::string >           aBlendShapeNames;
+};
+
+
+// TODO: what if the model we're loading already has indices calculated for it? can't we just use that?
+bool MeshBuild_StartMesh( MeshBuildData_t& srMeshBuildData, u32 sMaterialCount, ChHandle_t* spMaterials );
+void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName = "" );
+
+void MeshBuild_AllocateVertices( MeshBuildData_t& srMeshBuildData, u32 sMaterial, u32 sCount );
+void MeshBuild_AllocateBlendShapes( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sBlendShapeCount );
+
+void MeshBuild_SetVertexPos( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sVertIndex, const glm::vec3& data );
+void MeshBuild_FillVertexPosData( MeshBuildData_t& srMeshBuildData, u32 sMaterial, glm::vec3* spData, u32 sCount, u32 sOffset );
 

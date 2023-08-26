@@ -229,6 +229,10 @@ struct GraphicsData_t
 
 	std::vector< ViewRenderList_t >               aViewRenderLists;
 
+	// Renderables that need skinning applied to them
+	//ChVector< ChHandle_t >                        aSkinningRenderList;
+	std::unordered_set< ChHandle_t >              aSkinningRenderList;
+
 	ChHandle_t*                                   aCommandBuffers;
 	u32                                           aCommandBufferCount;
 

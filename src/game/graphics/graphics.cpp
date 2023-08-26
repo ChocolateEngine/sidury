@@ -27,6 +27,7 @@ extern IRender*        render;
 
 void                   Graphics_LoadObj( const std::string& srBasePath, const std::string& srPath, Model* spModel );
 void                   Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath, const std::string& srExt, Model* spModel );
+void                   Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srPath, const std::string& srExt, Model* spModel );
 
 void                   Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& srPath, Scene_t* spScene );
 
@@ -211,7 +212,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 			return InvalidHandle;
 		}
 
-		Graphics_LoadGltf( srPath, fullPath, fileExt, model );
+		Graphics_LoadGltfNew( srPath, fullPath, fileExt, model );
 	}
 	else
 	{
@@ -270,9 +271,6 @@ void Graphics_FreeModel( Handle shModel )
 	// Resource_GetData( gModels, &model );
 	// Resource_IncrementRefCount( gModels, &model );
 	// 
-
-	// more urgent issue to do
-	#pragma message( "TODO: Make Materials and Textures Ref Counted, and Free Materials on Freeing Models" )
 
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
@@ -796,9 +794,6 @@ static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u
 void Graphics_WriteDeviceBufferRegions()
 {
 }
-
-
-constexpr auto what = sizeof( Buffer_Core_t );
 
 
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
@@ -1515,6 +1510,24 @@ static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBuffe
 }
 
 
+void Graphics_CreateBlendShapeBuffer( ChHandle_t& srBuffer, VertexData_t* spVertexData, VertFormatData_t& srVertexFormatData, const char* spDebugName )
+{
+	PROF_SCOPE();
+
+	if ( spVertexData == nullptr || spVertexData->aCount == 0 )
+	{
+		Log_Warn( gLC_ClientGraphics, "Trying to create Vertex Buffers for mesh with no vertices!\n" );
+		return;
+	}
+
+	srBuffer = CreateModelBuffer(
+	  spDebugName ? spDebugName : "MORPHS",
+	  srVertexFormatData.apData,
+	  Graphics_GetVertexFormatSize( srVertexFormatData.aFormat ) * spVertexData->aCount * spVertexData->aBlendShapeCount,
+	  EBufferFlags_Storage );
+}
+
+
 void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
 	PROF_SCOPE();
@@ -1579,6 +1592,23 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 
 		spBuffer->aVertex[ j ] = buffer;
 	}
+
+	// Handle Blend Shapes
+	
+	// TODO: this expects each vertex attribute to have it's own vertex buffer
+	// but we want the blend shapes to all be in one huge storage buffer
+	// what this expects is a buffer for each vertex attribute, for each blend shape
+	// so we would need like (blend shape count) * (vertex attribute count) buffers for blend shapes,
+	// that's not happening and needs to change
+
+	if ( spVertexData->aBlendShapeCount == 0 )
+		return;
+
+	spBuffer->aMorphs = CreateModelBuffer(
+	  spDebugName ? spDebugName : "MORPHS",
+	  spVertexData->aBlendShapeData.apData,
+	  Graphics_GetVertexFormatSize( spVertexData->aBlendShapeData.aFormat ) * spVertexData->aCount * spVertexData->aBlendShapeCount,
+	  EBufferFlags_Storage );
 }
 
 

@@ -102,7 +102,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 		for ( VertexAttribute attrib : attribs )
 		{
-			size_t size        = Graphics_GetVertexAttributeSize( attrib );
+			size_t size = Graphics_GetVertexAttributeSize( attrib );
 
 			for ( ; attribIndex < vertData->aData.size(); attribIndex++ )
 			{
@@ -172,8 +172,6 @@ void MeshBuilder::End( bool sCreateBuffers )
 			else MOVE_VERT_DATA( VertexAttribute_Normal,   normal,   3 )
 			else MOVE_VERT_DATA( VertexAttribute_Color,    color,    3 )
 			else MOVE_VERT_DATA( VertexAttribute_TexCoord, texCoord, 2 )
-				
-			// else MOVE_VERT_DATA( VertexAttribute_MorphPos, morphPos, 3 )
 
 			#undef MOVE_VERT_DATA
 		}
@@ -322,8 +320,8 @@ void MeshBuilder::NextVertex()
 
 
 #define VERT_EMPTY_CHECK() \
-	Assert( aSurfaces.size() ); \
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() ); \
+	CH_ASSERT( apSurf );
 
 
 void MeshBuilder::SetPos( const glm::vec3& data )
@@ -403,30 +401,6 @@ void MeshBuilder::SetTexCoord( float x, float y )
 	apSurf->aVertex.texCoord.x = x;
 	apSurf->aVertex.texCoord.y = y;
 }
-
-
-// ------------------------------------------------------------------------
-// Blend Shapes
-
-
-// inline void MeshBuilder::SetMorphPos( const glm::vec3& data )
-// {
-// 	VERT_EMPTY_CHECK();
-// 
-// 	apSurf->aFormat |= VertexFormat_MorphPos;
-// 	apSurf->aVertex.morphPos = data;
-// }
-// 
-// 
-// inline void MeshBuilder::SetMorphPos( float x, float y, float z )
-// {
-// 	VERT_EMPTY_CHECK();
-// 
-// 	apSurf->aFormat |= VertexFormat_MorphPos;
-// 	apSurf->aVertex.morphPos.x = x;
-// 	apSurf->aVertex.morphPos.y = y;
-// 	apSurf->aVertex.morphPos.z = z;
-// }
 
 
 // ------------------------------------------------------------------------
@@ -538,4 +512,212 @@ void MeshBuilder::CalculateAllNormals()
 
 
 #undef VERT_EMPTY_CHECK
+
+
+// =============================================================================================
+// Mesh Builder 2
+// Helper System for loading models, not really meant for creating meshes from scratch in code
+
+
+bool MeshBuild_StartMesh( MeshBuildData_t& srMeshBuildData, u32 sMaterialCount, ChHandle_t* spMaterials )
+{
+	if ( sMaterialCount == 0 )
+		return false;
+
+	srMeshBuildData.aMaterials.resize( sMaterialCount );
+
+	for ( u32 i = 0; i < sMaterialCount; i++ )
+	{
+		srMeshBuildData.aMaterials[ i ].aMaterial = spMaterials[ i ];
+	}
+
+	return true;
+}
+
+
+static void MeshBuild_CopyVerts( void* spDest, u32 sBaseSize, u32 sStride, void* spData, u32 sVertexCount )
+{
+	float* data = (float*)spDest + sBaseSize;
+	memcpy( data, spData, sVertexCount * sizeof( float ) * sStride );
+}
+
+
+static bool realloc_free( void*& spData, size_t sCount )
+{
+	void* data = realloc( spData, sCount );
+
+	if ( !data )
+	{
+		free( spData );
+		return false;
+	}
+		
+	spData = data;
+	return true;
+}
+
+
+void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName )
+{
+	if ( spModel->aMeshes.size() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Meshes already created for Model: \"%s\"\n", spDebugName ? spDebugName : "internal" );
+		return;
+	}
+
+	VertexData_t* vertData                       = new VertexData_t;
+	spModel->apVertexData                        = vertData;
+	vertData->aFormat                            = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
+	ChVector< u32 >&              indexList      = vertData->aIndices;
+	ChVector< VertAttribData_t >& vertAttribs    = vertData->aData;
+	VertFormatData_t&             blendShapeData = vertData->aBlendShapeData;
+
+	vertAttribs.resize( 3 );
+	vertAttribs[ 0 ].aAttrib = VertexAttribute_Position;
+	vertAttribs[ 1 ].aAttrib = VertexAttribute_Normal;
+	vertAttribs[ 2 ].aAttrib = VertexAttribute_TexCoord;
+
+	blendShapeData.aFormat   = VertexFormat_Position | VertexFormat_Normal | VertexAttribute_TexCoord;
+
+	int strides[]            = { 3, 3, 2 };
+
+	spModel->aMeshes.resize( srMeshBuildData.aMaterials.size() );
+
+	if ( sCalculateIndices )
+	{
+	}
+	else
+	{
+		for ( size_t matI = 0; matI < srMeshBuildData.aMaterials.size(); matI++ )
+		{
+			MeshBuildMaterial_t& material = srMeshBuildData.aMaterials[ matI ];
+			Mesh&                mesh     = spModel->aMeshes[ matI ];
+			mesh.aMaterial                = material.aMaterial;
+
+			u32 baseSize                  = indexList.size();
+			mesh.aVertexOffset            = baseSize;
+			mesh.aVertexCount             = material.aVertexCount;
+
+			indexList.resize( baseSize + material.aVertexCount );
+
+			if ( !realloc_free( vertAttribs[ 0 ].apData, baseSize + material.aVertexCount * sizeof( float ) * 3 ) )
+				return;
+
+			if ( !realloc_free( vertAttribs[ 1 ].apData, baseSize + material.aVertexCount * sizeof( float ) * 3 ) )
+				return;
+
+			if ( !realloc_free( vertAttribs[ 2 ].apData, baseSize + material.aVertexCount * sizeof( float ) * 2 ) )
+				return;
+
+			u32 vertI = 0;
+			for ( u32 newIndex = baseSize; newIndex < indexList.size(); newIndex++, vertI++ )
+			{
+				indexList[ newIndex ] = newIndex;
+				// posList[ newIndex ]   = material.apPos[ vertI ];
+				// normList[ newIndex ]  = material.apNorm[ vertI ];
+				// uvList[ newIndex ]    = material.apUV[ vertI ];
+			}
+
+			// Copy Position
+			MeshBuild_CopyVerts( vertAttribs[ 0 ].apData, baseSize, 3, material.apPos, material.aVertexCount );
+
+			// Copy Normals
+			MeshBuild_CopyVerts( vertAttribs[ 1 ].apData, baseSize, 3, material.apNorm, material.aVertexCount );
+
+			// Copy UV's
+			MeshBuild_CopyVerts( vertAttribs[ 2 ].apData, baseSize, 2, material.apUV, material.aVertexCount );
+
+			// Copy Blend Shapes
+			// if ( material.aBlendShapes.empty() )
+			// 	continue;
+
+			if ( !realloc_free( blendShapeData.apData, baseSize + material.aVertexCount * sizeof( MeshBuildBlendShapeElement_t ) * material.aBlendShapes.size() ) )
+				return;
+
+			// Blend Shape Data is interleaved - POS|NORM|UV|POS|NORM|UV, instead of POS|POS|POS NORM|NORM|NORM UV|UV|UV
+
+			for ( u32 blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )
+			{
+				u32    dataOffset = blendI * material.aVertexCount;
+				float* data       = (float*)blendShapeData.apData + baseSize + dataOffset;
+
+				memcpy( data, material.aBlendShapes[ blendI ].apData, material.aVertexCount * sizeof( MeshBuildBlendShapeElement_t ) );
+			}
+		}
+
+		vertData->aCount = indexList.size();
+	}
+
+	if ( !sUploadMesh )
+		return;
+
+	if ( spModel->apBuffers == nullptr )
+		spModel->apBuffers = new ModelBuffers_t;
+
+	Graphics_CreateVertexBuffers( spModel->apBuffers, vertData, spDebugName );
+
+	if ( sCalculateIndices )
+		Graphics_CreateIndexBuffer( spModel->apBuffers, vertData, spDebugName );
+}
+
+
+void MeshBuild_AllocateVertices( MeshBuildData_t& srMeshBuildData, u32 sMaterial, u32 sCount )
+{
+	if ( sMaterial >= srMeshBuildData.aMaterials.size() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
+		return;
+	}
+
+	MeshBuildMaterial_t& material   = srMeshBuildData.aMaterials[ sMaterial ];
+	u32                  startCount = material.aVertexCount;
+
+	material.apPos                  = ch_realloc_count( material.apPos, startCount + sCount );
+	material.apNorm                 = ch_realloc_count( material.apNorm, startCount + sCount );
+	material.apUV                   = ch_realloc_count( material.apUV, startCount + sCount );
+
+	memset( material.apPos + startCount, 0, sCount );
+	memset( material.apNorm + startCount, 0, sCount );
+	memset( material.apUV + startCount, 0, sCount );
+
+	material.aVertexCount += sCount;
+}
+
+
+void MeshBuild_AllocateBlendShapes( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sBlendShapeCount )
+{
+	srMeshBuildMaterial.aBlendShapes.resize( sBlendShapeCount );
+
+	u32           vertCount     = srMeshBuildMaterial.aVertexCount;
+	constexpr int blendElemSize = 3 + 3 + 2;
+
+	for ( MeshBuildBlendShape_t& blendShape : srMeshBuildMaterial.aBlendShapes )
+	{
+		// blendShape.apPos  = ch_calloc_count< glm::vec3 >( vertCount );
+		// blendShape.apNorm = ch_calloc_count< glm::vec3 >( vertCount );
+		// blendShape.apUV   = ch_calloc_count< glm::vec2 >( vertCount );
+		
+		blendShape.apData = ch_calloc_count< MeshBuildBlendShapeElement_t >( vertCount );
+
+		// blendShape.apData = calloc( vertCount, sizeof( float ) * blendElemSize );
+	}
+}
+
+
+void MeshBuild_SetVertexPos( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sVertIndex, const glm::vec3& data )
+{
+	srMeshBuildMaterial.apPos[ sVertIndex ] = data;
+}
+
+
+void MeshBuild_FillVertexPosData( MeshBuildData_t& srMeshBuildData, u32 sMaterial, glm::vec3* spData, u32 sCount, u32 sOffset )
+{
+	if ( sMaterial <= srMeshBuildData.aMaterials.size() )
+	{
+		Log_WarnF( gLC_ClientGraphics, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
+		return;
+	}
+
+	MeshBuildMaterial_t& material = srMeshBuildData.aMaterials[ sMaterial ];
+}
 
