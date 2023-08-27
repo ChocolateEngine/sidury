@@ -39,6 +39,8 @@ CONVAR( r_line_thickness, 2 );
 
 CONVAR( r_show_draw_calls, 0 );
 
+CONVAR( r_random_blend_shapes, 1 );
+
 
 bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
 {
@@ -235,7 +237,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 		{
 			prevModel   = model;
 			prevSurface = &surfaceDraw;
-			if ( !Graphics_BindModel( cmd, vertexFormat, model, renderable->aOutVertexBuffers ) )
+			if ( !Graphics_BindModel( cmd, vertexFormat, model, renderable->aVertexBuffers ) )
 				continue;
 		}
 
@@ -338,19 +340,30 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 {
 #if 0
-	for ( uint32_t i = 0; i < gGraphicsData.aSkinningRenderList.size();  )
+	ChHandle_t shaderSkinning = Graphics_GetShader( "skinning" );
+
+	if ( shaderSkinning == CH_INVALID_HANDLE )
+	{
+		Log_Error( gLC_ClientGraphics, "skinning shader not found, can't apply blend shapes and bone transforms!\n" );
+		return;
+	}
+
+	if ( !Shader_Bind( sCmd, sCmdIndex, shaderSkinning ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to bind skinning shader, can't apply blend shapes and bone transforms!\n" );
+		return;
+	}
+
+	ShaderData_t*    shaderSkinningData = Shader_GetData( shaderSkinning );
+	IShaderPushComp* skinningPush       = shaderSkinningData->apPushComp;
+
+	u32 i = 0;
+	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
 	{
 		Renderable_t* renderable = nullptr;
-		if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aSkinningRenderList[ i ], &renderable ) )
+		if ( !gGraphicsData.aRenderables.Get( renderHandle, &renderable ) )
 		{
 			Log_Warn( gLC_ClientGraphics, "Renderable does not exist!\n" );
-			continue;
-		}
-
-		// get model and check if it's nullptr
-		if ( renderable->aModel == InvalidHandle )
-		{
-			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model handle is InvalidHandle\n" );
 			continue;
 		}
 
@@ -371,11 +384,23 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 
 		i++;
 
-		if ( !Graphics_BindModel( sCmd, VertexFormat_Position, model, model->apBuffers->aVertex ) )
-			continue;
+		ShaderSkinning_Push push{};
+		push.aVertexCount     = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
+		push.aBlendShapeCount = model->apVertexData->aBlendShapeCount;
 
+		render->CmdPushConstants( sCmd, shaderSkinningData->aLayout, ShaderStage_Compute, 0, sizeof( push ), &push );
+		render->CmdDispatch( sCmd, push.aVertexCount / 64, 1, 1 );
 
+#if 0
+		VkBufferMemoryBarrier barrier = vkinit::buffer_barrier(matrixBuffer, _graphicsQueueFamily);
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+#endif
 	}
+
+	gGraphicsData.aSkinningRenderList.clear();
 #endif
 }
 
@@ -511,6 +536,11 @@ void Graphics_PrepareDrawData()
 
 	Graphics_UpdateDebugDraw();
 
+#if 0
+	ChHandle_t              shaderSkinning     = Graphics_GetShader( "skinning" );
+	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
+#endif
+
 	ShaderArrayAllocator_t& surfAllocator = gGraphicsData.aFreeSurfaceDraws;
 	surfAllocator.aUsed                   = 0;
 
@@ -532,6 +562,19 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
+#if 0
+		if ( r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
+		{
+			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
+
+			// Graphics_RenderableBlendShapesDirty;
+			for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
+			{
+				renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+			}
+		}
+#endif
+
 		Model* model = Graphics_GetModelData( renderable->aModel );
 		if ( !model )
 		{
@@ -539,9 +582,6 @@ void Graphics_PrepareDrawData()
 			gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
 			continue;
 		}
-
-		if ( renderable->aOutVertexBuffers.empty() )
-			renderable->aOutVertexBuffers = model->apBuffers->aVertex;
 
 		// update data on gpu
 		// NOTE: we actually use the handle index for this and not the allocator
@@ -636,6 +676,37 @@ void Graphics_PrepareDrawData()
 
 				shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
 			}
+		}
+
+		i++;
+	}
+
+	// --------------------------------------------------------------------
+	// Prepare Skinning Compute Shader Buffers
+
+	u32 i = 0;
+	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
+	{
+		Renderable_t* renderable = nullptr;
+		if ( !gGraphicsData.aRenderables.Get( renderHandle, &renderable ) )
+		{
+			Log_Warn( gLC_ClientGraphics, "Renderable does not exist!\n" );
+			continue;
+		}
+
+		// get model data
+		Model* model = Graphics_GetModelData( renderable->aModel );
+		if ( !model )
+		{
+			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
+			continue;
+		}
+
+		// make sure this model has valid vertex buffers
+		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
+		{
+			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
+			continue;
 		}
 
 		i++;

@@ -117,17 +117,17 @@ struct MeshBuilder
 		ChHandle_t                    aMaterial = CH_INVALID_HANDLE;
 	};
 
-	const char*                                                     apDebugName  = nullptr;
+	const char*                                                 apDebugName  = nullptr;
 
-	Model*                                                          apMesh       = nullptr;
-	ModelBuffers_t*                                                 apBuffers    = nullptr;
-	VertexData_t*                                                   apVertexData = nullptr;
+	Model*                                                      apMesh       = nullptr;
+	ModelBuffers_t*                                             apBuffers    = nullptr;
+	VertexData_t*                                               apVertexData = nullptr;
 
-	ChVector< BlendShape >                                          aBlendShapes;
-	ChVector< Surface >                                             aSurfaces;
+	ChVector< BlendShape >                                      aBlendShapes;
+	ChVector< Surface >                                         aSurfaces;
 	std::vector< std::unordered_map< MeshBuilderVertex, u32 > > aSurfacesInd;  // kinda weird
-	uint32_t                                                        aSurf  = 0;
-	Surface*                                                        apSurf = 0;  // pointer to current surface
+	uint32_t                                                    aSurf  = 0;
+	Surface*                                                    apSurf = 0;  // pointer to current surface
 
 	// ------------------------------------------------------------------------
 
@@ -159,12 +159,6 @@ struct MeshBuilder
 	void                     SetTexCoord( float x, float y );
 
 	// ------------------------------------------------------------------------
-	// Blend Shapes
-
-	// void                     SetMorphPos( const glm::vec3& data );
-	// void                     SetMorphPos( float x, float y, float z );
-
-	// ------------------------------------------------------------------------
 
 	void                     SetMaterial( Handle sMaterial );
 	void                     SetSurfaceCount( size_t sCount );
@@ -185,26 +179,6 @@ struct MeshBuilder
 // Helper System for loading models, not really meant for creating meshes from scratch in code
 
 
-struct MeshBuildFormatData_t
-{
-	VertexFormat aFormat = VertexFormat_None;
-	void*        apData  = nullptr;
-
-//	VertAttribData_t()
-//	{
-//	}
-//
-//	~VertAttribData_t()
-//	{
-//		if ( apData )
-//			free( apData );
-//	}
-//
-//   private:
-//	VertAttribData_t( const VertAttribData_t& other );
-};
-
-
 struct MeshBuildBlendShapeElement_t
 {
 	glm::vec3 aPos;
@@ -215,10 +189,6 @@ struct MeshBuildBlendShapeElement_t
 
 struct MeshBuildBlendShape_t
 {
-	// glm::vec3* apPos;
-	// glm::vec3* apNorm;
-	// glm::vec2* apUV;
-
 	// Blend Shape Data is interleaved - POS|NORM|UV|POS|NORM|UV, instead of POS|POS|POS NORM|NORM|NORM UV|UV|UV
 	MeshBuildBlendShapeElement_t* apData;
 };
@@ -267,10 +237,10 @@ struct MeshBuildMaterial_t
 
 struct MeshBuildData_t
 {
-	ChVector< MeshBuildMaterial_t >   aMaterials;
-	VertexFormat                      aVertexFormat;
+	ChVector< MeshBuildMaterial_t > aMaterials;
+	VertexFormat                    aVertexFormat;
 
-	ChVector< std::string >           aBlendShapeNames;
+	ChVector< std::string >         aBlendShapeNames;
 };
 
 
@@ -281,6 +251,6 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 void MeshBuild_AllocateVertices( MeshBuildData_t& srMeshBuildData, u32 sMaterial, u32 sCount );
 void MeshBuild_AllocateBlendShapes( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sBlendShapeCount );
 
-void MeshBuild_SetVertexPos( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sVertIndex, const glm::vec3& data );
-void MeshBuild_FillVertexPosData( MeshBuildData_t& srMeshBuildData, u32 sMaterial, glm::vec3* spData, u32 sCount, u32 sOffset );
+// void MeshBuild_SetVertexPos( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sVertIndex, const glm::vec3& data );
+// void MeshBuild_FillVertexPosData( MeshBuildData_t& srMeshBuildData, u32 sMaterial, glm::vec3* spData, u32 sCount, u32 sOffset );
 

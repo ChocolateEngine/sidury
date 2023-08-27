@@ -331,15 +331,16 @@ struct Renderable_t
 	// u32         aMeshCount;
 	// ChHandle_t* apMaterials;
 
-	// technically we could have this here for skinning results if needed
-	// I don't like this here as only very few models will use skinning
-	ChVector< ChHandle_t > aOutVertexBuffers;
-
 	// used for calculating render lists
 	ModelBBox_t            aAABB;
 
 	// used for blend shapes, i don't like this here because very few models will have blend shapes
 	ChVector< float >      aBlendShapeWeights;
+
+	// technically we could have this here for skinning results if needed
+	// I don't like this here as only very few models will use skinning
+	ChVector< ChHandle_t > aVertexBuffers;
+	ChHandle_t             aBlendShapeWeightsBuffer;
 
 	// I don't like these bools that have to be checked every frame
 	bool                   aTestVis;
@@ -354,8 +355,27 @@ struct Renderable_t
 // Unique for each viewport
 struct SurfaceDraw_t
 {
-	Handle aRenderable;
-	size_t aSurface;
+	ChHandle_t aRenderable;
+	size_t     aSurface;
+	u32        aShaderSlot;  // index into core data shader draw
+};
+
+
+// For Bindless Rendering?
+// instead of drawing on material at a time,
+// we can group all materials on that model that share the same shader
+// and then do it in one draw call
+// Or, we can try to draw every surface that uses that shader in one draw call
+// making even further use of bindless rendering
+// though debugging it would be tricky, but it would be far faster to render tons of things
+// 
+// just imagine in renderdoc, you see a shader bind, one draw call, and everything using that shader is just drawn
+// 
+struct RenderableSurfaceDrawList_t
+{
+	ChHandle_t aRenderable;
+	u32*   apSurfaces;
+	u32    aSurfaceCount;
 	u32    aShaderSlot;  // index into core data shader draw
 };
 
@@ -485,11 +505,16 @@ using FShader_ResetPushData = void();
 using FShader_SetupPushData = void( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
 using FShader_PushConstants = void( ChHandle_t cmd, ChHandle_t sLayout, SurfaceDraw_t& srDrawInfo );
 
+// blech
+using FShader_SetupPushDataComp = void( ChHandle_t srRenderableHandle, Renderable_t* spDrawData );
+using FShader_PushConstantsComp = void( ChHandle_t cmd, ChHandle_t sLayout, ChHandle_t srRenderableHandle, Renderable_t* spDrawData );
+
 using FShader_Init = bool();
 using FShader_Destroy = void();
 
 using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeline );
-using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srGraphics );
+using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srCreate );
+using FShader_GetComputePipelineCreate = void( ComputePipelineCreate_t& srCreate );
 
 using FShader_DescriptorData = void();
 
@@ -504,27 +529,38 @@ struct IShaderPush
 };
 
 
+// awful hacky push interface for compute shaders, need to rethink it
+struct IShaderPushComp
+{
+	FShader_ResetPushData*     apReset = nullptr;
+	FShader_SetupPushDataComp* apSetup = nullptr;
+	FShader_PushConstantsComp* apPush  = nullptr;
+};
+
+
 struct ShaderCreate_t
 {
-	const char*                        apName              = nullptr;
-	ShaderStage                        aStages             = ShaderStage_None;
-	EPipelineBindPoint                 aBindPoint          = EPipelineBindPoint_Graphics;
-	EShaderFlags                       aFlags              = EShaderFlags_None;
-	EDynamicState                      aDynamicState       = EDynamicState_None;
-	VertexFormat                       aVertexFormat       = VertexFormat_None;
-	ERenderPass                        aRenderPass         = ERenderPass_Graphics;
+	const char*                        apName           = nullptr;
+	ShaderStage                        aStages          = ShaderStage_None;
+	EPipelineBindPoint                 aBindPoint       = EPipelineBindPoint_Graphics;
+	EShaderFlags                       aFlags           = EShaderFlags_None;
+	EDynamicState                      aDynamicState    = EDynamicState_None;
+	VertexFormat                       aVertexFormat    = VertexFormat_None;
+	ERenderPass                        aRenderPass      = ERenderPass_Graphics;
 
-	FShader_Init*                      apInit              = nullptr;
-	FShader_Destroy*                   apDestroy           = nullptr;
+	FShader_Init*                      apInit           = nullptr;
+	FShader_Destroy*                   apDestroy        = nullptr;
 
-	FShader_GetPipelineLayoutCreate*   apLayoutCreate      = nullptr;
-	FShader_GetGraphicsPipelineCreate* apGraphicsCreate    = nullptr;
+	FShader_GetPipelineLayoutCreate*   apLayoutCreate   = nullptr;
+	FShader_GetGraphicsPipelineCreate* apGraphicsCreate = nullptr;
+	FShader_GetComputePipelineCreate*  apComputeCreate  = nullptr;
 
-	IShaderPush*                       apShaderPush        = nullptr;
-	FShader_MaterialData*              apMaterialData      = nullptr;
+	IShaderPush*                       apShaderPush     = nullptr;
+	IShaderPushComp*                   apShaderPushComp = nullptr;
+	FShader_MaterialData*              apMaterialData   = nullptr;
 
-	CreateDescBinding_t*               apBindings          = nullptr;
-	u32                                aBindingCount       = 0;
+	CreateDescBinding_t*               apBindings       = nullptr;
+	u32                                aBindingCount    = 0;
 };
 
 
@@ -536,6 +572,7 @@ struct ShaderData_t
 	EDynamicState         aDynamicState   = EDynamicState_None;
 	ChHandle_t            aLayout         = CH_INVALID_HANDLE;
 	IShaderPush*          apPush          = nullptr;
+	IShaderPushComp*      apPushComp      = nullptr;
 	FShader_MaterialData* apMaterialIndex = nullptr;
 };
 

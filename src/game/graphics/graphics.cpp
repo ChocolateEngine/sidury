@@ -31,6 +31,8 @@ void                   Graphics_LoadGltfNew( const std::string& srBasePath, cons
 
 void                   Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& srPath, Scene_t* spScene );
 
+Handle                 CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage );
+
 // --------------------------------------------------------------------------------------
 // General Rendering
 // TODO: group these globals together by data commonly used together
@@ -300,6 +302,8 @@ void Graphics_FreeModel( Handle shModel )
 	model->aRefCount--;
 	if ( model->aRefCount == 0 )
 	{
+		// TODO: QUEUE THIS MODEL FOR DELETION, DON'T DELETE THIS NOW
+
 		// Free Materials attached to this model
 		for ( Mesh& mesh : model->aMeshes )
 		{
@@ -1251,7 +1255,7 @@ ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& sr
 }
 
 
-Handle Graphics_CreateRenderable( Handle sModel )
+ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 {
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
@@ -1263,7 +1267,7 @@ Handle Graphics_CreateRenderable( Handle sModel )
 	Log_Dev( gLC_ClientGraphics, 1, "Created Renderable\n" );
 
 	Renderable_t* modelDraw  = nullptr;
-	Handle        drawHandle = InvalidHandle;
+	ChHandle_t    drawHandle = InvalidHandle;
 
 	if ( !( drawHandle = gGraphicsData.aRenderables.Create( &modelDraw ) ) )
 	{
@@ -1280,6 +1284,47 @@ Handle Graphics_CreateRenderable( Handle sModel )
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
 	modelDraw->aAABB        = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gGraphicsData.aModelBBox[ modelDraw->aModel ] );
+
+	modelDraw->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
+	modelDraw->aVertexBuffers.resize( model->apBuffers->aVertex.size() );
+
+	if ( modelDraw->aBlendShapeWeights.size() )
+	{
+		// we need new vertex buffers for the modified vertices
+		for ( size_t j = 0; j < model->apVertexData->aData.size(); j++ )
+		{
+			size_t     bufferSize   = Graphics_GetVertexAttributeSize( model->apVertexData->aData[ j ].aAttrib ) * model->apVertexData->aCount;
+
+			ChHandle_t deviceBuffer = render->CreateBuffer(
+			  "output renderable vertices idfk",
+			  bufferSize,
+			  EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
+			  EBufferMemory_Device );
+
+			BufferRegionCopy_t copy;
+			copy.aSrcOffset = 0;
+			copy.aDstOffset = 0;
+			copy.aSize      = bufferSize;
+
+			render->BufferCopyQueued( model->apBuffers->aVertex[ j ], deviceBuffer, &copy, 1 );
+			
+			modelDraw->aVertexBuffers[ j ] = deviceBuffer;
+		}
+
+		// Now Create a Blend Shape Weights Storage Buffer
+		modelDraw->aBlendShapeWeightsBuffer = render->CreateBuffer(
+		  "BlendShape Weights",
+		  sizeof( float ) * modelDraw->aBlendShapeWeights.size(),
+		  EBufferFlags_Storage,
+		  EBufferMemory_Host );
+	}
+	else
+	{
+		for ( size_t j = 0; j < model->apBuffers->aVertex.size(); j++ )
+		{
+			modelDraw->aVertexBuffers[ j ] = model->apBuffers->aVertex[ j ];
+		}
+	}
 
 	return drawHandle;
 }
@@ -1302,8 +1347,34 @@ Renderable_t* Graphics_GetRenderableData( Handle sRenderable )
 
 void Graphics_FreeRenderable( Handle sRenderable )
 {
+	// TODO: QUEUE THIS RENDERABLE FOR DELETION, DON'T DELETE THIS NOW, SAME WITH MODELS, MATERIALS, AND TEXTURES!!!
+
 	if ( !sRenderable )
 		return;
+
+	Renderable_t* renderable = nullptr;
+	if ( !gGraphicsData.aRenderables.Get( sRenderable, &renderable ) )
+	{
+		Log_Warn( gLC_ClientGraphics, "Failed to find Renderable to delete!\n" );
+		return;
+	}
+
+	// HACK - REMOVE WHEN WE ADD QUEUED DELETION FOR ASSETS
+	render->WaitForQueues();
+
+	if ( renderable->aBlendShapeWeightsBuffer )
+	{
+		render->DestroyBuffer( renderable->aBlendShapeWeightsBuffer );
+		renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
+
+		// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
+		for ( size_t j = 0; j < renderable->aVertexBuffers.size(); j++ )
+		{
+			render->DestroyBuffer( renderable->aVertexBuffers[ j ] );
+		}
+	}
+
+	renderable->aVertexBuffers.clear();
 
 	gGraphicsData.aRenderables.Remove( sRenderable );
 }
@@ -1485,7 +1556,7 @@ const char* Graphics_GetVertexAttributeName( VertexAttribute attrib )
 // Buffers
 
 // sBufferSize is sizeof(element) * count
-static Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage )
+Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, EBufferFlags sUsage )
 {
 	PROF_SCOPE();
 
@@ -1544,14 +1615,6 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		return;
 	}
 
-	// VertexFormat shaderFormat = Mat_GetVertexFormat( srMesh.aMaterial );
-	// 
-	// if ( shaderFormat == VertexFormat_None )
-	// {
-	// 	Log_Error( gLC_ClientGraphics, "No Vertex Format for shader!\n" );
-	// 	return;
-	// }
-
 	// Get Attributes the shader wants
 	// TODO: what about if we don't have an attribute the shader wants???
 	// maybe create a temporary empty buffer full of zeros? idk
@@ -1588,7 +1651,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		  bufferName ? bufferName : "VB",
 		  data->apData,
 		  Graphics_GetVertexAttributeSize( data->aAttrib ) * spVertexData->aCount,
-		  EBufferFlags_Vertex );
+		  EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferSrc );
 
 		spBuffer->aVertex[ j ] = buffer;
 	}

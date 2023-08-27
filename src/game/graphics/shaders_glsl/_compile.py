@@ -7,6 +7,7 @@ SHADER_LIST = [
     # "basic2d",
     "unlit",
     # "unlitarray",
+    "skinning",
     "debug",
     "debug_col.vert",
     "skybox",
@@ -49,6 +50,10 @@ def main():
 
             if os.path.isfile(shader + ".frag"):
                 compile_shader(shader + ".frag")
+                found_shader = True
+
+            if os.path.isfile(shader + ".comp"):
+                compile_shader(shader + ".comp")
                 found_shader = True
 
         if not found_shader:

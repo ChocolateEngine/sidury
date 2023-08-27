@@ -634,6 +634,8 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 			if ( !realloc_free( blendShapeData.apData, baseSize + material.aVertexCount * sizeof( MeshBuildBlendShapeElement_t ) * material.aBlendShapes.size() ) )
 				return;
 
+			vertData->aBlendShapeCount = material.aBlendShapes.size();
+
 			// Blend Shape Data is interleaved - POS|NORM|UV|POS|NORM|UV, instead of POS|POS|POS NORM|NORM|NORM UV|UV|UV
 
 			for ( u32 blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )

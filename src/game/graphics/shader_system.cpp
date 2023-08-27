@@ -148,6 +148,30 @@ bool Shader_CreateGraphicsPipeline( ShaderCreate_t& srCreate, Handle& srPipeline
 }
 
 
+bool Shader_CreateComputePipeline( ShaderCreate_t& srCreate, Handle& srPipeline, Handle& srLayout, Handle sRenderPass )
+{
+	if ( srCreate.apComputeCreate == nullptr )
+	{
+		Log_Error( gLC_ClientGraphics, "FShader_GetComputePipelineCreate is nullptr!\n" );
+		return false;
+	}
+
+	ComputePipelineCreate_t pipelineCreate{};
+	srCreate.apComputeCreate( pipelineCreate );
+
+	pipelineCreate.apName          = srCreate.apName;
+	pipelineCreate.aPipelineLayout = srLayout;
+
+	if ( !render->CreateComputePipeline( srPipeline, pipelineCreate ) )
+	{
+		Log_ErrorF( "Failed to create Compute Pipeline for Shader \"%s\"\n", srCreate.apName );
+		return false;
+	}
+
+	return true;
+}
+
+
 bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& srCreate )
 {
 	Handle pipeline = InvalidHandle;
@@ -173,10 +197,21 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 		return false;
 	}
 
-	if ( !Shader_CreateGraphicsPipeline( srCreate, pipeline, shaderData.aLayout, sRenderPass ) )
+	if ( srCreate.aBindPoint == EPipelineBindPoint_Graphics )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create Graphics Pipeline\n" );
-		return false;
+		if ( !Shader_CreateGraphicsPipeline( srCreate, pipeline, shaderData.aLayout, sRenderPass ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create Graphics Pipeline\n" );
+			return false;
+		}
+	}
+	else
+	{
+		if ( !Shader_CreateComputePipeline( srCreate, pipeline, shaderData.aLayout, sRenderPass ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Failed to create Compute Pipeline\n" );
+			return false;
+		}
 	}
 
 	gShaderNames[ srCreate.apName ] = pipeline;
@@ -189,6 +224,9 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 
 	if ( srCreate.apShaderPush )
 		shaderData.apPush = srCreate.apShaderPush;
+
+	if ( srCreate.apShaderPushComp )
+		shaderData.apPushComp = srCreate.apShaderPushComp;
 
 	if ( srCreate.apMaterialData )
 		shaderData.apMaterialIndex = srCreate.apMaterialData;

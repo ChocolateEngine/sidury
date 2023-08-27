@@ -218,6 +218,14 @@ enum EShaderCoreArray : u32
 };
 
 
+// :skull:
+struct ShaderSkinning_Push
+{
+	u32 aVertexCount     = 0;
+	u32 aBlendShapeCount = 0;
+};
+
+
 constexpr u32 CH_SHADER_CORE_SLOT_INVALID = _UI32_MAX;
 
 
