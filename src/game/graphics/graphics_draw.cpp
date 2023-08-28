@@ -27,10 +27,10 @@ u32                          Shader_Basic3D_UpdateMaterialData( Handle sMat );
 // --------------------------------------------------------------------------------------
 // Other
 
-size_t                       gModelDrawCalls = 0;
-size_t                       gVertsDrawn     = 0;
+size_t                                 gModelDrawCalls = 0;
+size_t                                 gVertsDrawn     = 0;
 
-extern ChVector< glm::vec3 > gDebugLineVertPos;
+extern ChVector< Shader_VertexData_t > gDebugLineVerts;
 
 CONVAR( r_vis, 1 );
 CONVAR( r_vis_lock, 0 );
@@ -94,13 +94,20 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 	// TODO: figure out a way to use vertex and index offsets with this vertex format stuff
 	// ideally, it would be less vertex buffer binding, but would be harder to pull off
 	if ( spModel->apBuffers->aIndex )
-		render->CmdDrawIndexed(
+		render->CmdDraw(
 		  cmd,
 		  mesh.aIndexCount,
-		  1,                  // instance count
+		  1,
 		  mesh.aIndexOffset,
-		  0, // mesh.aVertexOffset,
 		  0 );
+
+		// render->CmdDrawIndexed(
+		//   cmd,
+		//   mesh.aIndexCount,
+		//   1,                  // instance count
+		//   mesh.aIndexOffset,
+		//   0, // mesh.aVertexOffset,
+		//   0 );
 
 	else
 		render->CmdDraw(
@@ -115,8 +122,9 @@ void Graphics_CmdDrawSurface( Handle cmd, Model* spModel, size_t sSurface )
 }
 
 
-bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spModel, ChVector< ChHandle_t >& srVertexBuffers )
+bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spModel, ChHandle_t sVertexBuffer )
 {
+#if 0
 	PROF_SCOPE();
 
 	// Bind the mesh's vertex and index buffers
@@ -129,25 +137,27 @@ bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spMo
 	// ChVector< ChHandle_t >& allVertexBuffers = spRenderable->aOutVertexBuffers.size() ? spRenderable->aOutVertexBuffers : spModel->apBuffers->aVertex;
 
 	// TODO: THIS CAN BE DONE WHEN ADDING THE MODEL TO THE MAIN DRAW LIST, AND PUT IN SurfaceDraw_t
-	for ( size_t i = 0; i < spModel->apVertexData->aData.size(); i++ )
-	{
-		VertAttribData_t& data = spModel->apVertexData->aData[ i ];
+	// for ( size_t i = 0; i < spModel->apVertexData->aData.size(); i++ )
+	// {
+	// 	VertAttribData_t& data = spModel->apVertexData->aData[ i ];
+	// 
+	// 	if ( sVertexFormat & ( 1 << data.aAttrib ) )
+	// 		vertexBuffers.push_back( srVertexBuffers[ i ] );
+	// }
 
-		if ( sVertexFormat & ( 1 << data.aAttrib ) )
-			vertexBuffers.push_back( srVertexBuffers[ i ] );
-	}
+	size_t                offsets = 0;
 
-	size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * vertexBuffers.size() );
-	if ( offsets == nullptr )
-	{
-		Log_Error( gLC_ClientGraphics, "Graphics_BindModel: Failed to allocate vertex buffer offsets!\n" );
-		return false;
-	}
+	// size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * vertexBuffers.size() );
+	// if ( offsets == nullptr )
+	// {
+	// 	Log_Error( gLC_ClientGraphics, "Graphics_BindModel: Failed to allocate vertex buffer offsets!\n" );
+	// 	return false;
+	// }
+	// 
+	// // TODO: i could probably use offsets here, i imagine it might actually be faster?
+	// memset( offsets, 0, sizeof( size_t ) * vertexBuffers.size() );
 
-	// TODO: i could probably use offsets here, i imagine it might actually be faster?
-	memset( offsets, 0, sizeof( size_t ) * vertexBuffers.size() );
-
-	render->CmdBindVertexBuffers( cmd, 0, vertexBuffers.size(), vertexBuffers.data(), offsets );
+	render->CmdBindVertexBuffers( cmd, 0, 1, &sVertexBuffer, &offsets );
 
 	// TODO: store index type here somewhere
 	if ( spModel->apBuffers->aIndex )
@@ -155,7 +165,8 @@ bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spMo
 
 	// SHADER: update and bind per object descriptor set?
 
-	CH_STACK_FREE( offsets );
+	// CH_STACK_FREE( offsets );
+#endif
 	return true;
 }
 
@@ -212,7 +223,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 		}
 
 		// make sure this model has valid vertex buffers
-		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
+		if ( model->apBuffers == nullptr || model->apBuffers->aVertex == CH_INVALID_HANDLE )
 		{
 			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
 			srRenderList.remove( i );
@@ -237,7 +248,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 		{
 			prevModel   = model;
 			prevSurface = &surfaceDraw;
-			if ( !Graphics_BindModel( cmd, vertexFormat, model, renderable->aVertexBuffers ) )
+			if ( !Graphics_BindModel( cmd, vertexFormat, model, renderable->aVertexBuffer ) )
 				continue;
 		}
 
@@ -340,7 +351,7 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 {
 #if 0
-	ChHandle_t shaderSkinning = Graphics_GetShader( "skinning" );
+	ChHandle_t shaderSkinning = Graphics_GetShader( "__skinning" );
 
 	if ( shaderSkinning == CH_INVALID_HANDLE )
 	{
@@ -376,7 +387,7 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		}
 
 		// make sure this model has valid vertex buffers
-		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
+		if ( model->apBuffers == nullptr || model->apBuffers->aVertex == CH_INVALID_HANDLE )
 		{
 			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
 			continue;
@@ -385,6 +396,9 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		i++;
 
 		ShaderSkinning_Push push{};
+		push.aRenderable      = CH_GET_HANDLE_INDEX( renderHandle );
+		push.aSourceVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+
 		push.aVertexCount     = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
 		push.aBlendShapeCount = model->apVertexData->aBlendShapeCount;
 
@@ -399,9 +413,9 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0, nullptr);
 #endif
 	}
+#endif
 
 	gGraphicsData.aSkinningRenderList.clear();
-#endif
 }
 
 
@@ -434,6 +448,73 @@ void Graphics_UpdateCoreData()
 }
 
 
+#if 0
+void Graphics_UpdateShaderBufferDescriptors( ShaderBufferList_t* spBufferList, u32* sBindings, u32 sCount )
+{
+	if ( sCount == 0 )
+		return;
+
+	WriteDescSet_t* writes = ch_malloc_count< WriteDescSet_t >( sCount );
+
+	for ( u32 i = 0; i < sCount; i++ )
+	{
+		writes[ i ].aDescSetCount = gShaderDescriptorData.aGlobalSets.aCount;
+		writes[ i ].apDescSets    = gShaderDescriptorData.aGlobalSets.apSets;
+
+		writes[ i ].aBindingCount = 1;
+		writes[ i ].apBindings    = CH_STACK_NEW( WriteDescSetBinding_t, update.aBindingCount );
+
+		// move out of here aaa
+		ChVector< ChHandle_t > buffers;
+		buffers.resize( spBufferList[ i ].aBuffers.size() );
+
+		writes[ i ].apBindings[ 0 ].aBinding = sBindings[ i ];
+		writes[ i ].apBindings[ 0 ].aType    = EDescriptorType_StorageBuffer;
+		writes[ i ].apBindings[ 0 ].aCount   = buffers.size();
+		writes[ i ].apBindings[ 0 ].apData   = buffers.data();
+	}
+
+	render->UpdateDescSets( &writes[ i ], sCount );
+
+	for ( u32 i = 0; i < sCount; i++ )
+	{
+		CH_STACK_FREE( writes[ i ].apBindings );
+	}
+
+	free( writes );
+}
+#endif
+
+
+void Graphics_UpdateShaderBufferDescriptors( ShaderBufferList_t& srBufferList, u32 sBinding )
+{
+	srBufferList.aDirty = false;
+
+	WriteDescSet_t write{};
+
+	write.aDescSetCount = gShaderDescriptorData.aGlobalSets.aCount;
+	write.apDescSets    = gShaderDescriptorData.aGlobalSets.apSets;
+
+	write.aBindingCount = 1;
+	write.apBindings    = CH_STACK_NEW( WriteDescSetBinding_t, write.aBindingCount );
+
+	ChVector< ChHandle_t > buffers;
+	buffers.reserve( srBufferList.aBuffers.size() );
+
+	for ( auto& [ handle, buffer ] : srBufferList.aBuffers )
+		buffers.push_back( buffer );
+
+	write.apBindings[ 0 ].aBinding = sBinding;
+	write.apBindings[ 0 ].aType    = EDescriptorType_StorageBuffer;
+	write.apBindings[ 0 ].aCount   = buffers.size();
+	write.apBindings[ 0 ].apData   = buffers.data();
+
+	render->UpdateDescSets( &write, 1 );
+
+	CH_STACK_FREE( write.apBindings );
+}
+
+
 void Graphics_PrepareDrawData()
 {
 	PROF_SCOPE();
@@ -449,7 +530,7 @@ void Graphics_PrepareDrawData()
 	{
 		gui->DebugMessage( "Model Draw Calls: %zd", gModelDrawCalls );
 		gui->DebugMessage( "Verts Drawn: %zd", gVertsDrawn );
-		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVertPos.size() );
+		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVerts.size() );
 	}
 
 	{
@@ -515,6 +596,19 @@ void Graphics_PrepareDrawData()
 
 	// --------------------------------------------------------------------
 
+	ChVector< ShaderBufferList_t > bufferUpdateList;
+	ChVector< ShaderBufferList_t > bufferUpdateBindings;
+	
+	// Update Vertex Buffer Array SSBO
+	if ( gGraphicsData.aVertexBuffers.aDirty )
+		Graphics_UpdateShaderBufferDescriptors( gGraphicsData.aVertexBuffers, CH_BINDING_VERTEX_BUFFERS );
+
+	// Update Index Buffer Array SSBO
+	if ( gGraphicsData.aIndexBuffers.aDirty )
+		Graphics_UpdateShaderBufferDescriptors( gGraphicsData.aIndexBuffers, CH_BINDING_INDEX_BUFFERS );
+
+	// --------------------------------------------------------------------
+
 	Shader_ResetPushData();
 
 	bool usingShadow = Graphics_IsUsingShadowMaps();
@@ -536,8 +630,8 @@ void Graphics_PrepareDrawData()
 
 	Graphics_UpdateDebugDraw();
 
-#if 0
-	ChHandle_t              shaderSkinning     = Graphics_GetShader( "skinning" );
+#if 1
+	ChHandle_t              shaderSkinning     = Graphics_GetShader( "__skinning" );
 	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
 #endif
 
@@ -562,7 +656,7 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-#if 0
+#if 1
 		if ( r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
 		{
 			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
@@ -657,9 +751,9 @@ void Graphics_PrepareDrawData()
 
 				// more unique use of this lol
 				u32                   surfIndex      = surfAllocator.aUsed++; 
-				Shader_SurfaceDraw_t& shaderSurfDraw = gGraphicsData.aSurfaceDraws[ surfIndex ];
-				shaderSurfDraw.aMaterial             = 0;
-				shaderSurfDraw.aRenderable           = renderIndex;
+				// Shader_SurfaceDraw_t& shaderSurfDraw = gGraphicsData.aSurfaceDraws[ surfIndex ];
+				// shaderSurfDraw.aMaterial             = 0;
+				// shaderSurfDraw.aRenderable           = renderIndex;
 
 				surfDraw.aShaderSlot                 = surfIndex;
 
@@ -674,7 +768,7 @@ void Graphics_PrepareDrawData()
 				if ( !shaderData->apMaterialIndex )
 					continue;
 
-				shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
+				// shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
 			}
 		}
 
@@ -684,6 +778,7 @@ void Graphics_PrepareDrawData()
 	// --------------------------------------------------------------------
 	// Prepare Skinning Compute Shader Buffers
 
+#if 0
 	u32 i = 0;
 	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
 	{
@@ -703,7 +798,7 @@ void Graphics_PrepareDrawData()
 		}
 
 		// make sure this model has valid vertex buffers
-		if ( model->apBuffers == nullptr || model->apBuffers->aVertex.empty() )
+		if ( model->apBuffers == nullptr || model->apBuffers->aVertex == CH_INVALID_HANDLE )
 		{
 			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
 			continue;
@@ -711,6 +806,7 @@ void Graphics_PrepareDrawData()
 
 		i++;
 	}
+#endif
 
 	// --------------------------------------------------------------------
 	// Update Renderables on the GPU and Calculate Light Lists
@@ -771,6 +867,29 @@ void Graphics_PrepareDrawData()
 			viewportBuffer.aViewPos           = viewport.aViewPos;
 			viewportBuffer.aNearZ             = viewport.aNearZ;
 			viewportBuffer.aFarZ              = viewport.aFarZ;
+		}
+
+		// Update Renderable Vertex Buffer Handles
+		for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
+		{
+			Renderable_t* renderable = nullptr;
+			if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aRenderables.aHandles[ i ], &renderable ) )
+			{
+				Log_Warn( gLC_ClientGraphics, "Renderable handle is invalid!\n" );
+				gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
+				continue;
+			}
+
+			if ( !renderable->aVisible )
+			{
+				i++;
+				continue;
+			}
+
+			gGraphicsData.aCoreData.aRenderables[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+			gGraphicsData.aCoreData.aRenderables[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
+
+			i++;
 		}
 
 		gGraphicsData.aCoreDataStaging.aDirty = false;

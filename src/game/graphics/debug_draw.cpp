@@ -6,13 +6,13 @@
 // --------------------------------------------------------------------------------------
 // Debug Drawing
 
+
 // static MeshBuilder                               gDebugLineBuilder;
-static Handle                          gDebugLineModel    = InvalidHandle;
-static Handle                          gDebugLineDraw     = InvalidHandle;
-static Handle                          gDebugLineMaterial = InvalidHandle;
-ChVector< glm::vec3 >                  gDebugLineVertPos;
-static ChVector< glm::vec3 >           gDebugLineVertColor;
-static size_t                          gDebugLineBufferSize = 0;
+static Handle                   gDebugLineModel    = InvalidHandle;
+static Handle                   gDebugLineDraw     = InvalidHandle;
+static Handle                   gDebugLineMaterial = InvalidHandle;
+ChVector< Shader_VertexData_t > gDebugLineVerts;
+static size_t                   gDebugLineBufferSize = 0;
 
 
 // --------------------------------------------------------------------------------------
@@ -23,6 +23,10 @@ CONVAR( r_debug_frustums, 0 );
 CONVAR( r_debug_normals, 0 );
 CONVAR( r_debug_normals_len, 8 );
 CONVAR( r_debug_normals_len_face, 8 );
+
+
+// bool& r_debug_draw = Con_RegisterConVar_Bool( "r_debug_draw", "Enable or Disable All Debug Drawing", true );
+
 
 // --------------------------------------------------------------------------------------
 
@@ -38,8 +42,7 @@ void Graphics_DebugDrawNewFrame()
 {
 	PROF_SCOPE();
 
-	gDebugLineVertPos.clear();
-	gDebugLineVertColor.clear();
+	gDebugLineVerts.clear();
 
 	if ( !r_debug_draw )
 	{
@@ -175,7 +178,7 @@ void Graphics_UpdateDebugDraw()
 	if ( !renderable )
 		return;
 
-	if ( gDebugLineModel && gDebugLineVertPos.size() )
+	if ( gDebugLineModel && gDebugLineVerts.size() )
 	{
 		renderable->aVisible = true;
 		// Mesh& mesh = gDebugLineModel->aMeshes[ 0 ];
@@ -195,40 +198,34 @@ void Graphics_UpdateDebugDraw()
 			model->apBuffers = new ModelBuffers_t;
 
 		// Is our current buffer size too small? If so, free the old ones
-		if ( gDebugLineVertPos.size() > gDebugLineBufferSize )
+		if ( gDebugLineVerts.size() > gDebugLineBufferSize )
 		{
-			if ( model->apBuffers && model->apBuffers->aVertex.size() )
+			if ( model->apBuffers && model->apBuffers->aVertex != CH_INVALID_HANDLE )
 			{
-				render->DestroyBuffer( model->apBuffers->aVertex[ 0 ] );
-				render->DestroyBuffer( model->apBuffers->aVertex[ 1 ] );
-				model->apBuffers->aVertex.clear();
+				render->DestroyBuffer( model->apBuffers->aVertex );
+				model->apBuffers->aVertex = CH_INVALID_HANDLE;
 			}
 
-			gDebugLineBufferSize = gDebugLineVertPos.size();
+			gDebugLineBufferSize = gDebugLineVerts.size();
 		}
 
-		size_t bufferSize = ( 3 * sizeof( float ) ) * gDebugLineVertPos.size();
+		size_t bufferSize = sizeof( Shader_VertexData_t ) * gDebugLineVerts.size();
 
 		// Create new Buffers if needed
-		if ( model->apBuffers->aVertex.empty() )
-		{
-			model->apBuffers->aVertex.resize( 2 );
-			model->apBuffers->aVertex[ 0 ] = render->CreateBuffer( "DebugLine Position", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
-			model->apBuffers->aVertex[ 1 ] = render->CreateBuffer( "DebugLine Color", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
-		}
+		if ( model->apBuffers->aVertex == CH_INVALID_HANDLE )
+			model->apBuffers->aVertex = render->CreateBuffer( "DebugLine Vertex", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
 
-		model->apVertexData->aCount = gDebugLineVertPos.size();
+		model->apVertexData->aCount = gDebugLineVerts.size();
 
 		if ( model->aMeshes.empty() )
 			model->aMeshes.resize( 1 );
 
 		model->aMeshes[ 0 ].aIndexCount   = 0;
 		model->aMeshes[ 0 ].aVertexOffset = 0;
-		model->aMeshes[ 0 ].aVertexCount  = gDebugLineVertPos.size();
+		model->aMeshes[ 0 ].aVertexCount  = gDebugLineVerts.size();
 
 		// Update the Buffers
-		render->BufferWrite( model->apBuffers->aVertex[ 0 ], bufferSize, gDebugLineVertPos.data() );
-		render->BufferWrite( model->apBuffers->aVertex[ 1 ], bufferSize, gDebugLineVertColor.data() );
+		render->BufferWrite( model->apBuffers->aVertex, bufferSize, gDebugLineVerts.data() );
 	}
 	else
 	{
@@ -248,14 +245,63 @@ void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
-	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 2 );
-	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 2 );
+	size_t index = gDebugLineVerts.size();
+	gDebugLineVerts.resize( gDebugLineVerts.size() + 2 );
 
-	gDebugLineVertPos.push_back( sX );
-	gDebugLineVertPos.push_back( sY );
+#if 0
+	gDebugLineVerts[ index ].aPos     = sX;
+	gDebugLineVerts[ index ].aColor.x = sColor.x;
+	gDebugLineVerts[ index ].aColor.y = sColor.y;
+	gDebugLineVerts[ index ].aColor.z = sColor.z;
 
-	gDebugLineVertColor.push_back( sColor );
-	gDebugLineVertColor.push_back( sColor );
+	index++;
+	gDebugLineVerts[ index ].aPos     = sY;
+	gDebugLineVerts[ index ].aColor.x = sColor.x;
+	gDebugLineVerts[ index ].aColor.y = sColor.y;
+	gDebugLineVerts[ index ].aColor.z = sColor.z;
+
+#else
+
+	gDebugLineVerts[ index ].aPosNormX.x = sX.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sX.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sX.z;
+
+	gDebugLineVerts[ index ].aColor.x = sColor.x;
+	gDebugLineVerts[ index ].aColor.y = sColor.y;
+	gDebugLineVerts[ index ].aColor.z = sColor.z;
+
+	index++;
+	gDebugLineVerts[ index ].aPosNormX.x = sY.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sY.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sY.z;
+
+	gDebugLineVerts[ index ].aColor.x = sColor.x;
+	gDebugLineVerts[ index ].aColor.y = sColor.y;
+	gDebugLineVerts[ index ].aColor.z = sColor.z;
+#endif
+}
+
+
+void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )
+{
+	PROF_SCOPE();
+
+	if ( !r_debug_draw || !gDebugLineModel )
+		return;
+
+	size_t index = gDebugLineVerts.size();
+	gDebugLineVerts.resize( gDebugLineVerts.size() + 2 );
+
+	gDebugLineVerts[ index ].aPosNormX.x = sX.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sX.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sX.z;
+	gDebugLineVerts[ index ].aColor      = sColor;
+
+	index++;
+	gDebugLineVerts[ index ].aPosNormX.x = sY.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sY.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sY.z;
+	gDebugLineVerts[ index ].aColor      = sColor;
 }
 
 
@@ -283,8 +329,7 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
 
-	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
-	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
+	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
 	// bottom
 	Graphics_DrawLine( sMin, glm::vec3( sMax.x, sMin.y, sMin.z ), sColor );
@@ -325,8 +370,7 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 		v[ i ].z     = ff.z / ff.w;
 	}
 
-	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
-	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
+	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
 	Graphics_DrawLine( v[ 0 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( v[ 0 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
@@ -352,8 +396,7 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 	if ( !r_debug_draw || !gDebugLineModel || !r_debug_frustums )
 		return;
 
-	gDebugLineVertPos.reserve( gDebugLineVertPos.size() + 24 );
-	gDebugLineVertColor.reserve( gDebugLineVertColor.size() + 24 );
+	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
 	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
@@ -412,8 +455,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 			return;
 		}
 
-		gDebugLineVertPos.reserve( gDebugLineVertPos.size() + ( mesh.aIndexCount * 3 ) );
-		gDebugLineVertColor.reserve( gDebugLineVertColor.size() + ( mesh.aIndexCount * 3 ) );
+		gDebugLineVerts.reserve( gDebugLineVerts.size() + ( mesh.aIndexCount * 3 ) );
 
 		u32 j = 0;
 		for ( u32 i = 0; i < mesh.aIndexCount; )
@@ -461,7 +503,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 
 				// protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() )
 
-				Graphics_DrawLine( posX, posY, {0.9, 0.1, 0.1} );
+				Graphics_DrawLine( posX, posY, {0.9, 0.1, 0.1, 1.f} );
 			}
 
 			// Draw Face Normal

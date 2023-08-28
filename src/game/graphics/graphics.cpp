@@ -320,6 +320,16 @@ void Graphics_FreeModel( Handle shModel )
 		// Free Vertex and Index Buffers
 		if ( model->apBuffers )
 		{
+			if ( model->apBuffers->aVertexHandle != UINT32_MAX )
+			{
+				Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+			}
+
+			if ( model->apBuffers->aIndexHandle != UINT32_MAX )
+			{
+				Graphics_RemoveShaderBuffer( gGraphicsData.aIndexBuffers, model->apBuffers->aIndexHandle );
+			}
+
 			delete model->apBuffers;
 		}
 		
@@ -813,6 +823,11 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightPoint ], CH_R_MAX_LIGHT_TYPE );
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCone ], CH_R_MAX_LIGHT_TYPE );
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCapsule ], CH_R_MAX_LIGHT_TYPE );
+
+	gGraphicsData.aVertexBuffers.aBuffers.reserve( CH_R_MAX_VERTEX_BUFFERS );
+	gGraphicsData.aIndexBuffers.aBuffers.reserve( CH_R_MAX_INDEX_BUFFERS );
+	gGraphicsData.aBlendShapeWeightBuffers.aBuffers.reserve( CH_R_MAX_BLEND_SHAPE_WEIGHT_BUFFERS );
+	gGraphicsData.aBlendShapeDataBuffers.aBuffers.reserve( CH_R_MAX_BLEND_SHAPE_DATA_BUFFERS );
 	
 	// ------------------------------------------------------
 	// Create Core Data Buffer
@@ -829,14 +844,14 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create SurfaceDraw Buffer
 
-	gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer = render->CreateBuffer( "Surface Draw Staging Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_TransferSrc, EBufferMemory_Host );
-	gGraphicsData.aSurfaceDrawsStaging.aBuffer        = render->CreateBuffer( "Surface Draw Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
-
-	if ( !gGraphicsData.aSurfaceDrawsStaging.aBuffer || !gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to Create SurfaceDraw Shader Storage Buffer\n" );
-		return false;
-	}
+	// gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer = render->CreateBuffer( "Surface Draw Staging Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_TransferSrc, EBufferMemory_Host );
+	// gGraphicsData.aSurfaceDrawsStaging.aBuffer        = render->CreateBuffer( "Surface Draw Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
+	// 
+	// if ( !gGraphicsData.aSurfaceDrawsStaging.aBuffer || !gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer )
+	// {
+	// 	Log_Error( gLC_ClientGraphics, "Failed to Create SurfaceDraw Shader Storage Buffer\n" );
+	// 	return false;
+	// }
 
 	// ------------------------------------------------------
 	// Create Core Descriptor Set
@@ -856,11 +871,17 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 		validation.aStages                       = ShaderStage_All;
 		validation.aType                         = EDescriptorType_StorageBuffer;
 
-		CreateDescBinding_t& surfaceDraws        = createLayout.aBindings.emplace_back();
-		surfaceDraws.aBinding                    = CH_BINDING_SURFACE_DRAWS;
-		surfaceDraws.aCount                      = 1;
-		surfaceDraws.aStages                     = ShaderStage_All;
-		surfaceDraws.aType                       = EDescriptorType_StorageBuffer;
+		CreateDescBinding_t& vertexBuffers       = createLayout.aBindings.emplace_back();
+		vertexBuffers.aBinding                   = CH_BINDING_VERTEX_BUFFERS;
+		vertexBuffers.aCount                     = CH_R_MAX_VERTEX_BUFFERS;
+		vertexBuffers.aStages                    = ShaderStage_All;
+		vertexBuffers.aType                      = EDescriptorType_StorageBuffer;
+		
+		CreateDescBinding_t& indexBuffers        = createLayout.aBindings.emplace_back();
+		indexBuffers.aBinding                    = CH_BINDING_INDEX_BUFFERS;
+		indexBuffers.aCount                      = CH_R_MAX_INDEX_BUFFERS;
+		indexBuffers.aStages                     = ShaderStage_All;
+		indexBuffers.aType                       = EDescriptorType_StorageBuffer;
 
 		// TODO: this is for 2 swap chain images, but the swap chain image count could be different
 		gShaderDescriptorData.aGlobalSets.aCount = 2;
@@ -875,7 +896,7 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 		update.aDescSetCount = gShaderDescriptorData.aGlobalSets.aCount;
 		update.apDescSets    = gShaderDescriptorData.aGlobalSets.apSets;
 
-		update.aBindingCount = static_cast< u32 >( createLayout.aBindings.size() );
+		update.aBindingCount = static_cast< u32 >( createLayout.aBindings.size() - 2 );  // don't write anything for vertex and index buffers
 		update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
 
 		size_t i             = 0;
@@ -885,11 +906,14 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 			update.apBindings[ i ].aType    = binding.aType;
 			update.apBindings[ i ].aCount   = binding.aCount;
 			i++;
+
+			if ( i == update.aBindingCount )
+				break;
 		}
 
 		update.apBindings[ CH_BINDING_TEXTURES ].apData      = ch_calloc_count< ChHandle_t >( CH_R_MAX_TEXTURES );
 		update.apBindings[ CH_BINDING_CORE ].apData          = &gGraphicsData.aCoreDataStaging.aBuffer;
-		update.apBindings[ CH_BINDING_SURFACE_DRAWS ].apData = &gGraphicsData.aSurfaceDrawsStaging.aBuffer;
+		// update.apBindings[ CH_BINDING_VERTEX_BUFFERS ].apData = &gGraphicsData.aSurfaceDrawsStaging.aBuffer;
 
 		// update.aImages = gViewportBuffers;
 		render->UpdateDescSets( &update, 1 );
@@ -938,6 +962,9 @@ u32 Graphics_AllocateCoreSlot( EShaderCoreArray sSlot )
 		return CH_SHADER_CORE_SLOT_INVALID;
 	}
 
+#if 1
+	return Graphics_AllocateShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], gShaderCoreArrayStr[ sSlot ] );
+#else
 	ShaderArrayAllocator_t& allocator = gGraphicsData.aCoreDataSlots[ sSlot ];
 
 	if ( allocator.aUsed == allocator.aAllocated )
@@ -963,6 +990,7 @@ u32 Graphics_AllocateCoreSlot( EShaderCoreArray sSlot )
 	allocator.apFree[ allocator.aAllocated - 1 ] = CH_SHADER_CORE_SLOT_INVALID;
 
 	return index;
+#endif
 }
 
 
@@ -974,6 +1002,9 @@ void Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex )
 		return;
 	}
 
+#if 1
+	Graphics_FreeShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], gShaderCoreArrayStr[ sSlot ], sIndex );
+#else
 	ShaderArrayAllocator_t& allocator = gGraphicsData.aCoreDataSlots[ sSlot ];
 
 	if ( allocator.aUsed == 0 )
@@ -995,6 +1026,111 @@ void Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex )
 	// write this free index
 	allocator.apFree[ allocator.aAllocated - allocator.aUsed ] == sIndex;
 	allocator.aUsed--;
+#endif
+}
+
+
+u32 Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName )
+{
+	if ( srAllocator.aUsed == srAllocator.aAllocated )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Out of slots for allocating shader data \"%s\", max of %zd\n",
+		            spDebugName ? spDebugName : "UNKNOWN", srAllocator.aAllocated );
+
+		return UINT32_MAX;
+	}
+
+	CH_ASSERT( srAllocator.apFree );
+
+	// Get the base of this free list
+	u32 index = srAllocator.apFree[ 0 ];
+	srAllocator.aUsed++;
+
+	CH_ASSERT( index != UINT32_MAX );
+
+	// shift everything down by one
+	memcpy( &srAllocator.apFree[ 0 ], &srAllocator.apFree[ 1 ], sizeof( u32 ) * ( srAllocator.aAllocated - 1 ) );
+
+	// mark the very end of the list as invalid
+	srAllocator.apFree[ srAllocator.aAllocated - 1 ] = UINT32_MAX;
+
+	// mark this as dirty
+	srAllocator.aDirty                               = true;
+
+	return index;
+}
+
+
+void Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName, u32 sIndex )
+{
+	if ( srAllocator.aUsed == 0 )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "No slots in use in core shader data for %s type, can't free this slot\n", spDebugName ? spDebugName : "UNKNOWN" );
+		return;
+	}
+
+	if ( srAllocator.aAllocated >= sIndex )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Core shader data slot index is greater than amount allocated for %s type, max of %zd, tried to free index %zd\n",
+		            spDebugName ? spDebugName : "UNKNOWN", srAllocator.aAllocated );
+		return;
+	}
+
+	CH_ASSERT( srAllocator.apFree );
+	CH_ASSERT( srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] == UINT32_MAX );
+
+	// write this free index
+	srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] = sIndex;
+	srAllocator.aUsed--;
+
+	// mark this as dirty
+	srAllocator.aDirty = true;
+}
+
+
+// return a magic number
+u32 Graphics_AddShaderBuffer( ShaderBufferList_t& srBufferList, ChHandle_t sBuffer )
+{
+	// Generate a handle magic number.
+	u32 magic = ( rand() % 0xFFFFFFFE ) + 1;
+
+	srBufferList.aBuffers[ magic ] = sBuffer;
+	srBufferList.aDirty            = true;
+
+	return magic;
+}
+
+
+void Graphics_RemoveShaderBuffer( ShaderBufferList_t& srBufferList, u32 sHandle )
+{
+	srBufferList.aBuffers.erase( sHandle );
+	srBufferList.aDirty = true;
+}
+
+
+u32 Graphics_GetShaderBuffer( const ShaderBufferList_t& srBufferList, u32 sHandle )
+{
+	if ( sHandle == UINT32_MAX )
+		return sHandle;
+
+	auto it = srBufferList.aBuffers.find( sHandle );
+	if ( it == srBufferList.aBuffers.end() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Find Buffer in ShaderBufferList_t! - %u\n", sHandle );
+		return UINT32_MAX;
+	}
+
+	return it->second;
+}
+
+
+u32 Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 sHandle )
+{
+	if ( sHandle == UINT32_MAX )
+		return sHandle;
+
+	// oh god no
+	return std::distance( std::begin( srBufferList.aBuffers ), srBufferList.aBuffers.find( sHandle ) );
 }
 
 
@@ -1128,6 +1264,25 @@ void Graphics_Shutdown()
 
 	if ( gGraphicsData.aFreeSurfaceDraws.apFree )
 		free( gGraphicsData.aFreeSurfaceDraws.apFree );
+
+	// if ( gGraphicsData.aVertexBufferSlots.apFree )
+	// 	free( gGraphicsData.aVertexBufferSlots.apFree );
+	// 
+	// if ( gGraphicsData.aIndexBufferSlots.apFree )
+	// 	free( gGraphicsData.aIndexBufferSlots.apFree );
+	// 
+	// if ( gGraphicsData.aBlendShapeWeightSlots.apFree )
+	// 	free( gGraphicsData.aBlendShapeWeightSlots.apFree );
+	// 
+	// // free model buffer arrays
+	// if ( gGraphicsData.aVertexBuffers )
+	// 	free( gGraphicsData.aVertexBuffers );
+	// 
+	// if ( gGraphicsData.aIndexBuffers )
+	// 	free( gGraphicsData.aIndexBuffers );
+	// 
+	// if ( gGraphicsData.aBlendShapeWeightBuffers )
+	// 	free( gGraphicsData.aBlendShapeWeightBuffers );
 }
 
 
@@ -1286,30 +1441,24 @@ ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 	modelDraw->aAABB        = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gGraphicsData.aModelBBox[ modelDraw->aModel ] );
 
 	modelDraw->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
-	modelDraw->aVertexBuffers.resize( model->apBuffers->aVertex.size() );
 
 	if ( modelDraw->aBlendShapeWeights.size() )
 	{
 		// we need new vertex buffers for the modified vertices
-		for ( size_t j = 0; j < model->apVertexData->aData.size(); j++ )
-		{
-			size_t     bufferSize   = Graphics_GetVertexAttributeSize( model->apVertexData->aData[ j ].aAttrib ) * model->apVertexData->aCount;
+		size_t bufferSize        = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
 
-			ChHandle_t deviceBuffer = render->CreateBuffer(
-			  "output renderable vertices idfk",
-			  bufferSize,
-			  EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
-			  EBufferMemory_Device );
+		modelDraw->aVertexBuffer = render->CreateBuffer(
+			"output renderable vertices idfk",
+			bufferSize,
+			EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
+			EBufferMemory_Device );
 
-			BufferRegionCopy_t copy;
-			copy.aSrcOffset = 0;
-			copy.aDstOffset = 0;
-			copy.aSize      = bufferSize;
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = bufferSize;
 
-			render->BufferCopyQueued( model->apBuffers->aVertex[ j ], deviceBuffer, &copy, 1 );
-			
-			modelDraw->aVertexBuffers[ j ] = deviceBuffer;
-		}
+		render->BufferCopyQueued( model->apBuffers->aVertex, modelDraw->aVertexBuffer, &copy, 1 );
 
 		// Now Create a Blend Shape Weights Storage Buffer
 		modelDraw->aBlendShapeWeightsBuffer = render->CreateBuffer(
@@ -1317,14 +1466,18 @@ ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 		  sizeof( float ) * modelDraw->aBlendShapeWeights.size(),
 		  EBufferFlags_Storage,
 		  EBufferMemory_Host );
+
+		// Allocate Indexes for these
+		modelDraw->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, modelDraw->aVertexBuffer );
+		modelDraw->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, modelDraw->aBlendShapeWeightsBuffer );
 	}
 	else
 	{
-		for ( size_t j = 0; j < model->apBuffers->aVertex.size(); j++ )
-		{
-			modelDraw->aVertexBuffers[ j ] = model->apBuffers->aVertex[ j ];
-		}
+		modelDraw->aVertexBuffer = model->apBuffers->aVertex;
+		modelDraw->aVertexIndex  = model->apBuffers->aVertexHandle;
 	}
+
+	modelDraw->aIndexHandle = model->apBuffers->aIndexHandle;
 
 	return drawHandle;
 }
@@ -1368,13 +1521,20 @@ void Graphics_FreeRenderable( Handle sRenderable )
 		renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
 
 		// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
-		for ( size_t j = 0; j < renderable->aVertexBuffers.size(); j++ )
+		render->DestroyBuffer( renderable->aVertexBuffer );
+
+		if ( renderable->aVertexIndex != UINT32_MAX )
 		{
-			render->DestroyBuffer( renderable->aVertexBuffers[ j ] );
+			Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+		}
+
+		if ( renderable->aBlendShapeWeightsIndex != UINT32_MAX )
+		{
+			Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
 		}
 	}
 
-	renderable->aVertexBuffers.clear();
+	renderable->aVertexBuffer = CH_INVALID_HANDLE;
 
 	gGraphicsData.aRenderables.Remove( sRenderable );
 }
@@ -1418,13 +1578,10 @@ GraphicsFmt Graphics_GetVertexAttributeFormat( VertexAttribute attrib )
 			return GraphicsFmt::RGB323232_SFLOAT;
 
 		case VertexAttribute_Color:
-			return GraphicsFmt::RGB323232_SFLOAT;
+			return GraphicsFmt::RGBA32323232_SFLOAT;
 
 		case VertexAttribute_TexCoord:
 			return GraphicsFmt::RG3232_SFLOAT;
-
-		// case VertexAttribute_MorphPos:
-		// 	return GraphicsFmt::RGB323232_SFLOAT;
 	}
 }
 
@@ -1442,6 +1599,7 @@ size_t Graphics_GetVertexAttributeTypeSize( VertexAttribute attrib )
 		case GraphicsFmt::INVALID:
 			return 0;
 
+		case GraphicsFmt::RGBA32323232_SFLOAT:
 		case GraphicsFmt::RGB323232_SFLOAT:
 		case GraphicsFmt::RG3232_SFLOAT:
 			return sizeof( float );
@@ -1461,6 +1619,9 @@ size_t Graphics_GetVertexAttributeSize( VertexAttribute attrib )
 
 		case GraphicsFmt::INVALID:
 			return 0;
+
+		case GraphicsFmt::RGBA32323232_SFLOAT:
+			return ( 4 * sizeof( float ) );
 
 		case GraphicsFmt::RGB323232_SFLOAT:
 			return ( 3 * sizeof( float ) );
@@ -1487,22 +1648,23 @@ size_t Graphics_GetVertexFormatSize( VertexFormat format )
 }
 
 
-void Graphics_GetVertexBindingDesc( VertexFormat format, std::vector< VertexInputBinding_t >& srAttrib )
+void Graphics_GetVertexBindingDesc( VertexFormat sFormat, std::vector< VertexInputBinding_t >& srAttrib )
 {
-	u32 binding = 0;
+	size_t formatSize = Graphics_GetVertexFormatSize( sFormat );
+	srAttrib.emplace_back( 0, formatSize, false );
 
-	for ( u8 attrib = 0; attrib < VertexAttribute_Count; attrib++ )
-	{
-		// does this format contain this attribute?
-		// if so, add this attribute to the vector
-		if ( format & ( 1 << attrib ) )
-		{
-			srAttrib.emplace_back(
-			  binding++,
-			  (u32)Graphics_GetVertexAttributeSize( (VertexAttribute)attrib ),
-			  false );
-		}
-	}
+	// for ( u8 attrib = 0; attrib < VertexAttribute_Count; attrib++ )
+	// {
+	// 	// does this format contain this attribute?
+	// 	// if so, add this attribute to the vector
+	// 	if ( format & ( 1 << attrib ) )
+	// 	{
+	// 		srAttrib.emplace_back(
+	// 		  0,
+	// 		  (u32)Graphics_GetVertexAttributeSize( (VertexAttribute)attrib ),
+	// 		  false );
+	// 	}
+	// }
 }
 
 
@@ -1518,12 +1680,16 @@ void Graphics_GetVertexAttributeDesc( VertexFormat format, std::vector< VertexIn
 		// if so, add this attribute to the vector
 		if ( format & ( 1 << attrib ) )
 		{
+			u32 attribSize = (u32)Graphics_GetVertexAttributeSize( (VertexAttribute)attrib );
+
 			srAttrib.emplace_back(
 			  location++,
-			  binding++,
+			  0,
 			  Graphics_GetVertexAttributeFormat( (VertexAttribute)attrib ),
-			  0  // no offset
+			  offset
 			);
+
+			offset += attribSize;
 		}
 	}
 }
@@ -1581,24 +1747,6 @@ Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, 
 }
 
 
-void Graphics_CreateBlendShapeBuffer( ChHandle_t& srBuffer, VertexData_t* spVertexData, VertFormatData_t& srVertexFormatData, const char* spDebugName )
-{
-	PROF_SCOPE();
-
-	if ( spVertexData == nullptr || spVertexData->aCount == 0 )
-	{
-		Log_Warn( gLC_ClientGraphics, "Trying to create Vertex Buffers for mesh with no vertices!\n" );
-		return;
-	}
-
-	srBuffer = CreateModelBuffer(
-	  spDebugName ? spDebugName : "MORPHS",
-	  srVertexFormatData.apData,
-	  Graphics_GetVertexFormatSize( srVertexFormatData.aFormat ) * spVertexData->aCount * spVertexData->aBlendShapeCount,
-	  EBufferFlags_Storage );
-}
-
-
 void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
 	PROF_SCOPE();
@@ -1615,46 +1763,94 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		return;
 	}
 
-	// Get Attributes the shader wants
-	// TODO: what about if we don't have an attribute the shader wants???
-	// maybe create a temporary empty buffer full of zeros? idk
-	std::vector< VertAttribData_t* > attribs;
+	size_t attribSize  = sizeof( Shader_VertexData_t );
+	size_t attribCount = spVertexData->aData.size();
 
-	for ( size_t j = 0; j < spVertexData->aData.size(); j++ )
+	// for ( size_t j = 0; j < spVertexData->aData.size(); j++ )
+	// {
+	// 	attribSize += Graphics_GetVertexAttributeSize( spVertexData->aData[ j ].aAttrib );
+	// }
+
+	size_t               bufferSize = attribSize * spVertexData->aCount;
+
+	// HACK HACK HACK !!!!!!
+	// We append all the data together for now just because i don't want to deal with changing a ton of code
+	// Maybe later on we can do that
+	Shader_VertexData_t* dataHack   = ch_calloc_count< Shader_VertexData_t >( spVertexData->aCount );
+
+	if ( dataHack == nullptr )
 	{
-		VertAttribData_t& data = spVertexData->aData[ j ];
-
-		// if ( shaderFormat & ( 1 << data.aAttrib ) )
-		attribs.push_back( &data );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to allocate vertex data array to copy to the gpu for \"%s\"\n", spDebugName );
+		return;
 	}
 
-	spBuffer->aVertex.resize( attribs.size() );
+	size_t formatSize = Graphics_GetVertexFormatSize( spVertexData->aFormat );
 
-	for ( size_t j = 0; j < attribs.size(); j++ )
+	// Slow as hell probably
+	for ( size_t v = 0; v < spVertexData->aCount; v++ )
 	{
-		auto& data       = attribs[ j ];
-		char* bufferName = nullptr;
+		size_t dataOffset = 0;
+		for ( size_t j = 0; j < spVertexData->aData.size(); j++ )
+		{
+			VertAttribData_t& data     = spVertexData->aData[ j ];
+			size_t            elemSize = Graphics_GetVertexAttributeSize( data.aAttrib );
+			char*             dataSrc  = static_cast< char* >( data.apData ) + ( v * elemSize );
+
+			switch ( data.aAttrib )
+			{
+				case VertexAttribute_Position:
+				{
+					memcpy( &dataHack[ v ].aPosNormX, dataSrc, elemSize );
+					break;
+				}
+
+				case VertexAttribute_Normal:
+				{
+					memcpy( &dataHack[ v ].aPosNormX.w, dataSrc, 4 );
+					memcpy( &dataHack[ v ].aNormYZ_UV, dataSrc + 4, 8 );
+					break;
+				}
+
+				case VertexAttribute_TexCoord:
+				{
+					memcpy( &dataHack[ v ].aNormYZ_UV.z, dataSrc, 8 );
+					break;
+				}
+
+				case VertexAttribute_Color:
+				{
+					memcpy( &dataHack[ v ].aColor, dataSrc, elemSize );
+					break;
+				}
+			}
+
+			dataOffset += elemSize;
+		}
+	}
+
+	char* bufferName = nullptr;
 
 #ifdef _DEBUG
-		if ( spDebugName )
-		{
-			const char* attribName = Graphics_GetVertexAttributeName( data->aAttrib );
+	if ( spDebugName )
+	{
+		size_t len = strlen( spDebugName );
+		bufferName = new char[ len + 5 ];  // MEMORY LEAK - need string memory pool
 
-			size_t      len        = strlen( spDebugName ) + strlen( attribName );
-			bufferName             = new char[ len + 9 ];  // MEMORY LEAK - need string memory pool
-
-			snprintf( bufferName, len + 9, "VB | %s | %s", attribName, spDebugName );
-		}
+		snprintf( bufferName, len + 5, "VB | %s", spDebugName );
+	}
 #endif
 
-		Handle buffer = CreateModelBuffer(
-		  bufferName ? bufferName : "VB",
-		  data->apData,
-		  Graphics_GetVertexAttributeSize( data->aAttrib ) * spVertexData->aCount,
-		  EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferSrc );
+	// transfer source needed if using blend shapes or has a skeleton
+	spBuffer->aVertex = CreateModelBuffer(
+		bufferName ? bufferName : "VB",
+		dataHack,
+		bufferSize,
+		EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferSrc );
 
-		spBuffer->aVertex[ j ] = buffer;
-	}
+	free( dataHack );
+
+	// Allocate an Index for this
+	spBuffer->aVertexHandle = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, spBuffer->aVertex );
 
 	// Handle Blend Shapes
 	
@@ -1667,11 +1863,13 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 	if ( spVertexData->aBlendShapeCount == 0 )
 		return;
 
-	spBuffer->aMorphs = CreateModelBuffer(
-	  spDebugName ? spDebugName : "MORPHS",
+	spBuffer->aBlendShape = CreateModelBuffer(
+	  spDebugName ? spDebugName : "Blend Shapes",
 	  spVertexData->aBlendShapeData.apData,
 	  Graphics_GetVertexFormatSize( spVertexData->aBlendShapeData.aFormat ) * spVertexData->aCount * spVertexData->aBlendShapeCount,
 	  EBufferFlags_Storage );
+
+	spBuffer->aVertexHandle = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeDataBuffers, spBuffer->aBlendShape );
 }
 
 
@@ -1691,9 +1889,9 @@ void Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVerte
 	if ( spDebugName )
 	{
 		size_t len = strlen( spDebugName );
-		bufferName = new char[ len + 6 ];  // MEMORY LEAK - need string memory pool
+		bufferName = new char[ len + 7 ];  // MEMORY LEAK - need string memory pool
 
-		snprintf( bufferName, len + 6, "IB | %s", spDebugName );
+		snprintf( bufferName, len + 7, "IB | %s", spDebugName );
 	}
 #endif
 
@@ -1702,7 +1900,10 @@ void Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVerte
 	  spVertexData->aIndices.data(),
 	  // sizeof( u32 ) * spVertexData->aIndices.size(),
 	  spVertexData->aIndices.size_bytes(),
-	  EBufferFlags_Index );
+	  EBufferFlags_Storage | EBufferFlags_Index );
+
+	// Allocate an Index for this
+	spBuffer->aIndexHandle = Graphics_AddShaderBuffer( gGraphicsData.aIndexBuffers, spBuffer->aIndex );
 }
 
 

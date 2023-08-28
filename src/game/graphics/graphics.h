@@ -35,7 +35,7 @@ enum VertexAttribute : u8
 	VertexAttribute_Position,  // vec3
 	VertexAttribute_Normal,    // vec3
 	VertexAttribute_TexCoord,  // vec2
-	VertexAttribute_Color,     // vec3 (should be vec4 probably)
+	VertexAttribute_Color,     // vec4
 
 	// this and morphs will be calculated in a compute shader
 	// VertexAttribute_BoneIndex,        // uvec4
@@ -54,6 +54,9 @@ enum : VertexFormat
 	VertexFormat_Normal   = ( 1 << VertexAttribute_Normal ),
 	VertexFormat_TexCoord = ( 1 << VertexAttribute_TexCoord ),
 	VertexFormat_Color    = ( 1 << VertexAttribute_Color ),
+
+	VertexFormat_All      = ( 1 << VertexAttribute_Count ) - 1,
+	// VertexFormat_All      = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord | VertexFormat_Color,
 };
 
 
@@ -253,24 +256,29 @@ struct VertexData_t
 
 struct ModelBuffers_t
 {
-	// TODO: only have one vertex buffer again, and add an attributes and skin buffer, like godot does
-	ChVector< ChHandle_t > aVertex;
-	ChHandle_t             aIndex  = CH_INVALID_HANDLE;
+	ChHandle_t aVertex           = CH_INVALID_HANDLE;
+	ChHandle_t aIndex            = CH_INVALID_HANDLE;
 
-	// Contains Morph Information
-	ChHandle_t             aMorphs = CH_INVALID_HANDLE;
+	// Contains Blend Shape Information
+	ChHandle_t aBlendShape       = CH_INVALID_HANDLE;
 
 	// Contains Bones and Bone Weights
-	ChHandle_t             aSkin   = CH_INVALID_HANDLE;
+	ChHandle_t aSkin             = CH_INVALID_HANDLE;
+
+	u32        aVertexHandle     = UINT32_MAX;
+	u32        aIndexHandle      = UINT32_MAX;
+	u32        aBlendShapeHandle = UINT32_MAX;
 
 	~ModelBuffers_t()
 	{
-		for ( auto& buf : aVertex )
-			if ( buf )
-				render->DestroyBuffer( buf );
+		if ( aVertex )
+			render->DestroyBuffer( aVertex );
 
 		if ( aIndex )
 			render->DestroyBuffer( aIndex );
+
+		if ( aBlendShape )
+			render->DestroyBuffer( aBlendShape );
 
 		if ( aSkin )
 			render->DestroyBuffer( aSkin );
@@ -322,31 +330,35 @@ struct ModelBBox_t
 struct Renderable_t
 {
 	// used in actual drawing
-	ChHandle_t             aModel;
-	glm::mat4              aModelMatrix;
+	ChHandle_t        aModel;
+	glm::mat4         aModelMatrix;
 
 	// TODO: store the materials for each mesh here so you can override them for this renderable
-	// ChVector< ChHandle_t > aMaterials
+	// ChVector< ChHandle_t > aMaterialOverrides;
 	// or
 	// u32         aMeshCount;
 	// ChHandle_t* apMaterials;
 
 	// used for calculating render lists
-	ModelBBox_t            aAABB;
+	ModelBBox_t       aAABB;
 
 	// used for blend shapes, i don't like this here because very few models will have blend shapes
-	ChVector< float >      aBlendShapeWeights;
+	ChVector< float > aBlendShapeWeights;
 
 	// technically we could have this here for skinning results if needed
 	// I don't like this here as only very few models will use skinning
-	ChVector< ChHandle_t > aVertexBuffers;
-	ChHandle_t             aBlendShapeWeightsBuffer;
+	ChHandle_t        aVertexBuffer;
+	ChHandle_t        aBlendShapeWeightsBuffer;
+
+	u32               aVertexIndex            = UINT32_MAX;
+	u32               aIndexHandle            = UINT32_MAX;
+	u32               aBlendShapeWeightsIndex = UINT32_MAX;
 
 	// I don't like these bools that have to be checked every frame
-	bool                   aTestVis;
-	bool                   aCastShadow;
-	bool                   aVisible;
-	bool                   aBlendShapesDirty;  // AAAAAAA
+	bool              aTestVis;
+	bool              aCastShadow;
+	bool              aVisible;
+	bool              aBlendShapesDirty;  // AAAAAAA
 };
 
 
@@ -797,6 +809,7 @@ ModelBBox_t        Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBo
 // Debug Rendering
 
 void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
+void               Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor );
 void               Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale );
 void               Graphics_DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor );
 void               Graphics_DrawProjView( const glm::mat4& srProjView );

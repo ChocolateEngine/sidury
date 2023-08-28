@@ -5,16 +5,8 @@
 
 
 static CreateDescBinding_t gSkinning_Bindings[] = {
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 0, 1 },  // inPos
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 1, 1 },  // inNorm
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 2, 1 },  // inTexCoord
-
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 3, 1 },  // outPos
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 4, 1 },  // outNorm
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 5, 1 },  // outTexCoord
-
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 6, 1 },  // blendWeights
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 7, 1 },  // blendData
+	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 0, 1 },  // blendWeights
+	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 1, 1 },  // blendData
 };
 
 
@@ -83,7 +75,7 @@ static IShaderPushComp gShaderPush_Skinning = {
 
 
 ShaderCreate_t gShaderCreate_Skinning = {
-	.apName           = "skinning",
+	.apName           = "__skinning",
 	.aStages          = ShaderStage_Compute,
 	.aBindPoint       = EPipelineBindPoint_Compute,
 	.aFlags           = Shader_ShaderSkinning_Flags(),
@@ -98,5 +90,5 @@ ShaderCreate_t gShaderCreate_Skinning = {
 };
 
 
-// CH_REGISTER_SHADER( gShaderCreate_Skinning );
+CH_REGISTER_SHADER( gShaderCreate_Skinning );
 

@@ -4,23 +4,29 @@
 
 
 // KEEP IN SYNC WITH core.glsl
-constexpr u32 CH_R_MAX_TEXTURES        = 4096;
-constexpr u32 CH_R_MAX_VIEWPORTS       = 32;
-constexpr u32 CH_R_MAX_RENDERABLES     = 4096;
-constexpr u32 CH_R_MAX_MATERIALS       = 64;  // max materials per renderable
+constexpr u32 CH_R_MAX_TEXTURES                   = 4096;
+constexpr u32 CH_R_MAX_VIEWPORTS                  = 32;
+constexpr u32 CH_R_MAX_RENDERABLES                = 4096;
+constexpr u32 CH_R_MAX_MATERIALS                  = 64;  // max materials per renderable
 
 // this is a mistake
 // absolute limit of how many surfaces can be drawn in all viewports
-constexpr u32 CH_R_MAX_SURFACE_DRAWS   = CH_R_MAX_VIEWPORTS * CH_R_MAX_RENDERABLES * CH_R_MAX_MATERIALS;
+constexpr u32 CH_R_MAX_SURFACE_DRAWS              = CH_R_MAX_VIEWPORTS * CH_R_MAX_RENDERABLES * CH_R_MAX_MATERIALS;
 
-constexpr u32 CH_R_MAX_LIGHT_TYPE      = 256;
-constexpr u32 CH_R_MAX_LIGHTS          = CH_R_MAX_LIGHT_TYPE * ELightType_Count;
+constexpr u32 CH_R_MAX_VERTEX_BUFFERS             = CH_R_MAX_RENDERABLES * 2;
+constexpr u32 CH_R_MAX_INDEX_BUFFERS              = CH_R_MAX_RENDERABLES;
+constexpr u32 CH_R_MAX_BLEND_SHAPE_WEIGHT_BUFFERS = CH_R_MAX_RENDERABLES;
+constexpr u32 CH_R_MAX_BLEND_SHAPE_DATA_BUFFERS   = CH_R_MAX_RENDERABLES;
 
-constexpr u32 CH_R_LIGHT_LIST_SIZE     = 16;
+constexpr u32 CH_R_MAX_LIGHT_TYPE                 = 256;
+constexpr u32 CH_R_MAX_LIGHTS                     = CH_R_MAX_LIGHT_TYPE * ELightType_Count;
 
-constexpr u32 CH_BINDING_TEXTURES      = 0;
-constexpr u32 CH_BINDING_CORE          = 1;
-constexpr u32 CH_BINDING_SURFACE_DRAWS = 2;
+constexpr u32 CH_R_LIGHT_LIST_SIZE                = 16;
+
+constexpr u32 CH_BINDING_TEXTURES                 = 0;
+constexpr u32 CH_BINDING_CORE                     = 1;
+constexpr u32 CH_BINDING_VERTEX_BUFFERS           = 2;
+constexpr u32 CH_BINDING_INDEX_BUFFERS            = 3;
 
 
 struct ViewRenderList_t
@@ -81,6 +87,29 @@ struct Shader_Viewport_t
 	glm::vec3 aViewPos{};
 	float     aNearZ = 0.f;
 	float     aFarZ  = 0.f;
+};
+
+
+struct Shader_VertexData_t
+{
+	// glm::vec3 aPos;
+	// glm::vec3 aNorm;
+	// glm::vec2 aUV;
+	// glm::vec4 aColor;
+
+	glm::vec4 aPosNormX;
+	glm::vec4 aNormYZ_UV;
+	glm::vec4 aColor;
+};
+
+
+struct Shader_VertexBuffer_t
+{
+};
+
+
+struct Shader_IndexData_t
+{
 };
 
 
@@ -200,7 +229,14 @@ struct ShaderArrayAllocator_t
 	u32  aAllocated = 0;
 	u32  aUsed      = 0;
 	u32* apFree     = nullptr;
-	// u32* apUsed     = nullptr;
+	bool aDirty     = false;
+};
+
+
+struct ShaderBufferList_t
+{
+	std::unordered_map< u32, ChHandle_t > aBuffers;
+	bool                                  aDirty = false;  // ew
 };
 
 
@@ -221,8 +257,10 @@ enum EShaderCoreArray : u32
 // :skull:
 struct ShaderSkinning_Push
 {
-	u32 aVertexCount     = 0;
-	u32 aBlendShapeCount = 0;
+	u32 aRenderable         = 0;
+	u32 aSourceVertexBuffer = 0;
+	u32 aVertexCount        = 0;
+	u32 aBlendShapeCount    = 0;
 };
 
 
@@ -289,12 +327,19 @@ struct GraphicsData_t
 	// Free Indexes
 	ShaderArrayAllocator_t                        aCoreDataSlots[ EShaderCoreArray_Count ];
 
-	Shader_SurfaceDraw_t                          aSurfaceDraws[ CH_R_MAX_SURFACE_DRAWS ];
-	DeviceBufferStaging_t                         aSurfaceDrawsStaging;
+	ShaderBufferList_t                            aVertexBuffers;
+	ShaderBufferList_t                            aIndexBuffers;
+	ShaderBufferList_t                            aBlendShapeWeightBuffers;
+	ShaderBufferList_t                            aBlendShapeDataBuffers;
 
 	// Free Indexes
 	ShaderArrayAllocator_t                        aFreeSurfaceDraws;
 };
+
+
+constexpr const char* gVertexBufferStr      = "Vertex Buffer";
+constexpr const char* gIndexBufferStr       = "Vertex Buffer";
+constexpr const char* gBlendShapeWeightsStr = "Blend Shape Weights Buffer";
 
 
 extern GraphicsData_t gGraphicsData;
@@ -307,6 +352,14 @@ void                  Graphics_DrawShaderRenderables( ChHandle_t cmd, size_t sIn
 void                  Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat );
 Frustum_t             Graphics_CreateFrustum( const glm::mat4& srViewInfo );
 
+u32                   Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName );
+void                  Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName, u32 sIndex );
+
 u32                   Graphics_AllocateCoreSlot( EShaderCoreArray sSlot );
 void                  Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex );
+
+// return a magic number
+u32                   Graphics_AddShaderBuffer( ShaderBufferList_t& srBufferList, ChHandle_t sBuffer );
+void                  Graphics_RemoveShaderBuffer( ShaderBufferList_t& srBufferList, u32 sHandle );
+u32                   Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 sHandle );
 

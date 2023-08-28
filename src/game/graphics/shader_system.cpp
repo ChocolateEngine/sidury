@@ -131,9 +131,6 @@ bool Shader_CreateGraphicsPipeline( ShaderCreate_t& srCreate, Handle& srPipeline
 	GraphicsPipelineCreate_t pipelineCreate{};
 	srCreate.apGraphicsCreate( pipelineCreate );
 
-	Graphics_GetVertexBindingDesc( srCreate.aVertexFormat, pipelineCreate.aVertexBindings );
-	Graphics_GetVertexAttributeDesc( srCreate.aVertexFormat, pipelineCreate.aVertexAttributes );
-
 	pipelineCreate.aRenderPass     = sRenderPass;
 	pipelineCreate.apName          = srCreate.apName;
 	pipelineCreate.aPipelineLayout = srLayout;
@@ -503,6 +500,9 @@ bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceD
 
 VertexFormat Shader_GetVertexFormat( Handle sShader )
 {
+	return VertexFormat_All;
+
+#if 0
 	PROF_SCOPE();
 
 	auto it = gShaderVertFormat.find( sShader );
@@ -514,5 +514,6 @@ VertexFormat Shader_GetVertexFormat( Handle sShader )
 	}
 
 	return it->second;
+#endif
 }
 

@@ -11,26 +11,26 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 
 layout(push_constant) uniform SkinningParams {
-	uint aRenderableCount;
+	// uint aRenderableCount;
+
+	uint aRenderable;
+	uint aSourceVertexBuffer;
+	uint aVertexCount;
+	uint aBlendShapeCount;
 }
 push;
 
 
 struct RenderableData_t
 {
+	uint aRenderable;
+	uint aSourceVertexBuffer;
 	uint aVertexCount;
 	uint aBlendShapeCount;
 };
 
 
-struct BlendShapeVertex_t
-{
-	vec3 aPos;
-	vec3 aNorm;
-	vec2 aTexCoord;
-};
-
-
+// TODO: pack this for alignment
 struct BoneTransform_t
 {
 	vec3 aPos;
@@ -39,68 +39,18 @@ struct BoneTransform_t
 };
 
 
-struct Pos_t
-{
-	vec3 aData[];
-};
-
-
-// -----------------------------------------------------------------------------------
-// Source Vertex Data
-
-
-layout(set = 1, binding = 0) buffer restrict readonly Buffer_SrcVertexDataPos {
-	vec3 inPosition[ CH_R_MAX_RENDERABLES ][];
-};
-
-layout(set = 1, binding = 1) buffer restrict readonly Buffer_SrcVertexDataNorm {
-	vec3 inNormal[];
-};
-
-layout(set = 1, binding = 2) buffer restrict readonly Buffer_SrcVertexDataUV {
-	vec2 inTexCoord[];
-};
-
-
-// -----------------------------------------------------------------------------------
-// Destination Vertex Data
-
-
-layout(set = 1, binding = 3) buffer restrict writeonly Buffer_DstVertexDataPos {
-	vec3 outPosition[];
-};
-
-layout(set = 1, binding = 4) buffer restrict writeonly Buffer_DstVertexDataNorm {
-	vec3 outNormal[];
-};
-
-layout(set = 1, binding = 5) buffer restrict writeonly Buffer_DstVertexDataUV {
-	vec2 outTexCoord[];
-};
-
-
-// -----------------------------------------------------------------------------------
-// Renderable List
-
-
-// is this even needed?
-layout(set = 1, binding = 6) buffer restrict readonly Buffer_Renderables {
-	RenderableData_t gRenderables[ CH_R_MAX_RENDERABLES ];
-};
-
-
 // -----------------------------------------------------------------------------------
 // Blend Shape Data
 
 
-layout(set = 1, binding = 6) buffer restrict readonly Buffer_BlendShapeWeights {
+layout(set = 1, binding = 0) buffer restrict readonly Buffer_BlendShapeWeights {
 	float data[];
 }
 gBlendShapeWeights;
 
 
-layout(set = 1, binding = 7) buffer restrict readonly Buffer_BlendShapeData {
-	BlendShapeVertex_t vertices[];
+layout(set = 1, binding = 1) buffer restrict readonly Buffer_BlendShapeData {
+	VertexData_t vertices[];
 }
 gBlendShapeData;
 
@@ -113,11 +63,18 @@ void main()
     // get current element shader is using
     uint vertIndex = gl_GlobalInvocationID.x;
 
-	vec3 newPos    = inPosition[ 0 ].aData[ vertIndex ];
-	vec3 morphPos  = gBlendShapeData.vertices[ vertIndex ].aPos;
+	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
+	VertexData_t vert = gVertexBuffers[ push.aSourceVertexBuffer ].aVert[ vertIndex ];
+
+	vec3 inPos  = vert.aPosNormX.xyz;
+	vec3 inNorm = vec3(vert.aPosNormX.w, vert.aNormYZ_UV.xy);
+	vec2 inUV   = vert.aNormYZ_UV.zw;
+
+	vec3 newPos    = inPos;
+	vec3 morphPos  = gBlendShapeData.vertices[ vertIndex ].aPosNormX.xyz;
 
 	newPos += (1.f * morphPos);
 
-	outPosition = newPos;
+	gVertexBuffers[ renderable.aVertexBuffer ].aVert[ vertIndex ].aPosNormX.xyz = newPos;
 }
 

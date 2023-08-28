@@ -1,26 +1,33 @@
 #ifndef CH_CORE_GLSL
 #define CH_CORE_GLSL
 
-#define CH_DESC_SET_GLOBAL       0
-#define CH_DESC_SET_PER_SHADER   1
+#define CH_DESC_SET_GLOBAL                  0
+#define CH_DESC_SET_PER_SHADER              1
 
 // KEEP IN SYNC WITH GAME CODE
 // TODO: make some file you can share between shader code and c++
-#define CH_LIGHT_TYPES           3  // TODO: 4 when you add capsule lights
+#define CH_LIGHT_TYPES                      3  // TODO: 4 when you add capsule lights
 
-#define CH_R_MAX_TEXTURES        4096
-#define CH_R_MAX_VIEWPORTS       32
-#define CH_R_MAX_RENDERABLES     4096
-#define CH_R_MAX_MATERIALS       64  // max materials per renderable
-#define CH_R_MAX_SURFACE_DRAWS   CH_R_MAX_VIEWPORTS * CH_R_MAX_RENDERABLES * CH_R_MAX_MATERIALS
-#define CH_R_MAX_LIGHT_TYPE      256
-#define CH_R_MAX_LIGHTS          CH_R_MAX_LIGHT_TYPE * CH_LIGHT_TYPES
+#define CH_R_MAX_TEXTURES                    4096
+#define CH_R_MAX_VIEWPORTS                   32
+#define CH_R_MAX_RENDERABLES                 4096
+#define CH_R_MAX_MATERIALS                   64  // max materials per renderable
+#define CH_R_MAX_SURFACE_DRAWS               CH_R_MAX_VIEWPORTS * CH_R_MAX_RENDERABLES * CH_R_MAX_MATERIALS
+#define CH_R_MAX_LIGHT_TYPE                  256
+#define CH_R_MAX_LIGHTS                      CH_R_MAX_LIGHT_TYPE * CH_LIGHT_TYPES
 
-#define CH_R_LIGHT_LIST_SIZE     CH_R_MAX_LIGHTS
+// 2 times because of blend shapes/skeletons needing a buffer to write modified data to
+#define CH_R_MAX_VERTEX_BUFFERS              CH_R_MAX_RENDERABLES * 2
+#define CH_R_MAX_INDEX_BUFFERS               CH_R_MAX_RENDERABLES
+#define CH_R_MAX_BLEND_SHAPE_WEIGHT_BUFFERS  CH_R_MAX_RENDERABLES
+#define CH_R_MAX_BLEND_SHAPE_DATA_BUFFERS    CH_R_MAX_RENDERABLES
 
-#define CH_BINDING_TEXTURES      0
-#define CH_BINDING_CORE          1
-#define CH_BINDING_SURFACE_DRAWS 2
+#define CH_R_LIGHT_LIST_SIZE                 CH_R_MAX_LIGHTS
+
+#define CH_BINDING_TEXTURES                  0
+#define CH_BINDING_CORE                      1
+#define CH_BINDING_VERTEX_BUFFERS            2
+#define CH_BINDING_INDEX_BUFFERS             3
 
 // ===================================================================================
 // Base Structs
@@ -34,6 +41,14 @@ struct Viewport_t
 	vec3  aViewPos;
 	float aNearZ;
 	float aFarZ;
+};
+
+
+struct VertexData_t
+{
+	vec4 aPosNormX;
+	vec4 aNormYZ_UV;
+	vec4 aColor;
 };
 
 
@@ -135,10 +150,22 @@ layout(set = 0, binding = CH_BINDING_CORE) buffer readonly Buffer_Core
 } gCore;
 
 
-layout(set = 0, binding = CH_BINDING_SURFACE_DRAWS) buffer readonly Buffer_SurfaceDraws
+layout(set = 0, binding = CH_BINDING_VERTEX_BUFFERS) buffer Buffer_VertexData
 {
-	SurfaceDraw_t gSurfaceDraws[ CH_R_MAX_SURFACE_DRAWS ];
-};
+	VertexData_t aVert[];
+} gVertexBuffers[];
+
+
+layout(set = 0, binding = CH_BINDING_INDEX_BUFFERS) buffer readonly Buffer_IndexData
+{
+	uint aIndex[];
+} gIndexBuffers[];
+
+
+// layout(set = 0, binding = CH_BINDING_SURFACE_DRAWS) buffer readonly Buffer_SurfaceDraws
+// {
+// 	SurfaceDraw_t gSurfaceDraws[ CH_R_MAX_SURFACE_DRAWS ];
+// };
 
 
 // ===================================================================================
