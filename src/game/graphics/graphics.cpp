@@ -810,19 +810,36 @@ void Graphics_WriteDeviceBufferRegions()
 }
 
 
+bool Graphics_CreateStagingBuffer( DeviceBufferStaging_t& srStaging, size_t sSize, const char* spStagingName, const char* spName )
+{
+	srStaging.aStagingBuffer = render->CreateBuffer( spStagingName, sSize, EBufferFlags_TransferSrc, EBufferMemory_Host );
+	srStaging.aBuffer        = render->CreateBuffer( spName, sSize, EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
+
+	if ( !srStaging.aBuffer || !srStaging.aStagingBuffer )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Create %s\n", spName );
+		return false;
+	}
+
+	return true;
+}
+
+
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 {
 	// ------------------------------------------------------
 	// Create Core Data Array Slots
 
-	Graphics_AllocateShaderArray( gGraphicsData.aFreeSurfaceDraws, CH_R_MAX_SURFACE_DRAWS );
-
-	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_Viewports ], CH_R_MAX_VIEWPORTS );
-
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightWorld ], CH_R_MAX_LIGHT_TYPE );
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightPoint ], CH_R_MAX_LIGHT_TYPE );
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCone ], CH_R_MAX_LIGHT_TYPE );
 	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCapsule ], CH_R_MAX_LIGHT_TYPE );
+
+	Graphics_AllocateShaderArray( gGraphicsData.aViewportSlots, CH_R_MAX_VIEWPORTS );
+
+	gGraphicsData.aRenderableData  = ch_calloc_count< Shader_Renderable_t >( CH_R_MAX_RENDERABLES );
+	gGraphicsData.aModelMatrixData = ch_calloc_count< glm::mat4 >( CH_R_MAX_RENDERABLES );
+	gGraphicsData.aViewportData    = ch_calloc_count< Shader_Viewport_t >( CH_R_MAX_VIEWPORTS );
 
 	gGraphicsData.aVertexBuffers.aBuffers.reserve( CH_R_MAX_VERTEX_BUFFERS );
 	gGraphicsData.aIndexBuffers.aBuffers.reserve( CH_R_MAX_INDEX_BUFFERS );
@@ -832,26 +849,26 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create Core Data Buffer
 
-	gGraphicsData.aCoreDataStaging.aStagingBuffer = render->CreateBuffer( "Core Staging Buffer", sizeof( Buffer_Core_t ), EBufferFlags_TransferSrc, EBufferMemory_Host );
-	gGraphicsData.aCoreDataStaging.aBuffer        = render->CreateBuffer( "Core Buffer", sizeof( Buffer_Core_t ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
-
-	if ( !gGraphicsData.aCoreDataStaging.aBuffer || !gGraphicsData.aCoreDataStaging.aStagingBuffer )
-	{
-		Log_Error( gLC_ClientGraphics, "Failed to Create Core Shader Storage Buffer\n" );
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aCoreDataStaging, sizeof( Buffer_Core_t ), "Core Staging Buffer", "Core Buffer" ) )
 		return false;
-	}
 	
 	// ------------------------------------------------------
-	// Create SurfaceDraw Buffer
+	// Create Viewport Data Buffer
 
-	// gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer = render->CreateBuffer( "Surface Draw Staging Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_TransferSrc, EBufferMemory_Host );
-	// gGraphicsData.aSurfaceDrawsStaging.aBuffer        = render->CreateBuffer( "Surface Draw Buffer", sizeof( gGraphicsData.aSurfaceDraws ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
-	// 
-	// if ( !gGraphicsData.aSurfaceDrawsStaging.aBuffer || !gGraphicsData.aSurfaceDrawsStaging.aStagingBuffer )
-	// {
-	// 	Log_Error( gLC_ClientGraphics, "Failed to Create SurfaceDraw Shader Storage Buffer\n" );
-	// 	return false;
-	// }
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aViewportStaging, sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS, "Viewport Staging Buffer", "Viewport Buffer" ) )
+		return false;
+
+	// ------------------------------------------------------
+	// Create Model Matrix Data Buffer
+
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aModelMatrixStaging, sizeof( glm::mat4 ) * CH_R_MAX_RENDERABLES, "Model Matrix Staging Buffer", "Model Matrix Buffer" ) )
+		return false;
+	
+	// ------------------------------------------------------
+	// Create Renderable Data Buffer
+
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aRenderableStaging, sizeof( Shader_Renderable_t ) * CH_R_MAX_RENDERABLES, "Renderable Staging Buffer", "Renderable Buffer" ) )
+		return false;
 
 	// ------------------------------------------------------
 	// Create Core Descriptor Set
@@ -870,6 +887,24 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 		validation.aCount                        = 1;
 		validation.aStages                       = ShaderStage_All;
 		validation.aType                         = EDescriptorType_StorageBuffer;
+
+		CreateDescBinding_t& viewports           = createLayout.aBindings.emplace_back();
+		viewports.aBinding                       = CH_BINDING_VIEWPORTS;
+		viewports.aCount                         = 1;
+		viewports.aStages                        = ShaderStage_All;
+		viewports.aType                          = EDescriptorType_StorageBuffer;
+
+		CreateDescBinding_t& renderables         = createLayout.aBindings.emplace_back();
+		renderables.aBinding                     = CH_BINDING_RENDERABLES;
+		renderables.aCount                       = 1;
+		renderables.aStages                      = ShaderStage_All;
+		renderables.aType                        = EDescriptorType_StorageBuffer;
+
+		CreateDescBinding_t& modelMatrices       = createLayout.aBindings.emplace_back();
+		modelMatrices.aBinding                   = CH_BINDING_MODEL_MATRICES;
+		modelMatrices.aCount                     = 1;
+		modelMatrices.aStages                    = ShaderStage_All;
+		modelMatrices.aType                      = EDescriptorType_StorageBuffer;
 
 		CreateDescBinding_t& vertexBuffers       = createLayout.aBindings.emplace_back();
 		vertexBuffers.aBinding                   = CH_BINDING_VERTEX_BUFFERS;
@@ -911,9 +946,12 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 				break;
 		}
 
-		update.apBindings[ CH_BINDING_TEXTURES ].apData      = ch_calloc_count< ChHandle_t >( CH_R_MAX_TEXTURES );
-		update.apBindings[ CH_BINDING_CORE ].apData          = &gGraphicsData.aCoreDataStaging.aBuffer;
-		// update.apBindings[ CH_BINDING_VERTEX_BUFFERS ].apData = &gGraphicsData.aSurfaceDrawsStaging.aBuffer;
+		update.apBindings[ CH_BINDING_TEXTURES ].apData       = ch_calloc_count< ChHandle_t >( CH_R_MAX_TEXTURES );
+		update.apBindings[ CH_BINDING_CORE ].apData           = &gGraphicsData.aCoreDataStaging.aBuffer;
+
+		update.apBindings[ CH_BINDING_VIEWPORTS ].apData      = &gGraphicsData.aViewportStaging.aBuffer;
+		update.apBindings[ CH_BINDING_RENDERABLES ].apData    = &gGraphicsData.aRenderableStaging.aBuffer;
+		update.apBindings[ CH_BINDING_MODEL_MATRICES ].apData = &gGraphicsData.aModelMatrixStaging.aBuffer;
 
 		// update.aImages = gViewportBuffers;
 		render->UpdateDescSets( &update, 1 );
@@ -926,27 +964,25 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 
 	// ------------------------------------------------------
 	// Create Per Shader Descriptor Sets
+	for ( ShaderRequirement_t& requirement : srRequire.aItems )
 	{
-		for ( ShaderRequirement_t& requirement : srRequire.aItems )
+		CreateDescLayout_t createLayout{};
+		createLayout.apName = requirement.aShader.data();
+		createLayout.aBindings.resize( requirement.aBindingCount );
+
+		for ( u32 i = 0; i < requirement.aBindingCount; i++ )
 		{
-			CreateDescLayout_t createLayout{};
-			createLayout.apName = requirement.aShader.data();
-			createLayout.aBindings.resize( requirement.aBindingCount );
+			createLayout.aBindings[ i ] = requirement.apBindings[ i ];
+		}
 
-			for ( u32 i = 0; i < requirement.aBindingCount; i++ )
-			{
-				createLayout.aBindings[ i ] = requirement.apBindings[ i ];
-			}
+		ShaderDescriptor_t& descriptor = gShaderDescriptorData.aPerShaderSets[ requirement.aShader ];
+		descriptor.aCount              = 2;
+		descriptor.apSets              = ch_calloc_count< ChHandle_t >( descriptor.aCount );
 
-			ShaderDescriptor_t& descriptor = gShaderDescriptorData.aPerShaderSets[ requirement.aShader ];
-			descriptor.aCount              = 2;
-			descriptor.apSets              = ch_calloc_count< ChHandle_t >( descriptor.aCount );
-
-			if ( !Graphics_CreateDescLayout( createLayout, gShaderDescriptorData.aPerShaderLayout[ requirement.aShader ], descriptor.apSets, descriptor.aCount, "Shader Sets" ) )
-			{
-				Log_ErrorF( "Failed to Create Descriptor Set Layout for shader \"%s\"\n", requirement.aShader.data() );
-				return false;
-			}
+		if ( !Graphics_CreateDescLayout( createLayout, gShaderDescriptorData.aPerShaderLayout[ requirement.aShader ], descriptor.apSets, descriptor.aCount, "Shader Sets" ) )
+		{
+			Log_ErrorF( "Failed to Create Descriptor Set Layout for shader \"%s\"\n", requirement.aShader.data() );
+			return false;
 		}
 	}
 
@@ -1134,6 +1170,12 @@ u32 Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 s
 }
 
 
+void Graphics_OnTextureIndexUpdate()
+{
+	Log_Msg( gLC_ClientGraphics, "TODO: HANDLE TEXTURE INDEX UPDATE !!!!\n" );
+}
+
+
 void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 {
 	gGraphicsData.aBackBuffer[ 0 ] = render->GetBackBufferColor();
@@ -1193,6 +1235,7 @@ bool Graphics_Init()
 	render->GetCommandBufferHandles( gGraphicsData.aCommandBuffers );
 
 	render->SetResetCallback( Graphics_OnResetCallback );
+	render->SetTextureIndexUpdateCallback( Graphics_OnTextureIndexUpdate );
 
 	render->GetBackBufferTextures( &gGraphicsData.aBackBufferTex[ 0 ], &gGraphicsData.aBackBufferTex[ 1 ], &gGraphicsData.aBackBufferTex[ 2 ] );
 
@@ -1262,8 +1305,17 @@ void Graphics_Shutdown()
 		gGraphicsData.aCoreDataSlots[ i ].aUsed      = 0;
 	}
 
-	if ( gGraphicsData.aFreeSurfaceDraws.apFree )
-		free( gGraphicsData.aFreeSurfaceDraws.apFree );
+	if ( gGraphicsData.aViewportSlots.apFree )
+		free( gGraphicsData.aViewportSlots.apFree );
+
+	if ( gGraphicsData.aModelMatrixData )
+		free( gGraphicsData.aModelMatrixData );
+
+	if ( gGraphicsData.aRenderableData )
+		free( gGraphicsData.aRenderableData );
+
+	if ( gGraphicsData.aViewportData )
+		free( gGraphicsData.aViewportData );
 
 	// if ( gGraphicsData.aVertexBufferSlots.apFree )
 	// 	free( gGraphicsData.aVertexBufferSlots.apFree );

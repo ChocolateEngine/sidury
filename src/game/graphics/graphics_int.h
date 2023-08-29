@@ -9,10 +9,6 @@ constexpr u32 CH_R_MAX_VIEWPORTS                  = 32;
 constexpr u32 CH_R_MAX_RENDERABLES                = 4096;
 constexpr u32 CH_R_MAX_MATERIALS                  = 64;  // max materials per renderable
 
-// this is a mistake
-// absolute limit of how many surfaces can be drawn in all viewports
-constexpr u32 CH_R_MAX_SURFACE_DRAWS              = CH_R_MAX_VIEWPORTS * CH_R_MAX_RENDERABLES * CH_R_MAX_MATERIALS;
-
 constexpr u32 CH_R_MAX_VERTEX_BUFFERS             = CH_R_MAX_RENDERABLES * 2;
 constexpr u32 CH_R_MAX_INDEX_BUFFERS              = CH_R_MAX_RENDERABLES;
 constexpr u32 CH_R_MAX_BLEND_SHAPE_WEIGHT_BUFFERS = CH_R_MAX_RENDERABLES;
@@ -25,8 +21,11 @@ constexpr u32 CH_R_LIGHT_LIST_SIZE                = 16;
 
 constexpr u32 CH_BINDING_TEXTURES                 = 0;
 constexpr u32 CH_BINDING_CORE                     = 1;
-constexpr u32 CH_BINDING_VERTEX_BUFFERS           = 2;
-constexpr u32 CH_BINDING_INDEX_BUFFERS            = 3;
+constexpr u32 CH_BINDING_VIEWPORTS                = 2;
+constexpr u32 CH_BINDING_RENDERABLES              = 3;
+constexpr u32 CH_BINDING_MODEL_MATRICES           = 4;
+constexpr u32 CH_BINDING_VERTEX_BUFFERS           = 5;
+constexpr u32 CH_BINDING_INDEX_BUFFERS            = 6;
 
 
 struct ViewRenderList_t
@@ -92,36 +91,19 @@ struct Shader_Viewport_t
 
 struct Shader_VertexData_t
 {
-	// glm::vec3 aPos;
-	// glm::vec3 aNorm;
-	// glm::vec2 aUV;
-	// glm::vec4 aColor;
-
 	glm::vec4 aPosNormX;
 	glm::vec4 aNormYZ_UV;
 	glm::vec4 aColor;
 };
 
 
-struct Shader_VertexBuffer_t
-{
-};
-
-
-struct Shader_IndexData_t
-{
-};
-
-
 // shared renderable data
 struct Shader_Renderable_t
 {
-	glm::mat4 aModel;
-
 	// alignas( 16 ) u32 aMaterialCount;
 	// u32 aMaterials[ CH_R_MAX_MATERIALS ];
 	
-	alignas( 16 ) u32 aVertexBuffer;
+	u32 aVertexBuffer;
 	u32 aIndexBuffer;
 
 	u32 aLightCount;
@@ -188,9 +170,6 @@ struct Buffer_Core_t
 	
 	u32                    aNumLights[ ELightType_Count ];
 
-	Shader_Renderable_t    aRenderables[ CH_R_MAX_RENDERABLES ];
-	Shader_Viewport_t      aViewports[ CH_R_MAX_VIEWPORTS ];
-
 	// NOTE: this could probably be brought down to one light struct, with packed data to unpack in the shader
 	//UBO_LightDirectional_t aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
 	//UBO_LightPoint_t       aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
@@ -242,9 +221,6 @@ struct ShaderBufferList_t
 
 enum EShaderCoreArray : u32
 {
-	EShaderCoreArray_Viewports    = 0,
-	// EShaderCoreArray_Renderables  = 1,
-
 	EShaderCoreArray_LightWorld   = 1,
 	EShaderCoreArray_LightPoint   = 2,
 	EShaderCoreArray_LightCone    = 3,
@@ -264,7 +240,7 @@ struct ShaderSkinning_Push
 };
 
 
-constexpr u32 CH_SHADER_CORE_SLOT_INVALID = _UI32_MAX;
+constexpr u32 CH_SHADER_CORE_SLOT_INVALID = UINT32_MAX;
 
 
 // I don't like this at all
@@ -331,9 +307,16 @@ struct GraphicsData_t
 	ShaderBufferList_t                            aIndexBuffers;
 	ShaderBufferList_t                            aBlendShapeWeightBuffers;
 	ShaderBufferList_t                            aBlendShapeDataBuffers;
+	
+	glm::mat4*                                    aModelMatrixData;  // shares the same slot index as renderables, which is the handle index
+	Shader_Renderable_t*                          aRenderableData;
 
-	// Free Indexes
-	ShaderArrayAllocator_t                        aFreeSurfaceDraws;
+	DeviceBufferStaging_t                         aModelMatrixStaging;
+	DeviceBufferStaging_t                         aRenderableStaging;
+
+	Shader_Viewport_t*                            aViewportData;
+	ShaderArrayAllocator_t                        aViewportSlots;
+	DeviceBufferStaging_t                         aViewportStaging;
 };
 
 

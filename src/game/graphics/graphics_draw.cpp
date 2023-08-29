@@ -635,8 +635,7 @@ void Graphics_PrepareDrawData()
 	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
 #endif
 
-	ShaderArrayAllocator_t& surfAllocator = gGraphicsData.aFreeSurfaceDraws;
-	surfAllocator.aUsed                   = 0;
+	u32 surfDrawIndex = 0;
 
 	for ( uint32_t i = 0; i < gGraphicsData.aRenderables.size(); )
 	{
@@ -689,10 +688,10 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-		Shader_Renderable_t& shaderRenderable = gGraphicsData.aCoreData.aRenderables[ renderIndex ];
+		Shader_Renderable_t& shaderRenderable         = gGraphicsData.aRenderableData[ renderIndex ];
 
 		// write model matrix, and vertex/index buffer indexes
-		shaderRenderable.aModel               = renderable->aModelMatrix;
+		gGraphicsData.aModelMatrixData[ renderIndex ] = renderable->aModelMatrix;
 
 		// update light lists
 
@@ -741,21 +740,11 @@ void Graphics_PrepareDrawData()
 				if ( !shaderData )
 					continue;
 
-				if ( CH_IF_ASSERT( surfAllocator.aUsed < surfAllocator.aAllocated ) )
-					continue;
-
 				// add a SurfaceDraw_t to this render list
 				SurfaceDraw_t& surfDraw  = gGraphicsData.aViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
 				surfDraw.aRenderable     = gGraphicsData.aRenderables.aHandles[ i ];
 				surfDraw.aSurface        = surf;
-
-				// more unique use of this lol
-				u32                   surfIndex      = surfAllocator.aUsed++; 
-				// Shader_SurfaceDraw_t& shaderSurfDraw = gGraphicsData.aSurfaceDraws[ surfIndex ];
-				// shaderSurfDraw.aMaterial             = 0;
-				// shaderSurfDraw.aRenderable           = renderIndex;
-
-				surfDraw.aShaderSlot                 = surfIndex;
+				surfDraw.aShaderSlot     = surfDrawIndex++;
 
 				Shader_SetupRenderableDrawData( renderIndex, viewIndex, renderable, shaderData, surfDraw );
 
@@ -853,13 +842,14 @@ void Graphics_PrepareDrawData()
 #endif
 
 	// Update Core Data SSBO
+#if 0
 	if ( gGraphicsData.aCoreDataStaging.aDirty )
 	{
 		// Update Viewports (this looks stupid)
 		for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
 		{
 			ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
-			Shader_Viewport_t& viewportBuffer = gGraphicsData.aCoreData.aViewports[ i ];
+			Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ i ];
 
 			viewportBuffer.aProjView          = viewport.aProjView;
 			viewportBuffer.aProjection        = viewport.aProjection;
@@ -886,8 +876,8 @@ void Graphics_PrepareDrawData()
 				continue;
 			}
 
-			gGraphicsData.aCoreData.aRenderables[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
-			gGraphicsData.aCoreData.aRenderables[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
+			gGraphicsData.aRenderableData[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+			gGraphicsData.aRenderableData[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
 
 			i++;
 		}
@@ -901,6 +891,79 @@ void Graphics_PrepareDrawData()
 		copy.aSize      = sizeof( Buffer_Core_t );
 
 		render->BufferCopyQueued( gGraphicsData.aCoreDataStaging.aStagingBuffer, gGraphicsData.aCoreDataStaging.aBuffer, &copy, 1 );
+	}
+#endif
+
+	// Update Viewport SSBO
+	{
+		// this looks stupid
+		for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		{
+			ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
+			Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ i ];
+
+			viewportBuffer.aProjView          = viewport.aProjView;
+			viewportBuffer.aProjection        = viewport.aProjection;
+			viewportBuffer.aView              = viewport.aView;
+			viewportBuffer.aViewPos           = viewport.aViewPos;
+			viewportBuffer.aNearZ             = viewport.aNearZ;
+			viewportBuffer.aFarZ              = viewport.aFarZ;
+		}
+
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS;
+
+		render->BufferWrite( gGraphicsData.aViewportStaging.aStagingBuffer, copy.aSize, gGraphicsData.aViewportData );
+		render->BufferCopyQueued( gGraphicsData.aViewportStaging.aStagingBuffer, gGraphicsData.aViewportStaging.aBuffer, &copy, 1 );
+	}
+
+	// Update Renderables SSBO
+	// if ( gGraphicsData.aRenderableStaging.aDirty )
+	{
+		// Update Renderable Vertex Buffer Handles
+		for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
+		{
+			Renderable_t* renderable = nullptr;
+			if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aRenderables.aHandles[ i ], &renderable ) )
+			{
+				Log_Warn( gLC_ClientGraphics, "Renderable handle is invalid!\n" );
+				gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
+				continue;
+			}
+
+			if ( !renderable->aVisible )
+			{
+				i++;
+				continue;
+			}
+
+			gGraphicsData.aRenderableData[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+			gGraphicsData.aRenderableData[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
+
+			i++;
+		}
+
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = sizeof( Shader_Renderable_t ) * CH_R_MAX_RENDERABLES;
+
+		render->BufferWrite( gGraphicsData.aRenderableStaging.aStagingBuffer, copy.aSize, gGraphicsData.aRenderableData );
+		render->BufferCopyQueued( gGraphicsData.aRenderableStaging.aStagingBuffer, gGraphicsData.aRenderableStaging.aBuffer, &copy, 1 );
+	}
+
+	// Update Model Matrices SSBO
+	// if ( gGraphicsData.aRenderableStaging.aDirty )
+	{
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = sizeof( glm::mat4 ) * CH_R_MAX_RENDERABLES;
+
+		render->BufferWrite( gGraphicsData.aModelMatrixStaging.aStagingBuffer, copy.aSize, gGraphicsData.aModelMatrixData );
+		render->BufferCopyQueued( gGraphicsData.aModelMatrixStaging.aStagingBuffer, gGraphicsData.aModelMatrixStaging.aBuffer, &copy, 1 );
 	}
 
 	// Update Shader Draws Data SSBO
@@ -1018,7 +1081,7 @@ void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
 
 u32 Graphics_CreateViewport( ViewportShader_t* spViewport )
 {
-	u32 index = Graphics_AllocateCoreSlot( EShaderCoreArray_Viewports );
+	u32 index = Graphics_AllocateShaderSlot( gGraphicsData.aViewportSlots, "Viewports" );
 
 	if ( index == UINT32_MAX )
 	{
@@ -1046,7 +1109,7 @@ u32 Graphics_CreateViewport( ViewportShader_t* spViewport )
 
 void Graphics_FreeViewport( u32 sViewportIndex )
 {
-	Graphics_FreeCoreSlot( EShaderCoreArray_Viewports, sViewportIndex );
+	Graphics_FreeShaderSlot( gGraphicsData.aViewportSlots, "Viewports", sViewportIndex );
 
 	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
 	{

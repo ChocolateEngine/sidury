@@ -46,7 +46,7 @@ void main()
 	// or, for each blend shape
 	// for ( int i = 0; i < ubo.morphCount; i++ )
 
-	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
+	Renderable_t renderable = gRenderables[ push.aRenderable ];
 	uint         vertIndex  = gl_VertexIndex;
 
 	// is this renderable using an index buffer?
@@ -55,18 +55,19 @@ void main()
 
 	VertexData_t vert = gVertexBuffers[ renderable.aVertexBuffer ].aVert[ vertIndex ];
 
-	vec3 inPos  = vert.aPosNormX.xyz;
-	vec3 inNorm = vec3(vert.aPosNormX.w, vert.aNormYZ_UV.xy);
-	vec2 inUV   = vert.aNormYZ_UV.zw;
+	mat4 inMatrix = gModelMatrices[ push.aRenderable ];
+	vec3 inPos    = vert.aPosNormX.xyz;
+	vec3 inNorm   = vec3(vert.aPosNormX.w, vert.aNormYZ_UV.xy);
+	vec2 inUV     = vert.aNormYZ_UV.zw;
 
 	outPosition = inPos;
 
-	outPositionWorld = (renderable.aModel * vec4(outPosition, 1.0)).rgb;
+	outPositionWorld = (inMatrix * vec4(outPosition, 1.0)).rgb;
 
-	gl_Position = gCore.aViewports[ push.aViewport ].aProjView * renderable.aModel * vec4(inPos, 1.0);
+	gl_Position = gViewports[ push.aViewport ].aProjView * inMatrix * vec4(inPos, 1.0);
 	// gl_Position = projView[push.projView].projView * vec4(inPosition, 1.0);
 
-	vec3 normalWorldSpace = normalize(mat3(renderable.aModel) * inNorm);
+	vec3 normalWorldSpace = normalize(mat3(inMatrix) * inNorm);
 
 	if ( isnan( normalWorldSpace.x ) )
 	{

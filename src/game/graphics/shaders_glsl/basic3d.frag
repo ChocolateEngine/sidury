@@ -68,7 +68,7 @@ float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
 void main()
 {
 	// SurfaceDraw_t surface    = gSurfaceDraws[ push.aSurface ];
-	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
+	Renderable_t renderable = gRenderables[ push.aRenderable ];
 
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
     vec4 albedo = texture( texDiffuse, fragTexCoord );

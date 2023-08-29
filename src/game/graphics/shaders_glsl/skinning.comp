@@ -63,7 +63,7 @@ void main()
     // get current element shader is using
     uint vertIndex = gl_GlobalInvocationID.x;
 
-	Renderable_t renderable = gCore.aRenderables[ push.aRenderable ];
+	Renderable_t renderable = gRenderables[ push.aRenderable ];
 	VertexData_t vert = gVertexBuffers[ push.aSourceVertexBuffer ].aVert[ vertIndex ];
 
 	vec3 inPos  = vert.aPosNormX.xyz;

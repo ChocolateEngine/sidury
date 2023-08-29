@@ -26,8 +26,11 @@
 
 #define CH_BINDING_TEXTURES                  0
 #define CH_BINDING_CORE                      1
-#define CH_BINDING_VERTEX_BUFFERS            2
-#define CH_BINDING_INDEX_BUFFERS             3
+#define CH_BINDING_VIEWPORTS                 2
+#define CH_BINDING_RENDERABLES               3
+#define CH_BINDING_MODEL_MATRICES            4
+#define CH_BINDING_VERTEX_BUFFERS            5
+#define CH_BINDING_INDEX_BUFFERS             6
 
 // ===================================================================================
 // Base Structs
@@ -55,8 +58,6 @@ struct VertexData_t
 // shared renderable data
 struct Renderable_t
 {
-	mat4 aModel;
-
     // uint aMaterialCount;
     // uint aMaterials[ CH_R_MAX_MATERIALS ];
 
@@ -140,14 +141,29 @@ layout(set = 0, binding = CH_BINDING_CORE) buffer readonly Buffer_Core
 
 	uint           aNumLights[ CH_LIGHT_TYPES ];
 
-	Renderable_t   aRenderables[ CH_R_MAX_RENDERABLES ];
-	Viewport_t     aViewports[ CH_R_MAX_VIEWPORTS ];
-
 	LightWorld_t   aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
 	LightPoint_t   aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
 	LightCone_t    aLightCone[ CH_R_MAX_LIGHT_TYPE ];
 	LightCapsule_t aLightCapsule[ CH_R_MAX_LIGHT_TYPE ];
 } gCore;
+
+
+layout(set = 0, binding = CH_BINDING_VIEWPORTS) buffer Buffer_Viewports
+{
+	Viewport_t gViewports[ CH_R_MAX_VIEWPORTS ];
+};
+
+
+layout(set = 0, binding = CH_BINDING_RENDERABLES) buffer Buffer_Renderables
+{
+	Renderable_t gRenderables[ CH_R_MAX_RENDERABLES ];
+};
+
+
+layout(set = 0, binding = CH_BINDING_MODEL_MATRICES) buffer Buffer_ModelMatrices
+{
+	mat4 gModelMatrices[ CH_R_MAX_RENDERABLES ];
+};
 
 
 layout(set = 0, binding = CH_BINDING_VERTEX_BUFFERS) buffer Buffer_VertexData
