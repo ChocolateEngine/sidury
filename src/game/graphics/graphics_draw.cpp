@@ -596,8 +596,7 @@ void Graphics_PrepareDrawData()
 
 	// --------------------------------------------------------------------
 
-	ChVector< ShaderBufferList_t > bufferUpdateList;
-	ChVector< ShaderBufferList_t > bufferUpdateBindings;
+	bool updateShaderRenderables = gGraphicsData.aVertexBuffers.aDirty || gGraphicsData.aIndexBuffers.aDirty;
 	
 	// Update Vertex Buffer Array SSBO
 	if ( gGraphicsData.aVertexBuffers.aDirty )
@@ -921,6 +920,7 @@ void Graphics_PrepareDrawData()
 
 	// Update Renderables SSBO
 	// if ( gGraphicsData.aRenderableStaging.aDirty )
+	if ( updateShaderRenderables )
 	{
 		// Update Renderable Vertex Buffer Handles
 		for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
