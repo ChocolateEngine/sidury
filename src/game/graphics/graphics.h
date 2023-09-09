@@ -147,6 +147,7 @@ inline glm::mat4 Util_ComputeProjection( float sWidth, float sHeight, float sNea
 
 
 // TODO: Get rid of this, merge it with the ViewportShader_t struct, it's the same thing
+// except this has fov
 struct ViewportCamera_t
 {
 	void ComputeProjection( float sWidth, float sHeight )
@@ -786,8 +787,8 @@ void               Graphics_Present();
 // ChHandle_t         Graphics_CreateRenderPass();
 // void               Graphics_UpdateRenderPass( ChHandle_t sRenderPass );
 
-// Returns the Viewport Index
-u32                Graphics_CreateViewport( ViewportShader_t* spViewport = nullptr );
+// Returns the Viewport Index - input is the address of a pointer
+u32                Graphics_CreateViewport( ViewportShader_t** spViewport = nullptr );
 void               Graphics_FreeViewport( u32 sViewportIndex );
 
 ViewportShader_t*  Graphics_GetViewportData( u32 sViewportIndex );

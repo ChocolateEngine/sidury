@@ -281,24 +281,6 @@ void Graphics_FreeModel( Handle shModel )
 		return;
 	}
 
-	//if ( model->apVertexData )
-	//{
-	//	model->apVertexData->Release();
-	//}
-	//
-	//if ( model->apBuffers )
-	//{
-	//	model->apBuffers->Release();
-	// 	for ( auto& buf : model->apBuffers->aVertex )
-	// 		render->DestroyBuffer( buf );
-	// 
-	// 	if ( model->apBuffers->aIndex )
-	// 		render->DestroyBuffer( model->apBuffers->aIndex );
-	// 
-	// 	model->apBuffers->aVertex.clear();
-	// 	model->apBuffers->aIndex = InvalidHandle;
-	//}
-
 	model->aRefCount--;
 	if ( model->aRefCount == 0 )
 	{
@@ -780,15 +762,6 @@ bool Graphics_CreateStorageBuffers( std::vector< Handle >& srBuffers, const char
 }
 
 
-// IDEA:
-// 
-// Make a global variable descriptor set that will store all textures, viewports, lights, etc.
-// binding 0 will be textures, 1 for viewports, 2 for lights, etc.
-// 
-// We could have a per shader variable set with all materials for it, like we did originally
-// 
-
-
 static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u32 sCount )
 {
 	srAllocator.aAllocated = sCount;
@@ -1144,16 +1117,16 @@ void Graphics_RemoveShaderBuffer( ShaderBufferList_t& srBufferList, u32 sHandle 
 }
 
 
-u32 Graphics_GetShaderBuffer( const ShaderBufferList_t& srBufferList, u32 sHandle )
+ChHandle_t Graphics_GetShaderBuffer( const ShaderBufferList_t& srBufferList, u32 sHandle )
 {
 	if ( sHandle == UINT32_MAX )
-		return sHandle;
+		return CH_INVALID_HANDLE;
 
 	auto it = srBufferList.aBuffers.find( sHandle );
 	if ( it == srBufferList.aBuffers.end() )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Failed to Find Buffer in ShaderBufferList_t! - %u\n", sHandle );
-		return UINT32_MAX;
+		return CH_INVALID_HANDLE;
 	}
 
 	return it->second;

@@ -10,8 +10,6 @@
 CONVAR( r_skybox, 1 );
 CONVAR( r_skybox_ang_freeze, 0 );
 
-// wtf
-extern ViewportCamera_t gView;
 
 constexpr float         SKYBOX_SCALE = 100.0f;
 constexpr glm::vec3     vec3_zero( 0, 0, 0 );

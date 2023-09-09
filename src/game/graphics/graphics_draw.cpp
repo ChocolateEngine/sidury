@@ -15,13 +15,9 @@
 #include <unordered_set>
 
 // --------------------------------------------------------------------------------------
-// TODO: GET RID OF ALL THESE EXTERNS !!!!!
-
-extern IGuiSystem*           gui;
-extern IRender*              render;
 
 // shaders, fun
-u32                          Shader_Basic3D_UpdateMaterialData( Handle sMat );
+u32                                    Shader_Basic3D_UpdateMaterialData( Handle sMat );
 
 
 // --------------------------------------------------------------------------------------
@@ -351,7 +347,7 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 {
 #if 0
-	ChHandle_t shaderSkinning = Graphics_GetShader( "__skinning" );
+	static ChHandle_t shaderSkinning = Graphics_GetShader( "__skinning" );
 
 	if ( shaderSkinning == CH_INVALID_HANDLE )
 	{
@@ -367,6 +363,8 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 
 	ShaderData_t*    shaderSkinningData = Shader_GetData( shaderSkinning );
 	IShaderPushComp* skinningPush       = shaderSkinningData->apPushComp;
+
+	ChVector< GraphicsBufferMemoryBarrier_t > buffers;
 
 	u32 i = 0;
 	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
@@ -396,11 +394,11 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		i++;
 
 		ShaderSkinning_Push push{};
-		push.aRenderable      = CH_GET_HANDLE_INDEX( renderHandle );
+		push.aRenderable         = CH_GET_HANDLE_INDEX( renderHandle );
 		push.aSourceVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
 
-		push.aVertexCount     = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
-		push.aBlendShapeCount = model->apVertexData->aBlendShapeCount;
+		push.aVertexCount        = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
+		push.aBlendShapeCount    = model->apVertexData->aBlendShapeCount;
 
 		render->CmdPushConstants( sCmd, shaderSkinningData->aLayout, ShaderStage_Compute, 0, sizeof( push ), &push );
 		render->CmdDispatch( sCmd, push.aVertexCount / 64, 1, 1 );
@@ -412,7 +410,22 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 
 		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0, nullptr);
 #endif
+
+		GraphicsBufferMemoryBarrier_t& buffer = buffers.emplace_back();
+		buffer.aSrcAccessMask                 = EGraphicsAccess_ShaderRead | EGraphicsAccess_ShaderWrite;
+		buffer.aDstAccessMask                 = EGraphicsAccess_ShaderRead | EGraphicsAccess_ShaderWrite;
+		buffer.aBuffer                        = Graphics_GetShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
 	}
+
+	PipelineBarrier_t endBarrier{};
+	endBarrier.aSrcStageMask             = EPipelineStage_ComputeShader;
+	endBarrier.aDstStageMask             = EPipelineStage_VertexShader;
+
+	endBarrier.aBufferMemoryBarrierCount = buffers.size();
+	endBarrier.apBufferMemoryBarriers    = buffers.data();
+
+	render->CmdPipelineBarrier( sCmd, endBarrier );
+
 #endif
 
 	gGraphicsData.aSkinningRenderList.clear();
@@ -1079,7 +1092,7 @@ void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
 #endif
 
 
-u32 Graphics_CreateViewport( ViewportShader_t* spViewport )
+u32 Graphics_CreateViewport( ViewportShader_t** spViewport )
 {
 	u32 index = Graphics_AllocateShaderSlot( gGraphicsData.aViewportSlots, "Viewports" );
 
@@ -1094,9 +1107,9 @@ u32 Graphics_CreateViewport( ViewportShader_t* spViewport )
 
 	if ( spViewport )
 	{
-		spViewport             = &gGraphicsData.aViewData.aViewports[ index ];
-		spViewport->aAllocated = true;
-		spViewport->aActive    = true;
+		( *spViewport )             = &gGraphicsData.aViewData.aViewports[ index ];
+		( *spViewport )->aAllocated = true;
+		( *spViewport )->aActive    = true;
 	}
 	else
 	{

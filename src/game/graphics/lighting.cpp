@@ -83,8 +83,8 @@ bool Graphics_CreateShadowRenderPass()
 
 void Graphics_AddShadowMap( Light_t* spLight )
 {
-	ViewportShader_t* viewport = nullptr;
-	u32               viewportIndex = Graphics_CreateViewport( viewport );
+	ViewportShader_t* viewport      = nullptr;
+	u32               viewportIndex = Graphics_CreateViewport( &viewport );
 
 	if ( viewport == nullptr )
 	{
@@ -98,7 +98,7 @@ void Graphics_AddShadowMap( Light_t* spLight )
 
 	viewport->aShaderOverride  = Graphics_GetShader( "__shadow_map" );
 	viewport->aSize            = shadowMap.aSize;
-	viewport->aActive          = true;
+	viewport->aActive          = false;
 
 	// Create Textures
 	TextureCreateInfo_t texCreate{};

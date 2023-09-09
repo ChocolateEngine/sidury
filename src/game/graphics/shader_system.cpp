@@ -351,7 +351,7 @@ bool Shader_ParseRequirements( ShaderRequirmentsList_t& srOutput )
 // }
 
 
-bool Shader_BindSlots( Handle sCmd, u32 sIndex, Handle sShader, ChVector< EShaderSlot >& srSlots )
+bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 {
 	PROF_SCOPE();
 
@@ -359,8 +359,12 @@ bool Shader_BindSlots( Handle sCmd, u32 sIndex, Handle sShader, ChVector< EShade
 	if ( !shaderData )
 		return false;
 
+	if ( !render->CmdBindPipeline( sCmd, sShader ) )
+		return false;
+
+	// Bind Descriptor Sets (TODO: Keep track of what is currently bound so we don't need to rebind set 0)
 	ChVector< Handle > descSets;
-	descSets.reserve( srSlots.size() * 2 );
+	descSets.reserve( 2 );
 
 	// TODO: Should only be done once per frame
 	descSets.push_back( gShaderDescriptorData.aGlobalSets.apSets[ sIndex ] );
@@ -376,63 +380,6 @@ bool Shader_BindSlots( Handle sCmd, u32 sIndex, Handle sShader, ChVector< EShade
 	}
 
 	return true;
-}
-
-
-bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
-{
-	PROF_SCOPE();
-
-	ShaderData_t* shaderData = Shader_GetData( sShader );
-	if ( !shaderData )
-		return false;
-
-	if ( !render->CmdBindPipeline( sCmd, sShader ) )
-		return false;
-
-	// NOTE: this probably needs to handle binding global stuff and per pass stuff
-#if 0
-	ChVector< Handle > descSets;
-	descSets.reserve( 8 );
-
-	// TODO: bind a single uniform variable so the shader can do a bounds check on this
-	if ( shaderData->aFlags & EShaderFlags_Sampler )
-		descSets.push_back( gUniformSampler.aSets[ sIndex ] );
-
-	if ( shaderData->aFlags & EShaderFlags_ViewInfo )
-		descSets.push_back( gUniformViewInfo.aSets[ sIndex ] );
-
-	if ( shaderData->aFlags & EShaderFlags_Lights )
-	{
-		for ( const auto& set : gUniformLights.aSets )
-			descSets.push_back( set );
-	}
-
-	if ( shaderData->aFlags & EShaderFlags_MaterialUniform )
-	{
-		Handle* mats = Shader_GetMaterialUniform( sShader );
-		if ( mats == nullptr )
-			return false;
-
-		descSets.push_back( mats[ sIndex ] );
-	}
-
-	if ( descSets.size() )
-	{
-		EPipelineBindPoint bindPoint = Shader_GetPipelineBindPoint( sShader );
-
-		// render->CmdBindDescriptorSets( sCmd, sIndex, bindPoint, shaderData->aLayout, descSets.data(), descSets.size() );
-		render->CmdBindDescriptorSets(
-		  sCmd, sIndex, bindPoint, shaderData->aLayout,
-		  gShaderDescriptorSets[ EShaderSlot_PerShader ].aSets.data(),
-		  gShaderDescriptorSets[ EShaderSlot_PerShader ].aSets.size() );
-	}
-#endif
-
-	ChVector< EShaderSlot > slots;
-	slots.push_back( EShaderSlot_Global );
-	slots.push_back( EShaderSlot_PerShader );
-	return Shader_BindSlots( sCmd, sIndex, sShader, slots );
 }
 
 
