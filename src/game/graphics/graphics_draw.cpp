@@ -36,6 +36,7 @@ CONVAR( r_line_thickness, 2 );
 CONVAR( r_show_draw_calls, 0 );
 
 CONVAR( r_random_blend_shapes, 1 );
+CONVAR( r_reset_blend_shapes, 0 );
 
 
 bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
@@ -249,7 +250,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 		}
 
 		// NOTE: not needed if the material is the same i think
-		if ( !Shader_PreRenderableDraw( cmd, sIndex, shader, surfaceDraw ) )
+		if ( !Shader_PreRenderableDraw( cmd, sIndex, shaderData, surfaceDraw ) )
 			continue;
 
 		Graphics_CmdDrawSurface( cmd, model, surfaceDraw.aSurface );
@@ -346,7 +347,7 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 
 void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 {
-#if 0
+#if 1
 	static ChHandle_t shaderSkinning = Graphics_GetShader( "__skinning" );
 
 	if ( shaderSkinning == CH_INVALID_HANDLE )
@@ -394,14 +395,18 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		i++;
 
 		ShaderSkinning_Push push{};
-		push.aRenderable         = CH_GET_HANDLE_INDEX( renderHandle );
-		push.aSourceVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+		push.aRenderable            = CH_GET_HANDLE_INDEX( renderHandle );
+		push.aSourceVertexBuffer    = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+		push.aVertexCount           = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
+		push.aBlendShapeCount       = model->apVertexData->aBlendShapeCount;
+		push.aBlendShapeWeightIndex = Graphics_GetShaderBufferIndex( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsIndex );
+		push.aBlendShapeDataIndex   = Graphics_GetShaderBufferIndex( gGraphicsData.aBlendShapeDataBuffers, model->apBuffers->aBlendShapeHandle );
 
-		push.aVertexCount        = model->apVertexData->aIndices.empty() ? model->apVertexData->aCount : model->apVertexData->aIndices.size();
-		push.aBlendShapeCount    = model->apVertexData->aBlendShapeCount;
+		if ( push.aSourceVertexBuffer == UINT32_MAX || push.aBlendShapeWeightIndex == UINT32_MAX || push.aBlendShapeDataIndex == UINT32_MAX )
+			continue;
 
 		render->CmdPushConstants( sCmd, shaderSkinningData->aLayout, ShaderStage_Compute, 0, sizeof( push ), &push );
-		render->CmdDispatch( sCmd, push.aVertexCount / 64, 1, 1 );
+		render->CmdDispatch( sCmd, glm::max( 1U, push.aVertexCount / 64 ), 1, 1 );
 
 #if 0
 		VkBufferMemoryBarrier barrier = vkinit::buffer_barrier(matrixBuffer, _graphicsQueueFamily);
@@ -412,12 +417,14 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 #endif
 
 		GraphicsBufferMemoryBarrier_t& buffer = buffers.emplace_back();
-		buffer.aSrcAccessMask                 = EGraphicsAccess_ShaderRead | EGraphicsAccess_ShaderWrite;
-		buffer.aDstAccessMask                 = EGraphicsAccess_ShaderRead | EGraphicsAccess_ShaderWrite;
+		buffer.aSrcAccessMask                 = EGraphicsAccess_MemoryRead | EGraphicsAccess_MemoryWrite;
+		buffer.aDstAccessMask                 = EGraphicsAccess_MemoryRead | EGraphicsAccess_MemoryWrite;
 		buffer.aBuffer                        = Graphics_GetShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
 	}
 
 	PipelineBarrier_t endBarrier{};
+	// endBarrier.aSrcStageMask             = EPipelineStage_BottomOfPipe;  // EPipelineStage_ComputeShader;
+	// endBarrier.aDstStageMask             = EPipelineStage_TopOfPipe;  // EPipelineStage_VertexShader;
 	endBarrier.aSrcStageMask             = EPipelineStage_ComputeShader;
 	endBarrier.aDstStageMask             = EPipelineStage_VertexShader;
 
@@ -546,10 +553,10 @@ void Graphics_PrepareDrawData()
 		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVerts.size() );
 	}
 
-	{
-		PROF_SCOPE_NAMED( "Imgui Render" );
-		ImGui::Render();
-	}
+	// {
+	// 	PROF_SCOPE_NAMED( "Imgui Render" );
+	// 	ImGui::Render();
+	// }
 
 	gModelDrawCalls = 0;
 	gVertsDrawn     = 0;
@@ -647,8 +654,12 @@ void Graphics_PrepareDrawData()
 	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
 #endif
 
+	if ( ImGui::Button( "Reset Blend Shapes" ) )
+		r_reset_blend_shapes.SetValue( 1 );
+
 	u32 surfDrawIndex = 0;
 
+	u32 imguiIndex    = 0;
 	for ( uint32_t i = 0; i < gGraphicsData.aRenderables.size(); )
 	{
 		PROF_SCOPE_NAMED( "Update Renderables" );
@@ -675,7 +686,14 @@ void Graphics_PrepareDrawData()
 			// Graphics_RenderableBlendShapesDirty;
 			for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
 			{
-				renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+				if ( r_reset_blend_shapes.GetBool() )
+					renderable->aBlendShapeWeights[ blendI ] = 0.f;
+
+				// renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+				ImGui::PushID( imguiIndex++ );
+				ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ blendI ], -1.f, 4.f, "%.4f", 1.f );
+				ImGui::PopID();
+				//renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
 			}
 		}
 #endif
@@ -779,7 +797,9 @@ void Graphics_PrepareDrawData()
 	// --------------------------------------------------------------------
 	// Prepare Skinning Compute Shader Buffers
 
-#if 0
+	r_reset_blend_shapes.SetValue( 0 );
+
+#if 1
 	u32 i = 0;
 	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
 	{
@@ -790,22 +810,8 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-		// get model data
-		Model* model = Graphics_GetModelData( renderable->aModel );
-		if ( !model )
-		{
-			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
-			continue;
-		}
-
-		// make sure this model has valid vertex buffers
-		if ( model->apBuffers == nullptr || model->apBuffers->aVertex == CH_INVALID_HANDLE )
-		{
-			Log_Error( gLC_ClientGraphics, "No Vertex/Index Buffers for Model??\n" );
-			continue;
-		}
-
 		i++;
+		render->BufferWrite( renderable->aBlendShapeWeightsBuffer, renderable->aBlendShapeWeights.size_bytes(), renderable->aBlendShapeWeights.data() );
 	}
 #endif
 
@@ -988,6 +994,11 @@ void Graphics_PrepareDrawData()
 	// }
 
 	render->CopyQueuedBuffers();
+
+	{
+		PROF_SCOPE_NAMED( "Imgui Render" );
+		ImGui::Render();
+	}
 }
 
 
@@ -998,6 +1009,8 @@ void Graphics_Present()
 	// render->LockGraphicsMutex();
 	render->WaitForQueues();
 	render->ResetCommandPool();
+
+	Graphics_FreeQueuedResources();
 
 	Graphics_PrepareDrawData();
 

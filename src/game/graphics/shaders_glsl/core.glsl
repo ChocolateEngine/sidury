@@ -51,7 +51,7 @@ struct VertexData_t
 {
 	vec4 aPosNormX;
 	vec4 aNormYZ_UV;
-	vec4 aColor;
+	vec4 aColor;      // TODO: make this into some unsigned int, 4 color channels packed from 0-255
 };
 
 

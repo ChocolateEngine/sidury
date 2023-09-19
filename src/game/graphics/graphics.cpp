@@ -17,6 +17,39 @@
 
 LOG_REGISTER_CHANNEL_EX( gLC_ClientGraphics, "ClientGraphics", LogColor::Green );
 
+bool _Graphics_LoadModel( ChHandle_t& item, const fs::path& srPath );
+bool _Graphics_CreateModel( ChHandle_t& item, const fs::path& srInternalPath, void* spData );
+void _Graphics_FreeModel( ChHandle_t item );
+
+bool _Graphics_LoadMaterial( ChHandle_t& item, const fs::path& srPath );
+bool _Graphics_CreateMaterial( ChHandle_t& item, const fs::path& srInternalPath, void* spData );
+void _Graphics_FreeMaterial( ChHandle_t item );
+
+
+// static ResourceType_t gResourceType_Model = {
+// 	.apName       = "Model",
+// 	.apFuncLoad   = _Graphics_LoadModel,
+// 	.apFuncCreate = _Graphics_CreateModel,
+// 	// .apFuncFree   = _Graphics_FreeModel,
+// };
+// 
+// static ResourceType_t gResourceType_Material = {
+// 	.apName       = "Material",
+// 	.apFuncLoad   = _Graphics_LoadMaterial,
+// 	.apFuncCreate = _Graphics_CreateMaterial,
+// 	// .apFuncFree   = _Graphics_FreeMaterial,
+// };
+// 
+// 
+// ChHandle_t             gResource_Model    = Resource_RegisterType( gResourceType_Model );
+// ChHandle_t             gResource_Material = Resource_RegisterType( gResourceType_Material );
+
+// #define CH_REGISTER_RESOURCE_TYPE( name, loadFunc, createFunc, freeFunc ) \
+// 	ChHandle_t gResource_##name = Resource_RegisterType( #name, loadFunc, createFunc, freeFunc )
+// 
+// CH_REGISTER_RESOURCE_TYPE( Model, _Graphics_LoadModel, _Graphics_CreateModel, nullptr );
+// CH_REGISTER_RESOURCE_TYPE( Material, _Graphics_LoadMaterial, _Graphics_CreateMaterial, nullptr );
+
 // --------------------------------------------------------------------------------------
 // Interfaces
 
@@ -188,8 +221,8 @@ Handle Graphics_LoadModel( const std::string& srPath )
 
 	std::string fileExt = FileSys_GetFileExt( srPath );
 
-	Model* model = nullptr;
-	Handle handle = InvalidHandle;
+	Model*      model   = nullptr;
+	Handle      handle  = InvalidHandle;
 
 	// TODO: try to do file header checking
 	if ( fileExt == "obj" )
@@ -253,82 +286,103 @@ Handle Graphics_CreateModel( Model** spModel )
 }
 
 
-void Graphics_FreeModel( Handle shModel )
+void Graphics_FreeQueuedResources()
 {
 	PROF_SCOPE();
 
-	if ( shModel == InvalidHandle )
-		return;
-
-	// HACK HACK PERF: we have to wait for queues to finish, so we could just free this model later
-	// maybe right before the next draw?
-	render->WaitForQueues();
-
-	// use smart pointer for apVertexData and apBuffers?
-	// though with the resource system, you can't do that, darn
-	// you need to use placement new there
-
-	// prototyping idea
-	// 
-	// Resource_GetData( gModels, &model );
-	// Resource_IncrementRefCount( gModels, &model );
-	// 
-
-	Model* model = nullptr;
-	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
+	// Free Models
+	for ( ChHandle_t modelHandle : gGraphicsData.aModelsToFree )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_FreeModel: Model is nullptr\n" );
-		return;
+		Model* model = nullptr;
+		if ( !gGraphicsData.aModels.Get( modelHandle, &model ) )
+		{
+			Log_Error( gLC_ClientGraphics, "Graphics_FreeModel: Model is nullptr\n" );
+			continue;
+		}
+
+		model->aRefCount--;
+		if ( model->aRefCount == 0 )
+		{
+			// TODO: QUEUE THIS MODEL FOR DELETION, DON'T DELETE THIS NOW
+
+			// Free Materials attached to this model
+			for ( Mesh& mesh : model->aMeshes )
+			{
+				if ( mesh.aMaterial )
+					Graphics_FreeMaterial( mesh.aMaterial );
+			}
+
+			// Free Vertex Data
+			if ( model->apVertexData )
+			{
+				delete model->apVertexData;
+			}
+
+			// Free Vertex and Index Buffers
+			if ( model->apBuffers )
+			{
+				if ( model->apBuffers->aVertexHandle != UINT32_MAX )
+				{
+					Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+				}
+
+				if ( model->apBuffers->aIndexHandle != UINT32_MAX )
+				{
+					Graphics_RemoveShaderBuffer( gGraphicsData.aIndexBuffers, model->apBuffers->aIndexHandle );
+				}
+
+				delete model->apBuffers;
+			}
+
+			// If this model was loaded from disk, remove the stored model path
+			for ( auto& [ path, modelHandleI ] : gGraphicsData.aModelPaths )
+			{
+				if ( modelHandle == modelHandleI )
+				{
+					gGraphicsData.aModelPaths.erase( path );
+					break;
+				}
+			}
+
+			gGraphicsData.aModels.Remove( modelHandle );
+			gGraphicsData.aModelBBox.erase( modelHandle );
+		}
 	}
 
-	model->aRefCount--;
-	if ( model->aRefCount == 0 )
-	{
-		// TODO: QUEUE THIS MODEL FOR DELETION, DON'T DELETE THIS NOW
-
-		// Free Materials attached to this model
-		for ( Mesh& mesh : model->aMeshes )
-		{
-			if ( mesh.aMaterial )
-				Graphics_FreeMaterial( mesh.aMaterial );
-		}
-
-		// Free Vertex Data
-		if ( model->apVertexData )
-		{
-			delete model->apVertexData;
-		}
-
-		// Free Vertex and Index Buffers
-		if ( model->apBuffers )
-		{
-			if ( model->apBuffers->aVertexHandle != UINT32_MAX )
-			{
-				Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
-			}
-
-			if ( model->apBuffers->aIndexHandle != UINT32_MAX )
-			{
-				Graphics_RemoveShaderBuffer( gGraphicsData.aIndexBuffers, model->apBuffers->aIndexHandle );
-			}
-
-			delete model->apBuffers;
-		}
-		
-		// If this model was loaded from disk, remove the stored model path
-		for ( auto& [ path, modelHandle ] : gGraphicsData.aModelPaths )
-		{
-			if ( modelHandle == shModel )
-			{
-				gGraphicsData.aModelPaths.erase( path );
-				break;
-			}
-		}
-
-		gGraphicsData.aModels.Remove( shModel );
-		gGraphicsData.aModelBBox.erase( shModel );
-	}
+	gGraphicsData.aModelsToFree.clear();
 }
+
+
+void Graphics_FreeModel( ChHandle_t shModel )
+{
+	if ( shModel == CH_INVALID_HANDLE )
+		return;
+
+	gGraphicsData.aModelsToFree.emplace( shModel );
+}
+
+
+// ---------------------------------------------------
+// Resource System Funcs
+
+
+bool _Graphics_LoadModel( ChHandle_t& item, const fs::path& srPath )
+{
+	return false;
+}
+
+
+bool _Graphics_CreateModel( ChHandle_t& item, const fs::path& srInternalPath, void* spData )
+{
+	return false;
+}
+
+
+void _Graphics_FreeModel( ChHandle_t item )
+{
+}
+
+// ---------------------------------------------------
 
 
 Model* Graphics_GetModelData( Handle shModel )
@@ -1138,8 +1192,19 @@ u32 Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 s
 	if ( sHandle == UINT32_MAX )
 		return sHandle;
 
+	u32 i = 0;
+	for ( const auto& [ handle, buffer ] : srBufferList.aBuffers )
+	{
+		if ( handle == sHandle )
+			return i;
+
+		i++;
+	}
+
+	return UINT32_MAX;
+
 	// oh god no
-	return std::distance( std::begin( srBufferList.aBuffers ), srBufferList.aBuffers.find( sHandle ) );
+	// return std::distance( std::begin( srBufferList.aBuffers ), srBufferList.aBuffers.find( sHandle ) );
 }
 
 
@@ -1495,6 +1560,44 @@ ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 		// Allocate Indexes for these
 		modelDraw->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, modelDraw->aVertexBuffer );
 		modelDraw->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, modelDraw->aBlendShapeWeightsBuffer );
+
+		// update the descriptor sets for the skinning shader
+		WriteDescSet_t update{};
+
+		update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].aCount;
+		update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].apSets;
+
+		update.aBindingCount = 2;
+		update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
+
+		update.apBindings[ 0 ].aBinding  = 0;
+		update.apBindings[ 0 ].aType     = EDescriptorType_StorageBuffer;
+		update.apBindings[ 0 ].aCount    = gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size();
+		update.apBindings[ 0 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size() );
+
+		update.apBindings[ 1 ].aBinding  = 1;
+		update.apBindings[ 1 ].aType     = EDescriptorType_StorageBuffer;
+		update.apBindings[ 1 ].aCount    = gGraphicsData.aBlendShapeDataBuffers.aBuffers.size();
+		update.apBindings[ 1 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeDataBuffers.aBuffers.size() );
+
+		int i                            = 0;
+		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeWeightBuffers.aBuffers )
+		{
+			update.apBindings[ 0 ].apData[ i++ ] = buffer;
+		}
+
+		i = 0;
+		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeDataBuffers.aBuffers )
+		{
+			update.apBindings[ 1 ].apData[ i++ ] = buffer;
+		}
+
+		// update.aImages = gViewportBuffers;
+		render->UpdateDescSets( &update, 1 );
+
+		free( update.apBindings[ 0 ].apData );
+		free( update.apBindings[ 1 ].apData );
+		free( update.apBindings );
 	}
 	else
 	{
@@ -1890,11 +1993,11 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 
 	spBuffer->aBlendShape = CreateModelBuffer(
 	  spDebugName ? spDebugName : "Blend Shapes",
-	  spVertexData->aBlendShapeData.apData,
-	  Graphics_GetVertexFormatSize( spVertexData->aBlendShapeData.aFormat ) * spVertexData->aCount * spVertexData->aBlendShapeCount,
+	  spVertexData->apBlendShapeData,
+	  attribSize * spVertexData->aCount * spVertexData->aBlendShapeCount,
 	  EBufferFlags_Storage );
 
-	spBuffer->aVertexHandle = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeDataBuffers, spBuffer->aBlendShape );
+	spBuffer->aBlendShapeHandle = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeDataBuffers, spBuffer->aBlendShape );
 }
 
 

@@ -422,23 +422,19 @@ bool Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, R
 }
 
 
-bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable )
+bool Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
 {
 	PROF_SCOPE();
 
-	ShaderData_t* shaderData = Shader_GetData( sShader );
-	if ( !shaderData )
-		return false;
-
-	if ( shaderData->aFlags & EShaderFlags_PushConstant )
+	if ( spShaderData->aFlags & EShaderFlags_PushConstant )
 	{
-		if ( !shaderData->apPush )
+		if ( !spShaderData->apPush )
 			return false;
 
-		shaderData->apPush->apPush( sCmd, shaderData->aLayout, srRenderable );
+		spShaderData->apPush->apPush( sCmd, spShaderData->aLayout, srRenderable );
 
 		// void* data = gShaderPushData.at( &srRenderable );
-		// render->CmdPushConstants( sCmd, layout, shaderData->aStages, 0, shaderData->aPushSize, data );
+		// render->CmdPushConstants( sCmd, layout, spShaderData->aStages, 0, spShaderData->aPushSize, data );
 	}
 
 	return true;

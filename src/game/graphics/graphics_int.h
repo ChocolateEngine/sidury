@@ -89,14 +89,6 @@ struct Shader_Viewport_t
 };
 
 
-struct Shader_VertexData_t
-{
-	glm::vec4 aPosNormX;
-	glm::vec4 aNormYZ_UV;
-	glm::vec4 aColor;
-};
-
-
 // shared renderable data
 struct Shader_Renderable_t
 {
@@ -233,10 +225,12 @@ enum EShaderCoreArray : u32
 // :skull:
 struct ShaderSkinning_Push
 {
-	u32 aRenderable         = 0;
-	u32 aSourceVertexBuffer = 0;
-	u32 aVertexCount        = 0;
-	u32 aBlendShapeCount    = 0;
+	u32 aRenderable            = 0;
+	u32 aSourceVertexBuffer    = 0;
+	u32 aVertexCount           = 0;
+	u32 aBlendShapeCount       = 0;
+	u32 aBlendShapeWeightIndex = 0;
+	u32 aBlendShapeDataIndex   = 0;
 };
 
 
@@ -290,6 +284,8 @@ struct GraphicsData_t
 	ResourceList< Model >                         aModels;
 	std::unordered_map< std::string, ChHandle_t > aModelPaths;
 	std::unordered_map< ChHandle_t, ModelBBox_t > aModelBBox;
+
+	std::unordered_set< ChHandle_t >              aModelsToFree;
 
 	ResourceList< Scene_t >                       aScenes;
 	std::unordered_map< std::string, ChHandle_t > aScenePaths;
@@ -347,3 +343,4 @@ void                  Graphics_RemoveShaderBuffer( ShaderBufferList_t& srBufferL
 ChHandle_t            Graphics_GetShaderBuffer( const ShaderBufferList_t& srBufferList, u32 sHandle );
 u32                   Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 sHandle );
 
+void                  Graphics_FreeQueuedResources();

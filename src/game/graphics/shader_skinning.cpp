@@ -5,8 +5,8 @@
 
 
 static CreateDescBinding_t gSkinning_Bindings[] = {
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 0, 1 },  // blendWeights
-	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 1, 1 },  // blendData
+	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 0, CH_R_MAX_BLEND_SHAPE_WEIGHT_BUFFERS },  // blendWeights
+	{ EDescriptorType_StorageBuffer, ShaderStage_Compute, 1, CH_R_MAX_BLEND_SHAPE_DATA_BUFFERS },  // blendData
 };
 
 

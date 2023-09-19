@@ -2,6 +2,7 @@
 #include "types/transform.h"
 #include "render/irender.h"
 #include "graphics.h"
+#include "graphics_int.h"
 #include "mesh_builder.h"
 
 #include <glm/vec3.hpp>
@@ -557,6 +558,22 @@ static bool realloc_free( void*& spData, size_t sCount )
 }
 
 
+template< typename T >
+static bool realloc_free_cast( T*& spData, size_t sCount )
+{
+	void* data = realloc( spData, sCount * sizeof( T ) );
+
+	if ( !data )
+	{
+		free( spData );
+		return false;
+	}
+		
+	spData = static_cast< T* >( data );
+	return true;
+}
+
+
 void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName )
 {
 	if ( spModel->aMeshes.size() )
@@ -570,14 +587,12 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 	vertData->aFormat                            = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord;
 	ChVector< u32 >&              indexList      = vertData->aIndices;
 	ChVector< VertAttribData_t >& vertAttribs    = vertData->aData;
-	VertFormatData_t&             blendShapeData = vertData->aBlendShapeData;
+	vertData->apBlendShapeData                   = nullptr;
 
 	vertAttribs.resize( 3 );
 	vertAttribs[ 0 ].aAttrib = VertexAttribute_Position;
 	vertAttribs[ 1 ].aAttrib = VertexAttribute_Normal;
 	vertAttribs[ 2 ].aAttrib = VertexAttribute_TexCoord;
-
-	blendShapeData.aFormat   = VertexFormat_Position | VertexFormat_Normal | VertexAttribute_TexCoord;
 
 	int strides[]            = { 3, 3, 2 };
 
@@ -588,6 +603,7 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 	}
 	else
 	{
+		u32 baseBlendSize = 0;
 		for ( size_t matI = 0; matI < srMeshBuildData.aMaterials.size(); matI++ )
 		{
 			MeshBuildMaterial_t& material = srMeshBuildData.aMaterials[ matI ];
@@ -595,6 +611,7 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 			mesh.aMaterial                = material.aMaterial;
 
 			u32 baseSize                  = indexList.size();
+
 			mesh.aVertexOffset            = baseSize;
 			mesh.aVertexCount             = material.aVertexCount;
 
@@ -631,20 +648,69 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 			// if ( material.aBlendShapes.empty() )
 			// 	continue;
 
-			if ( !realloc_free( blendShapeData.apData, baseSize + material.aVertexCount * sizeof( MeshBuildBlendShapeElement_t ) * material.aBlendShapes.size() ) )
+			if ( !realloc_free_cast( vertData->apBlendShapeData, baseBlendSize + material.aVertexCount * material.aBlendShapes.size() ) )
 				return;
 
+			baseBlendSize += material.aVertexCount * material.aBlendShapes.size();
+
+			// u32 baseBlendCount = vertData->aBlendShapeCount;
+			// vertData->aBlendShapeCount += material.aBlendShapes.size();
 			vertData->aBlendShapeCount = material.aBlendShapes.size();
 
 			// Blend Shape Data is interleaved - POS|NORM|UV|POS|NORM|UV, instead of POS|POS|POS NORM|NORM|NORM UV|UV|UV
 
-			for ( u32 blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )
+#if 0
+			for ( size_t blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )
 			{
-				u32    dataOffset = blendI * material.aVertexCount;
-				float* data       = (float*)blendShapeData.apData + baseSize + dataOffset;
+				MeshBuildBlendShape_t& blendShape = material.aBlendShapes[ blendI ];
 
-				memcpy( data, material.aBlendShapes[ blendI ].apData, material.aVertexCount * sizeof( MeshBuildBlendShapeElement_t ) );
+				for ( size_t v = 0; v < material.aVertexCount; v++ )
+				{
+					MeshBuildBlendShapeElement_t& element = blendShape.apData[ v ];
+					
+					// Copy Position Data
+					memcpy( &vertData->apBlendShapeData[ v ].aPosNormX, &element.aPos, sizeof( element.aPos ) );
+
+					// Copy Normal Data
+					vertData->apBlendShapeData[ v ].aPosNormX.w = element.aNorm.x;
+					memcpy( &vertData->apBlendShapeData[ v ].aNormYZ_UV, &element.aNorm.y, 8 );
+
+					// Copy UV Data
+					memcpy( &vertData->apBlendShapeData[ v ].aNormYZ_UV.z, &element.aUV, 8 );
+				}
 			}
+#else
+			size_t blendV             = 0;
+			for ( size_t blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )
+			{
+				MeshBuildBlendShape_t& blendShape = material.aBlendShapes[ blendI ];
+
+				for ( size_t v = 0; v < material.aVertexCount; v++ )
+				{
+					MeshBuildBlendShapeElement_t& element = blendShape.apData[ v ];
+					
+					// Copy Position Data
+					memcpy( &vertData->apBlendShapeData[ blendV ].aPosNormX, &element.aPos, sizeof( element.aPos ) );
+
+					// Copy Normal Data
+					vertData->apBlendShapeData[ blendV ].aPosNormX.w = element.aNorm.x;
+					memcpy( &vertData->apBlendShapeData[ blendV ].aNormYZ_UV, &element.aNorm.y, 8 );
+
+					// Copy UV Data
+					memcpy( &vertData->apBlendShapeData[ blendV ].aNormYZ_UV.z, &element.aUV, 8 );
+					blendV++;
+				}
+			}
+#endif
+
+
+			// for ( u32 blendI = 0; blendI < material.aBlendShapes.size(); blendI++ )
+			// {
+			// 	u32    dataOffset = blendI * material.aVertexCount;
+			// 	float* data       = (float*)blendShapeData.apData + baseSize + dataOffset;
+			// 
+			// 	memcpy( data, material.aBlendShapes[ blendI ].apData, material.aVertexCount * sizeof( Shader_VertexData_t ) );
+			// }
 		}
 
 		vertData->aCount = indexList.size();

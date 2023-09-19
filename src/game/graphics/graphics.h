@@ -9,6 +9,8 @@
 
 LOG_CHANNEL2( ClientGraphics )
 
+extern ChHandle_t gResource_Model;
+
 struct VertexInputBinding_t;
 struct VertexInputAttribute_t;
 
@@ -202,6 +204,14 @@ struct MeshBlendShapeDrawData_t
 };
 
 
+struct Shader_VertexData_t
+{
+	glm::vec4 aPosNormX;
+	glm::vec4 aNormYZ_UV;
+	glm::vec4 aColor;
+};
+
+
 struct VertAttribData_t
 {
 	VertexAttribute aAttrib = VertexAttribute_Position;
@@ -251,7 +261,7 @@ struct VertexData_t
 
 	// ChVector< ChVector< VertAttribData_t > > aBlendShapeData;
 	u32                                      aBlendShapeCount = 0;
-	VertFormatData_t                         aBlendShapeData;  // size of data is (blend shape count) * (vertex count)
+	Shader_VertexData_t*                     apBlendShapeData;  // size of data is (blend shape count) * (vertex count)
 };
 
 
@@ -353,6 +363,7 @@ struct Renderable_t
 
 	u32               aVertexIndex            = UINT32_MAX;
 	u32               aIndexHandle            = UINT32_MAX;
+	// u32               aBlendShapeWeightsMagic = UINT32_MAX;
 	u32               aBlendShapeWeightsIndex = UINT32_MAX;
 
 	// I don't like these bools that have to be checked every frame
@@ -745,7 +756,7 @@ const char*        Graphics_GetShaderName( Handle sShader );
 bool               Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void               Shader_ResetPushData();
 bool               Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
-bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, Handle sShader, SurfaceDraw_t& srRenderable );
+bool               Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
 
 VertexFormat       Shader_GetVertexFormat( Handle sShader );
 ShaderData_t*      Shader_GetData( Handle sShader );

@@ -17,6 +17,8 @@ layout(push_constant) uniform SkinningParams {
 	uint aSourceVertexBuffer;
 	uint aVertexCount;
 	uint aBlendShapeCount;
+	uint aBlendShapeWeightIndex;
+	uint aBlendShapeDataIndex;
 }
 push;
 
@@ -39,6 +41,9 @@ struct BoneTransform_t
 };
 
 
+// POS|UV|NORM|POS|UV|NORM|POS|UV|NORM|POS|UV|NORM|POS|UV|NORM| |POS|UV|NORM|POS|UV|NORM|POS|UV|NORM|POS|UV|NORM|POS|UV|NORM|
+
+
 // -----------------------------------------------------------------------------------
 // Blend Shape Data
 
@@ -46,13 +51,13 @@ struct BoneTransform_t
 layout(set = 1, binding = 0) buffer restrict readonly Buffer_BlendShapeWeights {
 	float data[];
 }
-gBlendShapeWeights;
+gBlendShapeWeights[];
 
 
 layout(set = 1, binding = 1) buffer restrict readonly Buffer_BlendShapeData {
 	VertexData_t vertices[];
 }
-gBlendShapeData;
+gBlendShapeData[];
 
 
 // -----------------------------------------------------------------------------------
@@ -70,10 +75,15 @@ void main()
 	vec3 inNorm = vec3(vert.aPosNormX.w, vert.aNormYZ_UV.xy);
 	vec2 inUV   = vert.aNormYZ_UV.zw;
 
-	vec3 newPos    = inPos;
-	vec3 morphPos  = gBlendShapeData.vertices[ vertIndex ].aPosNormX.xyz;
+	vec3 newPos = inPos;
 
-	newPos += (1.f * morphPos);
+	uint morphVertIndex = 0;
+	for ( uint morphI = 0; morphI < push.aBlendShapeCount; morphI++ )
+	{
+		uint dataOffset = morphI * push.aVertexCount;
+		vec3 morphPos   = gBlendShapeData[ push.aBlendShapeDataIndex ].vertices[ vertIndex + dataOffset ].aPosNormX.xyz;
+		newPos         += gBlendShapeWeights[ push.aBlendShapeWeightIndex ].data[ morphI ] * morphPos;
+	}
 
 	gVertexBuffers[ renderable.aVertexBuffer ].aVert[ vertIndex ].aPosNormX.xyz = newPos;
 }
