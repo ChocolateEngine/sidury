@@ -1,4 +1,3 @@
-#include "core/resources.hh"
 #include "graphics.h"
 #include "graphics_int.h"
 #include "render/irender.h"
