@@ -718,6 +718,8 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 	// --------------------------------------------------------
 	// Parse Model Data
 
+	// Parse gltf_skin* skins;, contains all bone data
+
 	// NOTE: try only changing the count of every material group first
 	// then at the end, set all the offsets from the count of everything
 
@@ -892,35 +894,6 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 
 
 			// -------------------------------------------------------------------------------------
-
-
-			// uh, small problem, we have a variable amount of morph targets on the mesh
-			// so we need to know how many morph targets there are
-			// so, how do we load that in the shader?
-			
-			// store the weights and count of morph targets in the uniform buffer of the shader?
-			// and in the shader, we can loop over the morph targets and apply the weights
-			// for the vertex data, we can store an array of vertex data for each morph target
-			
-			std::vector< cgltf_accessor* > morphTargetsPos;
-			// cgltf_accessor* morphPos = nullptr;
-			
-			for ( size_t t = 0; t < prim.targets_count; t++ )
-			{
-				cgltf_morph_target& target = prim.targets[t];
-				
-				for ( size_t a = 0; a < target.attributes_count; a++ )
-				{
-					cgltf_attribute& attrib = target.attributes[a];
-
-					if ( attrib.name == Attrib_Position )
-						morphTargetsPos.push_back( attrib.data );
-				}
-
-				Assert( vertexBuffer->component_type == cgltf_component_type_r_32f );
-				Assert( vertexBuffer->type == cgltf_type_vec3 );
-
-			}
 
 #if 0
 			meshBuilder.SetMorphCount( morphTargetsPos.size() );

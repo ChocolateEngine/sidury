@@ -76,6 +76,8 @@ bool CvarF_ClientExecuteCallback( ConVarBase* spBase, const std::vector< std::st
 
 void Game_Shutdown()
 {
+	Resource_Shutdown();
+
 	TEST_Shutdown();
 
 	CL_Shutdown();
@@ -218,6 +220,8 @@ void Game_Update( float frameTime )
 	}
 
 	Con_Update();
+
+	Resource_Update();
 }
 
 

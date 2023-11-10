@@ -142,7 +142,7 @@ bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spMo
 	// 		vertexBuffers.push_back( srVertexBuffers[ i ] );
 	// }
 
-	size_t                offsets = 0;
+	uint64_t                offsets = 0;
 
 	// size_t* offsets = (size_t*)CH_STACK_ALLOC( sizeof( size_t ) * vertexBuffers.size() );
 	// if ( offsets == nullptr )
@@ -678,26 +678,6 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-#if 1
-		if ( r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
-		{
-			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
-
-			// Graphics_RenderableBlendShapesDirty;
-			for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
-			{
-				if ( r_reset_blend_shapes.GetBool() )
-					renderable->aBlendShapeWeights[ blendI ] = 0.f;
-
-				// renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
-				ImGui::PushID( imguiIndex++ );
-				ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ blendI ], -1.f, 4.f, "%.4f", 1.f );
-				ImGui::PopID();
-				//renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
-			}
-		}
-#endif
-
 		Model* model = Graphics_GetModelData( renderable->aModel );
 		if ( !model )
 		{
@@ -732,6 +712,7 @@ void Graphics_PrepareDrawData()
 		}
 
 		// check if we need this in any views
+		bool isVisible = false;
 		for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
 		{
 			PROF_SCOPE_NAMED( "Viewport Testing" );
@@ -745,6 +726,7 @@ void Graphics_PrepareDrawData()
 			if ( !Graphics_ViewFrustumTest( renderable, viewIndex ) )
 				continue;
 
+			isVisible                  = true;
 			ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewIndex ];
 
 			// Add each surface to the shader draw list
@@ -788,6 +770,24 @@ void Graphics_PrepareDrawData()
 					continue;
 
 				// shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
+			}
+		}
+
+		if ( isVisible && r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
+		{
+			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
+
+			// Graphics_RenderableBlendShapesDirty;
+			for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
+			{
+				if ( r_reset_blend_shapes.GetBool() )
+					renderable->aBlendShapeWeights[ blendI ] = 0.f;
+
+				// renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+				ImGui::PushID( imguiIndex++ );
+				ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ blendI ], -1.f, 4.f, "%.4f", 1.f );
+				ImGui::PopID();
+				//renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
 			}
 		}
 

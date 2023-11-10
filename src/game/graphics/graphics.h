@@ -212,6 +212,18 @@ struct Shader_VertexData_t
 };
 
 
+// Each Bone Transform is local to the parent bone
+// We don't store this as a calculated matrix
+// as we just calculate it on the gpu once per skeleton update
+struct BoneTransform_t
+{
+	u32       aParent;
+	glm::vec3 aPos;
+	glm::vec3 aAng;
+	glm::vec3 aScale;
+};
+
+
 struct VertAttribData_t
 {
 	VertexAttribute aAttrib = VertexAttribute_Position;
@@ -341,36 +353,47 @@ struct ModelBBox_t
 struct Renderable_t
 {
 	// used in actual drawing
-	ChHandle_t        aModel;
-	glm::mat4         aModelMatrix;
+	ChHandle_t                  aModel;
+	glm::mat4                   aModelMatrix;
 
 	// TODO: store the materials for each mesh here so you can override them for this renderable
-	// ChVector< ChHandle_t > aMaterialOverrides;
+	// all material handles are 0 by default, which means no custom materials are being used
+	// also will start with 1 material by default for async loading, and then will expand upon model loading finish
 	// or
 	// u32         aMeshCount;
 	// ChHandle_t* apMaterials;
 
-	// used for calculating render lists
-	ModelBBox_t       aAABB;
+	// used for blend shapes and skeleton data, i don't like this here because very few models will have blend shapes/skeletons
+	ChVector< float >           aBlendShapeWeights;
+	ChVector< BoneTransform_t > aBoneTransforms;
 
-	// used for blend shapes, i don't like this here because very few models will have blend shapes
-	ChVector< float > aBlendShapeWeights;
+	// -------------------------------------------------
+	// Internal Rendering Parts
+
+	// used for calculating render lists
+	ModelBBox_t                 aAABB;
 
 	// technically we could have this here for skinning results if needed
 	// I don't like this here as only very few models will use skinning
-	ChHandle_t        aVertexBuffer;
-	ChHandle_t        aBlendShapeWeightsBuffer;
+	ChHandle_t                  aVertexBuffer;
+	ChHandle_t                  aBlendShapeWeightsBuffer;
+	ChHandle_t                  aBoneTransformBuffer;
 
-	u32               aVertexIndex            = UINT32_MAX;
-	u32               aIndexHandle            = UINT32_MAX;
+	u32                         aVertexIndex            = UINT32_MAX;
+	u32                         aIndexHandle            = UINT32_MAX;
 	// u32               aBlendShapeWeightsMagic = UINT32_MAX;
-	u32               aBlendShapeWeightsIndex = UINT32_MAX;
+	u32                         aBlendShapeWeightsIndex = UINT32_MAX;
+	u32                         aBoneTransformHandle    = UINT32_MAX;
+
+	// -------------------------------------------------
+	// User Defined Bools
 
 	// I don't like these bools that have to be checked every frame
-	bool              aTestVis;
-	bool              aCastShadow;
-	bool              aVisible;
-	bool              aBlendShapesDirty;  // AAAAAAA
+	bool                        aTestVis;
+	bool                        aCastShadow;
+	bool                        aVisible;
+	bool                        aBlendShapesDirty;  // AAAAAAA
+	bool                        aBonesDirty;        // AAAAAAA
 };
 
 

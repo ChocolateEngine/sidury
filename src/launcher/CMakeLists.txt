@@ -11,7 +11,7 @@ set( SIDURY_LAUNCHER_NAME sidurylauncher )
 
 set_target_properties(
 	SiduryLauncher PROPERTIES
-	OUTPUT_NAME ${SIDURY_LAUNCHER_NAME}
+	OUTPUT_NAME ${SIDURY_LAUNCHER_NAME}_${PLAT_FOLDER}
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}
 	
 	VS_DEBUGGER_WORKING_DIRECTORY ${CH_BUILD}
@@ -33,7 +33,7 @@ if (MSVC)
 	# Copy a pre-built manifest file to the output directory for DPI Scaling
 	add_custom_command(
 		TARGET SiduryLauncher POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/${SIDURY_LAUNCHER_NAME}.exe.manifest" "${CH_BUILD}/${SIDURY_LAUNCHER_NAME}.exe.manifest"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/${SIDURY_LAUNCHER_NAME}.exe.manifest" "${CH_BUILD}/${SIDURY_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying ${SIDURY_LAUNCHER_NAME}.exe.manifest to launcher directory"
     )

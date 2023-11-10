@@ -62,9 +62,9 @@ int main( int argc, char *argv[] )
 	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
 	void ( *core_exit )() = 0;
 
-	if ( load_object( &core, "bin/ch_core" EXT_DLL ) == -1 )
+	if ( load_object( &core, "bin/" CH_PLAT_FOLDER "/ch_core" EXT_DLL ) == -1 )
 		return -1;
-	if ( load_object( &imgui, "bin/imgui" EXT_DLL ) == -1 )
+	if ( load_object( &imgui, "bin/" CH_PLAT_FOLDER "/imgui" EXT_DLL ) == -1 )
 		return -1;
 
 	*( void** )( &core_init ) = SDL_LoadFunction( core, "core_init" );
@@ -85,7 +85,7 @@ int main( int argc, char *argv[] )
 
 	core_init( argc, argv, GAME_PATH );
 
-	if ( load_object( &client, "bin/client" EXT_DLL ) == -1 )
+	if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
 		return -1;
 
 	*( void** )( &game_init ) = SDL_LoadFunction( client, "game_init" );

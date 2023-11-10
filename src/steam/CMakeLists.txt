@@ -3,7 +3,11 @@ message( "Current Project: Steam Abstraction" )
 set( STEAM_API_DIR "${CMAKE_CURRENT_LIST_DIR}/steamworks_sdk_157/sdk" )
 
 if( WIN32 )
-	set( STEAM_API_BIN_DIR "${STEAM_API_DIR}/redistributable_bin/win64" )
+	if( ${64_BIT} )
+		set( STEAM_API_BIN_DIR "${STEAM_API_DIR}/redistributable_bin/win64" )
+	else()
+		set( STEAM_API_BIN_DIR "${STEAM_API_DIR}/redistributable_bin/win32" )
+	endif()
 else()
 	set( STEAM_API_BIN_DIR "${STEAM_API_DIR}/redistributable_bin/linux64" )
 endif()
@@ -21,7 +25,7 @@ set(
 include_directories( "${STEAM_API_DIR}/public/steam" )
 link_directories( "${STEAM_API_BIN_DIR}" )
 
-if( WIN32 )
+if( WIN32 AND ${64_BIT} )
 	link_libraries(
 		steam_api64
 	)
@@ -46,8 +50,8 @@ set_target_properties(
 	RUNTIME_OUTPUT_NAME ch_steam
 	LIBRARY_OUTPUT_NAME ch_steam
 
-	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
-	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
+	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
+	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
 )
 
 # set output directories for all builds (Debug, Release, etc.)
@@ -55,8 +59,8 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
     set_target_properties(
     	Steam PROPERTIES
-    	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin
-    	LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin
+    	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
+    	LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
     )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
@@ -74,12 +78,21 @@ source_group(
 	FILES ${PUBLIC_FILES}
 )
 
-if( WIN32 )
+if( WIN32 AND ${64_BIT} )
 	add_custom_command(
 		TARGET Steam POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api64.dll" "${CH_BUILD}/steam_api64.dll"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying Steam API DLL to launcher directory"
     )
-endif( WIN32 )
+endif()
+
+if( WIN32 AND ${32_BIT} )
+	add_custom_command(
+		TARGET Steam POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api.dll" "${CH_BUILD}/steam_api.dll"
+		COMMAND_EXPAND_LISTS
+        COMMENT "Copying Steam API 32-bit DLL to launcher directory"
+    )
+endif()
 
