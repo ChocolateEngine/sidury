@@ -33,7 +33,7 @@ CONVAR( r_debug_normals_len_face, 8 );
 
 bool Graphics_DebugDrawInit()
 {
-	gDebugLineMaterial = Graphics_CreateMaterial( "__debug_line_mat", Graphics_GetShader( "debug_line" ) );
+	gDebugLineMaterial = gGraphics.CreateMaterial( "__debug_line_mat", gGraphics.GetShader( "debug_line" ) );
 	return gDebugLineMaterial;
 }
 
@@ -48,19 +48,19 @@ void Graphics_DebugDrawNewFrame()
 	{
 		if ( gDebugLineModel )
 		{
-			Graphics_FreeModel( gDebugLineModel );
+			gGraphics.FreeModel( gDebugLineModel );
 			gDebugLineModel = InvalidHandle;
 		}
 
 		if ( gDebugLineDraw )
 		{
-			Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+			Renderable_t* renderable = gGraphics.GetRenderableData( gDebugLineDraw );
 
 			if ( !renderable )
 				return;
 
-			// Graphics_FreeModel( renderable->aModel );
-			Graphics_FreeRenderable( gDebugLineDraw );
+			// gGraphics.FreeModel( renderable->aModel );
+			gGraphics.FreeRenderable( gDebugLineDraw );
 			gDebugLineDraw = InvalidHandle;
 		}
 
@@ -70,7 +70,7 @@ void Graphics_DebugDrawNewFrame()
 	if ( !gDebugLineModel )
 	{
 		Model* model    = nullptr;
-		gDebugLineModel = Graphics_CreateModel( &model );
+		gDebugLineModel = gGraphics.CreateModel( &model );
 
 		if ( !gDebugLineModel )
 		{
@@ -88,11 +88,11 @@ void Graphics_DebugDrawNewFrame()
 		model->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
 		model->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
 
-		Model_SetMaterial( gDebugLineModel, 0, gDebugLineMaterial );
+		gGraphics.Model_SetMaterial( gDebugLineModel, 0, gDebugLineMaterial );
 
 		if ( gDebugLineDraw )
 		{
-			if ( Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw ) )
+			if ( Renderable_t* renderable = gGraphics.GetRenderableData( gDebugLineDraw ) )
 			{
 				renderable->aModel = gDebugLineDraw;
 			}
@@ -101,12 +101,12 @@ void Graphics_DebugDrawNewFrame()
 
 	if ( !gDebugLineDraw )
 	{
-		gDebugLineDraw = Graphics_CreateRenderable( gDebugLineModel );
+		gDebugLineDraw = gGraphics.CreateRenderable( gDebugLineModel );
 
 		if ( !gDebugLineDraw )
 			return;
 
-		Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+		Renderable_t* renderable = gGraphics.GetRenderableData( gDebugLineDraw );
 
 		if ( !renderable )
 			return;
@@ -143,7 +143,7 @@ void Graphics_UpdateDebugDraw()
 				{
 					// Graphics_DrawModelAABB( renderable->apDraw );
 
-					Renderable_t* renderable = Graphics_GetRenderableData( surfaceDraw.aRenderable );
+					Renderable_t* renderable = gGraphics.GetRenderableData( surfaceDraw.aRenderable );
 
 					if ( !renderable )
 					{
@@ -152,7 +152,7 @@ void Graphics_UpdateDebugDraw()
 					}
 
 					if ( r_debug_aabb )
-						Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+						gGraphics.DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
 
 					if ( r_debug_normals )
 					{
@@ -163,17 +163,17 @@ void Graphics_UpdateDebugDraw()
 							invMatrix  = glm::inverse( renderable->aModelMatrix );
 						}
 
-						Graphics_DrawNormals( renderable->aModel, invMatrix );
+						gGraphics.DrawNormals( renderable->aModel, invMatrix );
 					}
 
 					// ModelBBox_t& bbox = gModelBBox[ renderable->apDraw->aModel ];
-					// Graphics_DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
+					// gGraphics.DrawBBox( bbox.aMin, bbox.aMax, { 1.0, 0.5, 1.0 } );
 				}
 			}
 		}
 	}
 
-	Renderable_t* renderable = Graphics_GetRenderableData( gDebugLineDraw );
+	Renderable_t* renderable = gGraphics.GetRenderableData( gDebugLineDraw );
 
 	if ( !renderable )
 		return;
@@ -238,7 +238,7 @@ void Graphics_UpdateDebugDraw()
 // Debug Rendering Functions
 
 
-void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
+void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )
 {
 	PROF_SCOPE();
 
@@ -282,7 +282,7 @@ void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec
 }
 
 
-void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )
+void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )
 {
 	PROF_SCOPE();
 
@@ -308,7 +308,7 @@ void Graphics_DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec
 CONVAR( r_debug_axis_scale, 1 );
 
 
-void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )
+void Graphics::DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )
 {
 	if ( !r_debug_draw || !gDebugLineModel )
 		return;
@@ -316,13 +316,13 @@ void Graphics_DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm:
 	glm::vec3 forward, right, up;
 	Util_GetDirectionVectors( sAng, &forward, &right, &up );
 
-	Graphics_DrawLine( sPos, sPos + ( forward * sScale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
-	Graphics_DrawLine( sPos, sPos + ( right * sScale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
-	Graphics_DrawLine( sPos, sPos + ( up * sScale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
+	gGraphics.DrawLine( sPos, sPos + ( forward * sScale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
+	gGraphics.DrawLine( sPos, sPos + ( right * sScale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
+	gGraphics.DrawLine( sPos, sPos + ( up * sScale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
 }
 
 
-void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )
+void Graphics::DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm::vec3& sColor )
 {
 	PROF_SCOPE();
 
@@ -332,26 +332,26 @@ void Graphics_DrawBBox( const glm::vec3& sMin, const glm::vec3& sMax, const glm:
 	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
 	// bottom
-	Graphics_DrawLine( sMin, glm::vec3( sMax.x, sMin.y, sMin.z ), sColor );
-	Graphics_DrawLine( sMin, glm::vec3( sMin.x, sMax.y, sMin.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMin.x, sMax.y, sMin.z ), glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMax.x, sMin.y, sMin.z ), glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
+	gGraphics.DrawLine( sMin, glm::vec3( sMax.x, sMin.y, sMin.z ), sColor );
+	gGraphics.DrawLine( sMin, glm::vec3( sMin.x, sMax.y, sMin.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMin.x, sMax.y, sMin.z ), glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMax.x, sMin.y, sMin.z ), glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
 
 	// top
-	Graphics_DrawLine( sMax, glm::vec3( sMin.x, sMax.y, sMax.z ), sColor );
-	Graphics_DrawLine( sMax, glm::vec3( sMax.x, sMin.y, sMax.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMax.x, sMin.y, sMax.z ), glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMin.x, sMax.y, sMax.z ), glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
+	gGraphics.DrawLine( sMax, glm::vec3( sMin.x, sMax.y, sMax.z ), sColor );
+	gGraphics.DrawLine( sMax, glm::vec3( sMax.x, sMin.y, sMax.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMax.x, sMin.y, sMax.z ), glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMin.x, sMax.y, sMax.z ), glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
 
 	// sides
-	Graphics_DrawLine( sMin, glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
-	Graphics_DrawLine( sMax, glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMax.x, sMin.y, sMin.z ), glm::vec3( sMax.x, sMin.y, sMax.z ), sColor );
-	Graphics_DrawLine( glm::vec3( sMin.x, sMax.y, sMin.z ), glm::vec3( sMin.x, sMax.y, sMax.z ), sColor );
+	gGraphics.DrawLine( sMin, glm::vec3( sMin.x, sMin.y, sMax.z ), sColor );
+	gGraphics.DrawLine( sMax, glm::vec3( sMax.x, sMax.y, sMin.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMax.x, sMin.y, sMin.z ), glm::vec3( sMax.x, sMin.y, sMax.z ), sColor );
+	gGraphics.DrawLine( glm::vec3( sMin.x, sMax.y, sMin.z ), glm::vec3( sMin.x, sMax.y, sMax.z ), sColor );
 }
 
 
-void Graphics_DrawProjView( const glm::mat4& srProjView )
+void Graphics::DrawProjView( const glm::mat4& srProjView )
 {
 	PROF_SCOPE();
 
@@ -372,24 +372,24 @@ void Graphics_DrawProjView( const glm::mat4& srProjView )
 
 	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
-	Graphics_DrawLine( v[ 0 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 0 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 3 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 3 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 0 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 0 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 3 ], v[ 1 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 3 ], v[ 2 ], glm::vec3( 1, 1, 1 ) );
 
-	Graphics_DrawLine( v[ 4 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 4 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 7 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 7 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 4 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 4 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 7 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 7 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
 
-	Graphics_DrawLine( v[ 0 ], v[ 4 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 1 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 3 ], v[ 7 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( v[ 2 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 0 ], v[ 4 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 1 ], v[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 3 ], v[ 7 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( v[ 2 ], v[ 6 ], glm::vec3( 1, 1, 1 ) );
 }
 
 
-void Graphics_DrawFrustum( const Frustum_t& srFrustum )
+void Graphics::DrawFrustum( const Frustum_t& srFrustum )
 {
 	PROF_SCOPE();
 
@@ -398,31 +398,31 @@ void Graphics_DrawFrustum( const Frustum_t& srFrustum )
 
 	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
-	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
 
-	Graphics_DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
 
-	Graphics_DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 4 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 1 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 7 ], glm::vec3( 1, 1, 1 ) );
-	Graphics_DrawLine( srFrustum.aPoints[ 2 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 4 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 1 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 7 ], glm::vec3( 1, 1, 1 ) );
+	gGraphics.DrawLine( srFrustum.aPoints[ 2 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
 }
 
 
-void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
+void Graphics::DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 {
 	PROF_SCOPE();
 
 	if ( !r_debug_draw || !gDebugLineModel || !r_debug_normals )
 		return;
 
-	Model*    model = Graphics_GetModelData( sModel );
+	Model*    model = gGraphics.GetModelData( sModel );
 
 	// TODO: use this for physics materials later on
 	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
@@ -451,7 +451,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 
 		if ( pos == nullptr || normals == nullptr )
 		{
-			// Log_Error( "Graphics_DrawNormals(): Position Vertex Data not found?\n" );
+			// Log_Error( "gGraphics.DrawNormals(): Position Vertex Data not found?\n" );
 			return;
 		}
 
@@ -483,7 +483,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 			// Make sure we don't have any 0 lengths
 			if ( len == 0.f )
 			{
-				// Log_Warn( "Graphics_DrawNormals(): Face Normal of 0?\n" );
+				// Log_Warn( "gGraphics.DrawNormals(): Face Normal of 0?\n" );
 				continue;
 			}
 
@@ -503,7 +503,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 
 				// protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() )
 
-				Graphics_DrawLine( posX, posY, {0.9, 0.1, 0.1, 1.f} );
+				gGraphics.DrawLine( posX, posY, {0.9, 0.1, 0.1, 1.f} );
 			}
 
 			// Draw Face Normal
@@ -511,7 +511,7 @@ void Graphics_DrawNormals( Handle sModel, const glm::mat4& srMatrix )
 			// glm::vec3 posX = normal4 * srMatrix;
 			// glm::vec3 posY = posX * r_debug_normals_len_face.GetFloat();
 			// 
-			// Graphics_DrawLine( posX, posY, normal );
+			// gGraphics.DrawLine( posX, posY, normal );
 			j++;
 		}
 	}

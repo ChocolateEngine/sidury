@@ -1,6 +1,5 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
 #include "graphics_int.h"
 
 
@@ -75,7 +74,7 @@ bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 	// IDEA: since materials shouldn't be updated very often,
 	// maybe have the buffer be on the gpu (EBufferMemory_Device)?
 
-	Handle newBuffer = render->CreateBuffer( Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
+	Handle newBuffer = render->CreateBuffer( gGraphics.Mat_GetName( sMat ), sizeof( Basic3D_Material ), EBufferFlags_Storage | EBufferFlags_TransferDst, EBufferMemory_Device );
 
 	if ( newBuffer == InvalidHandle )
 	{
@@ -151,14 +150,14 @@ u32 Shader_Basic3D_UpdateMaterialData( ChHandle_t sMat )
 		mat = &gMaterialData[ sMat ];
 	}
 
-	mat->albedo        = Mat_GetTextureIndex( sMat, "diffuse" );
-	mat->ao            = Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
-	mat->emissive      = Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
+	mat->albedo        = gGraphics.Mat_GetTextureIndex( sMat, "diffuse" );
+	mat->ao            = gGraphics.Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
+	mat->emissive      = gGraphics.Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
 
-	mat->aoPower       = Mat_GetFloat( sMat, "aoPower", 0.f );
-	mat->emissivePower = Mat_GetFloat( sMat, "emissivePower", 0.f );
+	mat->aoPower       = gGraphics.Mat_GetFloat( sMat, "aoPower", 0.f );
+	mat->emissivePower = gGraphics.Mat_GetFloat( sMat, "emissivePower", 0.f );
 
-	mat->aAlphaTest    = Mat_GetBool( sMat, "alphaTest" );
+	mat->aAlphaTest    = gGraphics.Mat_GetBool( sMat, "alphaTest" );
 
 	if ( !gStagingBuffer )
 		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
@@ -193,8 +192,8 @@ static bool Shader_Basic3D_Init()
 	createData.aUsage  = EImageUsage_Sampled;
 
 	// create fallback textures
-	Graphics_LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
-	Graphics_LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
+	gGraphics.LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
+	gGraphics.LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
 
 	return true;
 }
@@ -202,8 +201,8 @@ static bool Shader_Basic3D_Init()
 
 static void Shader_Basic3D_Destroy()
 {
-	Graphics_FreeTexture( gFallbackAO );
-	Graphics_FreeTexture( gFallbackEmissive );
+	gGraphics.FreeTexture( gFallbackAO );
+	gGraphics.FreeTexture( gFallbackEmissive );
 	
 	if ( gStagingBuffer )
 		render->DestroyBuffer( gStagingBuffer );
@@ -214,7 +213,7 @@ static void Shader_Basic3D_Destroy()
 	gStagingBuffer = InvalidHandle;
 	gMaterialData.clear();
 
-	Graphics_SetAllMaterialsDirty();
+	gGraphics.SetAllMaterialsDirty();
 }
 
 
@@ -241,7 +240,7 @@ static void Shader_Basic3D_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& 
 
 static u32 Shader_Basic3D_GetMaterialIndex( u32 sRenderableIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
-	Handle mat = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+	Handle mat = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 
 	if ( !mat )
 		return 0;

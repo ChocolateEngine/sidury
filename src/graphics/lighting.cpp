@@ -1,4 +1,3 @@
-#include "graphics.h"
 #include "graphics_int.h"
 #include "lighting.h"
 #include "types/transform.h"
@@ -84,7 +83,7 @@ bool Graphics_CreateShadowRenderPass()
 void Graphics_AddShadowMap( Light_t* spLight )
 {
 	ViewportShader_t* viewport      = nullptr;
-	u32               viewportIndex = Graphics_CreateViewport( &viewport );
+	u32               viewportIndex = gGraphics.CreateViewport( &viewport );
 
 	if ( viewport == nullptr )
 	{
@@ -96,7 +95,7 @@ void Graphics_AddShadowMap( Light_t* spLight )
 	shadowMap.aSize            = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
 	shadowMap.aViewInfoIndex   = viewportIndex;
 
-	viewport->aShaderOverride  = Graphics_GetShader( "__shadow_map" );
+	viewport->aShaderOverride  = gGraphics.GetShader( "__shadow_map" );
 	viewport->aSize            = shadowMap.aSize;
 	viewport->aActive          = false;
 
@@ -115,7 +114,7 @@ void Graphics_AddShadowMap( Light_t* spLight )
 
 	createData.aDepthCompare   = true;
 
-	shadowMap.aTexture         = Graphics_CreateTexture( texCreate, createData );
+	shadowMap.aTexture         = gGraphics.CreateTexture( texCreate, createData );
 
 	// Create Framebuffer
 	CreateFramebuffer_t frameBufCreate{};
@@ -146,11 +145,11 @@ void Graphics_DestroyShadowMap( Light_t* spLight )
 		render->DestroyFramebuffer( it->second.aFramebuffer );
 
 	if ( it->second.aTexture )
-		Graphics_FreeTexture( it->second.aTexture );
+		gGraphics.FreeTexture( it->second.aTexture );
 
 	if ( it->second.aViewInfoIndex != UINT32_MAX )
 	{
-		Graphics_FreeViewport( it->second.aViewInfoIndex );
+		gGraphics.FreeViewport( it->second.aViewInfoIndex );
 	}
 
 	gLightShadows.erase( spLight );
@@ -578,7 +577,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 
 // TODO: this should be returning Handle's
-Light_t* Graphics_CreateLight( ELightType sType )
+Light_t* Graphics::CreateLight( ELightType sType )
 {
 	Light_t* light = new Light_t;
 
@@ -600,13 +599,13 @@ Light_t* Graphics_CreateLight( ELightType sType )
 }
 
 
-void Graphics_UpdateLight( Light_t* spLight )
+void Graphics::UpdateLight( Light_t* spLight )
 {
 	gDirtyLights.push_back( spLight );
 }
 
 
-void Graphics_DestroyLight( Light_t* spLight )
+void Graphics::DestroyLight( Light_t* spLight )
 {
 	if ( !spLight )
 		return;

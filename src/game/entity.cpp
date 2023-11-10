@@ -9,8 +9,6 @@
 #include "mapmanager.h"
 #include "igui.h"
 
-#include "graphics/graphics.h"
-
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 

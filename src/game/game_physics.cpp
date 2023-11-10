@@ -1,10 +1,11 @@
+#include "main.h"
 #include "game_physics.h"
 #include "game_shared.h"
 #include "cl_main.h"
 #include "entity.h"
 #include "render/irender.h"
-#include "graphics/graphics.h"
-#include "graphics/mesh_builder.h"
+#include "igraphics.h"
+#include "mesh_builder.h"
 
 
 extern IRender*          render;
@@ -39,7 +40,7 @@ CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ) | CVARF
 	GetPhysEnv()->SetGravityZ( phys_gravity );
 }
 
-extern ConVar r_debug_draw;
+ConVarRef r_debug_draw( "r_debug_draw" );
 
 
 // constexpr glm::vec3 vec3_default( 255, 255, 255 );
@@ -162,7 +163,7 @@ bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
 		{
 			// Free a model if we have one
 			if ( compPhysShape->aModel != InvalidHandle )
-				Graphics_FreeModel( compPhysShape->aModel );
+				graphics->FreeModel( compPhysShape->aModel );
 
 			compPhysShape->aModel = InvalidHandle;
 
@@ -174,7 +175,7 @@ bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
 		{
 			if ( compPhysShape->aModel == InvalidHandle )
 			{
-				compPhysShape->aModel = Graphics_LoadModel( compPhysShape->aPath.Get() );
+				compPhysShape->aModel = graphics->LoadModel( compPhysShape->aPath.Get() );
 			}
 
 			if ( compPhysShape->aModel == InvalidHandle )
@@ -445,17 +446,17 @@ EntSys_PhysObject* GetPhysObjectEntSys()
 
 void Phys_DebugInit()
 {
-	gShader_Debug     = Graphics_GetShader( "debug" );
-	gShader_DebugLine = Graphics_GetShader( "debug_line" );
+	gShader_Debug     = graphics->GetShader( "debug" );
+	gShader_DebugLine = graphics->GetShader( "debug_line" );
 
-	gMatSolid         = Graphics_CreateMaterial( "__phys_debug_solid", gShader_Debug );
-	gMatWire          = Graphics_CreateMaterial( "__phys_debug_wire", gShader_DebugLine );
+	gMatSolid         = graphics->CreateMaterial( "__phys_debug_solid", gShader_Debug );
+	gMatWire          = graphics->CreateMaterial( "__phys_debug_wire", gShader_DebugLine );
 }
 
 
 void Phys_DrawLine( const glm::vec3& from, const glm::vec3& to, const glm::vec3& color )
 {
-	Graphics_DrawLine( from, to, color );
+	graphics->DrawLine( from, to, color );
 }
 
 
@@ -465,9 +466,9 @@ void Phys_DrawTriangle(
   const glm::vec3& inV3,
   const glm::vec4& srColor )
 {
-	Graphics_DrawLine( inV1, inV2, srColor );
-	Graphics_DrawLine( inV1, inV3, srColor );
-	Graphics_DrawLine( inV2, inV3, srColor );
+	graphics->DrawLine( inV1, inV2, srColor );
+	graphics->DrawLine( inV1, inV3, srColor );
+	graphics->DrawLine( inV2, inV3, srColor );
 }
 
 // vertex_debug_t ToVertDBG( const JPH::DebugRenderer::Vertex& inVert )
@@ -486,9 +487,9 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 		return InvalidHandle;  // mEmptyBatch;
 
 	Model*      model  = nullptr;
-	Handle      handle = Graphics_CreateModel( &model );
+	Handle      handle = graphics->CreateModel( &model );
 
-	MeshBuilder meshBuilder;
+	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "_phys_triangle_batch" );
 	meshBuilder.SetMaterial( gMatSolid );
 
@@ -523,7 +524,7 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 
 	meshBuilder.End();
 
-	Graphics_CalcModelBBox( handle );
+	graphics->CalcModelBBox( handle );
 
 	gPhysRenderables[ handle ];
 	return handle;
@@ -538,9 +539,9 @@ Handle Phys_CreateTriangleBatchInd(
 		return InvalidHandle;
 
 	Model*      model  = nullptr;
-	Handle      handle = Graphics_CreateModel( &model );
+	Handle      handle = graphics->CreateModel( &model );
 
-	MeshBuilder meshBuilder;
+	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "__phys_model" );
 	meshBuilder.SetMaterial( gMatSolid );
 
@@ -559,7 +560,7 @@ Handle Phys_CreateTriangleBatchInd(
 
 	meshBuilder.End();
 
-	Graphics_CalcModelBBox( handle );
+	graphics->CalcModelBBox( handle );
 
 	gPhysRenderables[ handle ];
 	return handle;
@@ -579,20 +580,20 @@ void Phys_DrawGeometry(
 	if ( !r_debug_draw )
 		return;
 
-	Handle mat = Model_GetMaterial( sGeometry, 0 );
+	Handle mat = graphics->Model_GetMaterial( sGeometry, 0 );
 
-	// Mat_SetVar( mat, "color", srColor );
-	Mat_SetVar( mat, "color", {1, 0.25, 0, 1} );
+	// graphics->Mat_SetVar( mat, "color", srColor );
+	graphics->Mat_SetVar( mat, "color", {1, 0.25, 0, 1} );
 
 	Handle renderHandle = gPhysRenderables[ sGeometry ];
 
 	if ( renderHandle == InvalidHandle )
 	{
-		renderHandle                  = Graphics_CreateRenderable( sGeometry );
+		renderHandle                  = graphics->CreateRenderable( sGeometry );
 		gPhysRenderables[ sGeometry ] = renderHandle;
 	}
 
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+	if ( Renderable_t* renderable = graphics->GetRenderableData( renderHandle ) )
 	{
 		renderable->aTestVis     = false;
 		renderable->aCastShadow  = false;
@@ -600,7 +601,7 @@ void Phys_DrawGeometry(
 		renderable->aModel       = sGeometry;
 		renderable->aModelMatrix = srModelMatrix;
 
-		Graphics_UpdateRenderableAABB( renderHandle );
+		graphics->UpdateRenderableAABB( renderHandle );
 	}
 }
 
@@ -618,7 +619,7 @@ void Phys_DrawText(
 
 void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 {
-	Model* model = Graphics_GetModelData( sModel );
+	Model* model = graphics->GetModelData( sModel );
 
 	// TODO: use this for physics materials later on
 	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
@@ -684,7 +685,7 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 
 void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 {
-	Model* model = Graphics_GetModelData( sModel );
+	Model* model = graphics->GetModelData( sModel );
 
 	// TODO: use this for physics materials later on
 	// for ( size_t s = 0; s < model->aMeshes.size(); s++ )
@@ -742,7 +743,7 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 {
 	u32    origSize = srData.aVertCount;
-	Model* model    = Graphics_GetModelData( sModel );
+	Model* model    = graphics->GetModelData( sModel );
 
 	// TODO: use this for physics materials later on
 	for ( size_t s = 0; s < model->aMeshes.size(); s++ )
@@ -879,7 +880,7 @@ void Phys_Shutdown()
 		if ( !renderable )
 			continue;
 
-		Graphics_FreeRenderable( renderable );
+		graphics->FreeRenderable( renderable );
 	}
 
 	gPhysRenderables.clear();
@@ -941,7 +942,7 @@ void Phys_Simulate( IPhysicsEnvironment* spPhysEnv, float sFrameTime )
 		if ( !renderHandle )
 			continue;
 
-		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+		if ( Renderable_t* renderable = graphics->GetRenderableData( renderHandle ) )
 		{
 			renderable->aVisible = false;
 		}

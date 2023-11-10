@@ -1,6 +1,6 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
+#include "graphics_int.h"
 
 
 constexpr const char*       gpVertColShader = "shaders/debug_col.vert.spv";
@@ -49,8 +49,8 @@ static void Shader_Debug_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
 	push.aModelMatrix = spDrawData->aModelMatrix;
-	Handle mat        = Model_GetMaterial( spDrawData->aModel, srDrawInfo.aSurface );
-	push.aColor       = Mat_GetVec4( mat, "color" );
+	Handle mat        = gGraphics.Model_GetMaterial( spDrawData->aModel, srDrawInfo.aSurface );
+	push.aColor       = gGraphics.Mat_GetVec4( mat, "color" );
 }
 
 

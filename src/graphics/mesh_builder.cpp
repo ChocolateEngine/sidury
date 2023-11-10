@@ -1,7 +1,6 @@
 #include "core/core.h"
 #include "types/transform.h"
 #include "render/irender.h"
-#include "graphics.h"
 #include "graphics_int.h"
 #include "mesh_builder.h"
 
@@ -29,6 +28,9 @@
 // ------------------------------------------------------------------------
 
 
+LOG_REGISTER_CHANNEL_EX( gLC_MeshBuilder, "MeshBuilder", LogColor::Green );
+
+
 // source uses some IVertexBuffer and IIndexBuffer class here? hmm
 void MeshBuilder::Start( Model* spMesh, const char* spDebugName )
 {
@@ -49,7 +51,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 	if ( apMesh->aMeshes.size() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Meshes already created for Model: \"%s\"\n", apDebugName ? apDebugName : "internal" );
+		Log_WarnF( gLC_MeshBuilder, "Meshes already created for Model: \"%s\"\n", apDebugName ? apDebugName : "internal" );
 	}
 
 	// apMesh->SetSurfaceCount( aSurfaces.size() );
@@ -72,7 +74,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 		if ( surf.aVertices.empty() )
 		{
-			Log_DevF( gLC_ClientGraphics, 1, "Model Surface %zd has no vertices, skipping: \"%s\"\n", i, apDebugName ? apDebugName : "internal" );
+			Log_DevF( gLC_MeshBuilder, 1, "Model Surface %zd has no vertices, skipping: \"%s\"\n", i, apDebugName ? apDebugName : "internal" );
 			continue;
 		}
 
@@ -103,7 +105,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 
 		for ( VertexAttribute attrib : attribs )
 		{
-			size_t size = Graphics_GetVertexAttributeSize( attrib );
+			size_t size = apGraphics->GetVertexAttributeSize( attrib );
 
 			for ( ; attribIndex < vertData->aData.size(); attribIndex++ )
 			{
@@ -134,7 +136,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 				void* newBuffer = realloc( attribData.apData, size * vertData->aCount );
 				if ( newBuffer == nullptr )
 				{
-					Log_ErrorF( gLC_ClientGraphics, "Failed to allocate memory for vertex attribute buffer (%zd bytes)\n", size * vertData->aCount );
+					Log_ErrorF( gLC_MeshBuilder, "Failed to allocate memory for vertex attribute buffer (%zd bytes)\n", size * vertData->aCount );
 					return;
 				}
 
@@ -206,10 +208,10 @@ void MeshBuilder::End( bool sCreateBuffers )
 	if ( apMesh->apBuffers == nullptr )
 		apMesh->apBuffers = new ModelBuffers_t;
 
-	Graphics_CreateVertexBuffers( apMesh->apBuffers, vertData, apDebugName );
+	apGraphics->CreateVertexBuffers( apMesh->apBuffers, vertData, apDebugName );
 
 #if MESH_BUILDER_USE_IND
-	Graphics_CreateIndexBuffer( apMesh->apBuffers, vertData, apDebugName );
+	apGraphics->CreateIndexBuffer( apMesh->apBuffers, vertData, apDebugName );
 #endif
 }
 
@@ -574,11 +576,11 @@ static bool realloc_free_cast( T*& spData, size_t sCount )
 }
 
 
-void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName )
+void MeshBuild_FinishMesh( IGraphics* spGraphics, MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName )
 {
 	if ( spModel->aMeshes.size() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Meshes already created for Model: \"%s\"\n", spDebugName ? spDebugName : "internal" );
+		Log_WarnF( gLC_MeshBuilder, "Meshes already created for Model: \"%s\"\n", spDebugName ? spDebugName : "internal" );
 		return;
 	}
 
@@ -722,10 +724,10 @@ void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, boo
 	if ( spModel->apBuffers == nullptr )
 		spModel->apBuffers = new ModelBuffers_t;
 
-	Graphics_CreateVertexBuffers( spModel->apBuffers, vertData, spDebugName );
+	spGraphics->CreateVertexBuffers( spModel->apBuffers, vertData, spDebugName );
 
 	if ( sCalculateIndices )
-		Graphics_CreateIndexBuffer( spModel->apBuffers, vertData, spDebugName );
+		spGraphics->CreateIndexBuffer( spModel->apBuffers, vertData, spDebugName );
 }
 
 
@@ -733,7 +735,7 @@ void MeshBuild_AllocateVertices( MeshBuildData_t& srMeshBuildData, u32 sMaterial
 {
 	if ( sMaterial >= srMeshBuildData.aMaterials.size() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
+		Log_WarnF( gLC_MeshBuilder, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
 		return;
 	}
 
@@ -782,7 +784,7 @@ void MeshBuild_FillVertexPosData( MeshBuildData_t& srMeshBuildData, u32 sMateria
 {
 	if ( sMaterial <= srMeshBuildData.aMaterials.size() )
 	{
-		Log_WarnF( gLC_ClientGraphics, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
+		Log_WarnF( gLC_MeshBuilder, "Invalid Mesh Builder Material Index: %u - only %u allocated\n", sMaterial, srMeshBuildData.aMaterials.size() );
 		return;
 	}
 

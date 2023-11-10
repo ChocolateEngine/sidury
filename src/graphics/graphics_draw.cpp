@@ -1,13 +1,11 @@
 #include "core/core.h"
 #include "igui.h"
 #include "render/irender.h"
-#include "graphics.h"
 #include "graphics_int.h"
 #include "lighting.h"
 #include "debug_draw.h"
 #include "mesh_builder.h"
 #include "imgui/imgui.h"
-#include "../main.h"
 
 #include <forward_list>
 #include <stack>
@@ -63,7 +61,7 @@ bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
 }
 
 
-void Graphics_Reset()
+void Graphics::Reset()
 {
 	PROF_SCOPE();
 
@@ -71,7 +69,7 @@ void Graphics_Reset()
 }
 
 
-void Graphics_NewFrame()
+void Graphics::NewFrame()
 {
 	PROF_SCOPE();
 
@@ -174,7 +172,7 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 
 	if ( !Shader_Bind( cmd, sIndex, shader ) )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", Graphics_GetShaderName( shader ) );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", gGraphics.GetShaderName( shader ) );
 		return;
 	}
 
@@ -205,16 +203,16 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 		// get model and check if it's nullptr
 		if ( renderable->aModel == InvalidHandle )
 		{
-			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model handle is InvalidHandle\n" );
+			Log_Error( gLC_ClientGraphics, "Graphics::DrawShaderRenderables: model handle is InvalidHandle\n" );
 			srRenderList.remove( i );
 			continue;
 		}
 
 		// get model data
-		Model* model = Graphics_GetModelData( renderable->aModel );
+		Model* model = gGraphics.GetModelData( renderable->aModel );
 		if ( !model )
 		{
-			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
+			Log_Error( gLC_ClientGraphics, "Graphics::DrawShaderRenderables: model is nullptr\n" );
 			srRenderList.remove( i );
 			continue;
 		}
@@ -265,7 +263,7 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 	PROF_SCOPE();
 
 	// here we go again
-	static Handle skybox    = Graphics_GetShader( "skybox" );
+	static Handle skybox    = gGraphics.GetShader( "skybox" );
 
 	bool          hasSkybox = false;
 
@@ -348,7 +346,7 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 {
 #if 1
-	static ChHandle_t shaderSkinning = Graphics_GetShader( "__skinning" );
+	static ChHandle_t shaderSkinning = gGraphics.GetShader( "__skinning" );
 
 	if ( shaderSkinning == CH_INVALID_HANDLE )
 	{
@@ -378,10 +376,10 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		}
 
 		// get model data
-		Model* model = Graphics_GetModelData( renderable->aModel );
+		Model* model = gGraphics.GetModelData( renderable->aModel );
 		if ( !model )
 		{
-			Log_Error( gLC_ClientGraphics, "Graphics_DrawShaderRenderables: model is nullptr\n" );
+			Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": model is nullptr\n" );
 			continue;
 		}
 
@@ -540,18 +538,18 @@ void Graphics_PrepareDrawData()
 	PROF_SCOPE();
 
 	// fun
-	static Handle        shadow_map       = Graphics_GetShader( "__shadow_map" );
+	static Handle        shadow_map       = gGraphics.GetShader( "__shadow_map" );
 	static ShaderData_t* shadowShaderData = Shader_GetData( shadow_map );
 
 	render->PreRenderPass();
 	// Update Textures
 
-	if ( r_show_draw_calls )
-	{
-		gui->DebugMessage( "Model Draw Calls: %zd", gModelDrawCalls );
-		gui->DebugMessage( "Verts Drawn: %zd", gVertsDrawn );
-		gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVerts.size() );
-	}
+	// if ( r_show_draw_calls )
+	// {
+	// 	gui->DebugMessage( "Model Draw Calls: %zd", gModelDrawCalls );
+	// 	gui->DebugMessage( "Verts Drawn: %zd", gVertsDrawn );
+	// 	gui->DebugMessage( "Debug Line Verts: %zd", gDebugLineVerts.size() );
+	// }
 
 	// {
 	// 	PROF_SCOPE_NAMED( "Imgui Render" );
@@ -563,10 +561,10 @@ void Graphics_PrepareDrawData()
 
 	for ( const auto& mat : gGraphicsData.aDirtyMaterials )
 	{
-		Handle shader = Mat_GetShader( mat );
+		Handle shader = gGraphics.Mat_GetShader( mat );
 
 		// HACK HACK
-		if ( Graphics_GetShader( "basic_3d" ) == shader )
+		if ( gGraphics.GetShader( "basic_3d" ) == shader )
 			Shader_Basic3D_UpdateMaterialData( mat );
 	}
 
@@ -575,15 +573,15 @@ void Graphics_PrepareDrawData()
 	// update renderable AABB's
 	for ( auto& [ renderHandle, bbox ] : gGraphicsData.aRenderAABBUpdate )
 	{
-		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderHandle ) )
+		if ( Renderable_t* renderable = gGraphics.GetRenderableData( renderHandle ) )
 		{
 			if ( glm::length( bbox.aMin ) == 0 && glm::length( bbox.aMax ) == 0 )
 			{
 				Log_Warn( gLC_ClientGraphics, "Model Bounding Box not calculated, length of min and max is 0\n" );
-				bbox = Graphics_CalcModelBBox( renderable->aModel );
+				bbox = gGraphics.CalcModelBBox( renderable->aModel );
 			}
 
-			renderable->aAABB = Graphics_CreateWorldAABB( renderable->aModelMatrix, bbox );
+			renderable->aAABB = gGraphics.CreateWorldAABB( renderable->aModelMatrix, bbox );
 		}
 	}
 
@@ -610,7 +608,7 @@ void Graphics_PrepareDrawData()
 		for ( size_t i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
 		{
 			Graphics_CreateFrustum( gGraphicsData.aViewData.aFrustums[ i ], gGraphicsData.aViewData.aViewports[ i ].aProjView );
-			Graphics_DrawFrustum( gGraphicsData.aViewData.aFrustums[ i ] );
+			gGraphics.DrawFrustum( gGraphicsData.aViewData.aFrustums[ i ] );
 		}
 	}
 
@@ -650,7 +648,7 @@ void Graphics_PrepareDrawData()
 	Graphics_UpdateDebugDraw();
 
 #if 1
-	ChHandle_t              shaderSkinning     = Graphics_GetShader( "__skinning" );
+	ChHandle_t              shaderSkinning     = gGraphics.GetShader( "__skinning" );
 	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
 #endif
 
@@ -678,7 +676,7 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-		Model* model = Graphics_GetModelData( renderable->aModel );
+		Model* model = gGraphics.GetModelData( renderable->aModel );
 		if ( !model )
 		{
 			Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
@@ -746,7 +744,7 @@ void Graphics_PrepareDrawData()
 				Handle shader = gGraphicsData.aViewData.aViewports[ viewIndex ].aShaderOverride;
 
 				if ( !shader )
-					shader = Mat_GetShader( mat );
+					shader = gGraphics.Mat_GetShader( mat );
 
 				ShaderData_t* shaderData = Shader_GetData( shader );
 				if ( !shaderData )
@@ -800,7 +798,7 @@ void Graphics_PrepareDrawData()
 	r_reset_blend_shapes.SetValue( 0 );
 
 #if 1
-	u32 i = 0;
+	u32 r = 0;
 	for ( ChHandle_t renderHandle : gGraphicsData.aSkinningRenderList )
 	{
 		Renderable_t* renderable = nullptr;
@@ -810,7 +808,7 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
-		i++;
+		r++;
 		render->BufferWrite( renderable->aBlendShapeWeightsBuffer, renderable->aBlendShapeWeights.size_bytes(), renderable->aBlendShapeWeights.data() );
 	}
 #endif
@@ -1002,7 +1000,7 @@ void Graphics_PrepareDrawData()
 }
 
 
-void Graphics_Present()
+void Graphics::Present()
 {
 	PROF_SCOPE();
 
@@ -1105,7 +1103,7 @@ void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
 #endif
 
 
-u32 Graphics_CreateViewport( ViewportShader_t** spViewport )
+u32 Graphics::CreateViewport( ViewportShader_t** spViewport )
 {
 	u32 index = Graphics_AllocateShaderSlot( gGraphicsData.aViewportSlots, "Viewports" );
 
@@ -1133,7 +1131,7 @@ u32 Graphics_CreateViewport( ViewportShader_t** spViewport )
 }
 
 
-void Graphics_FreeViewport( u32 sViewportIndex )
+void Graphics::FreeViewport( u32 sViewportIndex )
 {
 	Graphics_FreeShaderSlot( gGraphicsData.aViewportSlots, "Viewports", sViewportIndex );
 
@@ -1149,7 +1147,7 @@ void Graphics_FreeViewport( u32 sViewportIndex )
 }
 
 
-ViewportShader_t* Graphics_GetViewportData( u32 sViewportIndex )
+ViewportShader_t* Graphics::GetViewportData( u32 sViewportIndex )
 {
 	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
 	{
@@ -1166,7 +1164,7 @@ ViewportShader_t* Graphics_GetViewportData( u32 sViewportIndex )
 }
 
 
-void Graphics_SetViewportUpdate( bool sUpdate )
+void Graphics::SetViewportUpdate( bool sUpdate )
 {
 	gGraphicsData.aCoreDataStaging.aDirty = sUpdate;
 }

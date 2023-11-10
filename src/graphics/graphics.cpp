@@ -1,13 +1,12 @@
 #include "core/core.h"
 #include "igui.h"
 #include "render/irender.h"
-#include "graphics.h"
 #include "graphics_int.h"
 #include "lighting.h"
 #include "debug_draw.h"
 #include "mesh_builder.h"
 #include "imgui/imgui.h"
-#include "../main.h"
+// #include "../main.h"
 
 #include <forward_list>
 #include <stack>
@@ -73,6 +72,22 @@ Handle                 CreateModelBuffer( const char* spName, void* spData, size
 GraphicsData_t         gGraphicsData;
 ShaderDescriptorData_t gShaderDescriptorData;
 
+IRender*               render;
+Graphics               gGraphics;
+
+static ModuleInterface_t gInterfaces[] = {
+	{ &gGraphics, IGRAPHICS_NAME, IGRAPHICS_VER }
+};
+
+extern "C"
+{
+	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	{
+		srCount = 1;
+		return gInterfaces;
+	}
+}
+
 // TODO: rethink this so you can have draw ordering
 // use the RenderLayer idea you had
 
@@ -115,7 +130,7 @@ CONCMD( r_reload_textures )
 }
 
 
-ModelBBox_t Graphics_CalcModelBBox( Handle sModel )
+ModelBBox_t Graphics::CalcModelBBox( Handle sModel )
 {
 	PROF_SCOPE();
 
@@ -123,7 +138,7 @@ ModelBBox_t Graphics_CalcModelBBox( Handle sModel )
 	bbox.aMax = { INT_MIN, INT_MIN, INT_MIN };
 	bbox.aMin = { INT_MAX, INT_MAX, INT_MAX };
 
-	Model* model = Graphics_GetModelData( sModel );
+	Model* model = gGraphics.GetModelData( sModel );
 	if ( !model )
 		return bbox;
 
@@ -177,7 +192,7 @@ ModelBBox_t Graphics_CalcModelBBox( Handle sModel )
 }
 
 
-bool Graphics_GetModelBBox( Handle sModel, ModelBBox_t& srBBox )
+bool Graphics::GetModelBBox( Handle sModel, ModelBBox_t& srBBox )
 {
 	auto it = gGraphicsData.aModelBBox.find( sModel );
 	if ( it == gGraphicsData.aModelBBox.end() )
@@ -188,7 +203,7 @@ bool Graphics_GetModelBBox( Handle sModel, ModelBBox_t& srBBox )
 }
 
 
-Handle Graphics_LoadModel( const std::string& srPath )
+Handle Graphics::LoadModel( const std::string& srPath )
 {
 	PROF_SCOPE();
 
@@ -202,7 +217,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 		Model* model = nullptr;
 		if ( !gGraphicsData.aModels.Get( it->second, &model ) )
 		{
-			Log_Error( gLC_ClientGraphics, "Graphics_LoadModel: Model is nullptr\n" );
+			Log_Error( gLC_ClientGraphics, "Graphics::LoadModel: Model is nullptr\n" );
 			return InvalidHandle;
 		}
 
@@ -265,7 +280,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 	}
 
 	// calculate a bounding box
-	Graphics_CalcModelBBox( handle );
+	Graphics::CalcModelBBox( handle );
 
 	gGraphicsData.aModelPaths[ srPath ] = handle;
 
@@ -275,7 +290,7 @@ Handle Graphics_LoadModel( const std::string& srPath )
 }
 
 
-Handle Graphics_CreateModel( Model** spModel )
+Handle Graphics::CreateModel( Model** spModel )
 {
 	Handle handle = gGraphicsData.aModels.Create( spModel );
 
@@ -296,7 +311,7 @@ void Graphics_FreeQueuedResources()
 		Model* model = nullptr;
 		if ( !gGraphicsData.aModels.Get( modelHandle, &model ) )
 		{
-			Log_Error( gLC_ClientGraphics, "Graphics_FreeModel: Model is nullptr\n" );
+			Log_Error( gLC_ClientGraphics, "Graphics::FreeModel: Model is nullptr\n" );
 			continue;
 		}
 
@@ -309,7 +324,7 @@ void Graphics_FreeQueuedResources()
 			for ( Mesh& mesh : model->aMeshes )
 			{
 				if ( mesh.aMaterial )
-					Graphics_FreeMaterial( mesh.aMaterial );
+					gGraphics.FreeMaterial( mesh.aMaterial );
 			}
 
 			// Free Vertex Data
@@ -353,7 +368,7 @@ void Graphics_FreeQueuedResources()
 }
 
 
-void Graphics_FreeModel( ChHandle_t shModel )
+void Graphics::FreeModel( ChHandle_t shModel )
 {
 	if ( shModel == CH_INVALID_HANDLE )
 		return;
@@ -385,14 +400,14 @@ void _Graphics_FreeModel( ChHandle_t item )
 // ---------------------------------------------------
 
 
-Model* Graphics_GetModelData( Handle shModel )
+Model* Graphics::GetModelData( Handle shModel )
 {
 	PROF_SCOPE();
 
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_GetModelData: Model is nullptr\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics::GetModelData: Model is nullptr\n" );
 		return nullptr;
 	}
 
@@ -400,7 +415,7 @@ Model* Graphics_GetModelData( Handle shModel )
 }
 
 
-std::string_view Graphics_GetModelPath( Handle sModel )
+std::string_view Graphics::GetModelPath( Handle sModel )
 {
 	for ( auto& [ path, modelHandle ] : gGraphicsData.aModelPaths )
 	{
@@ -414,7 +429,7 @@ std::string_view Graphics_GetModelPath( Handle sModel )
 }
 
 
-void Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat )
+void Graphics::Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat )
 {
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
@@ -433,7 +448,7 @@ void Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat )
 }
 
 
-Handle Model_GetMaterial( Handle shModel, size_t sSurface )
+Handle Graphics::Model_GetMaterial( Handle shModel, size_t sSurface )
 {
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( shModel, &model ) )
@@ -456,7 +471,7 @@ Handle Model_GetMaterial( Handle shModel, size_t sSurface )
 // Scenes
 
 
-Handle Graphics_LoadScene( const std::string& srPath )
+Handle Graphics::LoadScene( const std::string& srPath )
 {
 	// Have we loaded this scene already?
 	auto it = gGraphicsData.aScenePaths.find( srPath );
@@ -520,7 +535,7 @@ Handle Graphics_LoadScene( const std::string& srPath )
 	// Calculate Bounding Boxes for Models
 	for ( const auto& modelHandle : scene->aModels )
 	{
-		Graphics_CalcModelBBox( modelHandle );
+		Graphics::CalcModelBBox( modelHandle );
 	}
 
 	gGraphicsData.aScenePaths[ srPath ] = handle;
@@ -528,7 +543,7 @@ Handle Graphics_LoadScene( const std::string& srPath )
 }
 
 
-void Graphics_FreeScene( Handle sScene )
+void Graphics::FreeScene( Handle sScene )
 {
 	// HACK HACK PERF: we have to wait for queues to finish, so we could just free this model later
 	// maybe right before the next draw?
@@ -543,7 +558,7 @@ void Graphics_FreeScene( Handle sScene )
 
 	for ( auto& model : scene->aModels )
 	{
-		Graphics_FreeModel( model );
+		gGraphics.FreeModel( model );
 	}
 	
 	for ( auto& [ path, sceneHandle ] : gGraphicsData.aScenePaths )
@@ -560,7 +575,7 @@ void Graphics_FreeScene( Handle sScene )
 }
 
 
-SceneDraw_t* Graphics_AddSceneDraw( Handle sScene )
+SceneDraw_t* Graphics::AddSceneDraw( Handle sScene )
 {
 	if ( !sScene )
 		return nullptr;
@@ -578,14 +593,14 @@ SceneDraw_t* Graphics_AddSceneDraw( Handle sScene )
 
 	for ( uint32_t i = 0; i < scene->aModels.size(); i++ )
 	{
-		sceneDraw->aDraw[ i ] = Graphics_CreateRenderable( scene->aModels[ i ] );
+		sceneDraw->aDraw[ i ] = gGraphics.CreateRenderable( scene->aModels[ i ] );
 	}
 
 	return sceneDraw;
 }
 
 
-void Graphics_RemoveSceneDraw( SceneDraw_t* spScene )
+void Graphics::RemoveSceneDraw( SceneDraw_t* spScene )
 {
 	if ( !spScene )
 		return;
@@ -599,19 +614,19 @@ void Graphics_RemoveSceneDraw( SceneDraw_t* spScene )
 
 	for ( auto& modelDraw : spScene->aDraw )
 	{
-		Graphics_FreeRenderable( modelDraw );
+		gGraphics.FreeRenderable( modelDraw );
 	}
 
 	delete spScene;
 }
 
 
-size_t Graphics_GetSceneModelCount( Handle sScene )
+size_t Graphics::GetSceneModelCount( Handle sScene )
 {
 	Scene_t* scene = nullptr;
 	if ( !gGraphicsData.aScenes.Get( sScene, &scene ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_GetSceneModelCount: Failed to find Scene\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics::GetSceneModelCount: Failed to find Scene\n" );
 		return 0;
 	}
 
@@ -619,18 +634,18 @@ size_t Graphics_GetSceneModelCount( Handle sScene )
 }
 
 
-Handle Graphics_GetSceneModel( Handle sScene, size_t sIndex )
+Handle Graphics::GetSceneModel( Handle sScene, size_t sIndex )
 {
 	Scene_t* scene = nullptr;
 	if ( !gGraphicsData.aScenes.Get( sScene, &scene ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_GetSceneModel: Failed to find Scene\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics::GetSceneModel: Failed to find Scene\n" );
 		return 0;
 	}
 
 	if ( sIndex >= scene->aModels.size() )
 	{
-		Log_Error( gLC_ClientGraphics, "Graphics_GetSceneModel: Index out of range\n" );
+		Log_Error( gLC_ClientGraphics, "Graphics::GetSceneModel: Index out of range\n" );
 		return InvalidHandle;
 	}
 
@@ -641,50 +656,24 @@ Handle Graphics_GetSceneModel( Handle sScene, size_t sIndex )
 // ---------------------------------------------------------------------------------------
 
 
-ChHandle_t Graphics_LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData )
+ChHandle_t Graphics::LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData )
 {
 	//gGraphicsData.aTexturesDirty = true;
 	return render->LoadTexture( srHandle, srTexturePath, srCreateData );
 }
 
 
-ChHandle_t Graphics_CreateTexture( const TextureCreateInfo_t& srTextureCreateInfo, const TextureCreateData_t& srCreateData )
+ChHandle_t Graphics::CreateTexture( const TextureCreateInfo_t& srTextureCreateInfo, const TextureCreateData_t& srCreateData )
 {
 	//gGraphicsData.aTexturesDirty = true;
 	return render->CreateTexture( srTextureCreateInfo, srCreateData );
 }
 
 
-void Graphics_FreeTexture( ChHandle_t shTexture )
+void Graphics::FreeTexture( ChHandle_t shTexture )
 {
 	//gGraphicsData.aTexturesDirty = true;
 	render->FreeTexture( shTexture );
-}
-
-
-void Graphics_UpdateTextureIndices()
-{
-}
-
-
-int Graphics_GetTextureIndex( ChHandle_t shTexture )
-{
-	PROF_SCOPE();
-
-	if ( shTexture == CH_INVALID_HANDLE )
-		return 0;
-
-	// if ( gGraphicsData.aTexturesDirty )
-	// 	Graphics_UpdateTextureIndices();
-	// 
-	// gGraphicsData.aTexturesDirty = false;
-
-	return render->GetTextureIndex( shTexture );
-}
-
-
-void Graphics_CalcTextureIndices()
-{
 }
 
 
@@ -1259,8 +1248,16 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 }
 
 
-bool Graphics_Init()
+bool Graphics::Init()
 {
+	// Make sure we have the render dll
+	render = Mod_GetInterfaceCast< IRender >( IRENDER_NAME, IRENDER_VER );
+	if ( render == nullptr )
+	{
+		Log_Error( gLC_ClientGraphics, "Failed to load Renderer\n" );
+		return false;
+	}
+
 	gGraphicsData.aCommandBufferCount = render->GetCommandBufferHandles( nullptr );
 
 	if ( gGraphicsData.aCommandBufferCount < 1 )
@@ -1324,7 +1321,7 @@ bool Graphics_Init()
 }
 
 
-void Graphics_Shutdown()
+void Graphics::Shutdown()
 {
 	// TODO: Free Descriptor Set allocations
 
@@ -1376,55 +1373,6 @@ void Graphics_Shutdown()
 }
 
 
-// https://iquilezles.org/articles/frustumcorrect/
-bool Frustum_t::IsBoxVisible( const glm::vec3& sMin, const glm::vec3& sMax ) const
-{
-	PROF_SCOPE();
-
-	// Check Box Outside/Inside of Frustum
-	for ( int i = 0; i < EFrustum_Count; i++ )
-	{
-		if ( ( glm::dot( aPlanes[ i ], glm::vec4( sMin.x, sMin.y, sMin.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMax.x, sMin.y, sMin.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMin.x, sMax.y, sMin.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMax.x, sMax.y, sMin.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMin.x, sMin.y, sMax.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMax.x, sMin.y, sMax.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMin.x, sMax.y, sMax.z, 1.0f ) ) < 0.0 ) &&
-		     ( glm::dot( aPlanes[ i ], glm::vec4( sMax.x, sMax.y, sMax.z, 1.0f ) ) < 0.0 ) )
-		{
-			return false;
-		}
-	}
-
-	// Check Frustum Outside/Inside Box
-	for ( int j = 0; j < 3; j++ )
-	{
-		int out = 0;
-		for ( int i = 0; i < 8; i++ )
-		{
-			if ( aPoints[ i ][ j ] > sMax[ j ] )
-				out++;
-		}
-
-		if ( out == 8 )
-			return false;
-
-		out = 0;
-		for ( int i = 0; i < 8; i++ )
-		{
-			if ( aPoints[ i ][ j ] < sMin[ j ] )
-				out++;
-		}
-
-		if ( out == 8 )
-			return false;
-	}
-
-	return true;
-}
-
-
 void Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )
 {
 	PROF_SCOPE();
@@ -1458,7 +1406,7 @@ Frustum_t Graphics_CreateFrustum( const glm::mat4& srViewInfo )
 }
 
 
-ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )
+ModelBBox_t Graphics::CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )
 {
 	PROF_SCOPE();
 
@@ -1500,7 +1448,7 @@ ModelBBox_t Graphics_CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& sr
 }
 
 
-ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
+ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 {
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
@@ -1528,7 +1476,7 @@ ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
-	modelDraw->aAABB        = Graphics_CreateWorldAABB( modelDraw->aModelMatrix, gGraphicsData.aModelBBox[ modelDraw->aModel ] );
+	modelDraw->aAABB        = gGraphics.CreateWorldAABB( modelDraw->aModelMatrix, gGraphicsData.aModelBBox[ modelDraw->aModel ] );
 
 	modelDraw->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
 
@@ -1611,7 +1559,7 @@ ChHandle_t Graphics_CreateRenderable( ChHandle_t sModel )
 }
 
 
-Renderable_t* Graphics_GetRenderableData( Handle sRenderable )
+Renderable_t* Graphics::GetRenderableData( Handle sRenderable )
 {
 	PROF_SCOPE();
 
@@ -1626,7 +1574,7 @@ Renderable_t* Graphics_GetRenderableData( Handle sRenderable )
 }
 
 
-void Graphics_FreeRenderable( Handle sRenderable )
+void Graphics::FreeRenderable( Handle sRenderable )
 {
 	// TODO: QUEUE THIS RENDERABLE FOR DELETION, DON'T DELETE THIS NOW, SAME WITH MODELS, MATERIALS, AND TEXTURES!!!
 
@@ -1668,14 +1616,14 @@ void Graphics_FreeRenderable( Handle sRenderable )
 }
 
 
-void Graphics_UpdateRenderableAABB( Handle sRenderable )
+void Graphics::UpdateRenderableAABB( Handle sRenderable )
 {
 	PROF_SCOPE();
 
 	if ( !sRenderable )
 		return;
 
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( sRenderable ) )
+	if ( Renderable_t* renderable = gGraphics.GetRenderableData( sRenderable ) )
 		gGraphicsData.aRenderAABBUpdate.emplace( sRenderable, gGraphicsData.aModelBBox[ renderable->aModel ] );
 }
 
@@ -1690,7 +1638,7 @@ void Graphics_ConsolidateRenderables()
 // Vertex Format/Attributes
 
 
-GraphicsFmt Graphics_GetVertexAttributeFormat( VertexAttribute attrib )
+GraphicsFmt Graphics::GetVertexAttributeFormat( VertexAttribute attrib )
 {
 	switch ( attrib )
 	{
@@ -1714,9 +1662,9 @@ GraphicsFmt Graphics_GetVertexAttributeFormat( VertexAttribute attrib )
 }
 
 
-size_t Graphics_GetVertexAttributeTypeSize( VertexAttribute attrib )
+size_t Graphics::GetVertexAttributeTypeSize( VertexAttribute attrib )
 {
-	GraphicsFmt format = Graphics_GetVertexAttributeFormat( attrib );
+	GraphicsFmt format = gGraphics.GetVertexAttributeFormat( attrib );
 
 	switch ( format )
 	{
@@ -1735,9 +1683,9 @@ size_t Graphics_GetVertexAttributeTypeSize( VertexAttribute attrib )
 }
 
 
-size_t Graphics_GetVertexAttributeSize( VertexAttribute attrib )
+size_t Graphics::GetVertexAttributeSize( VertexAttribute attrib )
 {
-	GraphicsFmt format = Graphics_GetVertexAttributeFormat( attrib );
+	GraphicsFmt format = gGraphics.GetVertexAttributeFormat( attrib );
 
 	switch ( format )
 	{
@@ -1760,7 +1708,7 @@ size_t Graphics_GetVertexAttributeSize( VertexAttribute attrib )
 }
 
 
-size_t Graphics_GetVertexFormatSize( VertexFormat format )
+size_t Graphics::GetVertexFormatSize( VertexFormat format )
 {
 	size_t size = 0;
 
@@ -1769,16 +1717,16 @@ size_t Graphics_GetVertexFormatSize( VertexFormat format )
 		// does this format contain this attribute?
 		// if so, add the attribute size to it
 		if ( format & ( 1 << attrib ) )
-			size += Graphics_GetVertexAttributeSize( (VertexAttribute)attrib );
+			size += gGraphics.GetVertexAttributeSize( (VertexAttribute)attrib );
 	}
 
 	return size;
 }
 
 
-void Graphics_GetVertexBindingDesc( VertexFormat sFormat, std::vector< VertexInputBinding_t >& srAttrib )
+void Graphics::GetVertexBindingDesc( VertexFormat sFormat, std::vector< VertexInputBinding_t >& srAttrib )
 {
-	size_t formatSize = Graphics_GetVertexFormatSize( sFormat );
+	size_t formatSize = gGraphics.GetVertexFormatSize( sFormat );
 	srAttrib.emplace_back( 0, formatSize, false );
 
 	// for ( u8 attrib = 0; attrib < VertexAttribute_Count; attrib++ )
@@ -1796,7 +1744,7 @@ void Graphics_GetVertexBindingDesc( VertexFormat sFormat, std::vector< VertexInp
 }
 
 
-void Graphics_GetVertexAttributeDesc( VertexFormat format, std::vector< VertexInputAttribute_t >& srAttrib )
+void Graphics::GetVertexAttributeDesc( VertexFormat format, std::vector< VertexInputAttribute_t >& srAttrib )
 {
 	u32  location   = 0;
 	u32  binding    = 0;
@@ -1808,12 +1756,12 @@ void Graphics_GetVertexAttributeDesc( VertexFormat format, std::vector< VertexIn
 		// if so, add this attribute to the vector
 		if ( format & ( 1 << attrib ) )
 		{
-			u32 attribSize = (u32)Graphics_GetVertexAttributeSize( (VertexAttribute)attrib );
+			u32 attribSize = (u32)gGraphics.GetVertexAttributeSize( (VertexAttribute)attrib );
 
 			srAttrib.emplace_back(
 			  location++,
 			  0,
-			  Graphics_GetVertexAttributeFormat( (VertexAttribute)attrib ),
+			  gGraphics.GetVertexAttributeFormat( (VertexAttribute)attrib ),
 			  offset
 			);
 
@@ -1875,7 +1823,7 @@ Handle CreateModelBuffer( const char* spName, void* spData, size_t sBufferSize, 
 }
 
 
-void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
+void Graphics::CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
 	PROF_SCOPE();
 
@@ -1912,7 +1860,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		return;
 	}
 
-	size_t formatSize = Graphics_GetVertexFormatSize( spVertexData->aFormat );
+	size_t formatSize = gGraphics.GetVertexFormatSize( spVertexData->aFormat );
 
 	// Slow as hell probably
 	for ( size_t v = 0; v < spVertexData->aCount; v++ )
@@ -1921,7 +1869,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 		for ( size_t j = 0; j < spVertexData->aData.size(); j++ )
 		{
 			VertAttribData_t& data     = spVertexData->aData[ j ];
-			size_t            elemSize = Graphics_GetVertexAttributeSize( data.aAttrib );
+			size_t            elemSize = gGraphics.GetVertexAttributeSize( data.aAttrib );
 			char*             dataSrc  = static_cast< char* >( data.apData ) + ( v * elemSize );
 
 			switch ( data.aAttrib )
@@ -2001,7 +1949,7 @@ void Graphics_CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVer
 }
 
 
-void Graphics_CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
+void Graphics::CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName )
 {
 	PROF_SCOPE();
 

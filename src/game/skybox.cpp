@@ -1,8 +1,8 @@
 #include "skybox.h"
 #include "main.h"
 
-#include "graphics/graphics.h"
-#include "graphics/mesh_builder.h"
+#include "igraphics.h"
+#include "mesh_builder.h"
 #include "render/irender.h"
 #include "util.h"
 
@@ -53,14 +53,14 @@ CONCMD_DROP_VA( skybox_set, skybox_set_dropdown, 0, "Set the skybox material" )
 bool Skybox_Init()
 {
 	Model* model    = nullptr;
-	gSkyboxModel    = Graphics_CreateModel( &model );
-	gSkyboxShader   = Graphics_GetShader( "skybox" );
+	gSkyboxModel    = graphics->CreateModel( &model );
+	gSkyboxShader   = graphics->GetShader( "skybox" );
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
-	Handle      mat = Graphics_CreateMaterial( "__skybox", gSkyboxShader );
+	Handle      mat = graphics->CreateMaterial( "__skybox", gSkyboxShader );
 
-	MeshBuilder meshBuilder;
+	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "__skybox_model" );
 	meshBuilder.SetMaterial( mat );
 
@@ -116,10 +116,10 @@ bool Skybox_Init()
 void Skybox_Destroy()
 {
 	if ( gSkyboxModel )
-		Graphics_FreeModel( gSkyboxModel );
+		graphics->FreeModel( gSkyboxModel );
 
 	if ( gSkyboxDraw )
-		Graphics_FreeRenderable( gSkyboxDraw );
+		graphics->FreeRenderable( gSkyboxDraw );
 
 	gSkyboxModel = InvalidHandle;
 	gSkyboxDraw  = InvalidHandle;
@@ -131,10 +131,10 @@ void Skybox_SetAng( const glm::vec3& srAng )
 	if ( !gSkyboxModel && !Skybox_Init() )
 		return;
 
-	if ( !gSkyboxValid || r_skybox_ang_freeze || !Model_GetMaterial( gSkyboxModel, 0 ) )
+	if ( !gSkyboxValid || r_skybox_ang_freeze || !graphics->Model_GetMaterial( gSkyboxModel, 0 ) )
 		return;
 
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( gSkyboxDraw ) )
+	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
 		Util_ToViewMatrixY( renderable->aModelMatrix, srAng );
 		renderable->aModelMatrix = gView.aProjMat * renderable->aModelMatrix;
@@ -151,49 +151,49 @@ void Skybox_SetMaterial( const std::string& srPath )
 		return;
 	}
 
-	Graphics_FreeRenderable( gSkyboxDraw );
+	graphics->FreeRenderable( gSkyboxDraw );
 	gSkyboxDraw    = InvalidHandle;
 	gSkyboxValid   = false;
 
-	Handle prevMat = Model_GetMaterial( gSkyboxModel, 0 );
+	Handle prevMat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
 
 	if ( prevMat )
 	{
-		Model_SetMaterial( gSkyboxModel, 0, InvalidHandle );
-		Graphics_FreeMaterial( prevMat );
+		graphics->Model_SetMaterial( gSkyboxModel, 0, InvalidHandle );
+		graphics->FreeMaterial( prevMat );
 	}
 
 	if ( srPath.empty() )
 		return;
 
-	Handle mat = Graphics_LoadMaterial( srPath );
+	Handle mat = graphics->LoadMaterial( srPath );
 	if ( mat == InvalidHandle )
 		return;
 
-	Model_SetMaterial( gSkyboxModel, 0, mat );
+	graphics->Model_SetMaterial( gSkyboxModel, 0, mat );
 
-	if ( Mat_GetShader( mat ) != gSkyboxShader )
+	if ( graphics->Mat_GetShader( mat ) != gSkyboxShader )
 	{
 		Log_WarnF( "Skybox Material is not using skybox shader: %s\n", srPath.c_str() );
 		return;
 	}
 
-	gSkyboxDraw = Graphics_CreateRenderable( gSkyboxModel );
+	gSkyboxDraw = graphics->CreateRenderable( gSkyboxModel );
 
 	if ( !gSkyboxDraw )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create skybox renderable!\n" );
+		Log_Error( "Failed to create skybox renderable!\n" );
 		return;
 	}
 
-	if ( Renderable_t* renderable = Graphics_GetRenderableData( gSkyboxDraw ) )
+	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
 		renderable->aCastShadow = false;
 		renderable->aTestVis    = false;
 		gSkyboxValid            = true;
 	}
 
-	Mat_SetVar( mat, "ang", vec3_zero );
+	graphics->Mat_SetVar( mat, "ang", vec3_zero );
 }
 
 
@@ -202,11 +202,11 @@ const char* Skybox_GetMaterialName()
 	if ( ( !gSkyboxModel && !Skybox_Init() ) || !gSkyboxValid )
 		return nullptr;
 
-	Handle mat = Model_GetMaterial( gSkyboxModel, 0 );
+	Handle mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
 	if ( mat == CH_INVALID_HANDLE )
 		return nullptr;
 
-	return Mat_GetName( mat );
+	return graphics->Mat_GetName( mat );
 }
 
 

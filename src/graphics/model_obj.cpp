@@ -8,7 +8,7 @@ Class dedicated for loading models, and caches them too for multiple uses
 #include "core/console.h"
 #include "render/irender.h"
 
-#include "graphics.h"
+#include "graphics_int.h"
 #include "mesh_builder.h"
 
 #include <chrono>
@@ -48,7 +48,7 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 	std::string baseDir  = GetBaseDir( srPath );
 	std::string baseDir2 = GetBaseDir( srBasePath );
 
-	MeshBuilder meshBuilder;
+	MeshBuilder meshBuilder( gGraphics );
   #ifdef _DEBUG
 	meshBuilder.Start( spModel, srBasePath.c_str() );
   #else
@@ -60,19 +60,19 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 	{
 		fastObjMaterial& objMat   = obj->materials[ i ];
 		std::string      matName  = baseDir2 + "/" + objMat.name;
-		Handle           material = Graphics_FindMaterial( matName.c_str() );
+		Handle           material = gGraphics.FindMaterial( matName.c_str() );
 
 		if ( material == InvalidHandle )
 		{
 			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
-				material = Graphics_LoadMaterial( matPath );
+				material = gGraphics.LoadMaterial( matPath );
 		}
 
 		// fallback if there is no cmt file
 		if ( material == InvalidHandle )
 		{
-			material = Graphics_CreateMaterial( objMat.name, Graphics_GetShader( gDefaultShader ) );
+			material = gGraphics.CreateMaterial( objMat.name, gGraphics.GetShader( gDefaultShader ) );
 
 			TextureCreateData_t createData{};
 			createData.aUsage  = EImageUsage_Sampled;
@@ -86,11 +86,11 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 				Handle texture = InvalidHandle;
 
 				if ( FileSys_IsRelative( texname ) )
-					Graphics_LoadTexture( texture, baseDir2 + "/" + texname, createData );
+					gGraphics.LoadTexture( texture, baseDir2 + "/" + texname, createData );
 				else
-					Graphics_LoadTexture( texture, texname, createData );
+					gGraphics.LoadTexture( texture, texname, createData );
 
-				Mat_SetVar( material, param, texture );
+				gGraphics.Mat_SetVar( material, param, texture );
 			};
 
 			SetTexture( MatVar_Diffuse, objMat.map_Kd.path );
@@ -210,19 +210,19 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 	{
 		fastObjMaterial& objMat   = obj->materials[ i ];
 		std::string      matName  = baseDir2 + "/" + objMat.name;
-		Handle           material = Graphics_FindMaterial( matName.c_str() );
+		Handle           material = gGraphics.FindMaterial( matName.c_str() );
 
 		if ( material == InvalidHandle )
 		{
 			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
-				material = Graphics_LoadMaterial( matPath );
+				material = gGraphics.LoadMaterial( matPath );
 		}
 
 		// fallback if there is no cmt file
 		if ( material == InvalidHandle )
 		{
-			material = Graphics_CreateMaterial( matName, Graphics_GetShader( gDefaultShader ) );
+			material = gGraphics.CreateMaterial( matName, gGraphics.GetShader( gDefaultShader ) );
 
 			TextureCreateData_t createData{};
 			createData.aUsage  = EImageUsage_Sampled;
@@ -236,11 +236,11 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 				Handle texture = InvalidHandle;
 
 				if ( FileSys_IsRelative( texname ) )
-					Graphics_LoadTexture( texture, baseDir2 + "/" + texname, createData );
+					gGraphics.LoadTexture( texture, baseDir2 + "/" + texname, createData );
 				else
-					Graphics_LoadTexture( texture, texname, createData );
+					gGraphics.LoadTexture( texture, texname, createData );
 
-				Mat_SetVar( material, param, texture );
+				gGraphics.Mat_SetVar( material, param, texture );
 			};
 
 			SetTexture( MatVar_Diffuse, objMat.map_Kd.path );
@@ -264,7 +264,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 
 		// index_offset += group.index_offset;
 		Model* model        = nullptr;
-		spScene->aModels.push_back( Graphics_CreateModel( &model ) );
+		spScene->aModels.push_back( gGraphics.CreateModel( &model ) );
 		model->apBuffers    = modelBuffers;
 		model->apVertexData = vertData;
 
@@ -278,7 +278,7 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 		}
 #endif
 
-		MeshBuilder meshBuilder;
+		MeshBuilder meshBuilder( gGraphics );
 		meshBuilder.Start( model, groupName );
 		// meshBuilder.SetSurfaceCount( obj->material_count );
 
@@ -389,8 +389,8 @@ void Graphics_LoadSceneObj( const std::string& srBasePath, const std::string& sr
 		meshBuilder.End( false );
 	}
 
-	Graphics_CreateVertexBuffers( modelBuffers, vertData, srBasePath.c_str() );
-	Graphics_CreateIndexBuffer( modelBuffers, vertData, srBasePath.c_str() );
+	gGraphics.CreateVertexBuffers( modelBuffers, vertData, srBasePath.c_str() );
+	gGraphics.CreateIndexBuffer( modelBuffers, vertData, srBasePath.c_str() );
 
 	fast_obj_destroy( obj );
 }

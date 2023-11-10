@@ -26,12 +26,14 @@ class IGuiSystem;
 class IRender;
 class IInputSystem;
 class IAudioSystem;
+class IGraphics;
 class ISteamSystem;
 
 extern IGuiSystem*      gui;
 extern IRender*         render;
 extern IInputSystem*    input;
 extern IAudioSystem*    audio;
+extern IGraphics*       graphics;
 extern ISteamSystem*    steam;
 extern bool             gSteamLoaded;
 

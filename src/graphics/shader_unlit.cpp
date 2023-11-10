@@ -1,6 +1,6 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
+#include "graphics_int.h"
 
 
 struct ShaderUnlit_Push
@@ -53,12 +53,12 @@ static void Shader_ShaderUnlit_SetupPushData( u32 sRenderableIndex, u32 sViewpor
 	push.aModelMatrix      = spModelDraw->aModelMatrix;
 	push.aProjView         = 0;
 
-	Handle mat             = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+	Handle mat             = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 
 	if ( mat == CH_INVALID_HANDLE )
 		return;
 
-	push.aDiffuse = Mat_GetTextureIndex( mat, "diffuse" );
+	push.aDiffuse = gGraphics.Mat_GetTextureIndex( mat, "diffuse" );
 }
 
 

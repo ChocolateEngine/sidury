@@ -1,6 +1,6 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
+#include "graphics_int.h"
 
 
 struct ShadowMap_Push
@@ -55,16 +55,16 @@ static void Shader_ShadowMap_SetupPushData( u32 sRenderableIndex, u32 sViewportI
 	push.aViewInfo       = gShadowViewInfoIndex;
 	push.aAlbedo         = -1;
 
-	Handle mat           = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+	Handle mat           = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 	if ( mat == InvalidHandle )
 		return;
 
-	Handle texture = Mat_GetTexture( mat, "diffuse" );
+	Handle texture = gGraphics.Mat_GetTexture( mat, "diffuse" );
 
 	if ( texture == InvalidHandle )
 		return;
 
-	bool alphaTest = Mat_GetBool( mat, "alphaTest" );
+	bool alphaTest = gGraphics.Mat_GetBool( mat, "alphaTest" );
 
 #if 0
 	GraphicsFmt format   = render->GetTextureFormat( texture );

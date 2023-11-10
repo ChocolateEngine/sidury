@@ -1,7 +1,7 @@
 #include "testing.h"
 #include "main.h"
 #include "inputsystem.h"
-#include "graphics/graphics.h"
+#include "igraphics.h"
 #include "steam.h"
 
 #include "cl_main.h"
@@ -132,7 +132,7 @@ class ProtogenSystem : public IEntityComponentSystem
 
 		if ( renderable->aModel )
 		{
-			renderable->aRenderable = Graphics_CreateRenderable( renderable->aModel );
+			renderable->aRenderable = graphics->CreateRenderable( renderable->aModel );
 		}
 		else
 		{
@@ -197,14 +197,14 @@ void CreateProtogen_f( const std::string& path )
 
 	Ent_AddComponent( proto, "protogen" );
 
-	// Handle       model          = Graphics_LoadModel( path );
+	// Handle       model          = graphics->LoadModel( path );
 
 	CRenderable* renderable     = Ent_AddComponent< CRenderable >( proto, "renderable" );
 	renderable->aPath           = path;
 	// renderable->aModel          = model;
 
 	// CRenderable_t* renderComp  = Ent_AddComponent< CRenderable_t >( proto, "renderable" );
-	// renderComp->aHandle        = Graphics_CreateRenderable( model );
+	// renderComp->aHandle        = graphics->CreateRenderable( model );
 
 	CTransform* transform       = Ent_AddComponent< CTransform >( proto, "transform" );
 
@@ -220,7 +220,7 @@ void CreateModelEntity( const std::string& path )
 #if 0
 	Entity physEnt = GetEntitySystem()->CreateEntity();
 
-	Model* model   = Graphics_LoadModel( path );
+	Model* model   = graphics->LoadModel( path );
 	GetEntitySystem()->AddComponent< Model* >( physEnt, model );
 	Transform& transform = GetEntitySystem()->AddComponent< Transform >( physEnt );
 
@@ -236,10 +236,10 @@ void CreatePhysEntity( const std::string& path )
 #if 0
 	Entity         physEnt    = GetEntitySystem()->CreateEntity();
 
-	Handle         model      = Graphics_LoadModel( path );
+	Handle         model      = graphics->LoadModel( path );
 
 	CRenderable_t& renderComp = GetEntitySystem()->AddComponent< CRenderable_t >( physEnt );
-	renderComp.aHandle        = Graphics_CreateRenderable( model );
+	renderComp.aHandle        = graphics->CreateRenderable( model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
 
@@ -312,8 +312,8 @@ CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 	// while ( GetProtogenSys()->aEntities.size() )
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		// Graphics_FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
-		// Graphics_FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
+		// graphics->FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
+		// graphics->FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
 		GetEntitySystem()->DeleteEntity( proto );
 	}
 }
@@ -425,7 +425,7 @@ void TEST_EntUpdate()
 	{
 		CRenderable_t& renderComp = GetEntitySystem()->GetComponent< CRenderable_t >( ent );
 
-		if ( Renderable_t* renderable = Graphics_GetRenderableData( renderComp.aHandle ) )
+		if ( Renderable_t* renderable = graphics->GetRenderableData( renderComp.aHandle ) )
 		{
 			if ( renderable->aModel == InvalidHandle )
 				continue;
@@ -553,13 +553,13 @@ void TEST_CL_UpdateProtos( float frameTime )
 			{
 				if ( renderComp->aPath.Get().empty() )
 
-				renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+				renderComp->aModel = graphics->LoadModel( renderComp->aPath );
 				if ( renderComp->aModel == InvalidHandle )
 					continue;
 			}
 
-			Handle        renderable = Graphics_CreateRenderable( renderComp->aModel );
-			Renderable_t* renderData = Graphics_GetRenderableData( renderable );
+			Handle        renderable = graphics->CreateRenderable( renderComp->aModel );
+			Renderable_t* renderData = graphics->GetRenderableData( renderable );
 
 			if ( !renderData )
 			{
@@ -570,19 +570,19 @@ void TEST_CL_UpdateProtos( float frameTime )
 			renderComp->aRenderable = renderable;
 		}
 
-		Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+		Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 
 		if ( renderData )
 		{
 			GetEntitySystem()->GetWorldMatrix( renderData->aModelMatrix, proto );
-			Graphics_UpdateRenderableAABB( renderComp->aRenderable );
+			graphics->UpdateRenderableAABB( renderComp->aRenderable );
 		}
 
 		// glm::vec3 modelForward, modelRight, modelUp;
 		// Util_GetMatrixDirection( protoTransform->ToMatrix(), &modelForward, &modelRight, &modelUp );
-		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
-		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
-		// Graphics_DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
 	}
 
 	GetProtogenSys()->aUpdated.clear();
@@ -676,9 +676,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 			Util_ToMatrix( playerMatrix, playerTransform->aPos, playerTransform->aAng );
 			Util_GetMatrixDirection( playerMatrix, &forward, &right, &up );
 
-			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
-			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
-			// Graphics_DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
 
 			glm::vec3 protoView    = protoTransform->aPos;
 			//protoView.z += cl_view_height;

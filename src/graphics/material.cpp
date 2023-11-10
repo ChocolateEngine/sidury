@@ -108,7 +108,7 @@ static Handle                                         gInvalidMaterial;
 static std::string                                    gStrEmpty;
 
 
-const char* Mat_GetName( Handle shMat )
+const char* Graphics::Mat_GetName( Handle shMat )
 {
 	for ( auto& [name, mat] : gMaterialNames )
 	{
@@ -120,7 +120,7 @@ const char* Mat_GetName( Handle shMat )
 }
 
 
-size_t Mat_GetVarCount( Handle mat )
+size_t Graphics::Mat_GetVarCount( Handle mat )
 {
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
@@ -133,7 +133,7 @@ size_t Mat_GetVarCount( Handle mat )
 }
 
 
-EMatVar Mat_GetVarType( Handle mat, size_t sIndex )
+EMatVar Graphics::Mat_GetVarType( Handle mat, size_t sIndex )
 {
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
@@ -152,7 +152,7 @@ EMatVar Mat_GetVarType( Handle mat, size_t sIndex )
 }
 
 
-Handle Mat_GetShader( Handle mat )
+Handle Graphics::Mat_GetShader( Handle mat )
 {
 	auto it = gMaterialShaders.find( mat );
 	if ( it != gMaterialShaders.end() )
@@ -163,7 +163,7 @@ Handle Mat_GetShader( Handle mat )
 }
 
 
-void Mat_SetShader( Handle mat, Handle shShader )
+void Graphics::Mat_SetShader( Handle mat, Handle shShader )
 {
 	auto it = gMaterialShaders.find( mat );
 	if ( it != gMaterialShaders.end() )
@@ -178,7 +178,7 @@ void Mat_SetShader( Handle mat, Handle shShader )
 }
 
 
-VertexFormat Mat_GetVertexFormat( Handle mat )
+VertexFormat Graphics::Mat_GetVertexFormat( Handle mat )
 {
 	Handle shader = Mat_GetShader( mat );
 
@@ -190,7 +190,7 @@ VertexFormat Mat_GetVertexFormat( Handle mat )
 
 
 // Increments Reference Count for material
-void Mat_AddRef( ChHandle_t sMat )
+void Graphics::Mat_AddRef( ChHandle_t sMat )
 {
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( sMat, &data ) )
@@ -205,7 +205,7 @@ void Mat_AddRef( ChHandle_t sMat )
 
 
 // Decrements Reference Count for material - returns true if the material is deleted
-bool Mat_RemoveRef( ChHandle_t sMat )
+bool Graphics::Mat_RemoveRef( ChHandle_t sMat )
 {
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( sMat, &data ) )
@@ -290,17 +290,17 @@ void Mat_SetVarInternal( Handle mat, const std::string& name, const T& value )
 }
 
 
-void Mat_SetVar( Handle mat, const std::string& name, Handle value )
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, Handle value )
 {
 	Mat_SetVarInternal( mat, name, value );
 }
 
-void Mat_SetVar( Handle mat, const std::string& name, float value )              { Mat_SetVarInternal( mat, name, value ); }
-void Mat_SetVar( Handle mat, const std::string& name, int value )                { Mat_SetVarInternal( mat, name, value ); }
-void Mat_SetVar( Handle mat, const std::string& name, bool value )               { Mat_SetVarInternal( mat, name, value ); }
-void Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& value )   { Mat_SetVarInternal( mat, name, value ); }
-void Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& value )   { Mat_SetVarInternal( mat, name, value ); }
-void Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& value )   { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, float value )              { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, int value )                { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, bool value )               { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& value )   { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& value )   { Mat_SetVarInternal( mat, name, value ); }
+void Graphics::Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& value )   { Mat_SetVarInternal( mat, name, value ); }
 
 
 MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
@@ -327,56 +327,56 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 }
 
 
-int Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback )
+int Graphics::Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return render->GetTextureIndex( var ? var->GetTexture( fallback ) : fallback );
 }
 
 
-Handle Mat_GetTexture( Handle mat, std::string_view name, Handle fallback )
+Handle Graphics::Mat_GetTexture( Handle mat, std::string_view name, Handle fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetTexture( fallback ) : fallback;
 }
 
 
-float Mat_GetFloat( Handle mat, std::string_view name, float fallback )
+float Graphics::Mat_GetFloat( Handle mat, std::string_view name, float fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetFloat( fallback ) : fallback;
 }
 
 
-int Mat_GetInt( Handle mat, std::string_view name, int fallback )
+int Graphics::Mat_GetInt( Handle mat, std::string_view name, int fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetInt( fallback ) : fallback;
 }
 
 
-bool Mat_GetBool( Handle mat, std::string_view name, bool fallback )
+bool Graphics::Mat_GetBool( Handle mat, std::string_view name, bool fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetBool( fallback ) : fallback;
 }
 
 
-const glm::vec2& Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback )
+const glm::vec2& Graphics::Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetVec2( fallback ) : fallback;
 }
 
 
-const glm::vec3& Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback )
+const glm::vec3& Graphics::Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetVec3( fallback ) : fallback;
 }
 
 
-const glm::vec4& Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback )
+const glm::vec4& Graphics::Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
 	return var ? var->GetVec4( fallback ) : fallback;
@@ -439,7 +439,7 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				return false;
 			}
 
-			shader = Graphics_GetShader( cur.apString );
+			shader = gGraphics.GetShader( cur.apString );
 			if ( shader == InvalidHandle )
 			{
 				Log_ErrorF( gLC_ClientGraphics, "Failed to find Material Shader: %s - \"%s\"\n", cur.apString, srPath.c_str() );
@@ -490,7 +490,7 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				createData.aFilter = EImageFilter_Linear;
 
 				Handle texture     = InvalidHandle;
-				Mat_SetVar( handle, cur.apName, Graphics_LoadTexture( texture, cur.apString, createData ) );
+				gGraphics.Mat_SetVar( handle, cur.apName, gGraphics.LoadTexture( texture, cur.apString, createData ) );
 				break;
 			}
 
@@ -500,36 +500,36 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				if ( cur.aInt > INT_MAX )
 				{
 					Log_WarnF( gLC_ClientGraphics, "Overflowed Int Value for key \"%s\", clamping to INT_MAX - \"%s\"\n", cur.apName, srPath.c_str() );
-					Mat_SetVar( handle, cur.apName, INT_MAX );
+					gGraphics.Mat_SetVar( handle, cur.apName, INT_MAX );
 					break;
 				}
 				else if ( cur.aInt < INT_MIN )
 				{
 					Log_WarnF( gLC_ClientGraphics, "Underflowed Int Value for key \"%s\", clamping to INT_MIN - \"%s\"\n", cur.apName, srPath.c_str() );
-					Mat_SetVar( handle, cur.apName, INT_MIN );
+					gGraphics.Mat_SetVar( handle, cur.apName, INT_MIN );
 					break;
 				}
 
-				Mat_SetVar( handle, cur.apName, static_cast< int >( cur.aInt ) );
+				gGraphics.Mat_SetVar( handle, cur.apName, static_cast< int >( cur.aInt ) );
 				break;
 			}
 
 			// double
 			case EJsonType_Double:
 			{
-				Mat_SetVar( handle, cur.apName, static_cast< float >( cur.aDouble ) );
+				gGraphics.Mat_SetVar( handle, cur.apName, static_cast< float >( cur.aDouble ) );
 				break;
 			}
 
 			case EJsonType_True:
 			{
-				Mat_SetVar( handle, cur.apName, true );
+				gGraphics.Mat_SetVar( handle, cur.apName, true );
 				break;
 			}
 
 			case EJsonType_False:
 			{
-				Mat_SetVar( handle, cur.apName, false );
+				gGraphics.Mat_SetVar( handle, cur.apName, false );
 				break;
 			}
 
@@ -547,7 +547,7 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 }
 
 
-Handle Graphics_LoadMaterial( const std::string& srPath )
+Handle Graphics::LoadMaterial( const std::string& srPath )
 {
 	auto nameIt = gMaterialNames.find( srPath.c_str() );
 	if ( nameIt != gMaterialNames.end() )
@@ -568,7 +568,7 @@ Handle Graphics_LoadMaterial( const std::string& srPath )
 
 
 // Create a new material with a name and a shader
-Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
+Handle Graphics::CreateMaterial( const std::string& srName, Handle shShader )
 {
 	auto nameIt = gMaterialNames.find( srName.c_str() );
 	if ( nameIt != gMaterialNames.end() )
@@ -595,7 +595,7 @@ Handle Graphics_CreateMaterial( const std::string& srName, Handle shShader )
 
 
 // Free a material
-void Graphics_FreeMaterial( ChHandle_t shMaterial )
+void Graphics::FreeMaterial( ChHandle_t shMaterial )
 {
 	Mat_RemoveRef( shMaterial );
 }
@@ -605,7 +605,7 @@ void Graphics_FreeMaterial( ChHandle_t shMaterial )
 // Name is a full path to the cmt file
 // EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 // NAME: dev/grid01
-ChHandle_t Graphics_FindMaterial( const char* spName )
+ChHandle_t Graphics::FindMaterial( const char* spName )
 {
 	auto nameIt = gMaterialNames.find( spName );
 	if ( nameIt != gMaterialNames.end() )
@@ -619,14 +619,14 @@ ChHandle_t Graphics_FindMaterial( const char* spName )
 
 
 // Get the total amount of materials created
-size_t Graphics_GetMaterialCount()
+size_t Graphics::GetMaterialCount()
 {
 	return gMaterials.size();
 }
 
 
 // Get the path to the material
-const std::string& Graphics_GetMaterialPath( Handle sMaterial )
+const std::string& Graphics::GetMaterialPath( Handle sMaterial )
 {
 	if ( sMaterial == CH_INVALID_HANDLE )
 		return "";
@@ -642,7 +642,7 @@ const std::string& Graphics_GetMaterialPath( Handle sMaterial )
 
 
 // Tell all materials to rebuild
-void Graphics_SetAllMaterialsDirty()
+void Graphics::SetAllMaterialsDirty()
 {
 	if ( gMaterialShaders.size() == gGraphicsData.aDirtyMaterials.size() )
 		return;
@@ -654,6 +654,28 @@ void Graphics_SetAllMaterialsDirty()
 
 CONCMD( r_mark_all_materials_dirty )
 {
-	Graphics_SetAllMaterialsDirty();
+	gGraphics.SetAllMaterialsDirty();
+}
+
+
+
+// ---------------------------------------------------------------------------------------------------------
+// Resource System Functions
+
+
+bool _Graphics_LoadMaterial( ChHandle_t& item, const fs::path& srPath )
+{
+	return false;
+}
+
+
+bool _Graphics_CreateMaterial( ChHandle_t& item, const fs::path& srInternalPath, void* spData )
+{
+	return false;
+}
+
+
+void _Graphics_FreeMaterial( ChHandle_t item )
+{
 }
 

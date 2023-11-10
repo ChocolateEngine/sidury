@@ -8,7 +8,7 @@
 #include "player.h"
 #include "skybox.h"
 #include "sv_main.h"
-#include "graphics/graphics.h"
+#include "igraphics.h"
 
 #include "mapmanager.h"
 

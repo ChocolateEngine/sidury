@@ -1,6 +1,6 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
+#include "graphics_int.h"
 
 
 struct Skybox_Push
@@ -45,8 +45,8 @@ static void Shader_Skybox_SetupPushData( u32 sRenderableIndex, u32 sViewportInde
 	Skybox_Push& push = gSkyboxPushData[ &srDrawInfo ];
 	push.aModelMatrix = spModelDraw->aModelMatrix;
 
-	Handle mat        = Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
-	push.aSky         = Mat_GetTextureIndex( mat, "sky" );
+	Handle mat        = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
+	push.aSky         = gGraphics.Mat_GetTextureIndex( mat, "sky" );
 }
 
 

@@ -4,6 +4,7 @@
 
 #include "iinput.h"
 #include "render/irender.h"
+#include "igraphics.h"
 #include "igui.h"
 #include "iaudio.h"
 #include "physics/iphysics.h"
@@ -20,8 +21,9 @@
 #endif
 
 static bool gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
-static bool gArgNoSteam = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
-static bool gRunning   = true;
+static bool gArgNoSteam      = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
+// static bool gArgUseGL        = Args_Register( "Use the OpenGL Renderer", "-gl" );
+static bool gRunning         = true;
 
 CONVAR( host_max_frametime, 0.1 );
 CONVAR( host_timescale, 1 );
@@ -54,15 +56,17 @@ extern IRender*      render;
 extern IInputSystem* input;
 extern IAudioSystem* audio;
 extern Ch_IPhysics*  ch_physics;
+extern IGraphics*    graphics;
 
 
 static AppModule_t gAppModules[] = 
 {
-	{ (ISystem**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,     "ch_graphics", IRENDER_NAME, IRENDER_VER },
-	{ (ISystem**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
-	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&input,      "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&render,     "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
+	{ (ISystem**)&gui,        "ch_gui",       IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&audio,      "ch_aduio",     IADUIO_NAME, IADUIO_VER },
+	{ (ISystem**)&ch_physics, "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
+    { (ISystem**)&graphics,   "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
 };
 
 
@@ -81,6 +85,11 @@ extern "C"
 
 		// Needs to be done before Renderer is loaded
 		ImGui::CreateContext();
+
+		// if ( gArgUseGL )
+		// {
+		// 	gAppModules[ 1 ].apModuleName = "ch_render_gl";
+		// }
 
 		// Load Modules and Initialize them in this order
 		if ( !Mod_AddSystems( gAppModules, ARR_SIZE( gAppModules ) ) )

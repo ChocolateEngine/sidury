@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/core.h"
+#include "igraphics.h"
 
 
 // Vertex containing all possible values
@@ -117,6 +118,17 @@ struct MeshBuilder
 		ChHandle_t                    aMaterial = CH_INVALID_HANDLE;
 	};
 
+	MeshBuilder( IGraphics* spGraphics )
+	{
+		apGraphics = spGraphics;
+	}
+
+	MeshBuilder( IGraphics& srGraphics )
+	{
+		apGraphics = &srGraphics;
+	}
+
+	IGraphics*                                                  apGraphics   = nullptr;
 	const char*                                                 apDebugName  = nullptr;
 
 	Model*                                                      apMesh       = nullptr;
@@ -246,7 +258,7 @@ struct MeshBuildData_t
 
 // TODO: what if the model we're loading already has indices calculated for it? can't we just use that?
 bool MeshBuild_StartMesh( MeshBuildData_t& srMeshBuildData, u32 sMaterialCount, ChHandle_t* spMaterials );
-void MeshBuild_FinishMesh( MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName = "" );
+void MeshBuild_FinishMesh( IGraphics* spGraphics, MeshBuildData_t& srMeshBuildData, Model* spModel, bool sCalculateIndices, bool sUploadMesh, const char* spDebugName = "" );
 
 void MeshBuild_AllocateVertices( MeshBuildData_t& srMeshBuildData, u32 sMaterial, u32 sCount );
 void MeshBuild_AllocateBlendShapes( MeshBuildMaterial_t& srMeshBuildMaterial, u32 sBlendShapeCount );

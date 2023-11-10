@@ -4,7 +4,7 @@ modelloader_gtlf.cpp ( Authored by Demez )
 File dedicated for loading gltf models
 */
 
-#include "graphics.h"
+#include "graphics_int.h"
 #include "mesh_builder.h"
 #include "render/irender.h"
 
@@ -224,33 +224,33 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 	std::string baseDir = GetBaseDir( srPath );
 	std::string baseDir2 = GetBaseDir( srBasePath );
 
-	MeshBuilder meshBuilder;
+	MeshBuilder meshBuilder( gGraphics );
 	meshBuilder.Start( spModel, srPath.c_str() );
 	meshBuilder.SetSurfaceCount( gltf->materials_count );
 
 	// --------------------------------------------------------
 	// Parse Materials
 
-	Handle defaultShader = Graphics_GetShader( gDefaultShader );
+	Handle defaultShader = gGraphics.GetShader( gDefaultShader );
 
 	for ( size_t i = 0; i < gltf->materials_count; ++i )
 	{
 		cgltf_material& gltfMat = gltf->materials[i];
 
 		std::string     matName  = baseDir2 + "/" + gltfMat.name;
-		Handle          material = Graphics_FindMaterial( matName.c_str() );
+		Handle          material = gGraphics.FindMaterial( matName.c_str() );
 
 		if ( material == InvalidHandle )
 		{
 			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
-				material = Graphics_LoadMaterial( matPath );
+				material = gGraphics.LoadMaterial( matPath );
 		}
 
 		// fallback if there is no cmt file
 		if ( material == InvalidHandle )
 		{
-			material = Graphics_CreateMaterial( gltfMat.name, defaultShader );
+			material = gGraphics.CreateMaterial( gltfMat.name, defaultShader );
 
 			TextureCreateData_t createData{};
 			createData.aUsage  = EImageUsage_Sampled;
@@ -267,11 +267,11 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 				Handle handle = InvalidHandle;
 
 				if ( FileSys_IsRelative( texName.data() ) )
-					Graphics_LoadTexture( handle, baseDir2 + "/" + texName, createData );
+					gGraphics.LoadTexture( handle, baseDir2 + "/" + texName, createData );
 				else
-					Graphics_LoadTexture( handle, texName, createData );
+					gGraphics.LoadTexture( handle, texName, createData );
 
-				Mat_SetVar( material, param.data(), handle );
+				gGraphics.Mat_SetVar( material, param.data(), handle );
 			};
 
 			if ( gltfMat.has_pbr_metallic_roughness )
@@ -281,7 +281,7 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 			SetTexture( MatVar_Normal,   gltfMat.normal_texture.texture );
 
 			if ( gltfMat.has_emissive_strength )
-				Mat_SetVar( material, MatVar_EmissivePower.data(), gltfMat.emissive_strength.emissive_strength );
+				gGraphics.Mat_SetVar( material, MatVar_EmissivePower.data(), gltfMat.emissive_strength.emissive_strength );
 		}
 
 		meshBuilder.SetCurrentSurface( i );
@@ -652,7 +652,7 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 	// --------------------------------------------------------
 	// Parse Materials
 
-	Handle defaultShader = Graphics_GetShader( gDefaultShader );
+	Handle defaultShader = gGraphics.GetShader( gDefaultShader );
 
 	ChVector< ChHandle_t > materials;
 	materials.resize( gltf->materials_count );
@@ -662,19 +662,19 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 		cgltf_material& gltfMat = gltf->materials[i];
 
 		std::string     matName  = baseDir2 + "/" + gltfMat.name;
-		Handle          material = Graphics_FindMaterial( matName.c_str() );
+		Handle          material = gGraphics.FindMaterial( matName.c_str() );
 
 		if ( material == InvalidHandle )
 		{
 			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
-				material = Graphics_LoadMaterial( matPath );
+				material = gGraphics.LoadMaterial( matPath );
 		}
 
 		// fallback if there is no cmt file
 		if ( material == InvalidHandle )
 		{
-			material = Graphics_CreateMaterial( gltfMat.name, defaultShader );
+			material = gGraphics.CreateMaterial( gltfMat.name, defaultShader );
 
 			TextureCreateData_t createData{};
 			createData.aUsage  = EImageUsage_Sampled;
@@ -691,11 +691,11 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 				Handle handle = InvalidHandle;
 
 				if ( FileSys_IsRelative( texName.data() ) )
-					Graphics_LoadTexture( handle, baseDir2 + "/" + texName, createData );
+					gGraphics.LoadTexture( handle, baseDir2 + "/" + texName, createData );
 				else
-					Graphics_LoadTexture( handle, texName, createData );
+					gGraphics.LoadTexture( handle, texName, createData );
 
-				Mat_SetVar( material, param.data(), handle );
+				gGraphics.Mat_SetVar( material, param.data(), handle );
 			};
 
 			if ( gltfMat.has_pbr_metallic_roughness )
@@ -705,7 +705,7 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 			SetTexture( MatVar_Normal,   gltfMat.normal_texture.texture );
 
 			if ( gltfMat.has_emissive_strength )
-				Mat_SetVar( material, MatVar_EmissivePower.data(), gltfMat.emissive_strength.emissive_strength );
+				gGraphics.Mat_SetVar( material, MatVar_EmissivePower.data(), gltfMat.emissive_strength.emissive_strength );
 		}
 
 		materials[ i ] = material;
@@ -1123,7 +1123,7 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 		}
 	}
 
-	MeshBuild_FinishMesh( meshBuilder, spModel, false, true, srPath.c_str() );
+	MeshBuild_FinishMesh( &gGraphics, meshBuilder, spModel, false, true, srPath.c_str() );
 
 	cgltf_free( gltf );
 }

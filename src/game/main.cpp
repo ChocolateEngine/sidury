@@ -13,7 +13,7 @@
 #include "game_physics.h"
 #include "player.h"
 #include "entity.h"
-#include "graphics/graphics.h"
+#include "igraphics.h"
 #include "mapmanager.h"
 #include "inputsystem.h"
 #include "skybox.h"
@@ -36,6 +36,7 @@ IGuiSystem*      gui          = nullptr;
 IRender*         render       = nullptr;
 IInputSystem*    input        = nullptr;
 IAudioSystem*    audio        = nullptr;
+IGraphics*       graphics     = nullptr;
 ISteamSystem*    steam        = nullptr;
 
 static bool      gPaused      = false;
@@ -103,16 +104,16 @@ void WindowResizeCallback()
 
 	ImGui::NewFrame();
 	ImGui_ImplSDL2_NewFrame();
-	Graphics_NewFrame();
+	graphics->NewFrame();
 
 	Game_UpdateProjection();
 
-	Graphics_Reset();
+	graphics->Reset();
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
 		gui->Update( 0.f );
-		Graphics_Present();
+		graphics->Present();
 	}
 	else
 	{
@@ -129,11 +130,11 @@ bool Game_Init()
 
 	Steam_Init();
 
-	if ( !Graphics_Init() )
-		return false;
+	// if ( !graphics->Init() )
+	// 	return false;
 
 	// Create the Main Viewport - TODO: use this more across the game code
-	gMainViewportIndex = Graphics_CreateViewport();
+	gMainViewportIndex = graphics->CreateViewport();
 
 	Game_UpdateProjection();
 
@@ -192,7 +193,7 @@ void Game_Update( float frameTime )
 		ImGuizmo::SetDrawlist();
 	}
 
-	Graphics_NewFrame();
+	graphics->NewFrame();
 
 	CH_STEAM_CALL( Update( frameTime ) );
 
@@ -211,7 +212,7 @@ void Game_Update( float frameTime )
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
 		Tools_DrawUI();
-		Graphics_Present();
+		graphics->Present();
 	}
 	else
 	{
@@ -312,7 +313,7 @@ void Game_HandleSystemEvents()
 					{
 						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
-						Graphics_Reset();
+						graphics->Reset();
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:
@@ -350,7 +351,7 @@ void Game_UpdateProjection()
 	render->GetSurfaceSize( width, height );
 	gView.ComputeProjection( width, height );
 
-	ViewportShader_t* viewport = Graphics_GetViewportData( gMainViewportIndex );
+	ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportIndex );
 
 	if ( !viewport )
 		return;
@@ -363,7 +364,7 @@ void Game_UpdateProjection()
 	viewport->aFarZ       = gView.aFarZ;
 	viewport->aSize       = { width, height };
 
-	Graphics_SetViewportUpdate( true );
+	graphics->SetViewportUpdate( true );
 
 	auto& io = ImGui::GetIO();
 	io.DisplaySize.x = width;

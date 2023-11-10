@@ -10,7 +10,7 @@
 #include "mapmanager.h"
 #include "igui.h"
 
-#include "graphics/graphics.h"
+#include "igraphics.h"
 
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
@@ -184,7 +184,7 @@ Renderable_t* Ent_GetRenderable( Entity sEntity )
 		return nullptr;
 	}
 
-	return Graphics_GetRenderableData( renderComp->aRenderable );
+	return graphics->GetRenderableData( renderComp->aRenderable );
 }
 
 
@@ -203,7 +203,7 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity )
 	{
 		if ( renderComp->aModel == InvalidHandle )
 		{
-			renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+			renderComp->aModel = graphics->LoadModel( renderComp->aPath );
 			if ( renderComp->aModel == InvalidHandle )
 			{
 				Log_Error( "Failed to load model for renderable\n" );
@@ -211,7 +211,7 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity )
 			}
 		}
 
-		renderComp->aRenderable = Graphics_CreateRenderable( renderComp->aModel );
+		renderComp->aRenderable = graphics->CreateRenderable( renderComp->aModel );
 		if ( renderComp->aRenderable == InvalidHandle )
 		{
 			Log_Error( "Failed to create renderable\n" );
@@ -219,6 +219,6 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity )
 		}
 	}
 
-	return Graphics_GetRenderableData( renderComp->aRenderable );
+	return graphics->GetRenderableData( renderComp->aRenderable );
 }
 

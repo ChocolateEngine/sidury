@@ -1,6 +1,5 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
 #include "graphics_int.h"
 
 
@@ -51,7 +50,7 @@ std::vector< ShaderCreate_t* >& Shader_GetCreateList()
 }
 
 
-Handle Graphics_GetShader( std::string_view sName )
+Handle Graphics::GetShader( std::string_view sName )
 {
 	auto it = gShaderNames.find( sName );
 	if ( it != gShaderNames.end() )
@@ -62,7 +61,7 @@ Handle Graphics_GetShader( std::string_view sName )
 }
 
 
-const char* Graphics_GetShaderName( Handle sShader )
+const char* Graphics::GetShaderName( Handle sShader )
 {
 	for ( const auto& [name, shader] : gShaderNames )
 	{
@@ -370,7 +369,7 @@ bool Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader )
 	descSets.push_back( gShaderDescriptorData.aGlobalSets.apSets[ sIndex ] );
 
 	// AAAA
-	std::string_view shaderName = Graphics_GetShaderName( sShader );
+	std::string_view shaderName = gGraphics.GetShaderName( sShader );
 	descSets.push_back( gShaderDescriptorData.aPerShaderSets[ shaderName ].apSets[ sIndex ] );
 
 	if ( descSets.size() )

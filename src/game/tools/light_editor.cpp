@@ -1,4 +1,4 @@
-#include "../graphics/graphics.h"
+#include "igraphics.h"
 #include "../main.h"
 #include "../cl_main.h"
 #include "../entity_systems.h"
@@ -19,7 +19,7 @@ static Light_t*                               gpSelectedLight = nullptr;
 
 extern Handle                                 gLocalPlayer;
 
-extern std::vector< Light_t* >                gLights;
+// extern std::vector< Light_t* >                gLights;
 
 constexpr const char*                         gModelLightPointPath = "tools/light_editor/light_point.glb";
 constexpr const char*                         gModelLightConePath  = "tools/light_editor/light_cone.glb";
@@ -74,7 +74,7 @@ static Handle LightEditor_CreateRenderable( Light_t* spLight )
 		if ( spLight->aType == ELightType_Cone || spLight->aType == ELightType_Directional )
 			model = gModelLightCone;
 
-		Handle renderHandle = Graphics_CreateRenderable( model );
+		Handle renderHandle = graphics->CreateRenderable( model );
 
 		if ( !renderHandle )
 		{
@@ -101,7 +101,7 @@ static void LightEditor_DestroyRenderable( Light_t* spLight )
 	if ( it != gDrawLights.end() )
 	{
 		// destroy this renderable
-		Graphics_FreeRenderable( it->second );
+		graphics->FreeRenderable( it->second );
 		gDrawLights.erase( it );
 	}
 }
@@ -109,11 +109,11 @@ static void LightEditor_DestroyRenderable( Light_t* spLight )
 
 static void LightEditor_CreateRenderables()
 {
-	gDrawLights.reserve( gLights.size() );
-	for ( const auto& light : gLights )
-	{
-		LightEditor_CreateRenderable( light );
-	}
+	//gDrawLights.reserve( gLights.size() );
+	//for ( const auto& light : gLights )
+	//{
+	//	LightEditor_CreateRenderable( light );
+	//}
 }
 
 
@@ -126,7 +126,7 @@ static void LightEditor_DestroyRenderables()
 			continue;
 
 		// destroy this renderable
-		Graphics_FreeRenderable( renderable );
+		graphics->FreeRenderable( renderable );
 	}
 
 	gDrawLights.clear();
@@ -147,7 +147,7 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 		return;
 	}
 
-	Renderable_t* renderable = Graphics_GetRenderableData( renderHandle );
+	Renderable_t* renderable = graphics->GetRenderableData( renderHandle );
 	
 	if ( !renderable )
 	{
@@ -155,7 +155,7 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 		return;
 	}
 
-	Graphics_UpdateRenderableAABB( renderHandle );
+	graphics->UpdateRenderableAABB( renderHandle );
 
 	renderable->aCastShadow = false;
 
@@ -166,14 +166,14 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 
 	if ( spLight == gpSelectedLight )
 	{
-		Graphics_DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
+		graphics->DrawBBox( renderable->aAABB.aMin, renderable->aAABB.aMax, { 1.0, 0.5, 1.0 } );
 	}
 
 	if ( r_light_line && spLight->aType != ELightType_Point )
 	{
 		glm::vec3 forward;
 		Util_GetMatrixDirection( renderable->aModelMatrix, nullptr, nullptr, &forward );
-		Graphics_DrawLine( spLight->aPos, spLight->aPos + ( -forward * r_light_line_dist.GetFloat() ), { spLight->aColor.x, spLight->aColor.y, spLight->aColor.z } );
+		graphics->DrawLine( spLight->aPos, spLight->aPos + ( -forward * r_light_line_dist.GetFloat() ), { spLight->aColor.x, spLight->aColor.y, spLight->aColor.z } );
 	}
 }
 
@@ -181,8 +181,8 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 void LightEditor_UpdateAllLightDraws()
 {
 	// Load up all lights
-	for ( const auto& light : gLights )
-		LightEditor_UpdateLightDraw( light );
+	//for ( const auto& light : gLights )
+	//	LightEditor_UpdateLightDraw( light );
 }
 
 
@@ -218,7 +218,7 @@ CONCMD( tool_light_editor )
 bool LightEditor_Init()
 {
 	// Load Light Models
-	gModelLightPoint = Graphics_LoadModel( gModelLightPointPath );
+	gModelLightPoint = graphics->LoadModel( gModelLightPointPath );
 
 	if ( gModelLightPoint == InvalidHandle )
 	{
@@ -226,7 +226,7 @@ bool LightEditor_Init()
 		return false;
 	}
 
-	gModelLightCone = Graphics_LoadModel( gModelLightConePath );
+	gModelLightCone = graphics->LoadModel( gModelLightConePath );
 
 	if ( gModelLightCone == InvalidHandle )
 	{
@@ -240,8 +240,8 @@ bool LightEditor_Init()
 
 void LightEditor_Shutdown()
 {
-	Graphics_FreeModel( gModelLightPoint );
-	Graphics_FreeModel( gModelLightCone );
+	graphics->FreeModel( gModelLightPoint );
+	graphics->FreeModel( gModelLightCone );
 }
 
 
@@ -273,7 +273,7 @@ void LightEditor_DrawEditor()
 
 	if ( ImGui::Button( "Create Directional Light" ) )
 	{
-		Light_t* light = Graphics_CreateLight( ELightType_Directional );
+		Light_t* light = graphics->CreateLight( ELightType_Directional );
 
 		Log_Dev( 1, "Created Directional Light\n" );
 		// gLightsWorld
@@ -281,7 +281,7 @@ void LightEditor_DrawEditor()
 
 	if ( ImGui::Button( "Create Point Light" ) )
 	{
-		Light_t* light = Graphics_CreateLight( ELightType_Point );
+		Light_t* light = graphics->CreateLight( ELightType_Point );
 
 		if ( light != nullptr )
 		{
@@ -296,7 +296,7 @@ void LightEditor_DrawEditor()
 
 	if ( ImGui::Button( "Create Cone Light" ) )
 	{
-		Light_t* light = Graphics_CreateLight( ELightType_Cone );
+		Light_t* light = graphics->CreateLight( ELightType_Cone );
 
 		if ( light != nullptr )
 		{
@@ -321,50 +321,50 @@ void LightEditor_DrawEditor()
 	// and then internally, use different UBO light types, not have the raw UBO exposed
 
 	ImVec2 itemSize = ImGui::GetItemRectSize();
-	itemSize.y *= gLights.size();
+	//itemSize.y *= gLights.size();
 
 	const ImGuiStyle& style = ImGui::GetStyle();
 
 	itemSize.x += ( style.FramePadding.x + style.ItemInnerSpacing.x ) * 2;
 	itemSize.y += ( style.FramePadding.y + style.ItemInnerSpacing.y ) * 2;
 
-	if ( ImGui::BeginChild( "Lights", itemSize, true ) )
-	{
-		for ( size_t i = 0; i < gLights.size(); i++ )
-		{
-			const char* name = nullptr;
-
-			switch ( gLights[ i ]->aType )
-			{
-				case ELightType_Directional:
-					name = "Directional Light";
-					break;
-
-				case ELightType_Point:
-					name = "Point Light";
-					break;
-
-				case ELightType_Cone:
-					name = "Cone Light";
-					break;
-
-				//case ELightType_Capsule:
-				//	name = "Capsule Light";
-				//	break;
-			}
-
-			ImGui::PushID( i );
-
-			if ( ImGui::Selectable( name, gpSelectedLight == gLights[ i ] ) )
-			{
-				gpSelectedLight = gLights[ i ];
-			}
-
-			ImGui::PopID();
-		}
-	}
-
-	ImGui::EndChild();
+	//if ( ImGui::BeginChild( "Lights", itemSize, true ) )
+	//{
+	//	for ( size_t i = 0; i < gLights.size(); i++ )
+	//	{
+	//		const char* name = nullptr;
+	//
+	//		switch ( gLights[ i ]->aType )
+	//		{
+	//			case ELightType_Directional:
+	//				name = "Directional Light";
+	//				break;
+	//
+	//			case ELightType_Point:
+	//				name = "Point Light";
+	//				break;
+	//
+	//			case ELightType_Cone:
+	//				name = "Cone Light";
+	//				break;
+	//
+	//			//case ELightType_Capsule:
+	//			//	name = "Capsule Light";
+	//			//	break;
+	//		}
+	//
+	//		ImGui::PushID( i );
+	//
+	//		if ( ImGui::Selectable( name, gpSelectedLight == gLights[ i ] ) )
+	//		{
+	//			gpSelectedLight = gLights[ i ];
+	//		}
+	//
+	//		ImGui::PopID();
+	//	}
+	//}
+	//
+	//ImGui::EndChild();
 
 	if ( !gpSelectedLight )
 	{
@@ -376,7 +376,7 @@ void LightEditor_DrawEditor()
 	{
 		ImGui::End();
 		LightEditor_DestroyRenderable( gpSelectedLight );
-		Graphics_DestroyLight( gpSelectedLight );
+		graphics->DestroyLight( gpSelectedLight );
 		gpSelectedLight = nullptr;
 		return;
 	}
@@ -419,7 +419,7 @@ void LightEditor_DrawEditor()
 	//}
 
 	if ( updateLight )
-		Graphics_UpdateLight( gpSelectedLight );
+		graphics->UpdateLight( gpSelectedLight );
 
 	ImGui::EndChild();
 	ImGui::End();

@@ -20,7 +20,7 @@ using Entity = size_t;
 // AAA
 #include "game_shared.h"
 #include "flatbuffers/sidury_generated.h"
-#include "graphics/graphics.h"
+#include "igraphics.h"
 
 #include "iaudio.h"
 
@@ -1288,9 +1288,31 @@ struct CDirection
 };
 
 
+// TODO: add viewport info here
+// maybe have a field for an output texture or material?
+// and then with rendering certain surfaces you can reference that texture or material?
+// no idea how camera's usually work in game engines
+// in source, there seems to be a func_monitor brush, which takes in a camera name
+// but i know the tv had a monitor on it at one point, hmm
 struct CCamera
 {
 	ComponentNetVar< float > aFov = 90.f;
+};
+
+
+struct CCamera2
+{
+	ComponentNetVar< float >     aNear = 0.5f;
+	ComponentNetVar< float >     aFar  = 10000.f;
+	ComponentNetVar< float >     aFov  = 90.f;
+
+	ComponentNetVar< glm::vec2 > aSize{};
+
+	ComponentNetVar< glm::mat4 > aViewMat{};
+	ComponentNetVar< glm::mat4 > aProjMat{};
+
+	// projection matrix * view matrix
+	ComponentNetVar< glm::mat4 > aProjViewMat{};
 };
 
 

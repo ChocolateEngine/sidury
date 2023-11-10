@@ -9,30 +9,7 @@ file(
 set(
 	SRC_FILES
 	${SRC_FILES_GLOB}
-	
-	# networking
-	network/net_main.cpp
-	network/net_main.h
-	
-	# flatbuffers
-	flatbuffers/sidury.capnp.c++
-	flatbuffers/sidury.capnp.h
-	
-	# tools
-	tools/light_editor.cpp
-	tools/light_editor.h
 )
-
-if( WIN32 )
-	set(
-		SRC_FILES
-		${SRC_FILES_GLOB}
-		
-		# networking
-		network/net_windows.cpp
-		network/net_windows.h
-	)
-endif()
 
 file(
 	GLOB_RECURSE PUBLIC_FILES CONFIGURE_DEPENDS
@@ -47,34 +24,18 @@ set(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-include_directories(
-	"${CH_THIRDPARTY}/flatbuffers/include"
-	"../graphics"
-)
-
-set( FLATBUFFERS_DIR_DEBUG "${CH_THIRDPARTY}/flatbuffers/build/Debug" )
-set( FLATBUFFERS_DIR_RELEASE "${CH_THIRDPARTY}/flatbuffers/build/Release" )
-
-link_directories(
-	"$<$<CONFIG:Debug>:${FLATBUFFERS_DIR_DEBUG}>"
-	"$<$<CONFIG:Release>:${FLATBUFFERS_DIR_RELEASE}>"
-	"$<$<CONFIG:RelWithDebInfo>:${FLATBUFFERS_DIR_RELEASE}>"
-)
-
-# ??????
-add_library( SiduryClient SHARED ../graphics/mesh_builder.cpp ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
+add_library( Graphics SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 
 target_link_libraries(
-	SiduryClient
+	Graphics
 	PRIVATE
 	Core
 	ImGui
-	flatbuffers
 )
 
 if( WIN32 )
 	target_link_libraries(
-		SiduryClient
+		Graphics
 		PRIVATE
 		# Networking
 		wsock32
@@ -83,28 +44,28 @@ if( WIN32 )
 	)
 endif()
 
-add_dependencies( SiduryClient "Core" "ImGui" )
+add_dependencies( Graphics "Core" "ImGui" )
 
 set_target_properties(
-	SiduryClient PROPERTIES
-	RUNTIME_OUTPUT_NAME client
-	LIBRARY_OUTPUT_NAME client
+	Graphics PROPERTIES
+	RUNTIME_OUTPUT_NAME ch_graphics
+	LIBRARY_OUTPUT_NAME ch_graphics
 
-	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
-	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
+	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
+	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
 )
 
 # set output directories for all builds (Debug, Release, etc.)
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
     set_target_properties(
-    	SiduryClient PROPERTIES
+    	Graphics PROPERTIES
     	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
     	LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
     )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
-target_precompile_headers( SiduryClient PRIVATE "${CH_PUBLIC}/core/core.h" )
+target_precompile_headers( Graphics PRIVATE "${CH_PUBLIC}/core/core.h" )
 
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}

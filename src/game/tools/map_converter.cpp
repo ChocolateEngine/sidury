@@ -54,27 +54,27 @@ void MapConverter_DrawUI()
 
 void MapConverter_ConvertMap( const std::string& srPath, const std::string& srOutPath, const std::string& srAssetPath, const std::string& srAssetsOut )
 {
-	std::string absPath = FileSys_FindFile( srPath );
-
-	if ( absPath.empty() )
-	{
-		Log_WarnF( "Map does not exist: \"%s\"", srPath.c_str() );
-		return;
-	}
-
-	Log_MsgF( "Converting Map: %s\n", srPath.c_str() );
-
-	std::string fileExt = FileSys_GetFileExt( srPath );
-
-	if ( fileExt == "vmf" )
-	{
-		MapConverter_ConvertVMF( srPath, srOutPath, srAssetPath, srAssetsOut );
-	}
-	else
-	{
-		Log_ErrorF( "Unknown Map Format: %s\n", srPath.c_str() );
-		return;
-	}
+	// std::string absPath = FileSys_FindFile( srPath );
+	// 
+	// if ( absPath.empty() )
+	// {
+	// 	Log_WarnF( "Map does not exist: \"%s\"", srPath.c_str() );
+	// 	return;
+	// }
+	// 
+	// Log_MsgF( "Converting Map: %s\n", srPath.c_str() );
+	// 
+	// std::string fileExt = FileSys_GetFileExt( srPath );
+	// 
+	// if ( fileExt == "vmf" )
+	// {
+	// 	MapConverter_ConvertVMF( srPath, srOutPath, srAssetPath, srAssetsOut );
+	// }
+	// else
+	// {
+	// 	Log_ErrorF( "Unknown Map Format: %s\n", srPath.c_str() );
+	// 	return;
+	// }
 }
 
 

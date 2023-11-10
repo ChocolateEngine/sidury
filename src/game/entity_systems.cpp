@@ -1,7 +1,7 @@
+#include "main.h"
 #include "game_shared.h"
 #include "entity_systems.h"
-#include "graphics/graphics.h"
-#include "graphics/lighting.h"
+#include "igraphics.h"
 
 
 CONVAR( r_debug_draw_transforms, 0 );
@@ -18,7 +18,7 @@ void LightSystem::ComponentAdded( Entity sEntity, void* spData )
 	// 
 	// if ( light )
 	// 	light->apLight = nullptr;
-	// 	// light->apLight = Graphics_CreateLight( light->aType );
+	// 	// light->apLight = graphics->CreateLight( light->aType );
 }
 
 
@@ -30,7 +30,7 @@ void LightSystem::ComponentRemoved( Entity sEntity, void* spData )
 	auto light = static_cast< CLight* >( spData );
 
 	if ( light )
-		Graphics_DestroyLight( light->apLight );
+		graphics->DestroyLight( light->apLight );
 }
 
 
@@ -65,7 +65,7 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 	spLight->apLight->aShadow   = spLight->aShadow;
 	spLight->apLight->aEnabled  = spLight->aEnabled;
 
-	Graphics_UpdateLight( spLight->apLight );
+	graphics->UpdateLight( spLight->apLight );
 }
 
 
@@ -83,7 +83,7 @@ void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 
 	if ( !light->apLight )
 	{
-		light->apLight = Graphics_CreateLight( light->aType );
+		light->apLight = graphics->CreateLight( light->aType );
 
 		if ( !light->apLight )
 			return;
@@ -92,10 +92,10 @@ void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 	// Light type switched, we need to recreate the light
 	if ( light->aType != light->apLight->aType )
 	{
-		Graphics_DestroyLight( light->apLight );
+		graphics->DestroyLight( light->apLight );
 		light->apLight = nullptr;
 
-		light->apLight = Graphics_CreateLight( light->aType );
+		light->apLight = graphics->CreateLight( light->aType );
 
 		if ( !light->apLight )
 			return;
@@ -157,17 +157,17 @@ static bool UpdateModelHandle( CRenderable* modelInfo )
 
 	if ( modelInfo->aModel != InvalidHandle )
 	{
-		std::string_view curModel = Graphics_GetModelPath( modelInfo->aModel );
+		std::string_view curModel = graphics->GetModelPath( modelInfo->aModel );
 			
 		if ( curModel != modelInfo->aPath.Get() )
 		{
-			Graphics_FreeModel( modelInfo->aModel );
+			graphics->FreeModel( modelInfo->aModel );
 			modelInfo->aModel = InvalidHandle;
 		}
 	}
 
 	if ( modelInfo->aModel == InvalidHandle )
-		modelInfo->aModel = Graphics_LoadModel( modelInfo->aPath );
+		modelInfo->aModel = graphics->LoadModel( modelInfo->aPath );
 
 	// Update Renderable if needed
 
@@ -233,8 +233,8 @@ void EntSys_Transform::Update()
 			if ( !GetEntitySystem()->GetWorldMatrix( matrix, entity ) )
 				continue;
 
-			// Graphics_DrawAxis( transform->aPos, transform->aAng, transform->aScale );
-			Graphics_DrawAxis( Util_GetMatrixPosition( matrix ), glm::degrees( Util_GetMatrixAngles( matrix ) ), Util_GetMatrixScale( matrix ) );
+			// graphics->DrawAxis( transform->aPos, transform->aAng, transform->aScale );
+			graphics->DrawAxis( Util_GetMatrixPosition( matrix ), glm::degrees( Util_GetMatrixAngles( matrix ) ), Util_GetMatrixScale( matrix ) );
 		}
 	}
 }
@@ -261,17 +261,17 @@ void EntSys_Renderable::ComponentRemoved( Entity sEntity, void* spData )
 	auto renderComp = static_cast< CRenderable* >( spData );
 
 	// Auto Delete the renderable and free the model
-	Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+	Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 
 	if ( !renderData )
 		return;
 
 	if ( renderData->aModel )
 	{
-		Graphics_FreeModel( renderData->aModel );
+		graphics->FreeModel( renderData->aModel );
 	}
 
-	Graphics_FreeRenderable( renderComp->aRenderable );
+	graphics->FreeRenderable( renderComp->aRenderable );
 }
 
 
@@ -286,13 +286,13 @@ void EntSys_Renderable::ComponentUpdated( Entity sEntity, void* spData )
 
 	auto renderComp = static_cast< CRenderable* >( spData );
 
-	Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+	Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 
 	if ( !renderData )
 	{
 		// no need to update the handle if we're creating it
 		renderData = Ent_CreateRenderable( sEntity );
-		Graphics_UpdateRenderableAABB( renderComp->aRenderable );
+		graphics->UpdateRenderableAABB( renderComp->aRenderable );
 		return;
 	}
 
@@ -304,7 +304,7 @@ void EntSys_Renderable::ComponentUpdated( Entity sEntity, void* spData )
 	if ( renderComp->aModel != renderData->aModel )
 	{
 		renderData->aModel = renderComp->aModel;
-		Graphics_UpdateRenderableAABB( renderComp->aRenderable );
+		graphics->UpdateRenderableAABB( renderComp->aRenderable );
 	}
 }
 
@@ -331,7 +331,7 @@ void EntSys_Renderable::Update()
 			continue;
 		}
 
-		Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+		Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 
 		if ( !renderData )
 		{
@@ -340,7 +340,7 @@ void EntSys_Renderable::Update()
 		}
 
 		renderData->aModelMatrix = matrix;
-		Graphics_UpdateRenderableAABB( renderComp->aRenderable );
+		graphics->UpdateRenderableAABB( renderComp->aRenderable );
 	}
 }
 

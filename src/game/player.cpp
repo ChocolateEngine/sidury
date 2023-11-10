@@ -7,7 +7,7 @@
 #include "igui.h"
 #include "iinput.h"
 #include "render/irender.h"
-#include "graphics/graphics.h"
+#include "igraphics.h"
 
 #include "cl_main.h"
 #include "sv_main.h"
@@ -586,7 +586,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 		if ( !flashlight->aEnabled )
 		{
-			// Graphics_UpdateLight( flashlight );
+			// graphics->UpdateLight( flashlight );
 		}
 		else
 		{
@@ -604,7 +604,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 			UpdateTransform();
 		}
 
-		// Graphics_UpdateLight( flashlight );
+		// graphics->UpdateLight( flashlight );
 	}
 }
 
@@ -741,17 +741,17 @@ void PlayerManager::UpdateLocalPlayer()
 
 				if ( renderComp->aModel == InvalidHandle )
 				{
-					renderComp->aModel = Graphics_LoadModel( renderComp->aPath );
+					renderComp->aModel = graphics->LoadModel( renderComp->aPath );
 					if ( renderComp->aModel == InvalidHandle )
 						continue;
 				}
 
-				renderComp->aRenderable = Graphics_CreateRenderable( renderComp->aModel );
+				renderComp->aRenderable = graphics->CreateRenderable( renderComp->aModel );
 				if ( renderComp->aRenderable == InvalidHandle )
 					continue;
 			}
 			
-			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+			Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 
 			if ( !renderData )
 				continue;
@@ -806,7 +806,7 @@ void PlayerManager::UpdateLocalPlayer()
 
 			renderData->aModelMatrix = glm::scale( renderData->aModelMatrix, scale );
 
-			Graphics_UpdateRenderableAABB( renderComp->aRenderable );
+			graphics->UpdateRenderableAABB( renderComp->aRenderable );
 		}
 		else
 		{
@@ -815,7 +815,7 @@ void PlayerManager::UpdateLocalPlayer()
 			if ( renderComp->aRenderable == InvalidHandle )
 				continue;
 
-			Renderable_t* renderData = Graphics_GetRenderableData( renderComp->aRenderable );
+			Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
 			if ( !renderData )
 				continue;
 
@@ -1047,7 +1047,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 		if ( info->aIsLocalPlayer )
 		{
-			ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+			ViewportShader_t* viewport = graphics->GetViewportData( 0 );
 
 			if ( viewport )
 				viewport->aViewPos = thirdPerson.aPos;
@@ -1069,7 +1069,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			// wtf broken??
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
 			
-			ViewportShader_t* viewport = Graphics_GetViewportData( 0 );
+			ViewportShader_t* viewport = graphics->GetViewportData( 0 );
 
 			if ( viewport )
 				viewport->aViewPos = transformView.aPos;
@@ -1082,8 +1082,8 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	}
 
 	// temp
-	//Graphics_DrawAxis( transformView.aPos, transformView.aAng, { 40.f, 40.f, 40.f } );
-	//Graphics_DrawAxis( transform->aPos, transform->aAng, { 40.f, 40.f, 40.f } );
+	//graphics->DrawAxis( transformView.aPos, transformView.aAng, { 40.f, 40.f, 40.f } );
+	//graphics->DrawAxis( transform->aPos, transform->aAng, { 40.f, 40.f, 40.f } );
 
 	if ( info->aIsLocalPlayer )
 	// if ( player == gLocalPlayer )

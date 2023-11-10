@@ -1,3 +1,5 @@
+#if 0
+
 #include "map_converter.h"
 #include "../entity.h"
 #include "../graphics/mesh_builder.h"
@@ -946,3 +948,4 @@ void MapConverter_ConvertVMF( const std::string& srPath, const std::string& srOu
 	Graphics_UpdateRenderableAABB( renderHandle );
 }
 
+#endif
