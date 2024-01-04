@@ -1,6 +1,6 @@
 #include "util.h"
 #include "render/irender.h"
-#include "graphics.h"
+#include "graphics_int.h"
 
 #if 0
 

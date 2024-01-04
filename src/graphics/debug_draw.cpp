@@ -1,4 +1,3 @@
-#include "graphics.h"
 #include "graphics_int.h"
 #include "debug_draw.h"
 #include "types/transform.h"
@@ -33,8 +32,7 @@ CONVAR( r_debug_normals_len_face, 8 );
 
 bool Graphics_DebugDrawInit()
 {
-	gDebugLineMaterial = gGraphics.CreateMaterial( "__debug_line_mat", gGraphics.GetShader( "debug_line" ) );
-	return gDebugLineMaterial;
+	return true;
 }
 
 
@@ -87,6 +85,8 @@ void Graphics_DebugDrawNewFrame()
 		model->apVertexData->aData.resize( 2, true );
 		model->apVertexData->aData[ 0 ].aAttrib = VertexAttribute_Position;
 		model->apVertexData->aData[ 1 ].aAttrib = VertexAttribute_Color;
+
+		gDebugLineMaterial                      = gGraphics.CreateMaterial( "__debug_line_mat", gGraphics.GetShader( "debug_line" ) );
 
 		gGraphics.Model_SetMaterial( gDebugLineModel, 0, gDebugLineMaterial );
 
@@ -198,10 +198,15 @@ void Graphics_UpdateDebugDraw()
 			model->apBuffers = new ModelBuffers_t;
 
 		// Is our current buffer size too small? If so, free the old ones
-		if ( gDebugLineVerts.size() > gDebugLineBufferSize )
+		if ( gDebugLineVerts.size() > gDebugLineBufferSize || model->apBuffers->aVertex == CH_INVALID_HANDLE )
 		{
 			if ( model->apBuffers && model->apBuffers->aVertex != CH_INVALID_HANDLE )
 			{
+				if ( model->apBuffers->aVertexHandle != UINT32_MAX )
+				{
+					Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+				}
+
 				render->DestroyBuffer( model->apBuffers->aVertex );
 				model->apBuffers->aVertex = CH_INVALID_HANDLE;
 			}
@@ -213,7 +218,10 @@ void Graphics_UpdateDebugDraw()
 
 		// Create new Buffers if needed
 		if ( model->apBuffers->aVertex == CH_INVALID_HANDLE )
-			model->apBuffers->aVertex = render->CreateBuffer( "DebugLine Vertex", bufferSize, EBufferFlags_Vertex, EBufferMemory_Host );
+		{
+			model->apBuffers->aVertex       = render->CreateBuffer( "DebugLine Vertex", bufferSize, EBufferFlags_Storage, EBufferMemory_Host );
+			model->apBuffers->aVertexHandle = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertex );
+		}
 
 		model->apVertexData->aCount = gDebugLineVerts.size();
 
@@ -223,6 +231,9 @@ void Graphics_UpdateDebugDraw()
 		model->aMeshes[ 0 ].aIndexCount   = 0;
 		model->aMeshes[ 0 ].aVertexOffset = 0;
 		model->aMeshes[ 0 ].aVertexCount  = gDebugLineVerts.size();
+		
+		renderable->aVertexBuffer         = model->apBuffers->aVertex;
+		renderable->aVertexIndex          = model->apBuffers->aVertexHandle;
 
 		// Update the Buffers
 		render->BufferWrite( model->apBuffers->aVertex, bufferSize, gDebugLineVerts.data() );
@@ -266,18 +277,20 @@ void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::ve
 	gDebugLineVerts[ index ].aPosNormX.y = sX.y;
 	gDebugLineVerts[ index ].aPosNormX.z = sX.z;
 
-	gDebugLineVerts[ index ].aColor.x = sColor.x;
-	gDebugLineVerts[ index ].aColor.y = sColor.y;
-	gDebugLineVerts[ index ].aColor.z = sColor.z;
+	gDebugLineVerts[ index ].aColor.x    = sColor.x;
+	gDebugLineVerts[ index ].aColor.y    = sColor.y;
+	gDebugLineVerts[ index ].aColor.z    = sColor.z;
+	gDebugLineVerts[ index ].aColor.w    = 1.f;
 
 	index++;
 	gDebugLineVerts[ index ].aPosNormX.x = sY.x;
 	gDebugLineVerts[ index ].aPosNormX.y = sY.y;
 	gDebugLineVerts[ index ].aPosNormX.z = sY.z;
 
-	gDebugLineVerts[ index ].aColor.x = sColor.x;
-	gDebugLineVerts[ index ].aColor.y = sColor.y;
-	gDebugLineVerts[ index ].aColor.z = sColor.z;
+	gDebugLineVerts[ index ].aColor.x    = sColor.x;
+	gDebugLineVerts[ index ].aColor.y    = sColor.y;
+	gDebugLineVerts[ index ].aColor.z    = sColor.z;
+	gDebugLineVerts[ index ].aColor.w    = 1.f;
 #endif
 }
 
@@ -314,11 +327,44 @@ void Graphics::DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm
 		return;
 
 	glm::vec3 forward, right, up;
-	Util_GetDirectionVectors( sAng, &forward, &right, &up );
+	// Util_GetDirectionVectors( sAng, &forward, &right, &up );
+	glm::mat4 mat = Util_ToMatrix( &sPos, &sAng, &sScale );
+	Util_GetMatrixDirection( mat, &forward, &right, &up );
 
 	gGraphics.DrawLine( sPos, sPos + ( forward * sScale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
 	gGraphics.DrawLine( sPos, sPos + ( right * sScale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
 	gGraphics.DrawLine( sPos, sPos + ( up * sScale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
+}
+
+
+void Graphics::DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )
+{
+	if ( !r_debug_draw || !gDebugLineModel )
+		return;
+
+	glm::vec3 forward, right, up;
+	Util_GetMatrixDirection( sMat, &forward, &right, &up );
+	glm::vec3 pos = Util_GetMatrixPosition( sMat );
+
+	gGraphics.DrawLine( pos, pos + ( forward * sScale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
+	gGraphics.DrawLine( pos, pos + ( right * sScale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
+	gGraphics.DrawLine( pos, pos + ( up * sScale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
+}
+
+
+void Graphics::DrawAxis( const glm::mat4& sMat )
+{
+	if ( !r_debug_draw || !gDebugLineModel )
+		return;
+
+	glm::vec3 forward, right, up;
+	Util_GetMatrixDirection( sMat, &forward, &right, &up );
+	glm::vec3 pos   = Util_GetMatrixPosition( sMat );
+	glm::vec3 scale = Util_GetMatrixScale( sMat );
+
+	gGraphics.DrawLine( pos, pos + ( forward * scale.x * r_debug_axis_scale.GetFloat() ), { 1.f, 0.f, 0.f } );
+	gGraphics.DrawLine( pos, pos + ( right * scale.y * r_debug_axis_scale.GetFloat() ), { 0.f, 1.f, 0.f } );
+	gGraphics.DrawLine( pos, pos + ( up * scale.z * r_debug_axis_scale.GetFloat() ), { 0.f, 0.f, 1.f } );
 }
 
 

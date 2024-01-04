@@ -101,7 +101,7 @@ void LightSystem::ComponentUpdated( Entity sEntity, void* spData )
 			return;
 	}
 
-	Assert( light->apLight );
+	CH_ASSERT( light->apLight );
 
 	UpdateLightData( sEntity, light );
 }
@@ -122,7 +122,7 @@ void LightSystem::Update()
 		if ( !light )
 			continue;
 
-		Assert( light->apLight );
+		CH_ASSERT( light->apLight );
 
 		// this is awful
 		UpdateLightData( entity, light );
@@ -137,7 +137,7 @@ LightSystem* gLightEntSystems[ 2 ] = { 0, 0 };
 LightSystem* GetLightEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
-	Assert( gLightEntSystems[ i ] );
+	CH_ASSERT( gLightEntSystems[ i ] );
 	return gLightEntSystems[ i ];
 }
 
@@ -182,7 +182,7 @@ void EntSys_ModelInfo::Update()
 	{
 		auto modelInfo = Ent_GetComponent< CModelInfo >( entity, "modelInfo" );
 
-		Assert( modelInfo );
+		CH_ASSERT( modelInfo );
 
 		if ( !modelInfo )
 			continue;
@@ -351,7 +351,7 @@ EntSys_Renderable* gEntSys_Renderable[ 2 ] = { 0, 0 };
 EntSys_Renderable* GetRenderableEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
-	Assert( gEntSys_Renderable[ i ] );
+	CH_ASSERT( gEntSys_Renderable[ i ] );
 	return gEntSys_Renderable[ i ];
 }
 

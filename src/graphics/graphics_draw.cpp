@@ -614,7 +614,9 @@ void Graphics_PrepareDrawData()
 
 	// --------------------------------------------------------------------
 
-	bool updateShaderRenderables = gGraphicsData.aVertexBuffers.aDirty || gGraphicsData.aIndexBuffers.aDirty;
+	Graphics_UpdateDebugDraw();
+
+	bool updateShaderRenderables = gGraphicsData.aRenderableStaging.aDirty || gGraphicsData.aVertexBuffers.aDirty || gGraphicsData.aIndexBuffers.aDirty;
 	
 	// Update Vertex Buffer Array SSBO
 	if ( gGraphicsData.aVertexBuffers.aDirty )
@@ -645,15 +647,13 @@ void Graphics_PrepareDrawData()
 		gGraphicsData.aViewRenderLists.resize( gGraphicsData.aViewData.aViewports.size() );
 	}
 
-	Graphics_UpdateDebugDraw();
-
 #if 1
 	ChHandle_t              shaderSkinning     = gGraphics.GetShader( "__skinning" );
 	ShaderData_t*           shaderSkinningData = Shader_GetData( shaderSkinning );
 #endif
 
-	if ( ImGui::Button( "Reset Blend Shapes" ) )
-		r_reset_blend_shapes.SetValue( 1 );
+	// if ( ImGui::Button( "Reset Blend Shapes" ) )
+	// 	r_reset_blend_shapes.SetValue( 1 );
 
 	u32 surfDrawIndex = 0;
 
@@ -694,6 +694,13 @@ void Graphics_PrepareDrawData()
 			Log_WarnF( gLC_ClientGraphics, "Renderable Index %zd is greater than max shader renderable count of %zd\n", renderIndex, CH_R_MAX_RENDERABLES );
 			i++;
 			continue;
+		}
+
+		// Check if blend shapes are dirty
+		if ( renderable->aBlendShapesDirty )
+		{
+			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
+			renderable->aBlendShapesDirty = false;
 		}
 
 		Shader_Renderable_t& shaderRenderable         = gGraphicsData.aRenderableData[ renderIndex ];
@@ -762,7 +769,17 @@ void Graphics_PrepareDrawData()
 					continue;
 
 				// if ( shaderData->aFlags & EShaderFlags_Lights && usingShadow && shadowShaderData )
-				// 	Shader_SetupRenderableDrawData( renderable, shadowShaderData, renderable );
+				if ( usingShadow && shadowShaderData )
+				{
+					// Shader_SetupRenderableDrawData( renderIndex, 0, renderable, shadowShaderData, surfDraw );
+
+
+					// add a SurfaceDraw_t to each render list
+					// SurfaceDraw_t& surfDraw = gGraphicsData.aViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
+					// surfDraw.aRenderable    = gGraphicsData.aRenderables.aHandles[ i ];
+					// surfDraw.aSurface       = surf;
+					// surfDraw.aShaderSlot    = surfDrawIndex;
+				}
 				
 				if ( !shaderData->apMaterialIndex )
 					continue;
@@ -771,31 +788,32 @@ void Graphics_PrepareDrawData()
 			}
 		}
 
-		if ( isVisible && r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
-		{
-			gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
-
-			// Graphics_RenderableBlendShapesDirty;
-			for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
-			{
-				if ( r_reset_blend_shapes.GetBool() )
-					renderable->aBlendShapeWeights[ blendI ] = 0.f;
-
-				// renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
-				ImGui::PushID( imguiIndex++ );
-				ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ blendI ], -1.f, 4.f, "%.4f", 1.f );
-				ImGui::PopID();
-				//renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
-			}
-		}
+		//if ( isVisible && r_random_blend_shapes && renderable->aBlendShapeWeights.size() )
+		//{
+		//	gGraphicsData.aSkinningRenderList.emplace( gGraphicsData.aRenderables.aHandles[ i ] );
+		//
+		//	// Graphics_RenderableBlendShapesDirty;
+		//	for ( u32 blendI = 0; blendI < renderable->aBlendShapeWeights.size(); blendI++ )
+		//	{
+		//		if ( r_reset_blend_shapes.GetBool() )
+		//			renderable->aBlendShapeWeights[ blendI ] = 0.f;
+		//
+		//		// renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+		//		ImGui::PushID( imguiIndex++ );
+		//		ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ blendI ], -1.f, 4.f, "%.4f", 1.f );
+		//		ImGui::PopID();
+		//		//renderable->aBlendShapeWeights[ blendI ] = RandomFloat( 0.f, 1.f );
+		//	}
+		//}
 
 		i++;
 	}
 
+	if ( r_reset_blend_shapes )
+		r_reset_blend_shapes.SetValue( 0 );
+
 	// --------------------------------------------------------------------
 	// Prepare Skinning Compute Shader Buffers
-
-	r_reset_blend_shapes.SetValue( 0 );
 
 #if 1
 	u32 r = 0;
@@ -858,45 +876,45 @@ void Graphics_PrepareDrawData()
 #endif
 
 	// Update Core Data SSBO
-#if 0
+#if 01
 	if ( gGraphicsData.aCoreDataStaging.aDirty )
 	{
 		// Update Viewports (this looks stupid)
-		for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
-		{
-			ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
-			Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ i ];
-
-			viewportBuffer.aProjView          = viewport.aProjView;
-			viewportBuffer.aProjection        = viewport.aProjection;
-			viewportBuffer.aView              = viewport.aView;
-			viewportBuffer.aViewPos           = viewport.aViewPos;
-			viewportBuffer.aNearZ             = viewport.aNearZ;
-			viewportBuffer.aFarZ              = viewport.aFarZ;
-		}
-
-		// Update Renderable Vertex Buffer Handles
-		for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
-		{
-			Renderable_t* renderable = nullptr;
-			if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aRenderables.aHandles[ i ], &renderable ) )
-			{
-				Log_Warn( gLC_ClientGraphics, "Renderable handle is invalid!\n" );
-				gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
-				continue;
-			}
-
-			if ( !renderable->aVisible )
-			{
-				i++;
-				continue;
-			}
-
-			gGraphicsData.aRenderableData[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
-			gGraphicsData.aRenderableData[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
-
-			i++;
-		}
+		//for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		//{
+		//	ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
+		//	Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ i ];
+		//
+		//	viewportBuffer.aProjView          = viewport.aProjView;
+		//	viewportBuffer.aProjection        = viewport.aProjection;
+		//	viewportBuffer.aView              = viewport.aView;
+		//	viewportBuffer.aViewPos           = viewport.aViewPos;
+		//	viewportBuffer.aNearZ             = viewport.aNearZ;
+		//	viewportBuffer.aFarZ              = viewport.aFarZ;
+		//}
+		//
+		//// Update Renderable Vertex Buffer Handles
+		//for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
+		//{
+		//	Renderable_t* renderable = nullptr;
+		//	if ( !gGraphicsData.aRenderables.Get( gGraphicsData.aRenderables.aHandles[ i ], &renderable ) )
+		//	{
+		//		Log_Warn( gLC_ClientGraphics, "Renderable handle is invalid!\n" );
+		//		gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
+		//		continue;
+		//	}
+		//
+		//	if ( !renderable->aVisible )
+		//	{
+		//		i++;
+		//		continue;
+		//	}
+		//
+		//	gGraphicsData.aRenderableData[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+		//	gGraphicsData.aRenderableData[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
+		//
+		//	i++;
+		//}
 
 		gGraphicsData.aCoreDataStaging.aDirty = false;
 		render->BufferWrite( gGraphicsData.aCoreDataStaging.aStagingBuffer, sizeof( Buffer_Core_t ), &gGraphicsData.aCoreData );
@@ -939,6 +957,8 @@ void Graphics_PrepareDrawData()
 	// if ( gGraphicsData.aRenderableStaging.aDirty )
 	if ( updateShaderRenderables )
 	{
+		gGraphicsData.aRenderableStaging.aDirty = false;
+
 		// Update Renderable Vertex Buffer Handles
 		for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); )
 		{
@@ -1033,7 +1053,7 @@ void Graphics::Present()
 		Graphics_DoSkinning( c, cmdIndex );
 
 		// Draw Shadow Maps
-		Graphics_DrawShadowMaps( c, cmdIndex );
+		// Graphics_DrawShadowMaps( c, cmdIndex );
 
 		// ----------------------------------------------------------
 		// Main RenderPass

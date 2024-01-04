@@ -82,7 +82,7 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 {
 	PROF_SCOPE();
 
-	Assert( GetEntityCount() == aEntityFlags.size() );
+	CH_ASSERT( GetEntityCount() == aEntityFlags.size() );
 
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
 	updateOut.reserve( GetEntityCount() );
@@ -176,8 +176,8 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 		if ( !wroteVar )
 			continue;
 
-		Assert( var.aType != EEntNetField_Invalid );
-		Assert( var.aType != EEntNetField_Bool );
+		CH_ASSERT( var.aType != EEntNetField_Invalid );
+		CH_ASSERT( var.aType != EEntNetField_Bool );
 
 		switch ( var.aType )
 		{
@@ -872,7 +872,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		IEntityComponentSystem* system  = pool->apComponentSystem;
 		EntComponentData_t*     regData = pool->GetRegistryData();
 
-		AssertMsg( regData, "Failed to find component registry data" );
+		CH_ASSERT_MSG( regData, "Failed to find component registry data" );
 
 		if ( componentUpdate->hash() != regData->aHash )
 		{

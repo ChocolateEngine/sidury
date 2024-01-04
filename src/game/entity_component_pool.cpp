@@ -198,7 +198,7 @@ void EntityComponentPool::Remove( Entity entity )
 
 	ComponentID_t index = it->second;
 	void* data = aComponents[ index.aIndex ];
-	Assert( data );
+	CH_ASSERT( data );
 
 	// Remove it from systems
 	// for ( auto system : aComponentSystems )

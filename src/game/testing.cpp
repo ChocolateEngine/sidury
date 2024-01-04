@@ -178,7 +178,7 @@ static ProtogenSystem* gProtoSystems[ 2 ] = { 0, 0 };
 ProtogenSystem*        GetProtogenSys()
 {
 	int i = Game_ProcessingClient() ? CH_PROTO_CL : CH_PROTO_SV;
-	Assert( gProtoSystems[ i ] );
+	CH_ASSERT( gProtoSystems[ i ] );
 	return gProtoSystems[ i ];
 }
 
@@ -528,7 +528,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 	{
 		// auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
 		// 
-		// Assert( protoTransform );
+		// CH_ASSERT( protoTransform );
 		// 
 		// // Only update the renderable model matrix if the transform component is dirty
 		// bool transformDirty = false;
@@ -541,7 +541,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 
 		auto renderComp = Ent_GetComponent< CRenderable >( proto, "renderable" );
 
-		Assert( renderComp );
+		CH_ASSERT( renderComp );
 
 		if ( !renderComp )
 			continue;
@@ -653,7 +653,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 		auto playerTransform = Ent_GetComponent< CTransform >( protoLook.aLookTarget, "transform" );
 
-		// Assert( playerTransform );
+		// CH_ASSERT( playerTransform );
 
 		if ( !playerTransform )
 		{

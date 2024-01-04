@@ -7,6 +7,8 @@ struct Skybox_Push
 {
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
 	alignas( 16 ) int aSky = 0;              // sky texture index
+	alignas( 16 ) u32 aRenderable = 0;       // renderable index
+	alignas( 16 ) u32 aViewport = 0;         // viewport index
 };
 
 
@@ -47,6 +49,8 @@ static void Shader_Skybox_SetupPushData( u32 sRenderableIndex, u32 sViewportInde
 
 	Handle mat        = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
 	push.aSky         = gGraphics.Mat_GetTextureIndex( mat, "sky" );
+	push.aRenderable  = sRenderableIndex;
+	push.aViewport    = sViewportIndex;
 }
 
 
@@ -81,5 +85,5 @@ ShaderCreate_t gShaderCreate_Skybox = {
 };
 
 
-// CH_REGISTER_SHADER( gShaderCreate_Skybox );
+CH_REGISTER_SHADER( gShaderCreate_Skybox );
 

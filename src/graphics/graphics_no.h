@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include "core/core.h"
 #include "render/irender.h"
 
@@ -862,3 +864,4 @@ size_t             Graphics_GetVertexFormatSize( VertexFormat format );
 void               Graphics_GetVertexBindingDesc( VertexFormat format, std::vector< VertexInputBinding_t >& srAttrib );
 void               Graphics_GetVertexAttributeDesc( VertexFormat format, std::vector< VertexInputAttribute_t >& srAttrib );
 
+#endif

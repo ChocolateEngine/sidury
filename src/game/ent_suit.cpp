@@ -85,7 +85,7 @@ void SuitSystem::Update()
 SuitSystem* GetSuitEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
-	Assert( gSuitEntSystems[ i ] );
+	CH_ASSERT( gSuitEntSystems[ i ] );
 	return gSuitEntSystems[ i ];
 }
 

@@ -208,7 +208,7 @@ static PlayerSpawnManager* playerSpawn[ 2 ] = { 0, 0 };
 PlayerManager* GetPlayers()
 {
 	int i = Game_ProcessingClient() ? CH_PLAYER_CL : CH_PLAYER_SV;
-	Assert( players[ i ] );
+	CH_ASSERT( players[ i ] );
 	return players[ i ];
 }
 
@@ -311,7 +311,7 @@ void PlayerManager::ComponentUpdated( Entity sEntity, void* spData )
 
 bool PlayerManager::SetCurrentPlayer( Entity player )
 {
-	Assert( apMove );
+	CH_ASSERT( apMove );
 
 	apMove->aPlayer = player;
 
@@ -336,8 +336,8 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 		return false;
 	}
 
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	apMove->apCamTransform = GetTransform( playerInfo->aCamera );
 	apMove->apCamDir       = GetComp_Direction( playerInfo->aCamera );
@@ -350,16 +350,16 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 	apMove->apPhysObjComp  = GetComp_PhysObject( player );
 	apMove->apPhysObj      = apMove->apPhysObjComp->apObj;
 
-	Assert( apMove->apDir );
-	Assert( apMove->apRigidBody );
-	Assert( apMove->apTransform );
-	Assert( apMove->apPhysShape );
-	Assert( apMove->apPhysObjComp );
-	Assert( apMove->apPhysObj );
+	CH_ASSERT( apMove->apDir );
+	CH_ASSERT( apMove->apRigidBody );
+	CH_ASSERT( apMove->apTransform );
+	CH_ASSERT( apMove->apPhysShape );
+	CH_ASSERT( apMove->apPhysObjComp );
+	CH_ASSERT( apMove->apPhysObj );
 
-	Assert( apMove->apCamTransform );
-	Assert( apMove->apCamDir );
-	Assert( apMove->apCamera );
+	CH_ASSERT( apMove->apCamTransform );
+	CH_ASSERT( apMove->apCamDir );
+	CH_ASSERT( apMove->apCamera );
 
 	return true;
 }
@@ -376,7 +376,7 @@ void PlayerManager::Create( Entity player )
 	GetEntitySystem()->SetAllowSavingToMap( player, false );
 
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
-	Assert( playerInfo );
+	CH_ASSERT( playerInfo );
 
 	// Add Components to entity
 	Ent_AddComponent( player, "playerMoveData" );
@@ -392,11 +392,11 @@ void PlayerManager::Create( Entity player )
 	auto health       = Ent_AddComponent< CHealth >( player, "health" );
 	auto suit         = Ent_AddComponent< CSuit >( player, "suit" );
 
-	Assert( flashlight );
-	Assert( zoom );
-	Assert( transform );
-	Assert( health );
-	Assert( suit );
+	CH_ASSERT( flashlight );
+	CH_ASSERT( zoom );
+	CH_ASSERT( transform );
+	CH_ASSERT( health );
+	CH_ASSERT( suit );
 
 	health->aHealth = 100;
 
@@ -410,7 +410,7 @@ void PlayerManager::Create( Entity player )
 	{
 		SV_Client_t* client = SV_GetClientFromEntity( player );
 
-		Assert( client );
+		CH_ASSERT( client );
 
 		if ( !client )
 			return;
@@ -449,7 +449,7 @@ void PlayerManager::Create( Entity player )
 
 	IPhysicsShape* physShape = compPhysShape->apShape;
 
-	Assert( physShape );
+	CH_ASSERT( physShape );
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aMotionType = PhysMotionType::Dynamic;
@@ -461,7 +461,7 @@ void PlayerManager::Create( Entity player )
 
 	CPhysObject* physObj = Phys_CreateObject( player, physShape, physInfo );
 
-	Assert( physObj );
+	CH_ASSERT( physObj );
 }
 
 
@@ -488,20 +488,20 @@ void PlayerManager::Respawn( Entity player )
 	auto         zoom       = GetPlayerZoom( player );
 	auto         physObjComp    = GetComp_PhysObject( player );
 
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	auto camTransform = GetTransform( playerInfo->aCamera );
 
-	Assert( rigidBody );
-	Assert( transform );
-	Assert( camTransform );
-	Assert( zoom );
-	Assert( physObjComp );
+	CH_ASSERT( rigidBody );
+	CH_ASSERT( transform );
+	CH_ASSERT( camTransform );
+	CH_ASSERT( zoom );
+	CH_ASSERT( physObjComp );
 
 	IPhysicsObject* physObj = physObjComp->apObj;
 
-	Assert( physObj );
+	CH_ASSERT( physObj );
 
 	Transform playerSpawnSpot = GetPlayerSpawn()->SelectSpawnTransform();
 
@@ -552,7 +552,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 		return;
 	}
 
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo->aCamera );
 
 	CTransform* transform    = GetTransform( player );
 	CLight*     flashlight   = Ent_GetComponent< CLight >( player, "light" );
@@ -560,17 +560,23 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 	CTransform* camTransform = GetTransform( playerInfo->aCamera );
 	auto        camDir       = Ent_GetComponent< CDirection >( playerInfo->aCamera, "direction" );
 
-	Assert( transform );
-	Assert( camTransform );
-	Assert( camDir );
-	Assert( flashlight );
+	CH_ASSERT( transform );
+	CH_ASSERT( camTransform );
+	CH_ASSERT( camDir );
+	CH_ASSERT( flashlight );
 
 	auto UpdateTransform = [ & ]()
 	{
 		// weird stuff to get the angle of the light correct
+		// flashlight->aAng.Edit().x = camTransform->aAng.Get().z;
+		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
+		// flashlight->aAng.Edit().z = -camTransform->aAng.Get().x + 90.f;
+
 		flashlight->aAng.Edit().x = camTransform->aAng.Get().z;
-		flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
-		flashlight->aAng.Edit().z = -camTransform->aAng.Get().x + 90.f;
+		flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
+		flashlight->aAng.Edit().z = -camTransform->aAng.Get().y - 90.f;
+		//flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
+		//flashlight->aAng.Edit().z = -camTransform->aAng.Get().z;
 
 		flashlight->aPos          = transform->aPos.Get() + camTransform->aPos.Get();
 
@@ -644,8 +650,8 @@ void PlayerManager::Update( float frameTime )
 		auto playerInfo = GetPlayerInfo( player );
 		// auto camera     = GetCamera( player );
 
-		Assert( playerInfo );
-		Assert( playerInfo->aCamera );
+		CH_ASSERT( playerInfo );
+		CH_ASSERT( playerInfo->aCamera );
 
 		if ( !Game_IsPaused() )
 		{
@@ -653,8 +659,8 @@ void PlayerManager::Update( float frameTime )
 			auto transform    = GetTransform( player );
 			auto camTransform = GetTransform( playerInfo->aCamera );
 
-			Assert( transform );
-			Assert( camTransform );
+			CH_ASSERT( transform );
+			CH_ASSERT( camTransform );
 
 			// transform.aAng[PITCH] = -mouse.y;
 			camTransform->aAng.Edit()[ PITCH ] = userCmd.aAng[ PITCH ];
@@ -678,8 +684,8 @@ void PlayerManager::UpdateLocalPlayer()
 {
 	PROF_SCOPE();
 
-	Assert( Game_ProcessingClient() );
-	Assert( apMove );
+	CH_ASSERT( Game_ProcessingClient() );
+	CH_ASSERT( apMove );
 
 	auto userCmd = gClientUserCmd;
 
@@ -690,8 +696,8 @@ void PlayerManager::UpdateLocalPlayer()
 		PROF_SCOPE();
 
 		auto playerInfo = GetPlayerInfo( player );
-		Assert( playerInfo );
-		Assert( playerInfo->aCamera );
+		CH_ASSERT( playerInfo );
+		CH_ASSERT( playerInfo->aCamera );
 
 		auto     playerMove = GetPlayerMoveData( player );
 		auto     transform  = GetTransform( player );
@@ -700,11 +706,11 @@ void PlayerManager::UpdateLocalPlayer()
 		auto     camTransform = GetTransform( playerInfo->aCamera );
 		// auto     camera     = GetCamera( playerInfo->aCamera );
 
-		Assert( playerMove );
-		Assert( camTransform );
-		//Assert( camera );
-		Assert( transform );
-		Assert( flashlight );
+		CH_ASSERT( playerMove );
+		CH_ASSERT( camTransform );
+		//CH_ASSERT( camera );
+		CH_ASSERT( transform );
+		CH_ASSERT( flashlight );
 
 		apMove->SetPlayer( player );
 
@@ -828,11 +834,11 @@ void PlayerManager::UpdateLocalPlayer()
 
 void PlayerManager::DoMouseLook( Entity player )
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	CPlayerInfo* playerInfo = GetPlayerInfo( player );
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	if ( !playerInfo )
 	{
@@ -908,12 +914,12 @@ void CalcZoom( CCamera* camera, Entity player )
 
 		userCmd = &client->aUserCmd;
 
-		Assert( userCmd );
+		CH_ASSERT( userCmd );
 	}
 
 	CPlayerZoom* zoom = GetPlayerZoom( player );
 
-	Assert( zoom );
+	CH_ASSERT( zoom );
 
 	// If we have a usercmd to process on either client or server, process it
 	if ( userCmd )
@@ -990,8 +996,8 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 {
 	PROF_SCOPE();
 
-	Assert( info );
-	Assert( info->aCamera );
+	CH_ASSERT( info );
+	CH_ASSERT( info->aCamera );
 
 	CTransform* camTransform = GetTransform( info->aCamera );
 	CTransform* transform    = GetTransform( player );
@@ -1002,7 +1008,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	auto        camera       = GetCamera( info->aCamera );
 	auto        camDir       = GetComp_Direction( info->aCamera );
 
-	Assert( transform );
+	CH_ASSERT( transform );
 
 	ClampAngles( camTransform );
 
@@ -1133,7 +1139,7 @@ void PlayerMovement::EnsureUserCmd( Entity player )
 		apUserCmd = &client->aUserCmd;
 	}
 
-	Assert( apUserCmd );
+	CH_ASSERT( apUserCmd );
 }
 
 
@@ -1151,8 +1157,8 @@ void PlayerMovement::SetPlayer( Entity player )
 		return;
 	}
 
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	apCamTransform = GetTransform( playerInfo->aCamera );
 	apCamDir       = GetComp_Direction( playerInfo->aCamera );
@@ -1165,16 +1171,16 @@ void PlayerMovement::SetPlayer( Entity player )
 	apPhysObjComp  = GetComp_PhysObject( player );
 	apPhysObj      = apPhysObjComp->apObj;
 
-	Assert( apCamTransform );
-	Assert( apCamDir );
-	Assert( apCamera );
+	CH_ASSERT( apCamTransform );
+	CH_ASSERT( apCamDir );
+	CH_ASSERT( apCamera );
 
-	Assert( apMove );
-	Assert( apRigidBody );
-	Assert( apTransform );
-	Assert( apDir );
-	Assert( apPhysObjComp );
-	Assert( apPhysObj );
+	CH_ASSERT( apMove );
+	CH_ASSERT( apRigidBody );
+	CH_ASSERT( apTransform );
+	CH_ASSERT( apDir );
+	CH_ASSERT( apPhysObjComp );
+	CH_ASSERT( apPhysObj );
 }
 
 
@@ -1183,8 +1189,8 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	EnsureUserCmd( player );
 
 	CPlayerInfo* playerInfo = GetPlayerInfo( player );
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	if ( !playerInfo )
 	{
@@ -1195,8 +1201,8 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	CTransform* camTransform = GetTransform( playerInfo->aCamera );
 	auto        move         = GetPlayerMoveData( player );
 
-	Assert( move );
-	Assert( camTransform );
+	CH_ASSERT( move );
+	CH_ASSERT( camTransform );
 
 	SetMoveType( *move, PlayerMoveType::Walk );
 
@@ -1212,9 +1218,9 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	auto transform = GetTransform( player );
 	auto physObj   = GetComp_PhysObjectPtr( player );
 
-	Assert( move );
-	Assert( transform );
-	Assert( physObj );
+	CH_ASSERT( move );
+	CH_ASSERT( transform );
+	CH_ASSERT( physObj );
 
 	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
 	transform->aPos.Edit().z += phys_player_offset;
@@ -1336,7 +1342,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 		return;
 
 	CPlayerInfo* playerInfo = GetPlayerInfo( player );
-	Assert( playerInfo );
+	CH_ASSERT( playerInfo );
 
 	if ( !playerInfo )
 	{
@@ -1344,7 +1350,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 		return;
 	}
 
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo->aCamera );
 
 	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( player );
 	auto rigidBody = GetRigidBody( player );
@@ -1486,11 +1492,11 @@ void PlayerMovement::UpdatePosition( Entity player )
 	apPhysObjComp = GetComp_PhysObject( player );
 	apPhysObj     = apPhysObjComp->apObj;
 
-	Assert( apMove );
-	Assert( apTransform );
-	Assert( apRigidBody );
-	Assert( apPhysObjComp );
-	Assert( apPhysObj );
+	CH_ASSERT( apMove );
+	CH_ASSERT( apTransform );
+	CH_ASSERT( apRigidBody );
+	CH_ASSERT( apPhysObjComp );
+	CH_ASSERT( apPhysObj );
 
 	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
 
@@ -1526,8 +1532,8 @@ void PlayerMovement::DoSmoothDuck()
 	PROF_SCOPE();
 
 	CPlayerInfo* playerInfo = GetPlayerInfo( aPlayer );
-	Assert( playerInfo );
-	Assert( playerInfo->aCamera );
+	CH_ASSERT( playerInfo );
+	CH_ASSERT( playerInfo->aCamera );
 
 	if ( !playerInfo )
 	{

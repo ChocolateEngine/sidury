@@ -329,7 +329,20 @@ bool Shader_ParseRequirements( ShaderRequirmentsList_t& srOutput )
 		// create the per shader descriptor sets for this shader
 		ShaderSets_t& shaderSets = gShaderSets[ shaderCreate->apName ];
 
-		for ( u32 i = 0; i < shaderCreate->aBindingCount; i++ )
+		// future demez here - what the hell does this do and what's the purpose of this?
+		if ( shaderCreate->aBindingCount > 0 )
+		{
+			for ( u32 i = 0; i < shaderCreate->aBindingCount; i++ )
+			{
+				ShaderRequirement_t require{};
+				require.aShader       = shaderCreate->apName;
+				require.apBindings    = shaderCreate->apBindings;
+				require.aBindingCount = shaderCreate->aBindingCount;
+
+				srOutput.aItems.push_back( require );
+			}
+		}
+		else
 		{
 			ShaderRequirement_t require{};
 			require.aShader       = shaderCreate->apName;

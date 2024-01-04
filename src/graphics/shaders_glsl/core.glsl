@@ -1,12 +1,17 @@
 #ifndef CH_CORE_GLSL
 #define CH_CORE_GLSL
 
-#define CH_DESC_SET_GLOBAL                  0
-#define CH_DESC_SET_PER_SHADER              1
+#define CH_DESC_SET_GLOBAL                   0
+#define CH_DESC_SET_PER_SHADER               1
 
 // KEEP IN SYNC WITH GAME CODE
 // TODO: make some file you can share between shader code and c++
-#define CH_LIGHT_TYPES                      3  // TODO: 4 when you add capsule lights
+#define CH_LIGHT_TYPES                       3  // TODO: 4 when you add capsule lights
+
+#define CH_LIGHT_TYPE_WORLD                  0
+#define CH_LIGHT_TYPE_POINT                  1
+#define CH_LIGHT_TYPE_CONE                   2
+#define CH_LIGHT_TYPE_CAPSULE                3
 
 #define CH_R_MAX_TEXTURES                    4096
 #define CH_R_MAX_VIEWPORTS                   32
@@ -124,6 +129,8 @@ struct LightCapsule_t
 layout(set = 0, binding = CH_BINDING_TEXTURES) uniform sampler2D[]       texSamplers;
 layout(set = 0, binding = CH_BINDING_TEXTURES) uniform sampler2DArray[]  texSamplerArray;
 layout(set = 0, binding = CH_BINDING_TEXTURES) uniform sampler2DShadow[] texShadowMaps;
+
+layout(set = 0, binding = CH_BINDING_TEXTURES) uniform samplerCube[]     texSamplersCube;
 
 
 #endif // CH_FRAG_SHADER

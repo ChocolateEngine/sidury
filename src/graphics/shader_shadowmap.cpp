@@ -6,8 +6,9 @@
 struct ShadowMap_Push
 {
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
-	int aViewInfo = 0;                       // view info index
-	int aAlbedo   = 0;                       // albedo texture index
+	alignas( 16 ) int aAlbedo     = 0;       // albedo texture index
+	alignas( 16 ) u32 aRenderable = 0;       // renderable index
+	alignas( 16 ) u32 aViewport   = 0;       // viewport index
 };
 
 
@@ -52,7 +53,8 @@ static void Shader_ShadowMap_SetupPushData( u32 sRenderableIndex, u32 sViewportI
 
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = spModelDraw->aModelMatrix;
-	push.aViewInfo       = gShadowViewInfoIndex;
+	push.aViewport       = gShadowViewInfoIndex;
+	push.aRenderable     = sRenderableIndex;
 	push.aAlbedo         = -1;
 
 	Handle mat           = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
@@ -92,7 +94,7 @@ static void Shader_ShadowMap_PushConstants( Handle cmd, Handle sLayout, SurfaceD
 	PROF_SCOPE();
 
 	ShadowMap_Push& push = gPushData.at( &srDrawInfo );
-	push.aViewInfo       = gShadowViewInfoIndex;
+	push.aViewport       = gShadowViewInfoIndex;
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ), &push );
 }
 
@@ -120,5 +122,5 @@ ShaderCreate_t gShaderCreate_ShadowMap = {
 };
 
 
-// CH_REGISTER_SHADER( gShaderCreate_ShadowMap );
+CH_REGISTER_SHADER( gShaderCreate_ShadowMap );
 

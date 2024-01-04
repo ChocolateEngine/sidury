@@ -6,7 +6,7 @@
 #include "debug_draw.h"
 #include "mesh_builder.h"
 #include "imgui/imgui.h"
-// #include "../main.h"
+#include "rmlui_render.h"
 
 #include <forward_list>
 #include <stack>
@@ -176,8 +176,16 @@ ModelBBox_t Graphics::CalcModelBBox( Handle sModel )
 	{
 		if ( vertData->aIndices.size() )
 		{
-			for ( u32 i = 0; i < mesh.aIndexCount; i++ )
-				UpdateBBox( data[ vertData->aIndices[ mesh.aIndexOffset + i ] ] );
+			if ( mesh.aIndexCount )
+			{
+				for ( u32 i = 0; i < mesh.aIndexCount; i++ )
+					UpdateBBox( data[ vertData->aIndices[ mesh.aIndexOffset + i ] ] );
+			}
+			else
+			{
+				for ( u32 i = 0; i < mesh.aVertexCount; i++ )
+					UpdateBBox( data[ mesh.aVertexOffset + i ] );
+			}
 		}
 		else
 		{
@@ -318,8 +326,6 @@ void Graphics_FreeQueuedResources()
 		model->aRefCount--;
 		if ( model->aRefCount == 0 )
 		{
-			// TODO: QUEUE THIS MODEL FOR DELETION, DON'T DELETE THIS NOW
-
 			// Free Materials attached to this model
 			for ( Mesh& mesh : model->aMeshes )
 			{
@@ -1199,7 +1205,7 @@ u32 Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 s
 
 void Graphics_OnTextureIndexUpdate()
 {
-	Log_Msg( gLC_ClientGraphics, "TODO: HANDLE TEXTURE INDEX UPDATE !!!!\n" );
+	// Log_Msg( gLC_ClientGraphics, "TODO: HANDLE TEXTURE INDEX UPDATE !!!!\n" );
 }
 
 
@@ -1315,6 +1321,8 @@ bool Graphics::Init()
 	// gpWorldLight = Graphics_CreateLight( ELightType_Directional );
 	// gpWorldLight->aColor = { 1.0, 1.0, 1.0, 1.0 };
 	// gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
+
+	Rml::SetRenderInterface( &gRmlRender );
 
 	return render->InitImGui( gGraphicsData.aRenderPassGraphics );
 	// return render->InitImGui( gGraphicsData.aRenderPassGraphics );
@@ -1459,33 +1467,46 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 
 	Log_Dev( gLC_ClientGraphics, 1, "Created Renderable\n" );
 
-	Renderable_t* modelDraw  = nullptr;
+	Renderable_t* renderable  = nullptr;
 	ChHandle_t    drawHandle = InvalidHandle;
 
-	if ( !( drawHandle = gGraphicsData.aRenderables.Create( &modelDraw ) ) )
+	if ( !( drawHandle = gGraphicsData.aRenderables.Create( &renderable ) ) )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Failed to create Renderable_t\n" );
 		return InvalidHandle;
 	}
 
-	modelDraw->aModel       = sModel;
-	modelDraw->aModelMatrix = glm::identity< glm::mat4 >();
-	modelDraw->aTestVis     = true;
-	modelDraw->aCastShadow  = true;
-	modelDraw->aVisible     = true;
+#if DEBUG
+	
+	std::string_view modelPath = gGraphics.GetModelPath( sModel );
+
+	if ( modelPath.size() )
+	{
+		renderable->aDebugName = modelPath;
+	}
+
+#endif
+
+	renderable->aModel       = sModel;
+	renderable->aModelMatrix = glm::identity< glm::mat4 >();
+	renderable->aTestVis     = true;
+	renderable->aCastShadow  = true;
+	renderable->aVisible     = true;
+
+	// TODO: queue this stuff for when the model is finished loading
 
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
-	modelDraw->aAABB        = gGraphics.CreateWorldAABB( modelDraw->aModelMatrix, gGraphicsData.aModelBBox[ modelDraw->aModel ] );
+	renderable->aAABB        = gGraphics.CreateWorldAABB( renderable->aModelMatrix, gGraphicsData.aModelBBox[ renderable->aModel ] );
 
-	modelDraw->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
+	renderable->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
 
-	if ( modelDraw->aBlendShapeWeights.size() )
+	if ( renderable->aBlendShapeWeights.size() )
 	{
 		// we need new vertex buffers for the modified vertices
 		size_t bufferSize        = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
 
-		modelDraw->aVertexBuffer = render->CreateBuffer(
+		renderable->aVertexBuffer = render->CreateBuffer(
 			"output renderable vertices idfk",
 			bufferSize,
 			EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
@@ -1496,18 +1517,18 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 		copy.aDstOffset = 0;
 		copy.aSize      = bufferSize;
 
-		render->BufferCopyQueued( model->apBuffers->aVertex, modelDraw->aVertexBuffer, &copy, 1 );
+		render->BufferCopyQueued( model->apBuffers->aVertex, renderable->aVertexBuffer, &copy, 1 );
 
 		// Now Create a Blend Shape Weights Storage Buffer
-		modelDraw->aBlendShapeWeightsBuffer = render->CreateBuffer(
+		renderable->aBlendShapeWeightsBuffer = render->CreateBuffer(
 		  "BlendShape Weights",
-		  sizeof( float ) * modelDraw->aBlendShapeWeights.size(),
+		  sizeof( float ) * renderable->aBlendShapeWeights.size(),
 		  EBufferFlags_Storage,
 		  EBufferMemory_Host );
 
 		// Allocate Indexes for these
-		modelDraw->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, modelDraw->aVertexBuffer );
-		modelDraw->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, modelDraw->aBlendShapeWeightsBuffer );
+		renderable->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexBuffer );
+		renderable->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
 
 		// update the descriptor sets for the skinning shader
 		WriteDescSet_t update{};
@@ -1549,17 +1570,18 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 	}
 	else
 	{
-		modelDraw->aVertexBuffer = model->apBuffers->aVertex;
-		modelDraw->aVertexIndex  = model->apBuffers->aVertexHandle;
+		renderable->aVertexBuffer = model->apBuffers->aVertex;
+		renderable->aVertexIndex  = model->apBuffers->aVertexHandle;
 	}
 
-	modelDraw->aIndexHandle = model->apBuffers->aIndexHandle;
+	renderable->aIndexHandle = model->apBuffers->aIndexHandle;
+	gGraphicsData.aRenderableStaging.aDirty = true;
 
 	return drawHandle;
 }
 
 
-Renderable_t* Graphics::GetRenderableData( Handle sRenderable )
+Renderable_t* Graphics::GetRenderableData( ChHandle_t sRenderable )
 {
 	PROF_SCOPE();
 
@@ -1571,6 +1593,137 @@ Renderable_t* Graphics::GetRenderableData( Handle sRenderable )
 	}
 
 	return renderable;
+}
+
+
+void Graphics::SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )
+{
+	// TODO: queue this stuff for when the model is finished loading
+	Renderable_t* renderable = nullptr;
+	if ( !gGraphicsData.aRenderables.Get( sRenderable, &renderable ) )
+	{
+		Log_Warn( gLC_ClientGraphics, "Failed to find Renderable!\n" );
+		return;
+	}
+
+	if ( renderable->aModel )
+	{
+		// HACK - REMOVE WHEN WE ADD QUEUED DELETION FOR ASSETS
+		render->WaitForQueues();
+
+		if ( renderable->aBlendShapeWeightsBuffer )
+		{
+			render->DestroyBuffer( renderable->aBlendShapeWeightsBuffer );
+			renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
+
+			// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
+			render->DestroyBuffer( renderable->aVertexBuffer );
+
+			if ( renderable->aVertexIndex != UINT32_MAX )
+			{
+				Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+			}
+
+			if ( renderable->aBlendShapeWeightsIndex != UINT32_MAX )
+			{
+				Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
+			}
+		}
+
+		renderable->aVertexBuffer = CH_INVALID_HANDLE;
+	}
+
+	Model* model = nullptr;
+	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
+	{
+		Log_Warn( gLC_ClientGraphics, "Failed to find Model!\n" );
+		return;
+	}
+
+	renderable->aModel       = sModel;
+
+	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
+	// Graphics_UpdateModelAABB( modelDraw );
+	renderable->aAABB        = gGraphics.CreateWorldAABB(renderable->aModelMatrix, gGraphicsData.aModelBBox[ renderable->aModel ] );
+
+	renderable->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
+
+	if (renderable->aBlendShapeWeights.size() )
+	{
+		// we need new vertex buffers for the modified vertices
+		size_t bufferSize        = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
+
+		renderable->aVertexBuffer = render->CreateBuffer(
+			"output renderable vertices idfk",
+			bufferSize,
+			EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
+			EBufferMemory_Device );
+
+		BufferRegionCopy_t copy;
+		copy.aSrcOffset = 0;
+		copy.aDstOffset = 0;
+		copy.aSize      = bufferSize;
+
+		render->BufferCopyQueued( model->apBuffers->aVertex, renderable->aVertexBuffer, &copy, 1 );
+
+		// Now Create a Blend Shape Weights Storage Buffer
+		renderable->aBlendShapeWeightsBuffer = render->CreateBuffer(
+		  "BlendShape Weights",
+		  sizeof( float ) * renderable->aBlendShapeWeights.size(),
+		  EBufferFlags_Storage,
+		  EBufferMemory_Host );
+
+		// Allocate Indexes for these
+		renderable->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexBuffer );
+		renderable->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
+
+		// update the descriptor sets for the skinning shader
+		WriteDescSet_t update{};
+
+		update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].aCount;
+		update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].apSets;
+
+		update.aBindingCount = 2;
+		update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
+
+		update.apBindings[ 0 ].aBinding  = 0;
+		update.apBindings[ 0 ].aType     = EDescriptorType_StorageBuffer;
+		update.apBindings[ 0 ].aCount    = gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size();
+		update.apBindings[ 0 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size() );
+
+		update.apBindings[ 1 ].aBinding  = 1;
+		update.apBindings[ 1 ].aType     = EDescriptorType_StorageBuffer;
+		update.apBindings[ 1 ].aCount    = gGraphicsData.aBlendShapeDataBuffers.aBuffers.size();
+		update.apBindings[ 1 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeDataBuffers.aBuffers.size() );
+
+		int i                            = 0;
+		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeWeightBuffers.aBuffers )
+		{
+			update.apBindings[ 0 ].apData[ i++ ] = buffer;
+		}
+
+		i = 0;
+		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeDataBuffers.aBuffers )
+		{
+			update.apBindings[ 1 ].apData[ i++ ] = buffer;
+		}
+
+		// update.aImages = gViewportBuffers;
+		render->UpdateDescSets( &update, 1 );
+
+		free( update.apBindings[ 0 ].apData );
+		free( update.apBindings[ 1 ].apData );
+		free( update.apBindings );
+	}
+	else
+	{
+		renderable->aVertexBuffer = model->apBuffers->aVertex;
+		renderable->aVertexIndex  = model->apBuffers->aVertexHandle;
+	}
+
+	renderable->aIndexHandle = model->apBuffers->aIndexHandle;
+
+	gGraphicsData.aRenderableStaging.aDirty = true;
 }
 
 
@@ -1613,6 +1766,7 @@ void Graphics::FreeRenderable( Handle sRenderable )
 	renderable->aVertexBuffer = CH_INVALID_HANDLE;
 
 	gGraphicsData.aRenderables.Remove( sRenderable );
+	gGraphicsData.aRenderableStaging.aDirty = true;
 }
 
 
@@ -1626,6 +1780,31 @@ void Graphics::UpdateRenderableAABB( Handle sRenderable )
 	if ( Renderable_t* renderable = gGraphics.GetRenderableData( sRenderable ) )
 		gGraphicsData.aRenderAABBUpdate.emplace( sRenderable, gGraphicsData.aModelBBox[ renderable->aModel ] );
 }
+
+
+ModelBBox_t Graphics::GetRenderableAABB( Handle sRenderable )
+{
+	PROF_SCOPE();
+
+	if ( !sRenderable )
+		return {};
+
+	if ( Renderable_t* renderable = gGraphics.GetRenderableData( sRenderable ) )
+		return renderable->aAABB;
+}
+
+
+#if DEBUG
+
+void Graphics::SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )
+{
+	if ( Renderable_t* renderable = gGraphics.GetRenderableData(sRenderable) )
+	{
+		renderable->aDebugName = sName;
+	}
+}
+
+#endif
 
 
 void Graphics_ConsolidateRenderables()
@@ -2013,3 +2192,11 @@ void Graphics_CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVer
 		Graphics_CreateIndexBuffer( spBuffers, spVertexData, debugName );
 }
 #endif
+
+
+CONCMD( r_dump_vertex_buffers )
+{
+	// Dump Vertex Buffer Index for each renderable
+
+	gGraphicsData.aVertexBuffers;
+}

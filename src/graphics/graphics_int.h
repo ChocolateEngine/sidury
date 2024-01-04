@@ -167,10 +167,10 @@ struct Buffer_Core_t
 	u32                    aNumLights[ ELightType_Count ];
 
 	// NOTE: this could probably be brought down to one light struct, with packed data to unpack in the shader
-	//UBO_LightDirectional_t aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
-	//UBO_LightPoint_t       aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
-	//UBO_LightCone_t        aLightCone[ CH_R_MAX_LIGHT_TYPE ];
-	//UBO_LightCapsule_t     aLightCapsule[ CH_R_MAX_LIGHT_TYPE ];
+	UBO_LightDirectional_t aLightWorld[ CH_R_MAX_LIGHT_TYPE ];
+	UBO_LightPoint_t       aLightPoint[ CH_R_MAX_LIGHT_TYPE ];
+	UBO_LightCone_t        aLightCone[ CH_R_MAX_LIGHT_TYPE ];
+	UBO_LightCapsule_t     aLightCapsule[ CH_R_MAX_LIGHT_TYPE ];
 };
 
 
@@ -548,8 +548,15 @@ class Graphics : public IGraphics
 
 	virtual ChHandle_t         CreateRenderable( ChHandle_t sModel )                                                                                                                          override;
 	virtual Renderable_t*      GetRenderableData( ChHandle_t sRenderable )                                                                                                                    override;
+	virtual void               SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )                                                                                                override;
 	virtual void               FreeRenderable( ChHandle_t sRenderable )                                                                                                                       override;
 	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                                                                 override;
+	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    override;
+
+#if DEBUG
+	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       override;
+#endif
+
 	// virtual void               ConsolidateRenderables()                                                                                                                                       override;
 
 	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                                                              override;
@@ -560,6 +567,8 @@ class Graphics : public IGraphics
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  override;
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                                                  override;
 	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                                                              override;
+	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                                                     override;
+	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                                                              override;
 	virtual void               DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  override;
 	virtual void               DrawProjView( const glm::mat4& srProjView )                                                                                                                    override;
 	virtual void               DrawFrustum( const Frustum_t& srFrustum )                                                                                                                      override;

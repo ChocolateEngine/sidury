@@ -574,7 +574,7 @@ void CL_UpdateUserCmd()
 
 	auto camTransform = Ent_GetComponent< CTransform >( playerInfo->aCamera, "transform" );
 
-	Assert( camTransform );
+	CH_ASSERT( camTransform );
 
 	// Reset Values
 	gClientUserCmd.aButtons    = 0;
@@ -813,8 +813,8 @@ void CL_GetServerMessages()
 
 		EMsgSrc_Server msgType = serverMsg->type();
 
-		Assert( msgType < EMsgSrc_Server_MAX );
-		Assert( msgType >= EMsgSrc_Server_MIN );
+		CH_ASSERT( msgType < EMsgSrc_Server_MAX );
+		CH_ASSERT( msgType >= EMsgSrc_Server_MIN );
 
 		if ( msgType >= EMsgSrc_Server_MAX )
 		{

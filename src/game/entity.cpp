@@ -33,7 +33,7 @@ CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
 // 	}
 // 
 // 	EntComponentData_t* data = it->second;
-// 	Assert( data );
+// 	CH_ASSERT( data );
 // 	return data->aCreate();
 // }
 
@@ -376,18 +376,18 @@ EntitySystem* GetEntitySystem()
 {
 	if ( Game_ProcessingClient() )
 	{
-		Assert( cl_entities );
+		CH_ASSERT( cl_entities );
 		return cl_entities;
 	}
 
-	Assert( sv_entities );
+	CH_ASSERT( sv_entities );
 	return sv_entities;
 }
 
 
 bool EntitySystem::CreateClient()
 {
-	Assert( !cl_entities );
+	CH_ASSERT( !cl_entities );
 	if ( cl_entities )
 		return false;
 
@@ -400,7 +400,7 @@ bool EntitySystem::CreateClient()
 
 bool EntitySystem::CreateServer()
 {
-	Assert( !sv_entities );
+	CH_ASSERT( !sv_entities );
 	if ( sv_entities )
 		return false;
 
@@ -793,6 +793,8 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChi
 {
 	PROF_SCOPE();
 
+#pragma message( "could probably speed up GetChildrenRecurse() by instead iterating through aEntityParents, and checking the value for each one" )
+
 	for ( auto& [ otherEntity, flags ] : aEntityFlags )
 	{
 		if ( !( flags & EEntityFlag_Parented ) )
@@ -804,6 +806,9 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChi
 		{
 			srChildren.push_back( otherEntity );
 			GetChildrenRecurse( otherEntity, srChildren );
+
+#pragma message( "CHECK IF THIS BREAKS THE CODE" )
+			break;
 		}
 	}
 }
@@ -814,7 +819,8 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
 	PROF_SCOPE();
 
-	Entity    parent = IsParented( sEntity ) ? GetParent( sEntity ) : CH_ENT_INVALID;
+	// Entity    parent = IsParented( sEntity ) ? GetParent( sEntity ) : CH_ENT_INVALID;
+	Entity    parent = GetParent( sEntity );
 	glm::mat4 parentMat( 1.f );
 
 	if ( parent != CH_ENT_INVALID )
@@ -1186,7 +1192,7 @@ CONCMD( ent_dump_registry )
 
 	for ( const auto& [ name, regData ] : GetEntComponentRegistry().aComponentNames )
 	{
-		Assert( regData );
+		CH_ASSERT( regData );
 
 		if ( !regData )
 			continue;
@@ -1228,7 +1234,7 @@ CONCMD( ent_dump )
 
 	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
 	{
-		Assert( pool );
+		CH_ASSERT( pool );
 
 		if ( !pool )
 			continue;

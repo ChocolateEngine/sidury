@@ -22,11 +22,11 @@ IPhysicsEnvironment*     GetPhysEnv()
 {
 	if ( Game_ProcessingClient() )
 	{
-		Assert( cl_physenv );
+		CH_ASSERT( cl_physenv );
 		return cl_physenv;
 	}
 
-	Assert( sv_physenv );
+	CH_ASSERT( sv_physenv );
 	return sv_physenv;
 }
 
@@ -279,7 +279,7 @@ void EntSys_PhysShape::Update()
 	{
 		auto physShape  = Ent_GetComponent< CPhysShape >( entity, "physShape" );
 
-		Assert( physShape );
+		CH_ASSERT( physShape );
 
 		if ( !physShape )
 			continue;
@@ -376,8 +376,8 @@ void EntSys_PhysObject::Update()
 		auto physShape = Ent_GetComponent< CPhysShape >( entity, "physShape" );
 		auto physObject = Ent_GetComponent< CPhysObject >( entity, "physObject" );
 
-		Assert( physShape );
-		Assert( physObject );
+		CH_ASSERT( physShape );
+		CH_ASSERT( physObject );
 
 		if ( !physShape || !physObject )
 			continue;
@@ -428,7 +428,7 @@ EntSys_PhysObject* gEntSys_PhysObject[ 2 ];
 EntSys_PhysShape* GetPhysShapeEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
-	Assert( gEntSys_PhysShape[ i ] );
+	CH_ASSERT( gEntSys_PhysShape[ i ] );
 	return gEntSys_PhysShape[ i ];
 }
 
@@ -436,7 +436,7 @@ EntSys_PhysShape* GetPhysShapeEntSys()
 EntSys_PhysObject* GetPhysObjectEntSys()
 {
 	int i = Game_ProcessingClient() ? 1 : 0;
-	Assert( gEntSys_PhysObject[ i ] );
+	CH_ASSERT( gEntSys_PhysObject[ i ] );
 	return gEntSys_PhysObject[ i ];
 }
 

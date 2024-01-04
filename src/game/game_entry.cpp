@@ -63,10 +63,10 @@ static AppModule_t gAppModules[] =
 {
 	{ (ISystem**)&input,      "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
 	{ (ISystem**)&render,     "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
-	{ (ISystem**)&gui,        "ch_gui",       IGUI_NAME, IGUI_HASH },
 	{ (ISystem**)&audio,      "ch_aduio",     IADUIO_NAME, IADUIO_VER },
 	{ (ISystem**)&ch_physics, "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
     { (ISystem**)&graphics,   "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
+	{ (ISystem**)&gui,        "ch_gui",       IGUI_NAME, IGUI_HASH },
 };
 
 

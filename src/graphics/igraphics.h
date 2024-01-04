@@ -16,8 +16,6 @@ enum class GraphicsFmt;
 
 extern IRender* render;
 
-using Entity = size_t;
-
 
 enum EModelData
 {
@@ -396,6 +394,10 @@ struct ModelBBox_t
 // It also contains an AABB, and bools for testing vis, casting a shadow, and whether it's visible or not
 struct Renderable_t
 {
+#if DEBUG
+	std::string                 aDebugName;
+#endif
+
 	// used in actual drawing
 	ChHandle_t                  aModel;
 	glm::mat4                   aModelMatrix;
@@ -404,8 +406,8 @@ struct Renderable_t
 	// all material handles are 0 by default, which means no custom materials are being used
 	// also will start with 1 material by default for async loading, and then will expand upon model loading finish
 	// or
-	// u32         aMeshCount;
-	// ChHandle_t* apMaterials;
+	u32                         aMaterialCount;
+	ChHandle_t*                 apMaterials = nullptr;
 
 	// used for blend shapes and skeleton data, i don't like this here because very few models will have blend shapes/skeletons
 	ChVector< float >           aBlendShapeWeights;
@@ -512,7 +514,7 @@ struct RenderPassData_t
 struct Light_t
 {
 	ELightType aType = ELightType_Directional;
-	glm::vec4  aColor{};
+	glm::vec4  aColor{ 1.f, 1.f, 1.f, 1.f };
 	glm::vec3  aPos{};
 	glm::vec3  aAng{};
 	float      aInnerFov = 45.f;
@@ -867,18 +869,27 @@ class IGraphics : public ISystem
 
 	virtual ChHandle_t         CreateRenderable( ChHandle_t sModel )                                                                                                                          = 0;
 	virtual Renderable_t*      GetRenderableData( ChHandle_t sRenderable )                                                                                                                    = 0;
+	virtual void               SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )                                                                                                = 0;
 	virtual void               FreeRenderable( ChHandle_t sRenderable )                                                                                                                       = 0;
 	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                                                                 = 0;
+	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    = 0;
 	// virtual void               ConsolidateRenderables()                                                                                                                                       = 0;
+
+#if DEBUG
+	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       = 0;
+#endif
 
 	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                                                              = 0;
 
 	// ---------------------------------------------------------------------------------------
 	// Debug Rendering
+	// TODO: maybe make a line thickness option, which uses a material var?
 
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  = 0;
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                                                  = 0;
 	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                                                              = 0;
+	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                                                     = 0;
+	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                                                              = 0;
 	virtual void               DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  = 0;
 	virtual void               DrawProjView( const glm::mat4& srProjView )                                                                                                                    = 0;
 	virtual void               DrawFrustum( const Frustum_t& srFrustum )                                                                                                                      = 0;
@@ -898,5 +909,5 @@ class IGraphics : public ISystem
 
 
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  1
+#define IGRAPHICS_VER  2
 

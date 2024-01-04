@@ -602,10 +602,10 @@ bool MapManager_LoadWorldModel()
 	auto physShape  = Ent_AddComponent< CPhysShape >( worldEntity, "physShape" );
 	auto physObject = Ent_AddComponent< CPhysObject >( worldEntity, "physObject" );
 
-	Assert( transform );
-	Assert( renderable );
-	Assert( physShape );
-	Assert( physObject );
+	CH_ASSERT( transform );
+	CH_ASSERT( renderable );
+	CH_ASSERT( physShape );
+	CH_ASSERT( physObject );
 
 	renderable->aPath = gpMap->aMapInfo->modelPath;
 

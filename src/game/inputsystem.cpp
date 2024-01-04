@@ -21,18 +21,18 @@ CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
 CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 
-static glm::vec2                                       gMouseDelta{};
-static glm::vec2                                       gMouseDeltaScale{ 1.f, 1.f };
-static std::vector< ButtonInput_t >                    gButtonInputs;
-static ButtonInput_t                                   gButtons;
-static std::unordered_map< SDL_Scancode, std::string > gKeyBinds;
-static std::unordered_map< SDL_Scancode, std::string > gKeyBindToggle;
+static glm::vec2                                  gMouseDelta{};
+static glm::vec2                                  gMouseDeltaScale{ 1.f, 1.f };
+static std::vector< ButtonInput_t >               gButtonInputs;
+static ButtonInput_t                              gButtons;
+static std::unordered_map< EButton, std::string > gKeyBinds;
+static std::unordered_map< EButton, std::string > gKeyBindToggle;
 
-static std::vector< ConVar* >                          gInputCvars;
-static std::unordered_map< SDL_Scancode, ConVar* >     gInputCvarKeys;
+static std::vector< ConVar* >                     gInputCvars;
+static std::unordered_map< EButton, ConVar* >     gInputCvarKeys;
 
 
-static bool                                            gResetBindings = Args_Register( "Reset All Keybindings", "-reset-binds" );
+static bool                                       gResetBindings = Args_Register( "Reset All Keybindings", "-reset-binds" );
 
 
 CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
@@ -137,7 +137,7 @@ static void PrintBinding( const char* spKey, const char* spCmd )
 }
 
 
-static void PrintBinding( SDL_Scancode sScancode, const char* spKey )
+static void PrintBinding(EButton sScancode, const char* spKey )
 {
 	// Find the command for this key and print it
 	auto it = gKeyBinds.find( sScancode );
@@ -157,7 +157,7 @@ CONCMD_DROP_VA( bind, bind_dropdown, 0, "Bind a key to a command" )
 	if ( args.empty() )
 		return;
 
-	SDL_Scancode scancode = SDL_GetScancodeFromName( args[ 0 ].c_str() );
+	EButton scancode = input->GetKeyFromName( args[ 0 ].c_str() );
 
 	if ( scancode == SDL_SCANCODE_UNKNOWN )
 	{
@@ -195,7 +195,7 @@ CONCMD_DROP_VA( unbind, bind_dropdown_keys, 0, "UnBind a key" )
 	if ( args.empty() )
 		return;
 
-	SDL_Scancode scancode = SDL_GetScancodeFromName( args[ 0 ].c_str() );
+	EButton scancode = input->GetKeyFromName( args[ 0 ].c_str() );
 
 	if ( scancode == SDL_SCANCODE_UNKNOWN )
 	{
@@ -221,7 +221,7 @@ CONCMD_VA( bind_dump, "Dump all keys bound to a command" )
 {
 	for ( auto& [ scancode, command ] : gKeyBinds )
 	{
-		PrintBinding( SDL_GetScancodeName( scancode ), command.c_str() );
+		PrintBinding( input->GetKeyName( scancode ), command.c_str() );
 	}
 }
 
@@ -280,7 +280,7 @@ static void CmdBindArchive( std::string& srOutput )
 	{
 		// get ugly'd on - Agent Agrimar
 		srOutput += "bind \"";
-		srOutput += SDL_GetScancodeName( scancode );
+		srOutput += input->GetKeyName( scancode );
 		srOutput += "\" \"";
 		srOutput += command;
 		srOutput += "\"\n";
@@ -290,7 +290,7 @@ static void CmdBindArchive( std::string& srOutput )
 
 void Input_Init()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	Input_CalcMouseDelta();
 
@@ -319,7 +319,7 @@ void Input_Init()
 
 void Input_Update()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	// update mouse inputs
 	gMouseDelta = {};
@@ -370,7 +370,7 @@ void Input_Update()
 
 void Input_CalcMouseDelta()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	const glm::ivec2& baseDelta = input->GetMouseDelta();
 
@@ -381,7 +381,7 @@ void Input_CalcMouseDelta()
 
 glm::vec2 Input_GetMouseDelta()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	return gMouseDelta * gMouseDeltaScale;
 }
@@ -389,7 +389,7 @@ glm::vec2 Input_GetMouseDelta()
 
 void Input_SetMouseDeltaScale( const glm::vec2& scale )
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	gMouseDeltaScale = scale;
 }
@@ -397,7 +397,7 @@ void Input_SetMouseDeltaScale( const glm::vec2& scale )
 
 const glm::vec2& Input_GetMouseDeltaScale()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	return gMouseDeltaScale;
 }
@@ -405,7 +405,7 @@ const glm::vec2& Input_GetMouseDeltaScale()
 
 ButtonInput_t Input_RegisterButton()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	ButtonInput_t newBitShift = (1 << gButtonInputs.size());
 	gButtonInputs.push_back( newBitShift );
@@ -415,15 +415,21 @@ ButtonInput_t Input_RegisterButton()
 
 ButtonInput_t Input_GetButtonStates()
 {
-	Assert( Game_ProcessingClient() );
+	CH_ASSERT( Game_ProcessingClient() );
 
 	return gButtons;
 }
 
 
-void Input_BindKey( SDL_Scancode key, const std::string& cmd )
+void Input_BindKey( SDL_Scancode sKey, const std::string& cmd )
 {
-	Assert( Game_ProcessingClient() );
+	return Input_BindKey( (EButton)sKey, cmd );
+}
+
+
+void Input_BindKey( EButton key, const std::string& cmd )
+{
+	CH_ASSERT( Game_ProcessingClient() );
 
 	input->RegisterKey( key );
 
@@ -439,7 +445,7 @@ void Input_BindKey( SDL_Scancode key, const std::string& cmd )
 		it->second = cmd;
 	}
 
-	Log_DevF( gLC_GameInput, 1, "Bound Key: \"%s\" \"%s\"\n", SDL_GetScancodeName( key ), cmd.c_str() );
+	Log_DevF( gLC_GameInput, 1, "Bound Key: \"%s\" \"%s\"\n", input->GetKeyName( key ), cmd.c_str() );
 
 	// Add the first convar here to the input list
 	std::string name;

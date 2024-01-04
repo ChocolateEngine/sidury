@@ -123,7 +123,7 @@ void MeshBuilder::End( bool sCreateBuffers )
 					break;
 			}
 
-			Assert( attribIndex < vertData->aData.size() );
+			CH_ASSERT( attribIndex < vertData->aData.size() );
 
 			if ( attribIndex >= vertData->aData.size() )
 				continue;
@@ -230,14 +230,14 @@ void MeshBuilder::Reset()
 
 uint32_t MeshBuilder::GetVertexCount( uint32_t i ) const
 {
-	Assert( i > aSurfaces.size() );
+	CH_ASSERT( i > aSurfaces.size() );
 	return aSurfaces[ i ].aVertices.size();
 }
 
 
 uint32_t MeshBuilder::GetVertexCount() const
 {
-	Assert( aSurfaces.size() );
+	CH_ASSERT( aSurfaces.size() );
 	return aSurfaces[ aSurf ].aVertices.size();
 }
 
@@ -254,8 +254,8 @@ uint32_t MeshBuilder::GetVertexCount() const
 
 void MeshBuilder::PreallocateVertices( uint32_t sCount )
 {
-	Assert( aSurfaces.size() );
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() );
+	CH_ASSERT( apSurf );
 
 	if ( !apSurf )
 		return;
@@ -268,8 +268,8 @@ void MeshBuilder::PreallocateVertices( uint32_t sCount )
 
 void MeshBuilder::AllocateVertices( uint32_t sCount )
 {
-	Assert( aSurfaces.size() );
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() );
+	CH_ASSERT( apSurf );
 
 	if ( !apSurf )
 		return;
@@ -284,8 +284,8 @@ void MeshBuilder::NextVertex()
 {
 	PROF_SCOPE();
 
-	Assert( aSurfaces.size() );
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() );
+	CH_ASSERT( apSurf );
 
 	if ( apSurf->aVertices.empty() )
 	{
@@ -411,8 +411,8 @@ void MeshBuilder::SetTexCoord( float x, float y )
 
 void MeshBuilder::SetMaterial( Handle sMaterial )
 {
-	Assert( aSurfaces.size() );
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() );
+	CH_ASSERT( apSurf );
 
 	apSurf->aMaterial = sMaterial;
 }
@@ -430,7 +430,7 @@ void MeshBuilder::SetSurfaceCount( size_t sCount )
 
 void MeshBuilder::SetCurrentSurface( size_t sIndex )
 {
-	Assert( sIndex < aSurfaces.size() );
+	CH_ASSERT( sIndex < aSurfaces.size() );
 
 	aSurf = sIndex;
 	apSurf = &aSurfaces[sIndex];
@@ -440,15 +440,15 @@ void MeshBuilder::SetCurrentSurface( size_t sIndex )
 void MeshBuilder::AdvanceSurfaceIndex()
 {
 	aSurf++;
-	Assert( aSurf < aSurfaces.size() );
+	CH_ASSERT( aSurf < aSurfaces.size() );
 	apSurf = &aSurfaces[aSurf];
 }
 
 
 const MeshBuilderVertex& MeshBuilder::GetLastVertex()
 {
-	Assert( aSurfaces.size() );
-	Assert( apSurf );
+	CH_ASSERT( aSurfaces.size() );
+	CH_ASSERT( apSurf );
 	return *( apSurf->aVertices.end() );
 }
 
@@ -482,7 +482,7 @@ inline glm::vec3 CalculateVertexNormal( const glm::vec3& a, const glm::vec3& b, 
 
 void MeshBuilder::CalculateNormals( size_t sIndex )
 {
-	Assert( aSurfaces.size() );
+	CH_ASSERT( aSurfaces.size() );
 
 	Surface& surf = aSurfaces[sIndex];
 	VertexData_t* vertData = apMesh->apVertexData;

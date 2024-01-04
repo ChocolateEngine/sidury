@@ -213,6 +213,8 @@ u32 Graphics_AllocateLightSlot( Light_t* spLight )
 		Graphics_AddShadowMap( spLight );
 	}
 
+	gGraphicsData.aCoreData.aNumLights[ spLight->aType ]++;
+
 	return index;
 }
 
@@ -252,6 +254,9 @@ void Graphics_FreeLightSlot( Light_t* spLight )
 	{
 		Graphics_DestroyShadowMap( spLight );
 	}
+
+	if ( gGraphicsData.aCoreData.aNumLights[ spLight->aType ] > 0 )
+		gGraphicsData.aCoreData.aNumLights[ spLight->aType ]--;
 
 	vec_remove( gLights, spLight );
 	delete spLight;
@@ -398,7 +403,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 	gGraphicsData.aCoreDataStaging.aDirty = true;
 
-#if 0
+#if 1
 	switch ( spLight->aType )
 	{
 		default:
@@ -504,7 +509,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			glm::mat4 matrix;
 			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
 			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
-#if 0
+#if 1
 			// update shadow map view info
 			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
 
@@ -525,15 +530,23 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			view.aViewMat    = transform.ToViewMatrixZ();
 			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
 
-			gViewport[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
-			gViewport[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
-			gViewport[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
-			gViewport[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
-			gViewport[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
-			gViewport[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
+			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
+			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
+			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
+			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
+			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
+			// gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
 
-			Handle shadowBuffer                               = gViewportBuffers[ shadowMap.aViewInfoIndex ];
-			render->BufferWrite( shadowBuffer, sizeof( UBO_Viewport_t ), &gViewport[ shadowMap.aViewInfoIndex ] );
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
+
+			gGraphicsData.aViewportStaging.aDirty                                      = true;
+			// Handle shadowBuffer                               = gViewportBuffers[ shadowMap.aViewInfoIndex ];
+			// render->BufferWrite( shadowBuffer, sizeof( Shader_Viewport_t ), &gViewport[ shadowMap.aViewInfoIndex ] );
 
 			// get shadow map view info
 
@@ -541,11 +554,11 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			// USE THE ProjViewMat FROM THE ACTUAL VIEW IN THE VIEWPORT BUFFER
 			// see for more info: https://vkguide.dev/docs/chapter-4/descriptors_code_more/
 			// is there also a performance cost to doing this though? since we have to read memory elsewhere not in the cache?
-			light.aProjView                               = view.aProjViewMat;
-			light.aShadow                                 = render->GetTextureIndex( shadowMap.aTexture );
+			light.aProjView                                                            = view.aProjViewMat;
+			light.aShadow                                                              = render->GetTextureIndex( shadowMap.aTexture );
 
-			gViewport[ shadowMap.aViewInfoIndex ].aActive = spLight->aShadow && spLight->aEnabled;
-#endif
+			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aActive     = spLight->aShadow && spLight->aEnabled;
+	#endif
 
 			break;
 		}
@@ -587,7 +600,7 @@ Light_t* Graphics::CreateLight( ELightType sType )
 		return nullptr;
 	}
 
-	light->aType                 = sType;
+	light->aType                          = sType;
 	gGraphicsData.aCoreDataStaging.aDirty = true;
 
 	gLights.push_back( light );

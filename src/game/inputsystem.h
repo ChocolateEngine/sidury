@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL_scancode.h>
+#include "iinput.h"
 #include <string>
 
 extern ConVarFlag_t CVARF_INPUT;
@@ -53,6 +53,7 @@ const glm::vec2&     Input_GetMouseDeltaScale();
 ButtonInput_t        Input_RegisterButton();
 ButtonInput_t        Input_GetButtonStates();
 
+void                 Input_BindKey( EButton key, const std::string& cmd );
 void                 Input_BindKey( SDL_Scancode key, const std::string& cmd );
 
 //bool Input_KeyPressed( ButtonInput_t key );

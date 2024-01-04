@@ -1,5 +1,6 @@
 #include "core/platform.h"
 #include <stdio.h>
+#include <string>
 
 #if CH_USE_MIMALLOC
   #include "mimalloc-new-delete.h"
@@ -85,8 +86,16 @@ int main( int argc, char *argv[] )
 
 	core_init( argc, argv, GAME_PATH );
 
-	if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
-		return -1;
+	if ( argc >= 2 && strcmp( argv[ 1 ], "-editor" ) == 0 )
+	{
+		if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/editor" EXT_DLL ) == -1 )
+			return -1;
+	}
+	else
+	{
+		if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
+			return -1;
+	}
 
 	*( void** )( &game_init ) = SDL_LoadFunction( client, "game_init" );
 	if ( !game_init )

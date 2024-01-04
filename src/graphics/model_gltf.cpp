@@ -405,8 +405,8 @@ void Graphics_LoadGltf( const std::string& srBasePath, const std::string& srPath
 						morphTargetsPos.push_back( attrib.data );
 				}
 
-				Assert( vertexBuffer->component_type == cgltf_component_type_r_32f );
-				Assert( vertexBuffer->type == cgltf_type_vec3 );
+				CH_ASSERT( vertexBuffer->component_type == cgltf_component_type_r_32f );
+				CH_ASSERT( vertexBuffer->type == cgltf_type_vec3 );
 
 			}
 

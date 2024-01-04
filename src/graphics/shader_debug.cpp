@@ -12,15 +12,17 @@ struct Debug_Push
 {
 	alignas( 16 ) glm::mat4 aModelMatrix;
 	alignas( 16 ) glm::vec4 aColor;
+	alignas( 16 ) u32 aRenderable = 0;  // renderable index
+	alignas( 16 ) u32 aViewport   = 0;  // viewport index
 };
 
 
 static std::unordered_map< SurfaceDraw_t*, Debug_Push > gDebugPushData;
+static std::unordered_map< SurfaceDraw_t*, Debug_Push > gDebugLinePushData;
 
 
 static void Shader_Debug_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	//Graphics_AddPipelineLayouts( srPipeline, EShaderFlags_PushConstant );
 	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
 }
 
@@ -51,12 +53,38 @@ static void Shader_Debug_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex
 	push.aModelMatrix = spDrawData->aModelMatrix;
 	Handle mat        = gGraphics.Model_GetMaterial( spDrawData->aModel, srDrawInfo.aSurface );
 	push.aColor       = gGraphics.Mat_GetVec4( mat, "color" );
+	push.aRenderable  = sRenderableIndex;
+	push.aViewport    = sViewportIndex;
 }
 
 
 static void Shader_Debug_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
 {
 	Debug_Push& push = gDebugPushData.at( &srDrawInfo );
+	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
+}
+
+
+static void Shader_DebugLine_ResetPushData()
+{
+	gDebugLinePushData.clear();
+}
+
+
+static void Shader_DebugLine_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
+{
+	Debug_Push& push  = gDebugLinePushData[ &srDrawInfo ];
+	push.aModelMatrix = spDrawData->aModelMatrix;
+	Handle mat        = gGraphics.Model_GetMaterial( spDrawData->aModel, srDrawInfo.aSurface );
+	push.aColor       = gGraphics.Mat_GetVec4( mat, "color", {0, 0, 0, 1.f} );
+	push.aRenderable  = sRenderableIndex;
+	push.aViewport    = sViewportIndex;
+}
+
+
+static void Shader_DebugLine_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
+{
+	Debug_Push& push = gDebugLinePushData.at( &srDrawInfo );
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ), &push );
 }
 
@@ -83,11 +111,6 @@ ShaderCreate_t gShaderCreate_Debug = {
 };
 
 
-static void Shader_DebugLine_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
-{
-}
-
-
 static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
 	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
@@ -101,19 +124,27 @@ static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t
 }
 
 
+static IShaderPush gShaderPush_DebugLine = {
+	.apReset = Shader_DebugLine_ResetPushData,
+	.apSetup = Shader_DebugLine_SetupPushData,
+	.apPush  = Shader_DebugLine_PushConstants,
+};
+
+
 ShaderCreate_t gShaderCreate_DebugLine = {
 	.apName           = "debug_line",
 	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = 0,
+	.aFlags           = EShaderFlags_PushConstant,
 	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_LineWidth,
 	.aVertexFormat    = VertexFormat_Position | VertexFormat_Color,
 	.apInit           = nullptr,
 	.apDestroy        = nullptr,
-	.apLayoutCreate   = Shader_DebugLine_GetPipelineLayoutCreate,
+	.apLayoutCreate   = Shader_Debug_GetPipelineLayoutCreate,
 	.apGraphicsCreate = Shader_DebugLine_GetGraphicsPipelineCreate,
+	.apShaderPush     = &gShaderPush_DebugLine,
 };
 
 
-// CH_REGISTER_SHADER( gShaderCreate_Debug );
-// CH_REGISTER_SHADER( gShaderCreate_DebugLine );
+CH_REGISTER_SHADER( gShaderCreate_Debug );
+CH_REGISTER_SHADER( gShaderCreate_DebugLine );
 

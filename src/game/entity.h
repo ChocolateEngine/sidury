@@ -696,11 +696,11 @@ struct EntityData_t
 class EntitySystem
 {
   public:
-	static bool             CreateClient();
 	static bool             CreateServer();
+	static bool             CreateClient();
 
-	static void             DestroyClient();
 	static void             DestroyServer();
+	static void             DestroyClient();
 
 	bool                    Init();
 	void                    Shutdown();
@@ -858,6 +858,7 @@ class EntitySystem
 	std::vector< Entity >                                        aEntityPool{};
 
 	// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
+	// This is needed for client/server networking, the entity id on each end will be different, so we convert the id
 	std::unordered_map< Entity, Entity >                         aEntityIDConvert;
 
 	// Entity Flags

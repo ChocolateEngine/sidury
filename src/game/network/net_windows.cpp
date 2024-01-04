@@ -530,7 +530,7 @@ Socket_t Net_OpenSocket( const char* spPort )
 
 void Net_CloseSocket( Socket_t sSocket )
 {
-	if ( !sSocket )
+	if ( !sSocket || sSocket == CH_INVALID_SOCKET )
 		return;
 
 	int ret = closesocket( (SOCKET)sSocket );
