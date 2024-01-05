@@ -26,7 +26,8 @@ CONVAR( view_move_side, 500.0f );
 CONVAR( view_move_up, 500.0f );
 
 CONVAR( view_move_min, 0.01f );
-CONVAR( view_move_max, 50000.f );
+CONVAR( view_move_max, 15.f );
+CONVAR( view_move_scroll_sens, 0.125f );
 
 CONVAR( editor_show_pos, 1.f );
 
@@ -56,9 +57,11 @@ void EditorView_UpdateInputs()
 	glm::ivec2 mouseScroll = input->GetMouseScroll();
 
 	if ( mouseScroll.y != 0 )
-		gMoveScale += mouseScroll.y * 0.25;
-
-	gMoveScale = std::clamp( gMoveScale, view_move_min.GetFloat(), view_move_max.GetFloat() );
+	{
+		gMoveScale += mouseScroll.y * view_move_scroll_sens;
+		gMoveScale = std::clamp( gMoveScale, view_move_min.GetFloat(), view_move_max.GetFloat() );
+		Log_DevF( 1, "Movement Speed: %.4f\n", gMoveScale );
+	}
 
 	float moveScale = gFrameTime * gMoveScale;
 	
@@ -106,7 +109,6 @@ void EditorView_UpdateInputs()
 
 		Editor_GetContext()->aView.aResolution;
 		Editor_GetContext()->aView.aProjViewMat;
-
 	}
 
 	if ( gDrawMouseTrace )
