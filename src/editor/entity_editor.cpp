@@ -351,12 +351,20 @@ void EntEditor_DrawEntityData()
 	// Entity Model
 	ImGui::Separator();
 	
-	if ( ImGui::CollapsingHeader( "Model", ImGuiTreeNodeFlags_DefaultOpen ) )
+	if ( ImGui::CollapsingHeader( "Renderable", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
 		if ( entity->aModel )
 		{
 			std::string_view modelPath = graphics->GetModelPath( entity->aModel );
 			ImGui::Text( modelPath.data() );
+
+			// ImVec2 rect = ImGui::GetItemRectSize();
+			// 
+			// ImGui::IsMouseHoveringRect();
+			// 
+			// ImGui::BeginTooltip();
+			// ImGui::Text( modelPath.data() );
+			// ImGui::EndTooltip();
 		}
 
 		if ( ImGui::Button( "Load Model" ) )
@@ -396,75 +404,64 @@ void EntEditor_DrawEntityData()
 				if ( entity->aModel )
 					graphics->FreeModel( entity->aModel );
 
-				Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
-				entity->aModel           = model;
+				entity->aModel = model;
 
-				graphics->SetRenderableModel( entity->aRenderable, model );
+				if ( entity->aRenderable )
+				{
+					Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
+					graphics->SetRenderableModel( entity->aRenderable, model );
+				}
+				else
+				{
+					entity->aRenderable = graphics->CreateRenderable( entity->aModel );
+				}
 			}
 		}
 	}
 
-	// Entity Renderable
-	ImGui::Separator();
-
-	if ( ImGui::CollapsingHeader( "Renderable", ImGuiTreeNodeFlags_DefaultOpen ) )
+	if ( entity->aRenderable )
 	{
-		if ( entity->aRenderable )
+		Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
+
+		ImGui::Checkbox( "Visible", &renderable->aVisible );
+		ImGui::Checkbox( "Test Visibility", &renderable->aTestVis );
+		ImGui::Checkbox( "Cast Shadows", &renderable->aCastShadow );
+
+		// List Materials
+
+		// Do we have blend shapes?
+		if ( renderable->aBlendShapeWeights.size() )
 		{
-			Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
+			bool resetBlendShapes = ImGui::Button( "Reset Blend Shapes" );
 
-			ImGui::Checkbox( "Visible", &renderable->aVisible );
-			ImGui::Checkbox( "Test Visibility", &renderable->aTestVis );
-			ImGui::Checkbox( "Cast Shadows", &renderable->aCastShadow );
+			// Display Them (TODO: names)
 
-			// List Materials
-
-			// Do we have blend shapes?
-			if ( renderable->aBlendShapeWeights.size() )
+			if ( ImGui::BeginChild( "Blend Shapes", { 0, 200 }, true ) )
 			{
-				bool resetBlendShapes = ImGui::Button( "Reset Blend Shapes" );
-
-				// Display Them (TODO: names)
-
-				if ( ImGui::BeginChild( "Blend Shapes", {0, 200}, true ) )
+				u32 imguiID = 0;
+				for ( u32 i = 0; i < renderable->aBlendShapeWeights.size(); i++ )
 				{
-					u32 imguiID = 0;
-					for ( u32 i = 0; i < renderable->aBlendShapeWeights.size(); i++ )
+					ImGui::PushID( imguiID++ );
+
+					if ( ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ i ], -1.f, 4.f, "%.4f", 1.f ) )
 					{
-						ImGui::PushID( imguiID++ );
-				
-						if ( ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ i ], -1.f, 4.f, "%.4f", 1.f ) )
-						{
-							renderable->aBlendShapesDirty = true;
-						}
-				
-						ImGui::PopID();
-						ImGui::SameLine();
-						ImGui::PushID( imguiID++ );
-
-						if ( ImGui::Button( "Reset" ) || resetBlendShapes )
-						{
-							renderable->aBlendShapeWeights[ i ] = 0.f;
-							renderable->aBlendShapesDirty = true;
-						}
-
-						ImGui::PopID();
+						renderable->aBlendShapesDirty = true;
 					}
 
-					ImGui::EndChild();
+					ImGui::PopID();
+					ImGui::SameLine();
+					ImGui::PushID( imguiID++ );
+
+					if ( ImGui::Button( "Reset" ) || resetBlendShapes )
+					{
+						renderable->aBlendShapeWeights[ i ] = 0.f;
+						renderable->aBlendShapesDirty       = true;
+					}
+
+					ImGui::PopID();
 				}
-			}
-		}
-		else
-		{
-			// Maybe auto create a renderable?
-			if ( !entity->aModel )
-			{
-				ImGui::Text( "Set a Model first before creating a renderable" );
-			}
-			else if ( ImGui::Button( "Create Renderable" ) )
-			{
-				entity->aRenderable = graphics->CreateRenderable( entity->aModel );
+
+				ImGui::EndChild();
 			}
 		}
 	}
