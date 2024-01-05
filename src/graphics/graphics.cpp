@@ -6,7 +6,7 @@
 #include "debug_draw.h"
 #include "mesh_builder.h"
 #include "imgui/imgui.h"
-#include "rmlui_render.h"
+// #include "rmlui_render.h"
 
 #include <forward_list>
 #include <stack>
@@ -1322,7 +1322,7 @@ bool Graphics::Init()
 	// gpWorldLight->aColor = { 1.0, 1.0, 1.0, 1.0 };
 	// gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
 
-	Rml::SetRenderInterface( &gRmlRender );
+	// Rml::SetRenderInterface( &gRmlRender );
 
 	return render->InitImGui( gGraphicsData.aRenderPassGraphics );
 	// return render->InitImGui( gGraphicsData.aRenderPassGraphics );

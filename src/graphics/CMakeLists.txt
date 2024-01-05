@@ -24,7 +24,7 @@ set(
 	${CH_THIRDPARTY}/speedykeyv/KeyValue.h
 )
 
-include( ${CH_ROOT}/scripts/rmlui.cmake )
+# include( ${CH_ROOT}/scripts/rmlui.cmake )
 
 add_library( Graphics SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 

@@ -61,7 +61,7 @@ link_directories(
 	"$<$<CONFIG:RelWithDebInfo>:${FLATBUFFERS_DIR_RELEASE}>"
 )
 
-include( ${CH_ROOT}/scripts/rmlui.cmake )
+# include( ${CH_ROOT}/scripts/rmlui.cmake )
 
 # ??????
 add_library( SiduryClient SHARED ../graphics/mesh_builder.cpp ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
