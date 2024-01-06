@@ -325,8 +325,7 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 			bool resetBlendShapes = ImGui::Button( "Reset Blend Shapes" );
 
 			// Display Them (TODO: names)
-
-			if ( ImGui::BeginChild( "Blend Shapes", { 0, 200 }, true ) )
+			if ( ImGui::BeginChild( "Blend Shapes", {}, ImGuiChildFlags_ResizeY ) )
 			{
 				u32 imguiID = 0;
 				for ( u32 i = 0; i < renderable->aBlendShapeWeights.size(); i++ )
