@@ -4,6 +4,8 @@
 
 #include "imgui/imgui.h"
 
+#include <unordered_set>
+
 
 static ChHandle_t gSelectedEntity       = CH_INVALID_HANDLE;
 
@@ -269,6 +271,93 @@ std::string EntEditor_DrawModelSelectionWindow()
 }
 
 
+void EntEditor_DrawRenderableUI( Entity_t* spEntity )
+{
+	if ( spEntity->aModel )
+	{
+		std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
+		ImGui::Text( modelPath.data() );
+
+		// ImVec2 rect = ImGui::GetItemRectSize();
+		//
+		// ImGui::IsMouseHoveringRect();
+		//
+		// ImGui::BeginTooltip();
+		// ImGui::Text( modelPath.data() );
+		// ImGui::EndTooltip();
+	}
+
+	if ( ImGui::Button( "Load Model" ) )
+	{
+		gInModelSelect = true;
+
+		if ( spEntity->aModel )
+		{
+			std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
+			gModelSelectPath           = FileSys_GetDirName( modelPath );
+		}
+		else
+		{
+			gModelSelectPath = FileSys_GetExePath();
+		}
+	}
+
+	if ( spEntity->aRenderable )
+	{
+		Renderable_t* renderable = graphics->GetRenderableData( spEntity->aRenderable );
+
+		ImGui::Checkbox( "Visible", &renderable->aVisible );
+		ImGui::Checkbox( "Test Visibility", &renderable->aTestVis );
+		ImGui::Checkbox( "Cast Shadows", &renderable->aCastShadow );
+
+		// List Materials
+		if ( ImGui::CollapsingHeader( "Materials" ) )
+		{
+			ImGui::Text( "Materials: %d", renderable->aMaterialCount );
+			for ( u32 matI = 0; matI < renderable->aMaterialCount; matI++ )
+			{
+			}
+		}
+
+		// Do we have blend shapes?
+		if ( ImGui::CollapsingHeader( "Blend Shapes" ) && renderable->aBlendShapeWeights.size() )
+		{
+			bool resetBlendShapes = ImGui::Button( "Reset Blend Shapes" );
+
+			// Display Them (TODO: names)
+
+			if ( ImGui::BeginChild( "Blend Shapes", { 0, 200 }, true ) )
+			{
+				u32 imguiID = 0;
+				for ( u32 i = 0; i < renderable->aBlendShapeWeights.size(); i++ )
+				{
+					ImGui::PushID( imguiID++ );
+
+					if ( ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ i ], -1.f, 4.f, "%.4f", 1.f ) )
+					{
+						renderable->aBlendShapesDirty = true;
+					}
+
+					ImGui::PopID();
+					ImGui::SameLine();
+					ImGui::PushID( imguiID++ );
+
+					if ( ImGui::Button( "Reset" ) || resetBlendShapes )
+					{
+						renderable->aBlendShapeWeights[ i ] = 0.f;
+						renderable->aBlendShapesDirty       = true;
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndChild();
+			}
+		}
+	}
+}
+
+
 void EntEditor_DrawEntityData()
 {
 	if ( gSelectedEntity == CH_INVALID_HANDLE )
@@ -312,11 +401,22 @@ void EntEditor_DrawEntityData()
 			Entity_SetParent( gSelectedEntity, CH_INVALID_HANDLE );
 		}
 
+		// Can't parent it to any of these
+		std::unordered_set< ChHandle_t > children;
+		Entity_GetChildrenRecurse( gSelectedEntity, children );
+
 		const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
 
 		for ( ChHandle_t entityHandle : entityHandles )
 		{
 			if ( Entity_GetParent( gSelectedEntity ) == entityHandle || gSelectedEntity == entityHandle )
+				continue;
+
+			// Make sure this isn't one of our children
+			auto it = children.find( entityHandle );
+
+			// it is, we can't parent to a child, continue
+			if ( it != children.end() )
 				continue;
 
 			Entity_t* entityToParent = Entity_GetData( entityHandle );
@@ -348,39 +448,12 @@ void EntEditor_DrawEntityData()
 	ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
 	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
 
-	// Entity Model
 	ImGui::Separator();
-	
-	if ( ImGui::CollapsingHeader( "Renderable", ImGuiTreeNodeFlags_DefaultOpen ) )
+
+	// Entity Model/Renderable
+	if ( ImGui::CollapsingHeader( "Renderable", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding ) )
 	{
-		if ( entity->aModel )
-		{
-			std::string_view modelPath = graphics->GetModelPath( entity->aModel );
-			ImGui::Text( modelPath.data() );
-
-			// ImVec2 rect = ImGui::GetItemRectSize();
-			// 
-			// ImGui::IsMouseHoveringRect();
-			// 
-			// ImGui::BeginTooltip();
-			// ImGui::Text( modelPath.data() );
-			// ImGui::EndTooltip();
-		}
-
-		if ( ImGui::Button( "Load Model" ) )
-		{
-			gInModelSelect = true;
-
-			if ( entity->aModel )
-			{
-				std::string_view modelPath = graphics->GetModelPath( entity->aModel );
-				gModelSelectPath = FileSys_GetDirName( modelPath );
-			}
-			else
-			{
-				gModelSelectPath = FileSys_GetExePath();
-			}
-		}
+		EntEditor_DrawRenderableUI( entity );
 	}
 
 	if ( gInModelSelect )
@@ -419,105 +492,61 @@ void EntEditor_DrawEntityData()
 		}
 	}
 
-	if ( entity->aRenderable )
-	{
-		Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
-
-		ImGui::Checkbox( "Visible", &renderable->aVisible );
-		ImGui::Checkbox( "Test Visibility", &renderable->aTestVis );
-		ImGui::Checkbox( "Cast Shadows", &renderable->aCastShadow );
-
-		// List Materials
-
-		// Do we have blend shapes?
-		if ( renderable->aBlendShapeWeights.size() )
-		{
-			bool resetBlendShapes = ImGui::Button( "Reset Blend Shapes" );
-
-			// Display Them (TODO: names)
-
-			if ( ImGui::BeginChild( "Blend Shapes", { 0, 200 }, true ) )
-			{
-				u32 imguiID = 0;
-				for ( u32 i = 0; i < renderable->aBlendShapeWeights.size(); i++ )
-				{
-					ImGui::PushID( imguiID++ );
-
-					if ( ImGui::SliderFloat( "##blend_shape", &renderable->aBlendShapeWeights[ i ], -1.f, 4.f, "%.4f", 1.f ) )
-					{
-						renderable->aBlendShapesDirty = true;
-					}
-
-					ImGui::PopID();
-					ImGui::SameLine();
-					ImGui::PushID( imguiID++ );
-
-					if ( ImGui::Button( "Reset" ) || resetBlendShapes )
-					{
-						renderable->aBlendShapeWeights[ i ] = 0.f;
-						renderable->aBlendShapesDirty       = true;
-					}
-
-					ImGui::PopID();
-				}
-
-				ImGui::EndChild();
-			}
-		}
-	}
+	// Physics Model
+	// entity->aPhysicsModel;
 
 	// Light Editing
-	ImGui::Separator();
-
-	if ( entity->apLight )
+	if ( ImGui::CollapsingHeader( "Light", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
-		ImGui::SameLine();
-
-		if ( ImGui::Button( "Destroy Light" ) )
+		if ( entity->apLight )
 		{
-			graphics->DestroyLight( entity->apLight );
-			entity->apLight = nullptr;
+			ImGui::SameLine();
+
+			if ( ImGui::Button( "Destroy Light" ) )
+			{
+				graphics->DestroyLight( entity->apLight );
+				entity->apLight = nullptr;
+			}
+			else
+			{
+				EntEditor_DrawLightUI( entity );
+			}
 		}
 		else
 		{
-			EntEditor_DrawLightUI( entity );
+			if ( ImGui::BeginCombo( "Create Light", "Point Light" ) )
+			{
+				if ( ImGui::Selectable( "Point Light" ) )
+				{
+					entity->apLight          = graphics->CreateLight( ELightType_Point );
+					entity->apLight->aColor  = { 1, 1, 1, 10 };
+					entity->apLight->aRadius = 500;
+				}
+				else if ( ImGui::Selectable( "Cone Light" ) )
+				{
+					entity->apLight         = graphics->CreateLight( ELightType_Cone );
+					entity->apLight->aColor = { 1, 1, 1, 10 };
+
+					// weird stuff to get the angle of the light correct from the player's view matrix stuff
+					// light->aAng.x = playerWorldTransform.aAng.z;
+					// light->aAng.y = -playerWorldTransform.aAng.y;
+					// light->aAng.z = -playerWorldTransform.aAng.x + 90.f;
+
+					entity->apLight->aInnerFov = 0.f;  // FOV
+					entity->apLight->aOuterFov = 45.f;  // FOV
+				}
+				else if ( ImGui::Selectable( "World Light" ) )
+				{
+					entity->apLight = graphics->CreateLight( ELightType_Directional );
+				}
+				// else if ( ImGui::Selectable( "Capsule Light" ) )
+				// {
+				// }
+
+				ImGui::EndCombo();
+			}
 		}
 	}
-	else
-	{
-		if ( ImGui::BeginCombo( "Create Light", "Point Light" ) )
-		{
-			if ( ImGui::Selectable( "Point Light" ) )
-			{
-				entity->apLight          = graphics->CreateLight( ELightType_Point );
-				entity->apLight->aColor  = { 1, 1, 1, 10 };
-				entity->apLight->aRadius = 500;
-			}
-			else if ( ImGui::Selectable( "Cone Light" ) )
-			{
-				entity->apLight         = graphics->CreateLight( ELightType_Cone );
-				entity->apLight->aColor = { 1, 1, 1, 10 };
-
-				// weird stuff to get the angle of the light correct from the player's view matrix stuff
-				// light->aAng.x = playerWorldTransform.aAng.z;
-				// light->aAng.y = -playerWorldTransform.aAng.y;
-				// light->aAng.z = -playerWorldTransform.aAng.x + 90.f;
-
-				entity->apLight->aInnerFov = 0.f;  // FOV
-				entity->apLight->aOuterFov = 45.f;  // FOV
-			}
-			else if ( ImGui::Selectable( "World Light" ) )
-			{
-				entity->apLight = graphics->CreateLight( ELightType_Directional );
-			}
-			// else if ( ImGui::Selectable( "Capsule Light" ) )
-			// {
-			// }
-
-			ImGui::EndCombo();
-		}
-	}
-	
 
 	// Entity Components?
 	
@@ -622,6 +651,48 @@ void EntEditor_DrawMapDataUI()
 }
 
 
+void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
+{
+	Entity_t* entity = Entity_GetData( sParent );
+	if ( entity == nullptr )
+	{
+		Log_ErrorF( "Entity is nullptr????\n" );
+		return;
+	}
+
+	std::string entName = vstring( "Entity %zd", sParent );
+
+	ImGui::PushID( sParent );
+
+	bool treeOpen = ImGui::TreeNode( "##" );
+
+	ImGui::SameLine();
+
+	if ( ImGui::Selectable( entity->aName.size() ? entity->aName.c_str() : entName.c_str(), gSelectedEntity == sParent ) )
+	{
+		gSelectedEntity = sParent;
+		gInModelSelect  = false;
+		gModelSelectPath.clear();
+	}
+
+	if ( treeOpen )
+	{
+		ChVector< ChHandle_t > children;
+
+		Entity_GetChildren( sParent, children );
+
+		for ( ChHandle_t child : children )
+		{
+			EntEditor_DrawEntityChildTree( child );
+		}
+
+		ImGui::TreePop();
+	}
+
+	ImGui::PopID();
+}
+
+
 void EntEditor_DrawEntityList()
 {
 	EditorContext_t* context = Editor_GetContext();
@@ -677,31 +748,21 @@ void EntEditor_DrawEntityList()
 	if ( ImGui::BeginChild( "Entity List", {}, true ) )
 	{
 		const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
+		auto&                         entityParents = Entity_GetParentMap();
 
 		for ( ChHandle_t entityHandle : entityHandles )
 		{
-			Entity_t* entity = Entity_GetData( entityHandle );
-			if ( entity == nullptr )
-			{
-				Log_ErrorF( "Entity is nullptr????\n" );
-				continue;
-			}
+			auto it = entityParents.find( entityHandle );
 
-			std::string entName = vstring( "Entity %zd", entityHandle );
-	
-			ImGui::PushID( entityHandle );
-	
-			if ( ImGui::Selectable( entity->aName.size() ? entity->aName.c_str() : entName.c_str(), gSelectedEntity == entityHandle ) )
-			{
-				gSelectedEntity = entityHandle;
-				gInModelSelect  = false;
-				gModelSelectPath.clear();
-			}
-	
-			ImGui::PopID();
+			// this entity is already parented to something, it will be drawn in the recursive function if it's the parent tree is expanded
+			if ( it != entityParents.end() )
+				continue;
+
+			EntEditor_DrawEntityChildTree( entityHandle );
+
 		}
 	}
-	
+
 	ImGui::EndChild();
 	ImGui::EndChild();
 

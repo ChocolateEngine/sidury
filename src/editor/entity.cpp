@@ -9,6 +9,7 @@ LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
 static ResourceList< Entity_t >                      gEntityList;
 
 // Entity Parents
+// [ child ] = parent
 static std::unordered_map< ChHandle_t, ChHandle_t >  gEntityParents;
 
 //static std::unordered_map< glm::vec3, ChHandle_t > gColorToEntity;
@@ -235,6 +236,38 @@ void Entity_GetChildrenRecurse( ChHandle_t sEntity, ChVector< ChHandle_t >& srCh
 }
 
 
+// Recursively get all entities attached to this one (SLOW)
+void Entity_GetChildrenRecurse( ChHandle_t sEntity, std::unordered_set< ChHandle_t >& srChildren )
+{
+	PROF_SCOPE();
+
+	for ( auto& [ child, parent ] : gEntityParents )
+	{
+		if ( parent != sEntity )
+			continue;
+
+		srChildren.emplace( child );
+		Entity_GetChildrenRecurse( child, srChildren );
+		break;
+	}
+}
+
+
+// Get child entities attached to this one (SLOW)
+void Entity_GetChildren( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren )
+{
+	PROF_SCOPE();
+
+	for ( auto& [ child, parent ] : gEntityParents )
+	{
+		if ( parent != sEntity )
+			continue;
+
+		srChildren.push_back( child );
+	}
+}
+
+
 bool Entity_IsParented( ChHandle_t sEntity )
 {
 	if ( sEntity == CH_INVALID_HANDLE )
@@ -266,6 +299,18 @@ void Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent )
 	if ( sEntity == CH_INVALID_HANDLE || sEntity == sParent )
 		return;
 
+	// Make sure sParent isn't parented to sEntity
+	auto it = gEntityParents.find( sParent );
+
+	if ( it != gEntityParents.end() )
+	{
+		if ( it->second == sEntity )
+		{
+			Log_Error( gLC_Entity, "Trying to parent entity A to B, when B is already parented to A!!\n" );
+			return;
+		}
+	}
+
 	if ( sParent == CH_INVALID_HANDLE )
 	{
 		// Clear the parent
@@ -275,6 +320,12 @@ void Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent )
 	{
 		gEntityParents[ sEntity ] = sParent;
 	}
+}
+
+
+const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap()
+{
+	return gEntityParents;
 }
 
 
