@@ -326,7 +326,7 @@ void Game_UpdateGame( float frameTime )
 
 		if ( ImGui::BeginMenu( "Edit" ) )
 		{
-			if ( ImGui::MenuItem( "Set Skybox" ) )
+			if ( ImGui::MenuItem( "Bindings" ) )
 			{
 			}
 
