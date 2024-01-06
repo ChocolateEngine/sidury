@@ -6,7 +6,7 @@
 #include "igui.h"
 #include "render/irender.h"
 #include "imgui/imgui.h"
-#include "imgui/imgui_impl_sdl.h"
+#include "imgui/imgui_impl_sdl2.h"
 
 #include "util.h"
 #include "game_physics.h"

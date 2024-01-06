@@ -706,7 +706,7 @@ void EntEditor_DrawEntityList()
 		return;
 	}
 
-	ImGui::BeginChild( "##Entity List_", {180, 0} );
+	ImGui::BeginChild( "##Entity List_", {}, ImGuiChildFlags_ResizeX );
 
 	// TODO: make this create entity stuff into a context menu with plenty of presets
 	// also, create a duplicate entity option when selected on one, and move delete entity and clear parent to that
@@ -759,14 +759,13 @@ void EntEditor_DrawEntityList()
 				continue;
 
 			EntEditor_DrawEntityChildTree( entityHandle );
-
 		}
 	}
 
 	ImGui::EndChild();
 	ImGui::EndChild();
 
-	ImGui::SameLine( 195 );
+	ImGui::SameLine();
 
 	ImGui::BeginChild("tabs");
 	if ( ImGui::BeginTabBar( "entity editor tabs") )
