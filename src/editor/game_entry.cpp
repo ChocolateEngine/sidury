@@ -75,6 +75,8 @@ extern "C"
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
 
+		Con_SetDefaultArchive( "cfg" PATH_SEP_STR "config_editor.cfg", "cfg" PATH_SEP_STR "config_editor_default.cfg" );
+
 		IMGUI_CHECKVERSION();
 
 #if CH_USE_MIMALLOC
@@ -105,7 +107,7 @@ extern "C"
 			return;
 		}
 
-		Con_QueueCommandSilent( "exec ongameload", false );
+		Con_QueueCommandSilent( "exec autoexec_editor", false );
 
 		// ftl::TaskSchedulerInitOptions schedOptions;
 		// schedOptions.Behavior = ftl::EmptyQueueBehavior::Sleep;
@@ -121,6 +123,7 @@ extern "C"
 		{
 			PROF_SCOPE_NAMED( "Main Loop" );
 
+			// TODO: REPLACE THIS, it's actually kinda expensive
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			float time = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	
@@ -137,7 +140,7 @@ extern "C"
 					sys_sleep( 1 );
 
 				// framerate is above max
-				if (time < minFrameTime)
+				if ( time < minFrameTime )
 					continue;
 			}
 
