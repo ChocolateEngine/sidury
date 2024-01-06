@@ -25,7 +25,7 @@ CONVAR( view_move_forward, 500.0f );
 CONVAR( view_move_side, 500.0f );
 CONVAR( view_move_up, 500.0f );
 
-CONVAR( view_move_min, 0.01f );
+CONVAR( view_move_min, 0.125f );
 CONVAR( view_move_max, 15.f );
 CONVAR( view_move_scroll_sens, 0.125f );
 
@@ -60,8 +60,10 @@ void EditorView_UpdateInputs()
 	{
 		gMoveScale += mouseScroll.y * view_move_scroll_sens;
 		gMoveScale = std::clamp( gMoveScale, view_move_min.GetFloat(), view_move_max.GetFloat() );
-		Log_DevF( 1, "Movement Speed: %.4f\n", gMoveScale );
+		Log_DevF( 2, "Movement Speed Scale: %.4f\n", gMoveScale );
 	}
+
+	gui->DebugMessage( "Movement Speed Scale: %.4f", gMoveScale );
 
 	float moveScale = gFrameTime * gMoveScale;
 	
@@ -116,7 +118,6 @@ void EditorView_UpdateInputs()
 		graphics->DrawLine( gMouseTraceStart, gMouseTraceEnd, {1.f, 0.6f, 0.6f, 1.f} );
 	}
 }
-
 
 
 void EditorView_UpdateView( EditorContext_t* spContext )
