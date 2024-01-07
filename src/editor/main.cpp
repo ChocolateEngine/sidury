@@ -50,6 +50,10 @@ CONVAR( dbg_global_axis_size, 15 );
 CONVAR( r_render, 1 );
 
 
+int                             gMainMenuBarHeight    = 0.f;
+static bool                     gShowQuitConfirmation = false;
+
+
 EditorData_t                    gEditorData{};
 
 ChHandle_t                      gEditorContextIdx = CH_INVALID_EDITOR_CONTEXT;
@@ -73,8 +77,102 @@ void Game_Shutdown()
 }
 
 
+void DrawQuitConfirmation();
+
+void Main_DrawMenuBar()
+{
+	if ( gShowQuitConfirmation )
+	{
+		DrawQuitConfirmation();
+	}
+
+	if ( ImGui::BeginMainMenuBar() )
+	{
+		if ( ImGui::BeginMenu( "File" ) )
+		{
+			if ( ImGui::MenuItem( "New" ) )
+			{
+				Editor_CreateContext( nullptr );
+			}
+
+			if ( ImGui::MenuItem( "Load" ) )
+			{
+			}
+
+			if ( ImGui::MenuItem( "Save" ) )
+			{
+			}
+
+			if ( ImGui::MenuItem( "Close" ) )
+			{
+			}
+
+			ImGui::Separator();
+
+			if ( ImGui::BeginMenu( "Open Recent" ) )
+			{
+				ImGui::EndMenu();
+			}
+
+			ImGui::Separator();
+
+			if ( ImGui::MenuItem( "Quit" ) )
+			{
+				gShowQuitConfirmation = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu( "Edit" ) )
+		{
+			if ( ImGui::MenuItem( "Bindings" ) )
+			{
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if ( ImGui::BeginMenu( "View" ) )
+		{
+			if ( ImGui::MenuItem( "Entity Editor", nullptr, true ) )
+			{
+			}
+
+			ImGui::EndMenu();
+		}
+
+		// I would like tabs eventually
+		if ( ImGui::BeginMenu( "Map List" ) )
+		{
+			for ( u32 i = 0; i < gEditorContexts.aHandles.size(); i++ )
+			{
+				EditorContext_t* context = nullptr;
+				if ( !gEditorContexts.Get( gEditorContexts.aHandles[ i ], &context ) )
+					continue;
+
+				ImGui::PushID( i );
+				bool selected = gEditorContexts.aHandles[ i ] == gEditorContextIdx;
+				if ( ImGui::MenuItem( context->aMap.aMapPath.empty() ? "Unsaved Map" : context->aMap.aMapPath.c_str(), nullptr, &selected ) )
+				{
+					Editor_SetContext( gEditorContexts.aHandles[ i ] );
+				}
+				ImGui::PopID();
+			}
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
+
+	auto yeah          = ImGui::GetItemRectSize();
+	gMainMenuBarHeight = yeah.y;
+}
+
+
 // disabled cause for some reason, it could jump to the WindowProc function mid frame and call this 
-#define CH_LIVE_WINDOW_RESIZE 0
+#define CH_LIVE_WINDOW_RESIZE 1
 
 
 void WindowResizeCallback()
@@ -86,13 +184,18 @@ void WindowResizeCallback()
 	ImGui_ImplSDL2_NewFrame();
 	graphics->NewFrame();
 
-	Game_UpdateProjection();
-
 	graphics->Reset();
+
+	EntEditor_Update( 0.f );
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
 		gui->Update( 0.f );
+		Main_DrawMenuBar();
+		EntEditor_DrawUI();
+
+		Game_UpdateProjection();
+
 		graphics->Present();
 	}
 	else
@@ -221,9 +324,6 @@ void Game_Update( float frameTime )
 }
 
 
-static bool gShowQuitConfirmation = false;
-
-
 static void DrawQuitConfirmation()
 {
 	int width = 0, height = 0;
@@ -288,83 +388,7 @@ void Game_UpdateGame( float frameTime )
 
 	EditorView_Update();
 
-	if ( gShowQuitConfirmation )
-	{
-		DrawQuitConfirmation();
-	}
-
-	if ( ImGui::BeginMainMenuBar() )
-	{
-		if ( ImGui::BeginMenu( "File" ) )
-		{
-			if ( ImGui::MenuItem( "New" ) )
-			{
-				Editor_CreateContext( nullptr );
-			}
-
-			if ( ImGui::MenuItem( "Load" ) )
-			{
-			}
-
-			if ( ImGui::MenuItem( "Save" ) )
-			{
-			}
-
-			if ( ImGui::MenuItem( "Close" ) )
-			{
-			}
-
-			ImGui::Separator();
-			
-			if ( ImGui::MenuItem( "Quit" ) )
-			{
-				gShowQuitConfirmation = true;
-			}
-
-			ImGui::EndMenu();
-		}
-
-		if ( ImGui::BeginMenu( "Edit" ) )
-		{
-			if ( ImGui::MenuItem( "Bindings" ) )
-			{
-			}
-
-			ImGui::EndMenu();
-		}
-
-		if ( ImGui::BeginMenu( "View" ) )
-		{
-			if ( ImGui::MenuItem( "Entity Editor", nullptr, true ) )
-			{
-			}
-
-			ImGui::EndMenu();
-		}
-
-		// I would like tabs eventually
-		if ( ImGui::BeginMenu( "Map List" ) )
-		{
-			for ( u32 i = 0; i < gEditorContexts.aHandles.size(); i++ )
-			{
-				EditorContext_t* context = nullptr;
-				if ( !gEditorContexts.Get( gEditorContexts.aHandles[ i ], &context ) )
-					continue;
-
-				ImGui::PushID( i );
-				bool selected = gEditorContexts.aHandles[i] == gEditorContextIdx;
-				if ( ImGui::MenuItem( context->aMap.aMapPath.empty() ? "Unsaved Map" : context->aMap.aMapPath.c_str(), nullptr, &selected ) )
-				{
-					Editor_SetContext( gEditorContexts.aHandles[ i ] );
-				}
-				ImGui::PopID();
-			}
-
-			ImGui::EndMenu();
-		}
-
-		ImGui::EndMainMenuBar();
-	}
+	Main_DrawMenuBar();
 }
 
 
@@ -462,7 +486,16 @@ void Game_UpdateProjection()
 	io.DisplaySize.x  = width;
 	io.DisplaySize.y  = height;
 
-	glm::mat4 projMat = Util_ComputeProjection( width, height, r_nearz, r_farz, r_fov );
+	// HACK
+	extern glm::vec2 gEntityListSize;
+
+	int              offsetX = gEntityListSize.x;
+	int              offsetY = gMainMenuBarHeight;
+
+	int              newWidth  = width - offsetX;
+	int              newHeight = height - offsetY;
+
+	glm::mat4        projMat   = Util_ComputeProjection( newWidth, height, r_nearz, r_farz, r_fov );
 
 	// update each viewport for each context
 #if 0
@@ -498,8 +531,10 @@ void Game_UpdateProjection()
 
 	ViewportShader_t* viewport   = graphics->GetViewportData( 0 );
 
-	context->aView.aResolution.x = width;
-	context->aView.aResolution.x = height;
+	context->aView.aResolution.x = newWidth;
+	context->aView.aResolution.y = newHeight;
+	context->aView.aOffset.x     = offsetX;
+	context->aView.aOffset.y     = offsetY;
 	context->aView.aProjMat      = projMat;
 	context->aView.aProjViewMat  = projMat * context->aView.aViewMat;
 
@@ -512,7 +547,8 @@ void Game_UpdateProjection()
 
 	viewport->aNearZ      = r_nearz;
 	viewport->aFarZ       = r_farz;
-	viewport->aSize       = { width, height };
+	viewport->aSize       = { newWidth, height };
+	viewport->aOffset     = { offsetX, offsetY };
 #endif
 
 	graphics->SetViewportUpdate( true );

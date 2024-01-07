@@ -692,6 +692,10 @@ void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
 }
 
 
+extern int gMainMenuBarHeight;
+glm::vec2  gEntityListSize{};
+
+
 void EntEditor_DrawEntityList()
 {
 	EditorContext_t* context = Editor_GetContext();
@@ -699,95 +703,105 @@ void EntEditor_DrawEntityList()
 	if ( !context )
 		return;
 
-	if ( !ImGui::Begin( "Entity List" ) )
+	int width, height;
+	render->GetSurfaceSize( width, height );
+
+	ImGui::SetNextWindowPos( { 0.f, (float)gMainMenuBarHeight } );
+	ImGui::SetNextWindowSizeConstraints( { 0.f, (float)( height - gMainMenuBarHeight ) }, { (float)width, (float)( height - gMainMenuBarHeight ) } );
+
+	if ( !ImGui::Begin( "Entity List", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove ) )
 	{
 		ImGui::End();
+		auto windowSize   = ImGui::GetWindowSize();
+		gEntityListSize.x = windowSize.x;
+		gEntityListSize.y = windowSize.y;
 		return;
 	}
-
-	ImGui::BeginChild( "##Entity List_", {}, ImGuiChildFlags_ResizeX );
-
-	// TODO: make this create entity stuff into a context menu with plenty of presets
-	// also, create a duplicate entity option when selected on one, and move delete entity and clear parent to that
-
-	// if ( ImGui::Button( "Create" ) )
-	// {
-	// 	gSelectedEntity = Entity_Create();
-	// }
-	// 
-	// ImGui::SameLine();
-
-	if ( ImGui::Button( "Create" ) )
+	
+	ImGui::BeginChild( "tabs" );
+	if ( ImGui::BeginTabBar( "editor tabs" ) )
 	{
-		gSelectedEntity = Entity_Create();
-
-		Entity_t* entity = Entity_GetData( gSelectedEntity );
-		if ( entity == nullptr )
+		if ( ImGui::BeginTabItem( "Entities" ) )
 		{
-			Log_ErrorF( "Created Entity is nullptr????\n" );
-			gSelectedEntity = CH_INVALID_HANDLE;
-		}
-		else
-		{
-			entity->aTransform.aPos = context->aView.aPos;
-		}
-	}
+			ImGui::BeginChild( "##Entity List_", {}, ImGuiChildFlags_ResizeX );
 
-	ImGui::SameLine();
+			// TODO: make this create entity stuff into a context menu with plenty of presets
+			// also, create a duplicate entity option when selected on one, and move delete entity and clear parent to that
 
-	if ( ImGui::Button( "Delete" ) )
-	{
-		if ( gSelectedEntity )
-			Entity_Delete( gSelectedEntity );
+			// if ( ImGui::Button( "Create" ) )
+			// {
+			// 	gSelectedEntity = Entity_Create();
+			// }
+			//
+			// ImGui::SameLine();
 
-		gSelectedEntity = CH_INVALID_HANDLE;
-	}
+			if ( ImGui::Button( "Create" ) )
+			{
+				gSelectedEntity  = Entity_Create();
 
-	// Entity List
-	if ( ImGui::BeginChild( "Entity List", {}, true ) )
-	{
-		const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
-		auto&                         entityParents = Entity_GetParentMap();
+				Entity_t* entity = Entity_GetData( gSelectedEntity );
+				if ( entity == nullptr )
+				{
+					Log_ErrorF( "Created Entity is nullptr????\n" );
+					gSelectedEntity = CH_INVALID_HANDLE;
+				}
+				else
+				{
+					entity->aTransform.aPos = context->aView.aPos;
+				}
+			}
 
-		for ( ChHandle_t entityHandle : entityHandles )
-		{
-			auto it = entityParents.find( entityHandle );
+			ImGui::SameLine();
 
-			// this entity is already parented to something, it will be drawn in the recursive function if it's the parent tree is expanded
-			if ( it != entityParents.end() )
-				continue;
+			if ( ImGui::Button( "Delete" ) )
+			{
+				if ( gSelectedEntity )
+					Entity_Delete( gSelectedEntity );
 
-			EntEditor_DrawEntityChildTree( entityHandle );
-		}
-	}
+				gSelectedEntity = CH_INVALID_HANDLE;
+			}
 
-	ImGui::EndChild();
-	ImGui::EndChild();
+			// Entity List
+			if ( ImGui::BeginChild( "Entity List", {}, true ) )
+			{
+				const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
+				auto&                         entityParents = Entity_GetParentMap();
 
-	ImGui::SameLine();
+				for ( ChHandle_t entityHandle : entityHandles )
+				{
+					auto it = entityParents.find( entityHandle );
 
-	ImGui::BeginChild("tabs");
-	if ( ImGui::BeginTabBar( "entity editor tabs") )
-	{
-		if ( ImGui::BeginTabItem( "Entity Data" ) )
-		{
-			// ImGui::BeginChild("Entity Data", {}, true);
+					// this entity is already parented to something, it will be drawn in the recursive function if it's the parent tree is expanded
+					if ( it != entityParents.end() )
+						continue;
+
+					EntEditor_DrawEntityChildTree( entityHandle );
+				}
+			}
+
+			ImGui::EndChild();
+			ImGui::EndChild();
+
+			ImGui::SameLine();
+
+			ImGui::BeginChild( "##Entity Data" );
 			EntEditor_DrawEntityData();
-			// ImGui::EndChild();
+			ImGui::EndChild();
+
 			ImGui::EndTabItem();
 		}
-		
+
 		if ( ImGui::BeginTabItem( "Model Data" ) )
 		{
 			ImGui::EndTabItem();
 		}
-		
+
 		if ( ImGui::BeginTabItem( "Map Data" ) )
 		{
 			EntEditor_DrawMapDataUI();
 			ImGui::EndTabItem();
 		}
-		
+
 		if ( ImGui::BeginTabItem( "Material Editor" ) )
 		{
 			ImGui::EndTabItem();
@@ -795,7 +809,12 @@ void EntEditor_DrawEntityList()
 
 		ImGui::EndTabBar();
 	}
+
 	ImGui::EndChild();
+
+	auto windowSize   = ImGui::GetWindowSize();
+	gEntityListSize.x = windowSize.x;
+	gEntityListSize.y = windowSize.y;
 
 	ImGui::End();
 }

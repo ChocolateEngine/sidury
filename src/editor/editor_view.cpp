@@ -239,11 +239,15 @@ inline void ClampAngles( glm::vec3& srAng )
 };
 
 
-static void CenterMouseOnScreen()
+static void CenterMouseOnScreen( EditorContext_t* context )
 {
-	int w, h;
-	SDL_GetWindowSize( render->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
+	int x = ( context->aView.aResolution.x / 2.f ) + context->aView.aOffset.x;
+	int y = ( context->aView.aResolution.y / 2.f ) + context->aView.aOffset.y;
+
+	// int x = context->aView.aOffset.x;
+	// int y = context->aView.aOffset.y;
+
+	SDL_WarpMouseInWindow( render->GetWindow(), x, y );
 }
 
 
@@ -261,12 +265,15 @@ void EditorView_Update()
 		EditorView_UpdateInputs();
 	}
 
+	bool centerMouse = false;
+
 	// for now until some focus thing
 	if ( !gui->IsConsoleShown() && Input_KeyPressed( EBinding_Viewport_MouseLook ) )
 	{
 		if ( Input_KeyJustPressed( EBinding_Viewport_MouseLook ) )
 		{
-			SDL_SetRelativeMouseMode( SDL_TRUE );
+  			SDL_SetRelativeMouseMode( SDL_TRUE );
+			SDL_ShowCursor( SDL_FALSE );
 		}
 
 		// Handle Mouse Input
@@ -278,16 +285,20 @@ void EditorView_Update()
 
 		ClampAngles( context->aView.aAng );
 
-		CenterMouseOnScreen();
+		centerMouse = true;
 	}
 	else if ( Input_KeyJustReleased( EBinding_Viewport_MouseLook ) )
 	{
 		SDL_SetRelativeMouseMode( SDL_FALSE );
+		SDL_ShowCursor( SDL_TRUE );
 
-		CenterMouseOnScreen();
+		centerMouse = true;
 	}
 
 	// Handle View
 	EditorView_UpdateView( context );
+
+	if ( centerMouse )
+		CenterMouseOnScreen( context );
 }
 

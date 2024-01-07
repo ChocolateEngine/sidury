@@ -278,14 +278,24 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 
 	render->CmdSetScissor( cmd, 0, &rect, 1 );
 
+	auto viewportData = gGraphics.GetViewportData( sViewIndex );
+
 	// flip viewport
 	Viewport_t viewPort{};
-	viewPort.x        = 0.f;
-	viewPort.y        = height;
+	// viewPort.x        = 0.f;
+	// viewPort.y        = height;
+
+	viewPort.x        = viewportData->aOffset.x;
+	viewPort.y        = viewportData->aSize.y + viewportData->aOffset.y;
+
 	viewPort.minDepth = 0.f;
 	viewPort.maxDepth = 1.f;
-	viewPort.width    = width;
-	viewPort.height   = height * -1.f;
+
+	// viewPort.width    = width;
+	// viewPort.height   = height * -1.f;
+
+	viewPort.width    = viewportData->aSize.x;
+	viewPort.height   = viewportData->aSize.y * -1.f;
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 

@@ -63,7 +63,10 @@ struct EditorView_t
 	glm::mat4        aProjViewMat;
 
 	u32              aViewportIndex;
+
+	// TODO: remove this from here, right now this is the same between ALL contexts
 	glm::uvec2       aResolution;
+	glm::uvec2       aOffset;
 
 	glm::vec3        aPos{};
 	glm::vec3        aAng{};

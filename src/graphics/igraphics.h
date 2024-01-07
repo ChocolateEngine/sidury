@@ -580,6 +580,9 @@ struct ViewportShader_t
 
 	// HACK: if this is set, it overrides the shader used for all renderables in this view
 	ChHandle_t aShaderOverride = CH_INVALID_HANDLE;
+
+	// HACK: not used in shader
+	glm::vec2  aOffset;
 };
 
 
@@ -701,6 +704,10 @@ class IGraphics : public ISystem
 	virtual void               FreeModel( Handle hModel )                                                                                                                                     = 0;
 	virtual Model*             GetModelData( Handle hModel )                                                                                                                                  = 0;
 	virtual std::string_view   GetModelPath( Handle sModel )                                                                                                                                  = 0;
+	
+	// maybe this can contain a struct pointer to data containing model path, blend shape names, or other stuff, etc.
+	//virtual std::string_view   GetModelInfo( Handle sModel )                                                                                                                                  = 0;
+	
 	virtual ModelBBox_t        CalcModelBBox( Handle sModel )                                                                                                                                 = 0;
 	virtual bool               GetModelBBox( Handle sModel, ModelBBox_t& srBBox )                                                                                                             = 0;
 
