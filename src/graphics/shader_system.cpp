@@ -33,7 +33,25 @@ CONCMD( shader_dump )
 
 	for ( const auto& [name, shader] : gShaderNames )
 	{
-		Log_MsgF( gLC_ClientGraphics, "  %s\n", name.data() );
+		auto it = gShaderData.find( shader );
+		if ( it == gShaderData.end() )
+		{
+			Log_MsgF( gLC_ClientGraphics, "Found Invalid Shader: %s\n", name.data() );
+			continue;
+		}
+
+		std::string type;
+
+		if ( it->second.aStages & ShaderStage_Vertex )
+			type += " | Vertex";
+
+		if ( it->second.aStages & ShaderStage_Fragment )
+			type += " | Fragment";
+
+		if ( it->second.aStages & ShaderStage_Compute )
+			type += " | Compute";
+
+		Log_MsgF( gLC_ClientGraphics, "  %s%s\n", name.data(), type.data() );
 	}
 
 	Log_Msg( gLC_ClientGraphics, "\n" );

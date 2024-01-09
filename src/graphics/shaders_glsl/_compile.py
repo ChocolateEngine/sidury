@@ -12,6 +12,7 @@ SHADER_LIST = [
     "debug_col.vert",
     "skybox",
     "shadow",
+    "water",
 ]
 
 

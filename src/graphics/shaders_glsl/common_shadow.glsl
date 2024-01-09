@@ -1,5 +1,5 @@
-#ifndef _COMMON_SHADOW_GLSL
-#define _COMMON_SHADOW_GLSL
+#ifndef CH_COMMON_SHADOW_GLSL
+#define CH_COMMON_SHADOW_GLSL
 
 //! Sampler array containing the shadowmaps in the scene.
 layout(set = 0, binding = 0) uniform sampler2DShadow[] texShadowMaps;
@@ -41,4 +41,4 @@ float SampleShadowMapPCF( int shadowMapID, vec3 shadowCoord )
 	return shadow;
 }
 
-#endif  // !_COMMON_SHADOW_GLSL
+#endif  // CH_COMMON_SHADOW_GLSL
