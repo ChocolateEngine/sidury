@@ -28,7 +28,6 @@ IRender*         render       = nullptr;
 IInputSystem*    input        = nullptr;
 IAudioSystem*    audio        = nullptr;
 IGraphics*       graphics     = nullptr;
-ISteamSystem*    steam        = nullptr;
 
 static bool      gPaused      = false;
 float            gFrameTime   = 0.f;

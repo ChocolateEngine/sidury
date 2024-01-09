@@ -28,30 +28,15 @@ class IRender;
 class IInputSystem;
 class IAudioSystem;
 class IGraphics;
-class ISteamSystem;
 
 extern IGuiSystem*      gui;
 extern IRender*         render;
 extern IInputSystem*    input;
 extern IAudioSystem*    audio;
 extern IGraphics*       graphics;
-extern ISteamSystem*    steam;
-extern bool             gSteamLoaded;
 
 extern float            gFrameTime;
 extern double           gCurTime;
-
-constexpr int           CH_MAX_USERNAME_LEN = 256;
-
-#define AUDIO_OPENAL 1
-
-enum class GameState
-{
-	Menu,
-	Loading,
-	Running,
-	Paused,
-};
 
 
 struct EditorView_t
