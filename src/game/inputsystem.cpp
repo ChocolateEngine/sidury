@@ -35,6 +35,16 @@ static std::unordered_map< EButton, ConVar* >     gInputCvarKeys;
 static bool                                       gResetBindings = Args_Register( "Reset All Keybindings", "-reset-binds" );
 
 
+// TODO: buffered input
+// https://www.youtube.com/watch?v=VQ0Amoqz4Lg
+
+
+// maybe use editor input system and do this?
+// bind "ctrl+c" "command ent_copy"
+// bind "ctrl+c" "move_forward"
+// bind "ctrl+c" "command ent_copy;command ent_paste"
+
+
 CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 {
 	LogGroup group = Log_GroupBegin( gLC_GameInput );

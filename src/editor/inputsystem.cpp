@@ -15,8 +15,9 @@ CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 struct ButtonList_t 
 {
+	EModMask aModMask;
 	u8       aCount;
-	EButton* spButtons;
+	EButton* apButtons;
 
 	inline bool operator==( const ButtonList_t& srOther ) const
 	{
@@ -24,10 +25,13 @@ struct ButtonList_t
 		if ( this == &srOther )
 			return true;
 
+		if ( aModMask != srOther.aModMask )
+			return false;
+
 		if ( aCount != srOther.aCount )
 			return false;
 
-		return std::memcmp( &spButtons, &srOther.spButtons, sizeof( EButton* ) ) == 0;
+		return std::memcmp( &apButtons, &srOther.apButtons, sizeof( EButton* ) ) == 0;
 	}
 };
 
@@ -42,9 +46,9 @@ namespace std
 		{
 			size_t value = 0;
 
-			// for some reason just doing hash< glm::vec3 > doesn't work anymore
+			value ^= ( hash< EModMask >()( list.aModMask ) );
 			value ^= ( hash< u8 >()( list.aCount ) );
-			value ^= ( hash< EButton* >()( list.spButtons ) );
+			value ^= ( hash< EButton* >()( list.apButtons ) );
 
 			return value;
 		}
@@ -56,8 +60,6 @@ static glm::vec2                                    gMouseDelta{};
 static glm::vec2                                    gMouseDeltaScale{ 1.f, 1.f };
 static std::unordered_map< ButtonList_t, EBinding > gKeyBinds;
 static KeyState                                     gBindingState[ EBinding_Count ];
-// static std::unordered_map< EBinding, ButtonList_t > gBindingToKey;
-
 
 static bool                                         gResetBindings = Args_Register( "Reset All Bindings", "-reset-binds" );
 
@@ -86,83 +88,6 @@ CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 	}
 
 	Log_GroupEnd( group );
-}
-
-
-static void bind_dropdown_keys(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
-{
-	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
-	{
-		const char* name = SDL_GetScancodeName( (SDL_Scancode)i );
-
-		if ( strlen( name ) == 0 )
-			continue;
-
-		if ( args.size() > 1 )
-		{
-			// Check if they are both equal
-#ifdef _WIN32
-			if ( _strnicmp( name, args[ 0 ].c_str(), strlen( name ) ) != 0 )
-				continue;
-#else
-			if ( strncasecmp( name, args[ 0 ].c_str(), strlen( name ) ) != 0 )
-				continue;
-#endif
-		}
-		else if ( args.size() )
-		{
-			// Check if this string is inside this other string
-			const char* find = strcasestr( name, args[ 0 ].c_str() );
-
-			if ( !find )
-				continue;
-		}
-
-		std::string& result = results.emplace_back();
-		result += "\"";
-		result += name;
-		result += "\"";
-	}
-}
-
-static void bind_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
-{
-	bind_dropdown_keys( args, results );
-
-	if ( results.size() > 1 )
-		return;
-
-	// must be an invalid scancode
-	if ( results.empty() )
-	{
-		results.push_back( "INVALID SCANCODE" );
-		return;
-	}
-
-	std::string key = results[ 0 ] + " ";
-	results.clear();
-
-	// Build this spaced out command
-	std::string command;
-	for ( size_t i = 1; i < args.size(); i++ )
-	{
-		command += args[ i ];
-		if ( i + 1 < args.size() )
-			command += " ";
-	}
-
-	// Search Through ConVars
-	std::vector< std::string > searchResults;
-	Con_BuildAutoCompleteList( command, searchResults );
-
-	for ( auto& cvar : searchResults )
-	{
-		results.push_back( key + cvar );
-	}
 }
 
 
@@ -232,11 +157,105 @@ void Input_Init()
 }
 
 
+EModMask Input_CalcModMask()
+{
+	EModMask modMask = EModMask_None;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_LCTRL ) )
+		modMask |= EModMask_CtrlL;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_RCTRL ) )
+		modMask |= EModMask_CtrlR;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_LSHIFT ) )
+		modMask |= EModMask_ShiftL;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_RSHIFT ) )
+		modMask |= EModMask_ShiftR;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_LALT ) )
+		modMask |= EModMask_AltL;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_RALT ) )
+		modMask |= EModMask_AltR;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_LGUI ) )
+		modMask |= EModMask_GuiL;
+
+	if ( input->KeyPressed( (EButton)SDL_SCANCODE_RGUI ) )
+		modMask |= EModMask_GuiR;
+
+	return modMask;
+}
+
+
+EModMask Input_ConvertKeyToModMask( EButton spKey )
+{
+	switch ( spKey )
+	{
+		default:
+			return EModMask_None;
+
+		case SDL_SCANCODE_LCTRL:
+			return EModMask_CtrlL;
+
+		case SDL_SCANCODE_RCTRL:
+			return EModMask_CtrlR;
+
+		case SDL_SCANCODE_LSHIFT:
+			return EModMask_ShiftL;
+
+		case SDL_SCANCODE_RSHIFT:
+			return EModMask_ShiftR;
+
+		case SDL_SCANCODE_LALT:
+			return EModMask_AltL;
+
+		case SDL_SCANCODE_RALT:
+			return EModMask_AltR;
+
+		case SDL_SCANCODE_LGUI:
+			return EModMask_GuiL;
+
+		case SDL_SCANCODE_RGUI:
+			return EModMask_GuiR;
+	}
+
+	return EModMask_None;
+}
+
+
+// Extract Modifier Keys from the Key List
+EModMask Input_GetModMask( EButton* spKeys, u8 sKeyCount, ChVector< EButton >& srNewKeys )
+{
+	EModMask modMask = EModMask_None;
+
+	for ( u8 i = 0; i < sKeyCount; i++ )
+	{
+		EModMask newMask = Input_ConvertKeyToModMask( spKeys[ i ] );
+
+		if ( newMask )
+		{
+			modMask |= newMask;
+		}
+		else
+		{
+			srNewKeys.push_back( spKeys[ i ] );
+		}
+	}
+
+	return modMask;
+}
+
+
 void Input_Update()
 {
 	// update mouse inputs
 	gMouseDelta = {};
 	Input_CalcMouseDelta();
+
+	// Find current ModMask
+	EModMask modMaskPressed = Input_CalcModMask();
 
 	// Update Binding Key States
 	for ( auto& [ key, value ] : gKeyBinds )
@@ -244,31 +263,42 @@ void Input_Update()
 		bool pressed = true;
 		for ( u8 i = 0; i < key.aCount; i++ )
 		{
-			if ( !input->KeyPressed( key.spButtons[ i ] ) )
+			if ( !input->KeyPressed( key.apButtons[ i ] ) )
 			{
 				pressed = false;
 				break;
 			}
 		}
 
+		// If we have a key modifier mask on this key
+		// make sure it matches the modifier mask currently being pressed
+		if ( key.aModMask && key.aModMask != modMaskPressed )
+			pressed = false;	
+
 		KeyState state = gBindingState[ value ];
 
+		// Is this currently pressed
 		if ( state & KeyState_Pressed )
 		{
-			if ( state & KeyState_JustPressed )
-				state &= ~KeyState_JustPressed;
+			// Make sure we remove the just pressed state
+			state &= ~KeyState_JustPressed;
 
+			// If we released the key, remove both press types,
+			// and add both release types (released and just released)
 			if ( !pressed )
 			{
 				state |= KeyState_Released | KeyState_JustReleased;
 				state &= ~( KeyState_Pressed | KeyState_JustPressed );
 			}
 		}
+		// Is this key currently released?
 		else if ( state & KeyState_Released )
 		{
-			if ( state & KeyState_JustReleased )
-				state &= ~KeyState_JustReleased;
+			// Make sure we remove the just released state
+			state &= ~KeyState_JustReleased;
 
+			// If we pressed the key, remove both release types,
+			// and add both press types (pressed and just pressed)
 			if ( pressed )
 			{
 				state |= KeyState_Pressed | KeyState_JustPressed;
@@ -277,6 +307,7 @@ void Input_Update()
 		}
 		else
 		{
+			// Mark this key as just released
 			state |= KeyState_Released | KeyState_JustReleased;
 			state &= ~( KeyState_Pressed | KeyState_JustPressed );
 		}
@@ -290,13 +321,13 @@ void Input_ResetBinds()
 {
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_Z }, EBinding_General_Undo );
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_Y }, EBinding_General_Redo );
-
+	
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_X }, EBinding_General_Cut );
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_C }, EBinding_General_Copy );
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_V }, EBinding_General_Paste );
-
+	
 	Input_BindKey( SDL_SCANCODE_SPACE, EBinding_Viewport_MouseLook );
-
+	
 	Input_BindKey( SDL_SCANCODE_W, EBinding_Viewport_MoveForward );
 	Input_BindKey( SDL_SCANCODE_S, EBinding_Viewport_MoveBack );
 	Input_BindKey( SDL_SCANCODE_A, EBinding_Viewport_MoveLeft );
@@ -398,7 +429,7 @@ void Input_ClearBinding( EBinding sBinding )
 			continue;
 
 		// Free Memory
-		free( key.spButtons );
+		free( key.apButtons );
 
 		gKeyBinds.erase( key );
 		break;
@@ -408,7 +439,8 @@ void Input_ClearBinding( EBinding sBinding )
 
 void Input_BindKey( SDL_Scancode sKey, EBinding sBinding )
 {
-	return Input_BindKey( (EButton)sKey, sBinding );
+	Input_BindKeys( (EButton*)&sKey, 1, sBinding );
+	// Input_BindKey( (EButton)sKey, sBinding );
 }
 
 
@@ -449,16 +481,22 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	for ( u8 i = 0; i < sKeyCount; i++ )
 		input->RegisterKey( spKeys[ i ] );
 
+	ChVector< EButton > newKeyList;
+	EModMask            modMask = Input_GetModMask( spKeys, sKeyCount, newKeyList );
+
 	// this is kind weird
 	for ( auto& [ key, value ] : gKeyBinds )
 	{
-		if ( sKeyCount != key.aCount )
+		if ( newKeyList.size() != key.aCount )
+			continue;
+
+		if ( modMask != key.aModMask )
 			continue;
 
 		bool found = true;
 		for ( u8 i = 0; i < key.aCount; i++ )
 		{
-			if ( spKeys[ i ] != key.spButtons[ i ] )
+			if ( spKeys[ i ] != key.apButtons[ i ] )
 			{
 				found = false;
 				break;
@@ -480,12 +518,15 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	// Did not find key, allocate new one
 
 	ButtonList_t buttonList{};
-	buttonList.aCount         = sKeyCount;
-	buttonList.spButtons      = ch_malloc_count< EButton >( sKeyCount );
+	buttonList.aModMask       = modMask;
+	buttonList.aCount         = newKeyList.size();
 
-	for ( u8 i = 0; i < sKeyCount; i++ )
+	if ( buttonList.aCount )
+		buttonList.apButtons = ch_malloc_count< EButton >( buttonList.aCount );
+
+	for ( u8 i = 0; i < buttonList.aCount; i++ )
 	{
-		buttonList.spButtons[ i ] = spKeys[ i ];
+		buttonList.apButtons[ i ] = newKeyList[ i ];
 	}
 
 	gKeyBinds[ buttonList ]   = sBinding;

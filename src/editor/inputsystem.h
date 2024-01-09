@@ -3,6 +3,24 @@
 #include "iinput.h"
 #include <string>
 
+
+enum : u16
+{
+	EModMask_None   = 0,
+	EModMask_CtrlL  = ( 1 << 0 ),
+	EModMask_CtrlR  = ( 1 << 1 ),
+	EModMask_ShiftL = ( 1 << 2 ),
+	EModMask_ShiftR = ( 1 << 3 ),
+	EModMask_AltL   = ( 1 << 4 ),
+	EModMask_AltR   = ( 1 << 5 ),
+	EModMask_GuiL   = ( 1 << 6 ),
+	EModMask_GuiR   = ( 1 << 7 ),
+};
+
+
+using EModMask = u16;
+
+
 enum EBinding : u16
 {
 	// General
