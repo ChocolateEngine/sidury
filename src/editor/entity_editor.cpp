@@ -53,14 +53,51 @@ void EntEditor_DrawImporter()
 
 static std::unordered_map< ChHandle_t, ImTextureID >   gImGuiTextures;
 static std::unordered_map< ChHandle_t, TextureInfo_t > gTextureInfo;
+int                                                    gTextureListViewMode = 0;
 
 
-void EntEditor_DrawTextureList()
+void Editor_DrawTextureInfo( TextureInfo_t& info )
+{
+	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+
+	if ( info.aPath.size() )
+		ImGui::Text( info.aPath.data() );
+
+	ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
+	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+}
+
+
+void Editor_DrawTextureList()
 {
 	// Draws all currently loaded textures
 	ChVector< ChHandle_t > textures   = render->GetTextureList();
-
 	ImVec2                 windowSize = ImGui::GetWindowSize();
+
+	glm::vec2              imageDisplaySize = { 96, 96 };
+
+	if ( ImGui::BeginCombo( "View Type", gTextureListViewMode == 0 ? "List" : "Icons" ) )
+	{
+		if ( ImGui::Selectable( "List" ) )
+			gTextureListViewMode = 0;
+
+		if ( ImGui::Selectable( "Icons" ) )
+			gTextureListViewMode = 1;
+
+		ImGui::EndCombo();
+	}
+
+	// TODO: add a search bar?
+
+	bool wrapIconList      = false;
+	int  currentImageWidth = 0;
+	int  imagesInRow       = 0;
+
+	if ( !ImGui::BeginChild( "Texture List" ) )
+	{
+		ImGui::EndChild();
+		return;
+	}
 
 	for ( ChHandle_t texture : textures )
 	{
@@ -80,31 +117,101 @@ void EntEditor_DrawTextureList()
 		if ( imTexture == nullptr )
 			continue;
 
-
-		if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 20, 144 }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+		if ( gTextureListViewMode == 0 )
 		{
-			ImGui::Image( imTexture, { 128, 128 } );
-
 			TextureInfo_t info = render->GetTextureInfo( texture );
 
-			ImGui::SameLine();
-
-			if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 20 - 128, 144 }, 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+			if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 16, imageDisplaySize.y + 16 }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
 			{
-				ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+				ImGui::Image( imTexture, { imageDisplaySize.x, imageDisplaySize.y } );
 
-				if ( info.aPath.size() )
-					ImGui::Text( info.aPath.data() );
+				ImGui::SameLine();
 
-				ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
-				ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+				if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 16 - imageDisplaySize.x, imageDisplaySize.y + 16 }, 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+				{
+					Editor_DrawTextureInfo( info );
+				}
+
+				ImGui::EndChild();
 			}
 
-			
+			if ( ImGui::IsItemHovered() )
+			{
+				if ( ImGui::BeginTooltip() )
+					Editor_DrawTextureInfo( info );
+
+				ImGui::EndTooltip();
+			}
+
 			ImGui::EndChild();
 		}
+		else
+		{
+			ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 2, 2 } );
 
-		ImGui::EndChild();
+			if ( windowSize.x < currentImageWidth + imageDisplaySize.x + ( imagesInRow * 2 ) )  // imagesInRow is for padding
+			{
+				currentImageWidth = 0;
+				imagesInRow       = 0;
+			}
+			else
+			{
+				ImGui::SameLine();
+			}
+
+			ImGui::PushStyleVar( ImGuiStyleVar_ChildBorderSize, 0 );
+
+			if ( ImGui::BeginChild( (int)imTexture, { imageDisplaySize.x, imageDisplaySize.y }, 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+			{
+				ImGui::Image( imTexture, { imageDisplaySize.x, imageDisplaySize.y } );
+
+				if ( ImGui::IsItemHovered() )
+				{
+					if ( ImGui::BeginTooltip() )
+					{
+						TextureInfo_t info = render->GetTextureInfo( texture );
+						Editor_DrawTextureInfo( info );
+					}
+
+					ImGui::EndTooltip();
+				}
+			}
+
+			ImGui::EndChild();
+
+			ImGui::PopStyleVar();
+			ImGui::PopStyleVar();
+
+			currentImageWidth += imageDisplaySize.x;
+			imagesInRow++;
+		}
+	}
+	
+	ImGui::EndChild();
+}
+
+
+void Editor_DrawAssetList()
+{
+	if ( ImGui::BeginTabBar( "editor tabs" ) )
+	{
+		if ( ImGui::BeginTabItem( "Texture List" ) )
+		{
+			Editor_DrawTextureList();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Model List" ) )
+		{
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Material List" ) )
+		{
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
 	}
 }
 
@@ -171,6 +278,14 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 	{
 		std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
 		ImGui::Text( modelPath.data() );
+
+		if ( ImGui::IsItemHovered() )
+		{
+			// maybe wait a second before showing a tooltip?
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted( modelPath.data() );
+			ImGui::EndTooltip();
+		}
 
 		// ImVec2 rect = ImGui::GetItemRectSize();
 		//
@@ -705,9 +820,9 @@ void EntEditor_DrawEntityList()
 			ImGui::EndTabItem();
 		}
 
-		if ( ImGui::BeginTabItem( "Texture List" ) )
+		if ( ImGui::BeginTabItem( "Asset List" ) )
 		{
-			EntEditor_DrawTextureList();
+			Editor_DrawAssetList();
 			ImGui::EndTabItem();
 		}
 
