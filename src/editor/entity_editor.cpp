@@ -1,21 +1,21 @@
 #include "entity_editor.h"
 #include "entity.h"
 #include "main.h"
+#include "file_picker.h"
 
 #include "imgui/imgui.h"
 
 #include <unordered_set>
 
 
-static ChHandle_t gSelectedEntity       = CH_INVALID_HANDLE;
+FilePickerData_t  gModelBrowserData{};
+static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 
-
-// blech
-static std::string gModelSelectPath = "";
-static bool gInModelSelect = false;
 
 bool EntEditor_Init()
 {
+	gModelBrowserData.filterExt = { ".obj", ".glb", ".gltf" };
+
 	return true;
 }
 
@@ -183,7 +183,6 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 	}
 	else if ( spEntity->apLight->aType == ELightType_Point )
 	{
-		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &spEntity->apLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
 		updateLight |= ImGui::SliderFloat( "Radius", &spEntity->apLight->aRadius, 0, 1000 );
 	}
 	else if ( spEntity->apLight->aType == ELightType_Cone )
@@ -220,57 +219,6 @@ static int EntityNameInput( ImGuiInputTextCallbackData* data )
 }
 
 
-// return true if model selected
-std::string EntEditor_DrawModelSelectionWindow()
-{
-	if ( !ImGui::Begin( "Model Selection Window" ) )
-	{
-		ImGui::End();
-		return "";
-	}
-
-	if ( ImGui::Button( "Close" ) )
-	{
-		gInModelSelect = false;
-		gModelSelectPath.clear();
-	}
-
-	auto fileList = FileSys_ScanDir( gModelSelectPath, ReadDir_AbsPaths );
-
-	for ( std::string_view file : fileList )
-	{
-		bool isDir = FileSys_IsDir( file.data(), true );
-
-		if ( !isDir )
-		{
-			bool model = file.ends_with( ".obj" );
-			model |= file.ends_with( ".gltf" );
-			model |= file.ends_with( ".glb" );
-
-			if ( !model )
-				continue;
-		}
-
-		if ( ImGui::Selectable( file.data() ) )
-		{
-			if ( isDir )
-			{
-				gModelSelectPath = FileSys_CleanPath( file );
-			}
-			else
-			{
-				ImGui::End();
-				return file.data();
-			}
-		}
-	}
-
-	ImGui::End();
-
-	return "";
-}
-
-
 void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 {
 	if ( spEntity->aModel )
@@ -289,16 +237,16 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 
 	if ( ImGui::Button( "Load Model" ) )
 	{
-		gInModelSelect = true;
+		gModelBrowserData.open = true;
 
 		if ( spEntity->aModel )
 		{
 			std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
-			gModelSelectPath           = FileSys_GetDirName( modelPath );
+			gModelBrowserData.path     = FileSys_GetDirName( modelPath );
 		}
 		else
 		{
-			gModelSelectPath = FileSys_GetExePath();
+			gModelBrowserData.path = FileSys_GetExePath();
 		}
 	}
 
@@ -455,21 +403,20 @@ void EntEditor_DrawEntityData()
 		EntEditor_DrawRenderableUI( entity );
 	}
 
-	if ( gInModelSelect )
+	if ( gModelBrowserData.open )
 	{
 		// update model for renderable
-		std::string newModel = EntEditor_DrawModelSelectionWindow();
+		EFilePickerReturn status = FilePicker_Draw( gModelBrowserData );
 
-		if ( newModel.size() )
+		if ( status == EFilePickerReturn_SelectedItems )
 		{
-			gInModelSelect = false;
-			gModelSelectPath.clear();
+			gModelBrowserData.open = false;
 
-			ChHandle_t model = graphics->LoadModel( newModel );
+			ChHandle_t model       = graphics->LoadModel( gModelBrowserData.selectedItems[ 0 ] );
 
 			if ( model == CH_INVALID_HANDLE )
 			{
-				Log_ErrorF( "Invalid Model: %s\n", newModel.data() );
+				Log_ErrorF( "Invalid Model: %s\n", gModelBrowserData.selectedItems[ 0 ].data() );
 			}
 			else
 			{
@@ -669,9 +616,8 @@ void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
 
 	if ( ImGui::Selectable( entity->aName.size() ? entity->aName.c_str() : entName.c_str(), gSelectedEntity == sParent ) )
 	{
-		gSelectedEntity = sParent;
-		gInModelSelect  = false;
-		gModelSelectPath.clear();
+		gSelectedEntity        = sParent;
+		gModelBrowserData.open = false;
 	}
 
 	if ( treeOpen )

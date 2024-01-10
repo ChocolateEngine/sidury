@@ -29,6 +29,8 @@ struct Entity_t
 	Light_t*    apLight;
 	ChHandle_t  aLightRenderable;
 
+	// Audio
+
 	// Color for Selecting with the cursor
 	glm::vec3   aSelectColor;
 
