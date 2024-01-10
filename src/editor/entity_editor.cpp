@@ -9,6 +9,8 @@
 
 
 FilePickerData_t  gModelBrowserData{};
+FilePickerData_t  gImporterFilePicker{};
+
 static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 
 
@@ -30,137 +32,81 @@ void EntEditor_Update( float sFrameTime )
 }
 
 
-static int EntEditor_StdStringCallback( ImGuiInputTextCallbackData* data )
+void EntEditor_DrawImporter()
 {
-	auto value = static_cast< std::string* >( data->UserData );
-	value->resize( data->BufTextLen );
-	return 0;
-}
-
-
-#if 0
-// Returns true if the value changed
-bool EntEditor_DrawComponentVarUI( void* spData, EntComponentVarData_t& srVarData )
-{
-	switch ( srVarData.aType )
+	if ( ImGui::Button( "Import File" ) )
 	{
-		default:
-		case EEntNetField_Invalid:
-			return false;
-
-		case EEntNetField_Bool:
-		{
-			auto value = static_cast< bool* >( spData );
-			return ImGui::Checkbox( srVarData.apName, value );
-		}
-
-		case EEntNetField_Float:
-		{
-			auto value = static_cast< float* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_Double:
-		{
-			auto value = static_cast< double* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Double, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-
-		case EEntNetField_S8:
-		{
-			auto value = static_cast< s8* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S8, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_S16:
-		{
-			auto value = static_cast< s16* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S16, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_S32:
-		{
-			auto value = static_cast< s32* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S32, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_S64:
-		{
-			auto value = static_cast< s64* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_S64, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-
-		case EEntNetField_U8:
-		{
-			auto value = static_cast< u8* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U8, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_U16:
-		{
-			auto value = static_cast< u16* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U16, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_U32:
-		{
-			auto value = static_cast< u32* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U32, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_U64:
-		{
-			auto value = static_cast< u64* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_U64, value, 1, 1.f, nullptr, nullptr, nullptr, 1.f );
-		}
-
-		case EEntNetField_StdString:
-		{
-			auto value = static_cast< std::string* >( spData );
-			value->reserve( 512 );
-			bool enterPressed = ImGui::InputText( srVarData.apName, value->data(), 512, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways, &EntEditor_StdStringCallback, value );
-			return enterPressed;
-		}
-
-		case EEntNetField_Vec2:
-		{
-			auto value = static_cast< glm::vec2* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 2, 0.25f, nullptr, nullptr, nullptr, 1.f );
-
-		}
-		case EEntNetField_Vec3:
-		{
-			auto value = static_cast< glm::vec3* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_Vec4:
-		{
-			auto value = static_cast< glm::vec4* >( spData );
-			return ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &value->x, 4, 0.25f, nullptr, nullptr, nullptr, 1.f );
-		}
-		case EEntNetField_Quat:
-		{
-			auto value = static_cast< glm::quat* >( spData );
-			glm::vec3 euler = glm::degrees( glm::eulerAngles( *value ) );
-
-			bool modified = ImGui::DragScalarN( srVarData.apName, ImGuiDataType_Float, &euler.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-
-			if ( modified )
-			{
-				*value = glm::radians( euler );
-			}
-
-			return modified;
-		}
-		
-		case EEntNetField_Color3:
-		{
-			auto value = static_cast< glm::vec3* >( spData );
-			return ImGui::ColorEdit3( srVarData.apName, &value->x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
-		}
-		case EEntNetField_Color4:
-		{
-			auto value = static_cast< glm::vec4* >( spData );
-			return ImGui::ColorEdit4( srVarData.apName, &value->x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
-		}
+		gImporterFilePicker.open = true;
 	}
 
-	return false;
+	if ( gImporterFilePicker.open )
+	{
+		EFilePickerReturn status = FilePicker_Draw( gImporterFilePicker );
+
+		if ( status == EFilePickerReturn_SelectedItems )
+		{
+
+		}
+	}
 }
-#endif
+
+
+static std::unordered_map< ChHandle_t, ImTextureID >   gImGuiTextures;
+static std::unordered_map< ChHandle_t, TextureInfo_t > gTextureInfo;
+
+
+void EntEditor_DrawTextureList()
+{
+	// Draws all currently loaded textures
+	ChVector< ChHandle_t > textures   = render->GetTextureList();
+
+	ImVec2                 windowSize = ImGui::GetWindowSize();
+
+	for ( ChHandle_t texture : textures )
+	{
+		ImTextureID imTexture = 0;
+
+		auto it = gImGuiTextures.find( texture );
+		if ( it == gImGuiTextures.end() )
+		{
+			imTexture = render->AddTextureToImGui( texture );
+			gImGuiTextures[ texture ] = imTexture;
+		}
+		else
+		{
+			imTexture = it->second;
+		}
+
+		if ( imTexture == nullptr )
+			continue;
+
+
+		if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 20, 144 }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+		{
+			ImGui::Image( imTexture, { 128, 128 } );
+
+			TextureInfo_t info = render->GetTextureInfo( texture );
+
+			ImGui::SameLine();
+
+			if ( ImGui::BeginChild( (int)imTexture, { windowSize.x - 20 - 128, 144 }, 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+			{
+				ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+
+				if ( info.aPath.size() )
+					ImGui::Text( info.aPath.data() );
+
+				ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
+				ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+			}
+
+			
+			ImGui::EndChild();
+		}
+
+		ImGui::EndChild();
+	}
+}
 
 
 void EntEditor_DrawLightUI( Entity_t* spEntity )
@@ -750,6 +696,18 @@ void EntEditor_DrawEntityList()
 
 		if ( ImGui::BeginTabItem( "Material Editor" ) )
 		{
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Importer" ) )
+		{
+			EntEditor_DrawImporter();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Texture List" ) )
+		{
+			EntEditor_DrawTextureList();
 			ImGui::EndTabItem();
 		}
 

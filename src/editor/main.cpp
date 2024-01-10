@@ -16,6 +16,7 @@
 #include "skybox.h"
 #include "editor_view.h"
 #include "entity_editor.h"
+#include "importer.h"
 
 #include <SDL_system.h>
 #include <SDL_hints.h>
@@ -70,6 +71,7 @@ void Game_Shutdown()
 	Log_Msg( "TODO: Save all open maps\n" );
 
 	Resource_Shutdown();
+	Importer_Shutdown();
 	EntEditor_Shutdown();
 	Skybox_Destroy();
 	Phys_Shutdown();
@@ -211,6 +213,12 @@ bool Game_Init()
 
 	// Startup the Game Input System
 	Input_Init();
+
+	if ( !Importer_Init() )
+	{
+		Log_ErrorF( "Failed to init Importer\n" );
+		return false;
+	}
 
 	// Create the Main Viewport - TODO: use this more across the game code
 	gMainViewportIndex = graphics->CreateViewport();
