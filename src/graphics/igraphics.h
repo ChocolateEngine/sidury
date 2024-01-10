@@ -662,8 +662,8 @@ struct ShaderCreate_t
 // stored data internally
 struct ShaderData_t
 {
-	ShaderStage           aStages         = ShaderStage_None;
 	EShaderFlags          aFlags          = EShaderFlags_None;
+	ShaderStage           aStages         = ShaderStage_None;
 	EDynamicState         aDynamicState   = EDynamicState_None;
 	ChHandle_t            aLayout         = CH_INVALID_HANDLE;
 	IShaderPush*          apPush          = nullptr;
