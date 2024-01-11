@@ -56,6 +56,16 @@ static std::unordered_map< ChHandle_t, TextureInfo_t > gTextureInfo;
 int                                                    gTextureListViewMode = 0;
 
 
+static float bytes_to_mb( u32 bytes )
+{
+#ifdef _WIN32
+	return bytes * 0.00000095367432;  // 1024 multiples for windows
+#else
+	return bytes * 0.000001;
+#endif
+}
+
+
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
 	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
@@ -64,6 +74,8 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 		ImGui::Text( info.aPath.data() );
 
 	ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
+	ImGui::Text( "Format: TODO" );
+	ImGui::Text( "Memory Usage: %.4f MB", bytes_to_mb( info.aMemoryUsage ) );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 }
 
@@ -92,6 +104,16 @@ void Editor_DrawTextureList()
 	bool wrapIconList      = false;
 	int  currentImageWidth = 0;
 	int  imagesInRow       = 0;
+
+	u32  memoryUsage      = 0;
+
+	for ( ChHandle_t texture : textures )
+	{
+		TextureInfo_t info = render->GetTextureInfo( texture );
+		memoryUsage += info.aMemoryUsage;
+	}
+
+	ImGui::Text( "Texture Count: %d  -  Memory Usage: %.4f MB", textures.size(), bytes_to_mb( memoryUsage ) );
 
 	if ( !ImGui::BeginChild( "Texture List" ) )
 	{
@@ -454,7 +476,7 @@ void EntEditor_DrawEntityData()
 	// Entity Transform
 	ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
 	ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
+	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.005f, nullptr, nullptr, nullptr, 1.f );
 
 	ImGui::Separator();
 
