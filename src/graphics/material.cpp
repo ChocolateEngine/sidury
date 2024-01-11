@@ -224,6 +224,15 @@ bool Graphics::Mat_RemoveRef( ChHandle_t sMat )
 	if ( data->aRefCount != 0 )
 		return false;
 
+	// free textures in material vars
+	for ( MaterialVar& var : data->aVars )
+	{
+		if ( var.aType != EMatVar_Texture )
+			continue;
+
+		render->FreeTexture( var.aDataTexture );
+	}
+
 	delete data;
 	gMaterials.Remove( sMat );
 
