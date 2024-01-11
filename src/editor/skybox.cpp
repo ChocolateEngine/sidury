@@ -218,10 +218,20 @@ const char* Skybox_GetMaterialName()
 	if ( ( !gSkyboxModel && !Skybox_Init() ) || !gSkyboxValid )
 		return nullptr;
 
-	Handle mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
+	ChHandle_t mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
 	if ( mat == CH_INVALID_HANDLE )
 		return nullptr;
 
 	return graphics->Mat_GetName( mat );
+}
+
+
+ChHandle_t Skybox_GetMaterial()
+{
+	if ( ( !gSkyboxModel && !Skybox_Init() ) || !gSkyboxValid )
+		return CH_INVALID_HANDLE;
+
+	ChHandle_t mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
+	return mat;
 }
 

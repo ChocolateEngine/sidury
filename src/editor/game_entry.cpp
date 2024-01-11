@@ -102,7 +102,7 @@ extern "C"
 
 		if ( !Game_Init() )
 		{
-			Log_Error( "Failed to Start Game!\n" );
+			Log_Error( "Failed to Start Editor!\n" );
 			Game_Shutdown();
 			return;
 		}

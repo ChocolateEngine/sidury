@@ -49,9 +49,9 @@ static void FilePicker_ScanFolder( FilePickerData_t& srData, std::string_view sr
 
 #define PATH_LEN 1024
 
-EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData )
+EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData, const char* spWindowName )
 {
-	if ( !ImGui::Begin( "File Picker" ) )
+	if ( !ImGui::Begin( spWindowName ? spWindowName : "File Picker" ) )
 	{
 		ImGui::End();
 		return EFilePickerReturn_None;

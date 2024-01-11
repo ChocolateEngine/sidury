@@ -27,15 +27,26 @@ set(
 include_directories(
 	"${CH_THIRDPARTY}/flatbuffers/include"
 	"../graphics"
+
+	# Import Formats
+	"${CH_THIRDPARTY}/mozjpeg"
+	"${CH_THIRDPARTY}/mozjpeg/build"
 )
 
 set( FLATBUFFERS_DIR_DEBUG "${CH_THIRDPARTY}/flatbuffers/build/Debug" )
 set( FLATBUFFERS_DIR_RELEASE "${CH_THIRDPARTY}/flatbuffers/build/Release" )
 
+set( MOZJPEG_DIR_DEBUG "${CH_THIRDPARTY}/mozjpeg/build/Debug" )
+set( MOZJPEG_DIR_RELEASE "${CH_THIRDPARTY}/mozjpeg/build/Release" )
+
 link_directories(
 	"$<$<CONFIG:Debug>:${FLATBUFFERS_DIR_DEBUG}>"
 	"$<$<CONFIG:Release>:${FLATBUFFERS_DIR_RELEASE}>"
 	"$<$<CONFIG:RelWithDebInfo>:${FLATBUFFERS_DIR_RELEASE}>"
+
+	"$<$<CONFIG:Debug>:${MOZJPEG_DIR_DEBUG}>"
+	"$<$<CONFIG:Release>:${MOZJPEG_DIR_RELEASE}>"
+	"$<$<CONFIG:RelWithDebInfo>:${MOZJPEG_DIR_RELEASE}>"
 )
 
 # include( ${CH_ROOT}/scripts/rmlui.cmake )
@@ -49,6 +60,8 @@ target_link_libraries(
 	Core
 	ImGui
 	flatbuffers
+	jpeg-static
+	turbojpeg-static
 )
 
 add_dependencies( Editor "Core" "ImGui" )

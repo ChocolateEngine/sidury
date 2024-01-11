@@ -20,5 +20,5 @@ enum EFilePickerReturn
 };
 
 
-EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData );
+EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData, const char* spWindowName );
 

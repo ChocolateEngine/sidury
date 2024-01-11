@@ -2,6 +2,8 @@
 #include "entity.h"
 #include "main.h"
 #include "file_picker.h"
+#include "skybox.h"
+#include "importer.h"
 
 #include "imgui/imgui.h"
 
@@ -10,6 +12,7 @@
 
 FilePickerData_t  gModelBrowserData{};
 FilePickerData_t  gImporterFilePicker{};
+FilePickerData_t  gSkyboxFilePicker{};
 
 static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 
@@ -17,6 +20,7 @@ static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 bool EntEditor_Init()
 {
 	gModelBrowserData.filterExt = { ".obj", ".glb", ".gltf" };
+	gSkyboxFilePicker.filterExt = { ".cmt", };
 
 	return true;
 }
@@ -41,11 +45,13 @@ void EntEditor_DrawImporter()
 
 	if ( gImporterFilePicker.open )
 	{
-		EFilePickerReturn status = FilePicker_Draw( gImporterFilePicker );
+		EFilePickerReturn status = FilePicker_Draw( gImporterFilePicker, "Import File" );
 
 		if ( status == EFilePickerReturn_SelectedItems )
 		{
-
+			ImportSettings importSettings{};
+			importSettings.inputFile = gImporterFilePicker.selectedItems[ 0 ];
+			ChHandle_t importHandle = Importer_StartImport( importSettings );
 		}
 	}
 }
@@ -54,16 +60,6 @@ void EntEditor_DrawImporter()
 static std::unordered_map< ChHandle_t, ImTextureID >   gImGuiTextures;
 static std::unordered_map< ChHandle_t, TextureInfo_t > gTextureInfo;
 int                                                    gTextureListViewMode = 0;
-
-
-static float bytes_to_mb( u32 bytes )
-{
-#ifdef _WIN32
-	return bytes * 0.00000095367432;  // 1024 multiples for windows
-#else
-	return bytes * 0.000001;
-#endif
-}
 
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
@@ -75,7 +71,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 
 	ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
 	ImGui::Text( "Format: TODO" );
-	ImGui::Text( "Memory Usage: %.4f MB", bytes_to_mb( info.aMemoryUsage ) );
+	ImGui::Text( "Memory Usage: %.6f MB", Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 }
 
@@ -101,19 +97,28 @@ void Editor_DrawTextureList()
 
 	// TODO: add a search bar?
 
+	// TODO: use pages, and show only 100 textures per page, and have only 100 loaded for imgui not to freak out
+
 	bool wrapIconList      = false;
 	int  currentImageWidth = 0;
 	int  imagesInRow       = 0;
 
-	u32  memoryUsage      = 0;
+	u32  memoryUsage       = 0;
+	u32  rtMemoryUsage     = 0;
 
 	for ( ChHandle_t texture : textures )
 	{
 		TextureInfo_t info = render->GetTextureInfo( texture );
-		memoryUsage += info.aMemoryUsage;
+
+		if ( info.aRenderTarget )
+			rtMemoryUsage += info.aMemoryUsage;
+		else
+			memoryUsage += info.aMemoryUsage;
 	}
 
-	ImGui::Text( "Texture Count: %d  -  Memory Usage: %.4f MB", textures.size(), bytes_to_mb( memoryUsage ) );
+	ImGui::Text(
+	  "Count: %d | Memory: %.4f MB | Render Target Memory: %.4f MB",
+	  textures.size(), Util_BytesToMB( memoryUsage ), Util_BytesToMB( rtMemoryUsage ) );
 
 	if ( !ImGui::BeginChild( "Texture List" ) )
 	{
@@ -128,7 +133,7 @@ void Editor_DrawTextureList()
 		auto it = gImGuiTextures.find( texture );
 		if ( it == gImGuiTextures.end() )
 		{
-			imTexture = render->AddTextureToImGui( texture );
+			imTexture                 = render->AddTextureToImGui( texture );
 			gImGuiTextures[ texture ] = imTexture;
 		}
 		else
@@ -303,19 +308,10 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 
 		if ( ImGui::IsItemHovered() )
 		{
-			// maybe wait a second before showing a tooltip?
 			ImGui::BeginTooltip();
 			ImGui::TextUnformatted( modelPath.data() );
 			ImGui::EndTooltip();
 		}
-
-		// ImVec2 rect = ImGui::GetItemRectSize();
-		//
-		// ImGui::IsMouseHoveringRect();
-		//
-		// ImGui::BeginTooltip();
-		// ImGui::Text( modelPath.data() );
-		// ImGui::EndTooltip();
 	}
 
 	if ( ImGui::Button( "Load Model" ) )
@@ -415,6 +411,9 @@ void EntEditor_DrawEntityData()
 	if ( context == nullptr )
 		return;
 
+	// -------------------------------------------------------------------------------------
+	// Entity Parenting
+
 	ChHandle_t parent = Entity_GetParent( gSelectedEntity );
 	std::string parentName = "None";
 
@@ -473,14 +472,18 @@ void EntEditor_DrawEntityData()
 
 	ImGui::Separator();
 
+	// -------------------------------------------------------------------------------------
 	// Entity Transform
+
 	ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
 	ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.005f, nullptr, nullptr, nullptr, 1.f );
+	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.01f, nullptr, nullptr, nullptr, 1.f );
 
 	ImGui::Separator();
 
+	// -------------------------------------------------------------------------------------
 	// Entity Model/Renderable
+
 	if ( ImGui::CollapsingHeader( "Renderable", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding ) )
 	{
 		EntEditor_DrawRenderableUI( entity );
@@ -489,7 +492,7 @@ void EntEditor_DrawEntityData()
 	if ( gModelBrowserData.open )
 	{
 		// update model for renderable
-		EFilePickerReturn status = FilePicker_Draw( gModelBrowserData );
+		EFilePickerReturn status = FilePicker_Draw( gModelBrowserData, "Select Renderable Model" );
 
 		if ( status == EFilePickerReturn_SelectedItems )
 		{
@@ -521,10 +524,16 @@ void EntEditor_DrawEntityData()
 		}
 	}
 
+	// -------------------------------------------------------------------------------------
+	// Audio
+
+	// -------------------------------------------------------------------------------------
 	// Physics Model
 	// entity->aPhysicsModel;
 
+	// -------------------------------------------------------------------------------------
 	// Light Editing
+
 	if ( ImGui::CollapsingHeader( "Light", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
 		if ( entity->apLight )
@@ -676,7 +685,37 @@ void EntEditor_DrawEntityData()
 
 void EntEditor_DrawMapDataUI()
 {
+	ChHandle_t mat = Skybox_GetMaterial();
+
 	ImGui::Text( "Skybox" );
+
+	if ( mat == CH_INVALID_HANDLE )
+	{
+		ImGui::Text( "No Skybox Material Loaded" );
+	}
+	else
+	{
+		std::string_view path = graphics->GetMaterialPath( mat );
+		ImGui::Text( path.data() );
+	}
+
+	if ( ImGui::Button( "Load Skybox" ) )
+	{
+		gSkyboxFilePicker.open = true;
+	}
+
+	if ( gSkyboxFilePicker.open )
+	{
+		EFilePickerReturn status = FilePicker_Draw( gSkyboxFilePicker, "Pick Skybox Material" );
+
+		if ( status == EFilePickerReturn_SelectedItems )
+		{
+			Skybox_SetMaterial( gSkyboxFilePicker.selectedItems[ 0 ] );
+		}
+	}
+
+	// Skybox_SetMaterial( args[ 0 ] );
+
 }
 
 
