@@ -16,6 +16,9 @@ FilePickerData_t  gSkyboxFilePicker{};
 
 static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 
+extern glm::ivec2 gAssetBrowserSize;
+extern float      gAssetBrowserOffset;
+
 
 bool EntEditor_Init()
 {
@@ -775,7 +778,7 @@ void EntEditor_DrawEntityList()
 	render->GetSurfaceSize( width, height );
 
 	ImGui::SetNextWindowPos( { 0.f, (float)gMainMenuBarHeight } );
-	ImGui::SetNextWindowSizeConstraints( { 0.f, (float)( height - gMainMenuBarHeight ) }, { (float)width, (float)( height - gMainMenuBarHeight ) } );
+	ImGui::SetNextWindowSizeConstraints( { 0.f, (float)( height - ( gMainMenuBarHeight + gAssetBrowserSize.y ) ) }, { (float)width, (float)( height - ( gMainMenuBarHeight + gAssetBrowserSize.y ) ) } );
 
 	if ( !ImGui::Begin( "Entity List", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove ) )
 	{
@@ -787,7 +790,7 @@ void EntEditor_DrawEntityList()
 	}
 	
 	ImGui::BeginChild( "tabs" );
-	if ( ImGui::BeginTabBar( "editor tabs" ) )
+	if ( ImGui::BeginTabBar( "##editor tabs" ) )
 	{
 		if ( ImGui::BeginTabItem( "Entities" ) )
 		{
@@ -906,6 +909,8 @@ static const glm::vec3 gSelectBoxColor = { 1.f, 1.f, 1.f };
 
 void EntEditor_DrawUI()
 {
+	AssetBrowser_Draw();
+
 	EntEditor_DrawEntityList();
 	// EntEditor_DrawEntityData();
 

@@ -494,15 +494,16 @@ void Game_UpdateProjection()
 	io.DisplaySize.y  = height;
 
 	// HACK
-	extern glm::vec2 gEntityListSize;
+	extern glm::vec2  gEntityListSize;
+	extern glm::ivec2 gAssetBrowserSize;
 
-	int              offsetX = gEntityListSize.x;
-	int              offsetY = gMainMenuBarHeight;
+	int               offsetX   = gEntityListSize.x;
+	int               offsetY   = gMainMenuBarHeight;
 
-	int              newWidth  = width - offsetX;
-	int              newHeight = height - offsetY;
+	int               newWidth  = width - offsetX;
+	int               newHeight = height - offsetY - gAssetBrowserSize.y;
 
-	glm::mat4        projMat   = Util_ComputeProjection( newWidth, height, r_nearz, r_farz, r_fov );
+	glm::mat4         projMat   = Util_ComputeProjection( newWidth, newHeight, r_nearz, r_farz, r_fov );
 
 	// update each viewport for each context
 #if 0
@@ -554,7 +555,7 @@ void Game_UpdateProjection()
 
 	viewport->aNearZ      = r_nearz;
 	viewport->aFarZ       = r_farz;
-	viewport->aSize       = { newWidth, height };
+	viewport->aSize       = { newWidth, newHeight };
 	viewport->aOffset     = { offsetX, offsetY };
 #endif
 
