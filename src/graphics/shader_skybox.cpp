@@ -17,16 +17,16 @@ static std::unordered_map< SurfaceDraw_t*, Skybox_Push > gSkyboxPushData;
 
 static void Shader_Skybox_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Skybox_Push ) } );
 }
 
 
 static void Shader_Skybox_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/skybox.vert.spv", "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/skybox.frag.spv", "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, "shaders/skybox.vert.spv", "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, "shaders/skybox.frag.spv", "main" } );
 
-	srGraphics.aColorBlendAttachments.emplace_back( true );
+	srGraphics.aColorBlendAttachments.push_back( { true } );
 
 	srGraphics.aPrimTopology = EPrimTopology_Tri;
 	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;

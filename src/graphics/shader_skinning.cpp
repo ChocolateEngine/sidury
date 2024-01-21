@@ -20,7 +20,7 @@ constexpr EShaderFlags Shader_ShaderSkinning_Flags()
 
 static void Shader_ShaderSkinning_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Compute, 0, sizeof( ShaderSkinning_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Compute, 0, sizeof( ShaderSkinning_Push ) } );
 }
 
 

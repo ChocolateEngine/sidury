@@ -23,14 +23,14 @@ static std::unordered_map< SurfaceDraw_t*, Debug_Push > gDebugLinePushData;
 
 static void Shader_Debug_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Debug_Push ) } );
 }
 
 
 static void Shader_Debug_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertColShader, "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, gpVertColShader, "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, gpFragShader, "main" } );
 
 	srGraphics.aColorBlendAttachments.emplace_back( true );
 
@@ -113,8 +113,8 @@ ShaderCreate_t gShaderCreate_Debug = {
 
 static void Shader_DebugLine_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, gpVertShader, "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, gpFragShader, "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, gpVertShader, "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, gpFragShader, "main" } );
 
 	srGraphics.aColorBlendAttachments.emplace_back( true );
 

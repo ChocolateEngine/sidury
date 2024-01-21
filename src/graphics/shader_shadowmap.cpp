@@ -18,15 +18,15 @@ static int                                                  gShadowViewInfoIndex
 
 static void Shader_ShadowMap_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShadowMap_Push ) } );
 }
 
 
 static void Shader_ShadowMap_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/shadow.vert.spv", "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/shadow.frag.spv", "main" );
-	srGraphics.aColorBlendAttachments.emplace_back( false );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, "shaders/shadow.vert.spv", "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, "shaders/shadow.frag.spv", "main" } );
+	srGraphics.aColorBlendAttachments.push_back( { false } );
 	srGraphics.aPrimTopology    = EPrimTopology_Tri;
 	srGraphics.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor | EDynamicState_DepthBias;
 	srGraphics.aCullMode        = ECullMode_None;

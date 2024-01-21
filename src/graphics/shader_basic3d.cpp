@@ -221,16 +221,16 @@ static void Shader_Basic3D_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPi
 {
 	// NOTE: maybe create the descriptor set layout for this shader here, then add it? idk
 
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Basic3D_Push ) } );
 }
 
 
 static void Shader_Basic3D_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/basic3d.vert.spv", "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/basic3d.frag.spv", "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, "shaders/basic3d.vert.spv", "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, "shaders/basic3d.frag.spv", "main" } );
 
-	srGraphics.aColorBlendAttachments.emplace_back( false ); 
+	srGraphics.aColorBlendAttachments.push_back( { false } ); 
 
 	srGraphics.aPrimTopology   = EPrimTopology_Tri;
 	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;

@@ -22,16 +22,16 @@ constexpr EShaderFlags Shader_ShaderUnlit_Flags()
 
 static void Shader_ShaderUnlit_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipeline )
 {
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShaderUnlit_Push ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShaderUnlit_Push ) } );
 }
 
 
 static void Shader_ShaderUnlit_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/unlit.vert.spv", "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/unlit.frag.spv", "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, "shaders/unlit.vert.spv", "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, "shaders/unlit.frag.spv", "main" } );
 
-	srGraphics.aColorBlendAttachments.emplace_back( false ); 
+	srGraphics.aColorBlendAttachments.push_back( { false } ); 
 
 	srGraphics.aPrimTopology   = EPrimTopology_Tri;
 	srGraphics.aDynamicState   = EDynamicState_Viewport | EDynamicState_Scissor;

@@ -200,16 +200,16 @@ static void Shader_Water_GetPipelineLayoutCreate( PipelineLayoutCreate_t& srPipe
 {
 	// NOTE: maybe create the descriptor set layout for this shader here, then add it? idk
 
-	srPipeline.aPushConstants.emplace_back( ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Water_Push_t ) );
+	srPipeline.aPushConstants.push_back( { ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( Water_Push_t ) } );
 }
 
 
 static void Shader_Water_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& srGraphics )
 {
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Vertex, "shaders/water.vert.spv", "main" );
-	srGraphics.aShaderModules.emplace_back( ShaderStage_Fragment, "shaders/water.frag.spv", "main" );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Vertex, "shaders/water.vert.spv", "main" } );
+	srGraphics.aShaderModules.push_back( { ShaderStage_Fragment, "shaders/water.frag.spv", "main" } );
 
-	srGraphics.aColorBlendAttachments.emplace_back( false );
+	srGraphics.aColorBlendAttachments.push_back( { false } );
 
 	srGraphics.aPrimTopology = EPrimTopology_Tri;
 	srGraphics.aDynamicState = EDynamicState_Viewport | EDynamicState_Scissor;
