@@ -41,6 +41,7 @@ target_link_libraries(
 	Steam
 	PRIVATE
 	Core
+	SDL2
 )
 
 add_dependencies( Steam "Core" )

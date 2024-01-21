@@ -33,6 +33,7 @@ target_link_libraries(
 	PRIVATE
 	Core
 	ImGui
+	SDL2
 )
 
 if( WIN32 )

@@ -59,6 +59,7 @@ link_directories(
 	"$<$<CONFIG:Debug>:${FLATBUFFERS_DIR_DEBUG}>"
 	"$<$<CONFIG:Release>:${FLATBUFFERS_DIR_RELEASE}>"
 	"$<$<CONFIG:RelWithDebInfo>:${FLATBUFFERS_DIR_RELEASE}>"
+	"$<$<CONFIG:Profile>:${FLATBUFFERS_DIR_RELEASE}>"
 )
 
 # include( ${CH_ROOT}/scripts/rmlui.cmake )
@@ -71,6 +72,7 @@ target_link_libraries(
 	PRIVATE
 	Core
 	ImGui
+	SDL2
 	flatbuffers
 )
 
