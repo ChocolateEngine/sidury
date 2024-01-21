@@ -847,6 +847,21 @@ bool Graphics_CreateStagingBuffer( DeviceBufferStaging_t& srStaging, size_t sSiz
 }
 
 
+bool Graphics_CreateStagingUniformBuffer( DeviceBufferStaging_t& srStaging, size_t sSize, const char* spStagingName, const char* spName )
+{
+	srStaging.aStagingBuffer = render->CreateBuffer( spStagingName, sSize, EBufferFlags_TransferSrc, EBufferMemory_Host );
+	srStaging.aBuffer        = render->CreateBuffer( spName, sSize, EBufferFlags_Uniform | EBufferFlags_TransferDst, EBufferMemory_Device );
+
+	if ( !srStaging.aBuffer || !srStaging.aStagingBuffer )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Create %s\n", spName );
+		return false;
+	}
+
+	return true;
+}
+
+
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 {
 	// ------------------------------------------------------
@@ -877,7 +892,7 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create Viewport Data Buffer
 
-	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aViewportStaging, sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS, "Viewport Staging Buffer", "Viewport Buffer" ) )
+	if ( !Graphics_CreateStagingUniformBuffer( gGraphicsData.aViewportStaging, sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS, "Viewport Staging Buffer", "Viewport Buffer" ) )
 		return false;
 
 	// ------------------------------------------------------
@@ -914,7 +929,7 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 		viewports.aBinding                       = CH_BINDING_VIEWPORTS;
 		viewports.aCount                         = 1;
 		viewports.aStages                        = ShaderStage_All;
-		viewports.aType                          = EDescriptorType_StorageBuffer;
+		viewports.aType                          = EDescriptorType_UniformBuffer;
 
 		CreateDescBinding_t& renderables         = createLayout.aBindings.emplace_back();
 		renderables.aBinding                     = CH_BINDING_RENDERABLES;

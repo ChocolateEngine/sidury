@@ -155,7 +155,7 @@ layout(set = 0, binding = CH_BINDING_CORE) buffer readonly Buffer_Core
 } gCore;
 
 
-layout(set = 0, binding = CH_BINDING_VIEWPORTS) buffer Buffer_Viewports
+layout(set = 0, binding = CH_BINDING_VIEWPORTS) uniform Buffer_Viewports
 {
 	Viewport_t gViewports[ CH_R_MAX_VIEWPORTS ];
 };
