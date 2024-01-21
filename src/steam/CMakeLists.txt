@@ -82,7 +82,7 @@ source_group(
 if( WIN32 AND ${64_BIT} )
 	add_custom_command(
 		TARGET Steam POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api64.dll" "${CH_BUILD}/steam_api64.dll"
+		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api64.dll" "${CH_BIN}/steam_api64.dll"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying Steam API DLL to launcher directory"
     )
@@ -91,7 +91,7 @@ endif()
 if( WIN32 AND ${32_BIT} )
 	add_custom_command(
 		TARGET Steam POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api.dll" "${CH_BUILD}/steam_api.dll"
+		COMMAND ${CMAKE_COMMAND} -E copy "${STEAM_API_BIN_DIR}/steam_api.dll" "${CH_BIN}/steam_api.dll"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying Steam API 32-bit DLL to launcher directory"
     )

@@ -36,7 +36,7 @@ if (MSVC)
 	# Copy a pre-built manifest file to the output directory for DPI Scaling
 	add_custom_command(
 		TARGET LauncherSidury POST_BUILD
-        # COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BUILD}/bin/${PLAT_FOLDER}/${SIDURY_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
+        # COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BIN}/${SIDURY_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BUILD}/${SIDURY_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying ${SIDURY_LAUNCHER_NAME}.exe.manifest to launcher directory"
@@ -85,7 +85,7 @@ if (MSVC)
 	# Copy a pre-built manifest file to the output directory for DPI Scaling
 	add_custom_command(
 		TARGET LauncherEditor POST_BUILD
-        # COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BUILD}/bin/${PLAT_FOLDER}/${EDITOR_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
+        # COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BIN}/${EDITOR_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BUILD}/${EDITOR_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
 		COMMAND_EXPAND_LISTS
         COMMENT "Copying ${EDITOR_LAUNCHER_NAME}.exe.manifest to launcher directory"
