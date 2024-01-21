@@ -48,11 +48,37 @@ static glm::vec3 gMouseTraceEnd{};
 static float gMoveScale = 1.f;
 
 
+bool EditorView_IsMouseInView()
+{
+	// TEMP
+	ViewportShader_t* viewport = graphics->GetViewportData( 0 );
+
+	glm::ivec2 mousePos = input->GetMousePos();
+
+	if ( viewport->aOffset.x > mousePos.x )
+		return false;
+
+	if ( viewport->aOffset.y > mousePos.y )
+		return false;
+
+	if ( viewport->aOffset.x + viewport->aSize.x < mousePos.x )
+		return false;
+
+	if ( viewport->aOffset.y + viewport->aSize.y < mousePos.y )
+		return false;
+
+	return true;
+}
+
+
 void EditorView_UpdateInputs()
 {
 	PROF_SCOPE();
 
 	gEditorData.aMove = { 0.f, 0.f, 0.f };
+
+	if ( !EditorView_IsMouseInView() )
+		return;
 
 	glm::ivec2 mouseScroll = input->GetMouseScroll();
 
