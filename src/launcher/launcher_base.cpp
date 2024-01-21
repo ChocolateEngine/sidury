@@ -148,8 +148,6 @@ void set_search_directory()
 	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR "win64" );
 
 	auto ret = SetDllDirectory( path );
-
-	printf( "yeah\n" );
 #endif
 }
 
