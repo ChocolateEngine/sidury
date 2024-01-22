@@ -302,6 +302,220 @@ static int EntityNameInput( ImGuiInputTextCallbackData* data )
 }
 
 
+void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
+{
+	// if ( !ImGui::BeginChild( matI + 1, {}, ImGuiChildFlags_Border ) )
+	// if ( !ImGui::BeginChild( matI + 1, {} ) )
+
+	ChHandle_t  mat     = renderable->apMaterials[ matI ];
+	const char* matPath = graphics->Mat_GetName( mat );
+
+	//ImGui::PushID( matI + 1 );
+
+	//if ( !ImGui::TreeNode( matPath ) )
+	//{
+	//	ImGui::TreePop();
+	//	return;
+	//}
+
+	ImVec2 size = ImGui::GetWindowSize();
+
+	//if ( !ImGui::BeginChild( "##", { 0, 40 }, ImGuiChildFlags_Border | ImGuiChildFlags_ResizeY, ImGuiWindowFlags_NoSavedSettings ) )
+	{
+		//ImGui::EndChild();
+		////ImGui::TreePop();
+		//ImGui::PopID();
+		//return;
+	}
+
+	ImGui::Text( matPath );
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "Edit" ) )
+	{
+		// Focus Material Editor and Show this material
+	}
+	// 
+	// ImGui::Separator();
+
+	// TODO: use imgui tables
+
+
+	// ImGui::BeginChild( "ConVar List Child", ImVec2( 0, -ImGui::GetFrameHeightWithSpacing() ), true );
+
+	if ( ImGui::BeginTable( matPath, 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable ) )
+	{
+		// Draw Shader
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex( 0 );
+
+		ImGui::Text( "shader" );
+
+		ImGui::TableSetColumnIndex( 1 );
+		ChHandle_t shader = graphics->Mat_GetShader( mat );
+
+		const char* shaderName = graphics->GetShaderName( shader );
+
+		ImGui::Text( shaderName ? shaderName : "INVALID" );
+
+		size_t varCount = graphics->Mat_GetVarCount( mat );
+
+		for ( u32 varI = 0; varI < varCount; varI++ )
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex( 0 );
+
+
+			// TODO: probably expose MaterialVar directly? this re-accessing the data a lot
+			const char* varName    = graphics->Mat_GetVarName( mat, varI );
+			EMatVar     matVarType = graphics->Mat_GetVarType( mat, varI );
+
+			ImGui::Text( varName ? varName : "ERROR NAME" );
+
+			ImGui::TableSetColumnIndex( 1 );
+
+			switch ( matVarType )
+			{
+				default:
+				case EMatVar_Invalid:
+					break;
+
+				case EMatVar_Texture:
+				{
+					ChHandle_t    texHandle = graphics->Mat_GetTexture( mat, varI );
+					TextureInfo_t texInfo   = render->GetTextureInfo( texHandle );
+
+					ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
+
+					if ( ImGui::IsItemHovered() )
+					{
+						if ( ImGui::BeginTooltip() )
+							Editor_DrawTextureInfo( texInfo );
+
+						ImGui::EndTooltip();
+					}
+
+					break;
+				}
+
+				case EMatVar_Float:
+				{
+					float value = graphics->Mat_GetFloat( mat, varI );
+					ImGui::Text( "%.6f", value );
+					break;
+				}
+
+				case EMatVar_Int:
+				{
+					int value = graphics->Mat_GetInt( mat, varI );
+					ImGui::Text( "%d", value );
+					break;
+				}
+
+				case EMatVar_Bool:
+				{
+					bool value = graphics->Mat_GetBool( mat, varI );
+					ImGui::Text( value ? "True" : "False" );
+					break;
+				}
+
+				case EMatVar_Vec2:
+				{
+					glm::vec2 value = graphics->Mat_GetVec2( mat, varI );
+					ImGui::Text( "X: %.6f, Y: %.6f", value.x, value.y );
+					break;
+				}
+
+				case EMatVar_Vec3:
+				{
+					glm::vec3 value = graphics->Mat_GetVec3( mat, varI );
+					ImGui::Text( "X: %.6f, Y: %.6f, Z: %.6f", value.x, value.y, value.z );
+					break;
+				}
+
+				case EMatVar_Vec4:
+				{
+					glm::vec4 value = graphics->Mat_GetVec4( mat, varI );
+					ImGui::Text( "X: %.6f, Y: %.6f, Z: %.6f, W: %.6f", value.x, value.y, value.z, value.w );
+					break;
+				}
+			}
+
+			//if ( varI + 1 < varCount )
+			//	ImGui::Separator();
+		}
+
+	}
+
+	ImGui::EndTable();
+
+	//size_t varCount = graphics->Mat_GetVarCount( mat );
+	//
+	//for ( u32 varI = 0; varI < varCount; varI++ )
+	//{
+	//	// TODO: probably expose MaterialVar directly? this re-accessing the data a lot
+	//	const char* varName = graphics->Mat_GetVarName( mat, varI );
+	//	EMatVar matVarType  = graphics->Mat_GetVarType( mat, varI );
+	//
+	//	ImGui::Text( varName ? varName : "ERROR NAME" );
+	//
+	//	ImGui::SameLine();
+	//
+	//	switch ( matVarType )
+	//	{
+	//		default:
+	//		case EMatVar_Invalid:
+	//			break;
+	//
+	//		case EMatVar_Texture:
+	//		{
+	//			ChHandle_t texHandle  = graphics->Mat_GetTexture( mat, varI );
+	//			TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
+	//
+	//			ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
+	//
+	//			break;
+	//		}
+	//
+	//		case EMatVar_Float:
+	//			ImGui::Text( "Float" );
+	//			break;
+	//
+	//		case EMatVar_Int:
+	//			ImGui::Text( "Int" );
+	//			break;
+	//
+	//		case EMatVar_Bool:
+	//			ImGui::Text( "Bool" );
+	//			break;
+	//
+	//		case EMatVar_Vec2:
+	//			ImGui::Text( "Vec2" );
+	//			break;
+	//
+	//		case EMatVar_Vec3:
+	//			ImGui::Text( "Vec3" );
+	//			break;
+	//
+	//		case EMatVar_Vec4:
+	//			ImGui::Text( "Vec4" );
+	//			break;
+	//	}
+	//
+	//	if ( varI + 1 < varCount )
+	//		ImGui::Separator();
+	//}
+
+	//ImGui::EndChild();
+	/// ImGui::TreePop();
+	//ImGui::PopID();
+
+	// if ( matI + 1 < renderable->aMaterialCount )
+	// 	ImGui::Separator();
+}
+
+
 void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 {
 	if ( spEntity->aModel )
@@ -346,6 +560,7 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 			ImGui::Text( "Materials: %d", renderable->aMaterialCount );
 			for ( u32 matI = 0; matI < renderable->aMaterialCount; matI++ )
 			{
+				EntEditor_DrawBasicMaterialData( renderable, matI );
 			}
 		}
 
@@ -541,7 +756,7 @@ void EntEditor_DrawEntityData()
 	{
 		if ( entity->apLight )
 		{
-			ImGui::SameLine();
+			//ImGui::SameLine();
 
 			if ( ImGui::Button( "Destroy Light" ) )
 			{

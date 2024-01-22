@@ -176,33 +176,61 @@ void Main_DrawMenuBar()
 #define CH_LIVE_WINDOW_RESIZE 1
 
 
-void WindowResizeCallback()
+void UpdateLoop( float frameTime, bool sResize )
 {
-#if CH_LIVE_WINDOW_RESIZE
-	PROF_SCOPE_NAMED( "WindowResizeCallback" );
+	PROF_SCOPE();
 
-	ImGui::NewFrame();
-	ImGui_ImplSDL2_NewFrame();
+	{
+		PROF_SCOPE_NAMED( "Imgui New Frame" );
+		ImGui::NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+	}
+
+	ImGui::ShowDemoWindow();
+
 	graphics->NewFrame();
 
-	graphics->Reset();
+	if ( !sResize )
+		Game_UpdateGame( frameTime );
+	else
+		graphics->Reset();
 
-	EntEditor_Update( 0.f );
+	gui->Update( frameTime );
+
+	if ( !sResize )
+		Entity_Update();
+
+	EntEditor_Update( frameTime );
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
-		gui->Update( 0.f );
 		Main_DrawMenuBar();
 		EntEditor_DrawUI();
 
-		Game_UpdateProjection();
+		if ( sResize )
+			Game_UpdateProjection();
 
 		graphics->Present();
 	}
 	else
 	{
+		PROF_SCOPE_NAMED( "Imgui End Frame" );
 		ImGui::EndFrame();
 	}
+
+	if ( sResize )
+		return;
+
+	Con_Update();
+
+	Resource_Update();
+}
+
+
+void WindowResizeCallback()
+{
+#if CH_LIVE_WINDOW_RESIZE
+	UpdateLoop( 0.f, true );
 #endif
 }
 
@@ -236,6 +264,8 @@ bool Game_Init()
 	Phys_Init();
 
 	EntEditor_Init();
+
+	// TODO, mess with ImGui WantSaveIniSettings
 
 	Log_Msg( "Editor Loaded!\n" );
 	return true;
@@ -297,37 +327,42 @@ std::string DrawSkyboxSelectionWindow()
 
 void Game_Update( float frameTime )
 {
-	PROF_SCOPE();
+	UpdateLoop( frameTime, false );
 
-	{
-		PROF_SCOPE_NAMED( "Imgui New Frame" );
-		ImGui::NewFrame();
-		ImGui_ImplSDL2_NewFrame();
-	}
-
-	graphics->NewFrame();
-
-	Game_UpdateGame( frameTime );
-
-	gui->Update( frameTime );
-
-	Entity_Update();
-	EntEditor_Update( frameTime );
-
-	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
-	{
-		EntEditor_DrawUI();
-		graphics->Present();
-	}
-	else
-	{
-		PROF_SCOPE_NAMED( "Imgui End Frame" );
-		ImGui::EndFrame();
-	}
-
-	Con_Update();
-
-	Resource_Update();
+	// PROF_SCOPE();
+	// 
+	// {
+	// 	PROF_SCOPE_NAMED( "Imgui New Frame" );
+	// 	ImGui::NewFrame();
+	// 	ImGui_ImplSDL2_NewFrame();
+	// }
+	// 
+	// ImGui::ShowDemoWindow();
+	// 
+	// graphics->NewFrame();
+	// 
+	// Game_UpdateGame( frameTime );
+	// 
+	// gui->Update( frameTime );
+	// 
+	// Entity_Update();
+	// EntEditor_Update( frameTime );
+	// 
+	// if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
+	// {
+	// 	Main_DrawMenuBar();
+	// 	EntEditor_DrawUI();
+	// 	graphics->Present();
+	// }
+	// else
+	// {
+	// 	PROF_SCOPE_NAMED( "Imgui End Frame" );
+	// 	ImGui::EndFrame();
+	// }
+	// 
+	// Con_Update();
+	// 
+	// Resource_Update();
 }
 
 
@@ -394,8 +429,6 @@ void Game_UpdateGame( float frameTime )
 	gCurTime += gFrameTime;
 
 	EditorView_Update();
-
-	Main_DrawMenuBar();
 }
 
 
