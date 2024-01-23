@@ -2204,7 +2204,7 @@ Transform PlayerSpawnManager::SelectSpawnTransform()
 	// If we have more than one playerSpawn entity, pick a random one
 	// TODO: maybe make some priority thing, or master spawn like in source engine? idk
 	if ( aEntities.size() > 1 )
-		index = RandomSizeT( 0, aEntities.size() - 1 );
+		index = RandomU64( 0, aEntities.size() - 1 );
 	
 	auto transform = Ent_GetComponent< CTransform >( aEntities[ index ], "transform" );
 
