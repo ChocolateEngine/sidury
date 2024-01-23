@@ -140,12 +140,9 @@ void set_search_directory()
 #ifdef _WIN32
 	char* cwd = getcwd( 0, 0 );
 
-	char  B[ 8192 ] = { "" };
-	auto  what = GetDllDirectoryA( 8192, B );
-
 	char  path[ 512 ] = {};
 	strcat( path, cwd );
-	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR "win64" );
+	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER );
 
 	auto ret = SetDllDirectory( path );
 #endif
