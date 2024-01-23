@@ -38,14 +38,58 @@ struct Basic3D_Push
 
 struct Basic3D_Material
 {
-	int   albedo        = 0;
+	int   diffuse       = 0;
 	int   ao            = 0;
 	int   emissive      = 0;
 
 	float aoPower       = 1.f;
 	float emissivePower = 1.f;
 
-	bool  aAlphaTest    = false;
+	bool  alphaTest     = false;
+};
+
+
+#define CH_SHADER_MATERIAL_VAR( type, name, desc, default ) \
+	{                                                       \
+		#name, desc, default, offsetof( type, name ), sizeof( type::name )        \
+	}
+
+
+// static ShaderMaterialVarDesc gBasic3D_MaterialVars[] = {
+// 	{ "diffuse", "Diffuse Texture", "", offsetof( Basic3D_Material, diffuse ), sizeof( Basic3D_Material::diffuse ) },
+// 	{ "ao", "Ambient Occlusion Texture", gpFallbackAOPath, offsetof( Basic3D_Material, ao ) },
+// 	{ "emissive", "Emission Texture", gpFallbackEmissivePath, offsetof( Basic3D_Material, emissive ) },
+// 
+// 	{ "aoPower", "Ambient Occlusion Strength", 0.f, offsetof( Basic3D_Material, aoPower ) },
+// 	{ "emissivePower", "Emission Strength", 0.f, offsetof( Basic3D_Material, emissivePower ) },
+// 
+// 	{ "alphaTest", "Alpha Testing", false, offsetof( Basic3D_Material, alphaTest ) },
+// };
+
+
+static ShaderMaterialVarDesc gBasic3D_MaterialVars[] = {
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, diffuse, "Diffuse Texture", "" ),
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, ao, "Ambient Occlusion Texture", gpFallbackAOPath ),
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, emissive, "Emission Texture", gpFallbackEmissivePath ),
+
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, aoPower, "Ambient Occlusion Strength", 0.f ),
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, emissivePower, "Emission Strength", 0.f ),
+
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, alphaTest, "Alpha Testing", false ),
+};
+
+
+// KEEP IN THE SAME ORDER AS THE MATERIAL VARS ABOVE
+enum : u32
+{
+	EBasic3D_Diffuse,
+	EBasic3D_AmbientOcclusion,
+	EBasic3D_Emissive,
+
+	EBasic3D_AmbientOcclusionPower,
+	EBasic3D_EmissivePower,
+
+	EBasic3D_AlphaTest,
 };
 
 
@@ -69,6 +113,7 @@ EShaderFlags Shader_Basic3D_Flags()
 }
 
 
+#if 0
 bool Shader_Basic3D_CreateMaterialBuffer( Handle sMat )
 {
 	// IDEA: since materials shouldn't be updated very often,
@@ -150,14 +195,14 @@ u32 Shader_Basic3D_UpdateMaterialData( ChHandle_t sMat )
 		mat = &gMaterialData[ sMat ];
 	}
 
-	mat->albedo        = gGraphics.Mat_GetTextureIndex( sMat, "diffuse" );
+	mat->diffuse       = gGraphics.Mat_GetTextureIndex( sMat, "diffuse" );
 	mat->ao            = gGraphics.Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
 	mat->emissive      = gGraphics.Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
 
 	mat->aoPower       = gGraphics.Mat_GetFloat( sMat, "aoPower", 0.f );
 	mat->emissivePower = gGraphics.Mat_GetFloat( sMat, "emissivePower", 0.f );
 
-	mat->aAlphaTest    = gGraphics.Mat_GetBool( sMat, "alphaTest" );
+	mat->alphaTest    = gGraphics.Mat_GetBool( sMat, "alphaTest" );
 
 	if ( !gStagingBuffer )
 		gStagingBuffer = render->CreateBuffer( "Staging Buffer", sizeof( Basic3D_Material ), EBufferFlags_Uniform | EBufferFlags_TransferSrc, EBufferMemory_Host );
@@ -183,6 +228,7 @@ u32 Shader_Basic3D_UpdateMaterialData( ChHandle_t sMat )
 
 	return gMaterialBufferIndex[ sMat ];
 }
+#endif
 
 
 static bool Shader_Basic3D_Init()
@@ -192,8 +238,8 @@ static bool Shader_Basic3D_Init()
 	createData.aUsage  = EImageUsage_Sampled;
 
 	// create fallback textures
-	gGraphics.LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
-	gGraphics.LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
+	//gGraphics.LoadTexture( gFallbackAO, gpFallbackAOPath, createData );
+	//gGraphics.LoadTexture( gFallbackEmissive, gpFallbackEmissivePath, createData );
 
 	return true;
 }
@@ -201,8 +247,8 @@ static bool Shader_Basic3D_Init()
 
 static void Shader_Basic3D_Destroy()
 {
-	gGraphics.FreeTexture( gFallbackAO );
-	gGraphics.FreeTexture( gFallbackEmissive );
+	//gGraphics.FreeTexture( gFallbackAO );
+	//gGraphics.FreeTexture( gFallbackEmissive );
 	
 	if ( gStagingBuffer )
 		render->DestroyBuffer( gStagingBuffer );
@@ -238,6 +284,7 @@ static void Shader_Basic3D_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t& 
 }
 
 
+#if 0
 static u32 Shader_Basic3D_GetMaterialIndex( u32 sRenderableIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
 {
 	Handle mat = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );
@@ -255,6 +302,23 @@ static u32 Shader_Basic3D_GetMaterialIndex( u32 sRenderableIndex, Renderable_t* 
 }
 
 
+void Basic3D_UpdateMaterial( ChHandle_t sMat, void* spData )
+{
+	Basic3D_Material* mat = static_cast< Basic3D_Material* >( spData );
+
+	// TODO: do i stick with this? or have the shader system handle it, to automatically handle fallbacks?
+	mat->diffuse          = gGraphics.Mat_GetTextureIndex( sMat, "diffuse" );
+	mat->ao               = gGraphics.Mat_GetTextureIndex( sMat, "ao", gFallbackAO );
+	mat->emissive         = gGraphics.Mat_GetTextureIndex( sMat, "emissive", gFallbackEmissive );
+
+	mat->aoPower          = gGraphics.Mat_GetFloat( sMat, "aoPower", 0.f );
+	mat->emissivePower    = gGraphics.Mat_GetFloat( sMat, "emissivePower", 0.f );
+
+	mat->alphaTest       = gGraphics.Mat_GetBool( sMat, "alphaTest" );
+}
+#endif
+
+
 // TODO: Move this push constant management into the shader system
 // we should only need the SetupPushData function
 static void Shader_Basic3D_ResetPushData()
@@ -263,19 +327,35 @@ static void Shader_Basic3D_ResetPushData()
 }
 
 
-static void Shader_Basic3D_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_Basic3D_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	PROF_SCOPE();
 
 	Basic3D_Push& push = gPushData[ srDrawInfo.aShaderSlot ];
 	// push.aModelMatrix  = spModelDraw->aModelMatrix;
 	push.aRenderable   = CH_GET_HANDLE_INDEX( srDrawInfo.aRenderable );
-	push.aMaterial     = Shader_Basic3D_GetMaterialIndex( sSurfaceIndex, spModelDraw, srDrawInfo );
+	push.aMaterial     = spMaterialData->matIndex;
 	push.aViewport     = sViewportIndex;
 
 	push.aDebugDraw    = r_basic3d_dbg_mode;
 	// push.aPCF          = gArgPCF;
 }
+
+
+//static void Shader_Basic3D_SetupPushData2( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo, void* spData )
+//{
+//	PROF_SCOPE();
+//
+//	Basic3D_Push* push = static_cast< Basic3D_Push* >( spData );
+//
+//	// push->aModelMatrix  = spModelDraw->aModelMatrix;
+//	push->aRenderable  = CH_GET_HANDLE_INDEX( srDrawInfo.aRenderable );
+//	push->aMaterial    = Shader_Basic3D_GetMaterialIndex( sSurfaceIndex, spModelDraw, srDrawInfo );
+//	push->aViewport    = sViewportIndex;
+//
+//	push->aDebugDraw   = r_basic3d_dbg_mode;
+//	// push->aPCF          = gArgPCF;
+//}
 
 
 static void Shader_Basic3D_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw_t& srDrawInfo )
@@ -294,23 +374,44 @@ static IShaderPush gShaderPush_Basic3D = {
 };
 
 
+//static IShaderMaterial gShaderMaterial_Basic3D = {
+//	.apAdd    = Basic3D_AddMaterial,
+//	.apRemove = Basic3D_RemoveMaterial,
+//	.apUpdate = Basic3D_UpdateMaterial,
+//};
+
+
+// TODO: some binding list saying which ones are materials? or only have one option for saying which binding is a material
 ShaderCreate_t gShaderCreate_Basic3D = {
-	.apName           = "basic_3d",
-	.aStages          = ShaderStage_Vertex | ShaderStage_Fragment,
-	.aBindPoint       = EPipelineBindPoint_Graphics,
-	.aFlags           = Shader_Basic3D_Flags(),
-	.aDynamicState    = EDynamicState_Viewport | EDynamicState_Scissor,
-	.aVertexFormat    = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord,
+	.apName               = "basic_3d",
+	.aStages              = ShaderStage_Vertex | ShaderStage_Fragment,
+	.aBindPoint           = EPipelineBindPoint_Graphics,
+	.aFlags               = Shader_Basic3D_Flags(),
+	.aDynamicState        = EDynamicState_Viewport | EDynamicState_Scissor,
+	.aVertexFormat        = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord,
 
-	.apInit           = Shader_Basic3D_Init,
-	.apDestroy        = Shader_Basic3D_Destroy,
-	.apLayoutCreate   = Shader_Basic3D_GetPipelineLayoutCreate,
-	.apGraphicsCreate = Shader_Basic3D_GetGraphicsPipelineCreate,
-	.apShaderPush     = &gShaderPush_Basic3D,
-	.apMaterialData   = Shader_Basic3D_GetMaterialIndex,
+	.apInit               = Shader_Basic3D_Init,
+	.apDestroy            = Shader_Basic3D_Destroy,
+	.apLayoutCreate       = Shader_Basic3D_GetPipelineLayoutCreate,
+	.apGraphicsCreate     = Shader_Basic3D_GetGraphicsPipelineCreate,
 
-	.apBindings       = gBasic3D_Bindings,
-	.aBindingCount    = CH_ARR_SIZE( gBasic3D_Bindings ),
+	// .aPushSize         = sizeof( Basic3D_Push ),
+	// .apPushSetup       = Shader_Basic3D_SetupPushData2,
+
+	.apShaderPush         = &gShaderPush_Basic3D,
+
+	// .apMaterialData     = Shader_Basic3D_GetMaterialIndex,
+
+	// .apUpdateMaterial   = Basic3D_UpdateMaterial,
+	.aMaterialSize        = sizeof( Basic3D_Material ),
+	.aUseMaterialBuffer   = true,
+	.aMaterialBufferIndex = 0,
+
+	.apBindings           = gBasic3D_Bindings,
+	.aBindingCount        = CH_ARR_SIZE( gBasic3D_Bindings ),
+
+	.apMaterialVars       = gBasic3D_MaterialVars,
+	.aMaterialVarCount    = CH_ARR_SIZE( gBasic3D_MaterialVars ),
 };
 
 

@@ -552,7 +552,6 @@ void Graphics_PrepareDrawData()
 	static ShaderData_t* shadowShaderData = Shader_GetData( shadow_map );
 
 	render->PreRenderPass();
-	// Update Textures
 
 	// if ( r_show_draw_calls )
 	// {
@@ -569,16 +568,7 @@ void Graphics_PrepareDrawData()
 	gModelDrawCalls = 0;
 	gVertsDrawn     = 0;
 
-	for ( const auto& mat : gGraphicsData.aDirtyMaterials )
-	{
-		Handle shader = gGraphics.Mat_GetShader( mat );
-
-		// HACK HACK
-		if ( gGraphics.GetShader( "basic_3d" ) == shader )
-			Shader_Basic3D_UpdateMaterialData( mat );
-	}
-
-	gGraphicsData.aDirtyMaterials.clear();
+	Shader_UpdateMaterialVars();
 
 	// update renderable AABB's
 	for ( auto& [ renderHandle, bbox ] : gGraphicsData.aRenderAABBUpdate )
@@ -773,7 +763,7 @@ void Graphics_PrepareDrawData()
 				surfDraw.aSurface        = surf;
 				surfDraw.aShaderSlot     = surfDrawIndex++;
 
-				Shader_SetupRenderableDrawData( renderIndex, viewIndex, renderable, shaderData, surfDraw );
+				Shader_SetupRenderableDrawData( shader, mat, renderIndex, viewIndex, renderable, shaderData, surfDraw );
 
 				if ( !renderable->aCastShadow )
 					continue;

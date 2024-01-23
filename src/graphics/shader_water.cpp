@@ -242,7 +242,7 @@ static void Shader_Water_ResetPushData()
 }
 
 
-static void Shader_Water_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_Water_SetupPushData( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	PROF_SCOPE();
 
@@ -284,7 +284,7 @@ ShaderCreate_t gShaderCreate_Water = {
 	.apLayoutCreate   = Shader_Water_GetPipelineLayoutCreate,
 	.apGraphicsCreate = Shader_Water_GetGraphicsPipelineCreate,
 	.apShaderPush     = &gShaderPush_Water,
-	.apMaterialData   = Shader_Water_GetMaterialIndex,
+	//.apMaterialData   = Shader_Water_GetMaterialIndex,
 
 	.apBindings       = gWater_Bindings,
 	.aBindingCount    = CH_ARR_SIZE( gWater_Bindings ),

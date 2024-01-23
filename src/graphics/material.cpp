@@ -5,12 +5,21 @@
 #include "core/string.hpp"
 
 #include <unordered_set>
+#include <variant>
 
 #if __unix__
 #include <limits.h>
 #endif /* __unix__  */
 
 extern IRender* render;
+
+using MaterialVar2 = std::variant<
+  ChHandle_t,
+  float,
+  int,
+  glm::vec2,
+  glm::vec3,
+  glm::vec4 >;
 
 struct MaterialVar
 {
@@ -111,8 +120,13 @@ const char* Graphics::Mat_GetName( Handle shMat )
 {
 	for ( auto& [name, mat] : gMaterialNames )
 	{
-		if ( mat == shMat )
-			return name.data();
+		if ( mat != shMat )
+			continue;
+
+		if ( name.data() == nullptr )
+			Log_Error( gLC_ClientGraphics, "Material Name is nullptr???\n" );
+
+		return name.data();
 	}
 
 	return nullptr;
@@ -151,6 +165,25 @@ EMatVar Graphics::Mat_GetVarType( Handle mat, size_t sIndex )
 }
 
 
+const char* Graphics::Mat_GetVarName( Handle mat, size_t sIndex )
+{
+	MaterialData_t* data = nullptr;
+	if ( !gMaterials.Get( mat, &data ) )
+	{
+		Log_Error( gLC_ClientGraphics, "Mat_GetVarType: No Vars found, material must of been freed\n" );
+		return "";
+	}
+
+	if ( sIndex >= data->aVars.size() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Mat_GetVarType: Index out of bounds (index: %zu - size: %zd)\n", sIndex, data->aVars.size() );
+		return "";
+	}
+
+	return data->aVars[ sIndex ].apName;
+}
+
+
 Handle Graphics::Mat_GetShader( Handle mat )
 {
 	auto it = gMaterialShaders.find( mat );
@@ -167,8 +200,13 @@ void Graphics::Mat_SetShader( Handle mat, Handle shShader )
 	auto it = gMaterialShaders.find( mat );
 	if ( it != gMaterialShaders.end() )
 	{
+		Shader_RemoveMaterial( mat );
+
 		it->second = shShader;
 		gGraphicsData.aDirtyMaterials.emplace( mat );
+
+		// Tell Shader System we changed shader
+		Shader_AddMaterial( mat );
 	}
 	else
 	{
@@ -232,6 +270,8 @@ bool Graphics::Mat_RemoveRef( ChHandle_t sMat )
 
 		render->FreeTexture( var.aDataTexture );
 	}
+
+	Shader_RemoveMaterial( sMat );
 
 	delete data;
 	gMaterials.Remove( sMat );
@@ -318,7 +358,7 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Mat_SetVar: No Vars found, material must of been freed\n" );
+		Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": No Vars found, material must of been freed\n" );
 		return nullptr;
 	}
 
@@ -332,6 +372,27 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 	}
 
 	return nullptr;
+}
+
+
+MaterialVar* Mat_GetVarInternal( Handle mat, u32 sIndex )
+{
+	PROF_SCOPE();
+
+	MaterialData_t* data = nullptr;
+	if ( !gMaterials.Get( mat, &data ) )
+	{
+		Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": No Vars found, material must of been freed\n" );
+		return nullptr;
+	}
+
+	if ( sIndex >= data->aVars.size() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": Index out of bounds (index: %zu - size: %zd)\n", sIndex, data->aVars.size() );
+		return nullptr;
+	}
+
+	return &data->aVars[ sIndex ];
 }
 
 
@@ -387,6 +448,65 @@ const glm::vec3& Graphics::Mat_GetVec3( Handle mat, std::string_view name, const
 const glm::vec4& Graphics::Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback )
 {
 	MaterialVar* var = Mat_GetVarInternal( mat, name );
+	return var ? var->GetVec4( fallback ) : fallback;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------
+
+
+int Graphics::Mat_GetTextureIndex( Handle mat, u32 sIndex, Handle fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return render->GetTextureIndex( var ? var->GetTexture( fallback ) : fallback );
+}
+
+
+Handle Graphics::Mat_GetTexture( Handle mat, u32 sIndex, Handle fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetTexture( fallback ) : fallback;
+}
+
+
+float Graphics::Mat_GetFloat( Handle mat, u32 sIndex, float fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetFloat( fallback ) : fallback;
+}
+
+
+int Graphics::Mat_GetInt( Handle mat, u32 sIndex, int fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetInt( fallback ) : fallback;
+}
+
+
+bool Graphics::Mat_GetBool( Handle mat, u32 sIndex, bool fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetBool( fallback ) : fallback;
+}
+
+
+const glm::vec2& Graphics::Mat_GetVec2( Handle mat, u32 sIndex, const glm::vec2& fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetVec2( fallback ) : fallback;
+}
+
+
+const glm::vec3& Graphics::Mat_GetVec3( Handle mat, u32 sIndex, const glm::vec3& fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
+	return var ? var->GetVec3( fallback ) : fallback;
+}
+
+
+const glm::vec4& Graphics::Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4& fallback )
+{
+	MaterialVar* var = Mat_GetVarInternal( mat, sIndex );
 	return var ? var->GetVec4( fallback ) : fallback;
 }
 
@@ -476,8 +596,12 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 					Json_Free( &root );
 					return false;
 				}
+
+				Shader_RemoveMaterial( handle );
 			}
+
 			gMaterialShaders[ handle ] = shader;
+			Shader_AddMaterial( handle );
 
 			continue;
 		}
@@ -598,6 +722,8 @@ Handle Graphics::CreateMaterial( const std::string& srName, Handle shShader )
 	gMaterialNames[ name ]     = handle;
 	gMaterialShaders[ handle ] = shShader;
 
+	Shader_AddMaterial( handle );
+
 	return handle;
 }
 
@@ -618,6 +744,7 @@ ChHandle_t Graphics::FindMaterial( const char* spName )
 	auto nameIt = gMaterialNames.find( spName );
 	if ( nameIt != gMaterialNames.end() )
 	{
+		// TODO: should this really add a reference to this?
 		Mat_AddRef( nameIt->second );
 		return nameIt->second;
 	}
@@ -627,9 +754,23 @@ ChHandle_t Graphics::FindMaterial( const char* spName )
 
 
 // Get the total amount of materials created
-size_t Graphics::GetMaterialCount()
+u32 Graphics::GetMaterialCount()
 {
 	return gMaterials.size();
+}
+
+
+ChHandle_t Graphics::GetMaterialByIndex( u32 sIndex )
+{
+	return gMaterials.GetHandleByIndex( sIndex );
+
+	//if ( gMaterials.aHandles.size() >= sIndex )
+	//{
+	//	Log_ErrorF( "Invalid Material Index: %d, only %d Materials loaded\n", sIndex, gMaterials.size() );
+	//	return CH_INVALID_HANDLE;
+	//}
+	//
+	//return gMaterials.aHandles[ sIndex ];
 }
 
 

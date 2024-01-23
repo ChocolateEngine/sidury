@@ -45,7 +45,7 @@ static void Shader_ShaderUnlit_ResetPushData()
 }
 
 
-static void Shader_ShaderUnlit_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_ShaderUnlit_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	PROF_SCOPE();
 

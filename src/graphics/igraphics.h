@@ -361,7 +361,7 @@ struct Mesh
 	u32        aIndexOffset;
 	u32        aIndexCount;
 
-	ChHandle_t aMaterial;
+	ChHandle_t aMaterial;  // base material to copy from
 };
 
 
@@ -595,10 +595,39 @@ struct ShadowMap_t
 };
 
 
+struct ShaderMaterialVar
+{
+	EMatVar aType;
+
+	union
+	{
+		ChHandle_t aTexture;
+		float      aFloat;
+		int        aInt;
+		bool       aBool;
+		glm::vec2  aVec2;
+		glm::vec3  aVec3;
+		glm::vec4  aVec4;
+	};
+};
+
+
+struct ShaderMaterialData
+{
+	ChHandle_t                    material;
+	u32                           matIndex;
+	ChVector< ShaderMaterialVar > vars;
+
+	// void*                         pData;
+};
+
+
 // Push Constant Function Pointers
 using FShader_ResetPushData             = void();
-using FShader_SetupPushData             = void( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
+using FShader_SetupPushData             = void( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData );
 using FShader_PushConstants             = void( ChHandle_t cmd, ChHandle_t sLayout, SurfaceDraw_t& srDrawInfo );
+
+using FShader_SetupPushData2            = void( u32 sSurfaceIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo, void* spData );
 
 // blech
 using FShader_SetupPushDataComp         = void( ChHandle_t srRenderableHandle, Renderable_t* spDrawData );
@@ -611,10 +640,15 @@ using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeli
 using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srCreate );
 using FShader_GetComputePipelineCreate  = void( ComputePipelineCreate_t& srCreate );
 
+using FShader_AddMaterial               = void( ChHandle_t sMat );
+using FShader_RemoveMaterial            = void( ChHandle_t sMat );
+using FShader_UpdateMaterial            = void( ChHandle_t sMat, void* spData );
+
 using FShader_DescriptorData            = void();
 
 // blech
 using FShader_MaterialData              = u32( u32 sRenderableIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
+
 
 struct IShaderPush
 {
@@ -633,42 +667,149 @@ struct IShaderPushComp
 };
 
 
+struct IShaderMaterial
+{
+	FShader_AddMaterial*    apAdd    = nullptr;
+	FShader_RemoveMaterial* apRemove = nullptr;
+	FShader_UpdateMaterial* apUpdate = nullptr;
+};
+
+
+struct ShaderMaterialVarDesc
+{
+	EMatVar     type;
+	const char* name;
+	const char* desc;
+
+	union
+	{
+		const char* defaultTexture;  // Path To Default Texture
+		float       defaultFloat;
+		int         defaultInt;
+		bool        defaultBool;
+		glm::vec2   defaultVec2;
+		glm::vec3   defaultVec3;
+		glm::vec4   defaultVec4;
+	};
+
+	u32        dataOffset;
+	u32        dataSize;
+
+	// INTERNAL USE
+	ChHandle_t defaultTextureHandle;
+
+	ShaderMaterialVarDesc( EMatVar sType, const char* spName, const char* spDesc, u32 sDataOffset, u32 sDataSize )
+	{
+		type       = sType;
+		name       = spName;
+		desc       = spDesc;
+		dataOffset = sDataOffset;
+		dataSize   = sDataSize;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, const char* spDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Texture, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultTexture = spDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, float sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Float, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultFloat = sDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, int sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Int, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultInt = sDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, bool sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Bool, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultBool = sDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, glm::vec2 sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Vec2, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultVec2 = sDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, glm::vec3 sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Vec3, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultVec3 = sDefault;
+	}
+
+	ShaderMaterialVarDesc( const char* spName, const char* spDesc, glm::vec4 sDefault, u32 sDataOffset, u32 sDataSize ) :
+		ShaderMaterialVarDesc( EMatVar_Vec4, spName, spDesc, sDataOffset, sDataSize )
+	{
+		defaultVec4 = sDefault;
+	}
+};
+
+
 struct ShaderCreate_t
 {
-	const char*                        apName           = nullptr;
-	ShaderStage                        aStages          = ShaderStage_None;
-	EPipelineBindPoint                 aBindPoint       = EPipelineBindPoint_Graphics;
-	EShaderFlags                       aFlags           = EShaderFlags_None;
-	EDynamicState                      aDynamicState    = EDynamicState_None;
-	VertexFormat                       aVertexFormat    = VertexFormat_None;
-	ERenderPass                        aRenderPass      = ERenderPass_Graphics;
+	const char*                        apName               = nullptr;
+	ShaderStage                        aStages              = ShaderStage_None;
+	EPipelineBindPoint                 aBindPoint           = EPipelineBindPoint_Graphics;
+	EShaderFlags                       aFlags               = EShaderFlags_None;
+	EDynamicState                      aDynamicState        = EDynamicState_None;
+	VertexFormat                       aVertexFormat        = VertexFormat_None;
+	ERenderPass                        aRenderPass          = ERenderPass_Graphics;
 
-	FShader_Init*                      apInit           = nullptr;
-	FShader_Destroy*                   apDestroy        = nullptr;
+	FShader_Init*                      apInit               = nullptr;
+	FShader_Destroy*                   apDestroy            = nullptr;
 
-	FShader_GetPipelineLayoutCreate*   apLayoutCreate   = nullptr;
-	FShader_GetGraphicsPipelineCreate* apGraphicsCreate = nullptr;
-	FShader_GetComputePipelineCreate*  apComputeCreate  = nullptr;
+	FShader_GetPipelineLayoutCreate*   apLayoutCreate       = nullptr;
+	FShader_GetGraphicsPipelineCreate* apGraphicsCreate     = nullptr;
+	FShader_GetComputePipelineCreate*  apComputeCreate      = nullptr;
 
-	IShaderPush*                       apShaderPush     = nullptr;
-	IShaderPushComp*                   apShaderPushComp = nullptr;
-	FShader_MaterialData*              apMaterialData   = nullptr;
+	u16                                aPushSize            = 0;
+	FShader_SetupPushData2*            apPushSetup          = nullptr;
 
-	CreateDescBinding_t*               apBindings       = nullptr;
-	u32                                aBindingCount    = 0;
+	IShaderPush*                       apShaderPush         = nullptr;
+	IShaderPushComp*                   apShaderPushComp     = nullptr;
+	FShader_MaterialData*              apMaterialData       = nullptr;
+
+	FShader_UpdateMaterial*            apUpdateMaterial     = nullptr;
+	u32                                aMaterialSize        = 0;
+	bool                               aUseMaterialBuffer   = false;
+	u32                                aMaterialBufferIndex = 0;
+
+	CreateDescBinding_t*               apBindings           = nullptr;
+	u32                                aBindingCount        = 0;
+
+	ShaderMaterialVarDesc*             apMaterialVars       = nullptr;
+	u32                                aMaterialVarCount    = 0;
 };
 
 
 // stored data internally
 struct ShaderData_t
 {
-	EShaderFlags          aFlags          = EShaderFlags_None;
-	ShaderStage           aStages         = ShaderStage_None;
-	EDynamicState         aDynamicState   = EDynamicState_None;
-	ChHandle_t            aLayout         = CH_INVALID_HANDLE;
-	IShaderPush*          apPush          = nullptr;
-	IShaderPushComp*      apPushComp      = nullptr;
-	FShader_MaterialData* apMaterialIndex = nullptr;
+	EShaderFlags            aFlags               = EShaderFlags_None;
+	ShaderStage             aStages              = ShaderStage_None;
+	EDynamicState           aDynamicState        = EDynamicState_None;
+	ChHandle_t              aLayout              = CH_INVALID_HANDLE;
+	IShaderPush*            apPush               = nullptr;
+	IShaderPushComp*        apPushComp           = nullptr;
+	FShader_MaterialData*   apMaterialIndex      = nullptr;
+
+	u16                     aPushSize            = 0;
+	FShader_SetupPushData2* apPushSetup          = nullptr;
+
+	CreateDescBinding_t*    apBindings           = nullptr;
+	u32                     aBindingCount        = 0;
+
+	ShaderMaterialVarDesc*  apMaterialVars       = nullptr;
+	u32                     aMaterialVarCount    = 0;
+	u32                     aMaterialSize        = 0;
+	bool                    aUseMaterialBuffer   = false;
+	u32                     aMaterialBufferIndex = 0;
 };
 
 
@@ -782,7 +923,10 @@ class IGraphics : public ISystem
 	virtual Handle             FindMaterial( const char* spName )                                                                                                                             = 0;
 
 	// Get the total amount of materials created
-	virtual size_t             GetMaterialCount()                                                                                                                                             = 0;
+	virtual u32                GetMaterialCount()                                                                                                                                             = 0;
+
+	// Get a material by index
+	virtual ChHandle_t         GetMaterialByIndex( u32 sIndex )                                                                                                                               = 0;
 
 	// Get the path to the material
 	virtual const std::string& GetMaterialPath( Handle sMaterial )                                                                                                                            = 0;
@@ -794,6 +938,7 @@ class IGraphics : public ISystem
 	virtual const char*        Mat_GetName( Handle mat )                                                                                                                                      = 0;
 	virtual size_t             Mat_GetVarCount( Handle mat )                                                                                                                                  = 0;
 	virtual EMatVar            Mat_GetVarType( Handle mat, size_t sIndex )                                                                                                                    = 0;
+	virtual const char*        Mat_GetVarName( Handle mat, size_t sIndex )                                                                                                                    = 0;
 
 	virtual Handle             Mat_GetShader( Handle mat )                                                                                                                                    = 0;
 	virtual void               Mat_SetShader( Handle mat, Handle shShader )                                                                                                                   = 0;
@@ -823,12 +968,30 @@ class IGraphics : public ISystem
 	virtual const glm::vec3&   Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback = {} )                                                                               = 0;
 	virtual const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback = {} )                                                                               = 0;
 
+	virtual int                Mat_GetTextureIndex( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                 = 0;
+	virtual Handle             Mat_GetTexture( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                      = 0;
+	virtual float              Mat_GetFloat( Handle mat, u32 sIndex, float fallback = 0.f )                                                                                                   = 0;
+	virtual int                Mat_GetInt( Handle mat, u32 sIndex, int fallback = 0 )                                                                                                         = 0;
+	virtual bool               Mat_GetBool( Handle mat, u32 sIndex, bool fallback = false )                                                                                                   = 0;
+	virtual const glm::vec2&   Mat_GetVec2( Handle mat, u32 sIndex, const glm::vec2& fallback = {} )                                                                                          = 0;
+	virtual const glm::vec3&   Mat_GetVec3( Handle mat, u32 sIndex, const glm::vec3& fallback = {} )                                                                                          = 0;
+	virtual const glm::vec4&   Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4& fallback = {} )                                                                                          = 0;
+
 	// ---------------------------------------------------------------------------------------
 	// Shaders
 
 	// virtual bool               Shader_Init( bool sRecreate )                                                                                                                                  = 0;
-	virtual Handle             GetShader( std::string_view sName )                                                                                                                            = 0;
-	virtual const char*        GetShaderName( Handle sShader )                                                                                                                                = 0;
+	virtual ChHandle_t        GetShader( std::string_view sName )                                                                                                                             = 0;
+	virtual const char*       GetShaderName( Handle sShader )                                                                                                                                 = 0;
+
+	virtual u32               GetShaderCount()                                                                                                                                                = 0;
+	virtual ChHandle_t        GetShaderByIndex( u32 sIndex )                                                                                                                                  = 0;
+
+	virtual u32               GetGraphicsShaderCount()                                                                                                                                        = 0;
+	virtual ChHandle_t        GetGraphicsShaderByIndex( u32 sIndex )                                                                                                                          = 0;
+
+	virtual u32               GetComputeShaderCount()                                                                                                                                         = 0;
+	virtual ChHandle_t        GetComputeShaderByIndex( u32 sIndex )                                                                                                                           = 0;
 
 	// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 	// virtual bool               Shader_IsMaterialTransparent( Handle sMat ) = 0;
@@ -916,5 +1079,5 @@ class IGraphics : public ISystem
 
 
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  2
+#define IGRAPHICS_VER  3
 

@@ -47,7 +47,7 @@ static void Shader_Debug_ResetPushData()
 }
 
 
-static void Shader_Debug_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
+static void Shader_Debug_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	Debug_Push& push  = gDebugPushData[ &srDrawInfo ];
 	push.aModelMatrix = spDrawData->aModelMatrix;
@@ -71,7 +71,7 @@ static void Shader_DebugLine_ResetPushData()
 }
 
 
-static void Shader_DebugLine_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo )
+static void Shader_DebugLine_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	Debug_Push& push  = gDebugLinePushData[ &srDrawInfo ];
 	push.aModelMatrix = spDrawData->aModelMatrix;

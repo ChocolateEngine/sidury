@@ -40,7 +40,7 @@ static void Shader_Skybox_ResetPushData()
 }
 
 
-static void Shader_Skybox_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo )
+static void Shader_Skybox_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	PROF_SCOPE();
 

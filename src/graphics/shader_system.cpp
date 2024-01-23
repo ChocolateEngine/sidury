@@ -3,13 +3,13 @@
 #include "graphics_int.h"
 
 
-static std::unordered_map< std::string_view, Handle >       gShaderNames;
-static std::unordered_map< std::string_view, ShaderSets_t > gShaderSets;  // [shader name] = descriptor sets for this shader
+static std::unordered_map< std::string_view, Handle >                  gShaderNames;
+static std::unordered_map< std::string_view, ShaderSets_t >            gShaderSets;  // [shader name] = descriptor sets for this shader
 
-static std::unordered_map< Handle, EPipelineBindPoint >     gShaderBindPoint;   // [shader] = bind point
-static std::unordered_map< Handle, VertexFormat >           gShaderVertFormat;  // [shader] = vertex format
-static std::unordered_map< Handle, FShader_Destroy* >       gShaderDestroy;     // [shader] = shader destroy function
-static std::unordered_map< Handle, ShaderData_t >           gShaderData;        // [shader] = assorted shader data
+static std::unordered_map< Handle, EPipelineBindPoint >                gShaderBindPoint;   // [shader] = bind point
+static std::unordered_map< Handle, VertexFormat >                      gShaderVertFormat;  // [shader] = vertex format
+static std::unordered_map< Handle, FShader_Destroy* >                  gShaderDestroy;     // [shader] = shader destroy function
+static std::unordered_map< Handle, ShaderData_t >                      gShaderData;        // [shader] = assorted shader data
 
 // descriptor set layouts
 // extern ShaderBufferArray_t                              gUniformSampler;
@@ -17,7 +17,23 @@ static std::unordered_map< Handle, ShaderData_t >           gShaderData;        
 // extern ShaderBufferArray_t                              gUniformMaterialBasic3D;
 // extern ShaderBufferArray_t                              gUniformLights;
 
-static std::unordered_map< SurfaceDraw_t*, void* >          gShaderPushData;
+//static std::unordered_map< SurfaceDraw_t, void* >                      gShaderPushData;
+
+static ChVector< ChHandle_t >                                          gShaderGraphics;
+static ChVector< ChHandle_t >                                          gShaderCompute;
+
+
+// Shader = List of Materials using that shader
+static std::unordered_map< ChHandle_t, ChVector< ShaderMaterialData > > gShaderMaterials;
+
+// Material = Storage Buffer
+static std::unordered_map< ChHandle_t, DeviceBufferStaging_t >          gMaterialBuffers;
+
+
+// shader
+// list of materials using shader
+// data for each material setup for that shader
+
 
 CONCMD( shader_reload )
 {
@@ -91,6 +107,66 @@ const char* Graphics::GetShaderName( Handle sShader )
 
 	Log_ErrorF( gLC_ClientGraphics, "Graphics_GetShader: Shader not found: %zd\n", sShader );
 	return nullptr;
+}
+
+
+u32 Graphics::GetShaderCount()
+{
+	return gShaderNames.size();
+}
+
+
+ChHandle_t Graphics::GetShaderByIndex( u32 sIndex )
+{
+	u32 i = 0;
+	for ( const auto& [ name, shader ] : gShaderNames )
+	{
+		if ( sIndex != i )
+		{
+			i++;
+			continue;
+		}
+
+		return shader;
+	}
+
+	return CH_INVALID_HANDLE;
+}
+
+
+u32 Graphics::GetGraphicsShaderCount()
+{
+	return gShaderGraphics.size();
+}
+
+
+ChHandle_t Graphics::GetGraphicsShaderByIndex( u32 sIndex )
+{
+	if ( sIndex >= gShaderGraphics.size() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Invalid Graphics Shader Index: %d, only have %d graphics shaders\n", sIndex, gShaderGraphics.size() );
+		return CH_INVALID_HANDLE;
+	}
+
+	return gShaderGraphics[ sIndex ];
+}
+
+
+u32 Graphics::GetComputeShaderCount()
+{
+	return gShaderCompute.size();
+}
+
+
+ChHandle_t Graphics::GetComputeShaderByIndex( u32 sIndex )
+{
+	if ( sIndex >= gShaderCompute.size() )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Invalid Compute Shader Index: %d, only have %d compute shaders\n", sIndex, gShaderCompute.size() );
+		return CH_INVALID_HANDLE;
+	}
+
+	return gShaderCompute[ sIndex ];
 }
 
 
@@ -218,6 +294,9 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 			Log_Error( gLC_ClientGraphics, "Failed to create Graphics Pipeline\n" );
 			return false;
 		}
+
+		if ( !sRecreate )
+			gShaderGraphics.push_back( pipeline );
 	}
 	else
 	{
@@ -226,6 +305,9 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 			Log_Error( gLC_ClientGraphics, "Failed to create Compute Pipeline\n" );
 			return false;
 		}
+
+		if ( !sRecreate )
+			gShaderCompute.push_back( pipeline );
 	}
 
 	gShaderNames[ srCreate.apName ] = pipeline;
@@ -235,6 +317,18 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 	shaderData.aFlags               = srCreate.aFlags;
 	shaderData.aStages              = srCreate.aStages;
 	shaderData.aDynamicState        = srCreate.aDynamicState;
+
+	shaderData.apBindings           = srCreate.apBindings;
+	shaderData.aBindingCount        = srCreate.aBindingCount;
+
+	shaderData.aPushSize            = srCreate.aPushSize;
+	shaderData.apPushSetup          = srCreate.apPushSetup;
+
+	shaderData.aMaterialBufferIndex = srCreate.aMaterialBufferIndex;
+	shaderData.aMaterialSize        = srCreate.aMaterialSize;
+	shaderData.aMaterialVarCount    = srCreate.aMaterialVarCount;
+	shaderData.apMaterialVars       = srCreate.apMaterialVars;
+	shaderData.aUseMaterialBuffer   = srCreate.aUseMaterialBuffer;
 
 	if ( srCreate.apShaderPush )
 		shaderData.apPush = srCreate.apShaderPush;
@@ -246,6 +340,26 @@ bool Graphics_CreateShader( bool sRecreate, Handle sRenderPass, ShaderCreate_t& 
 		shaderData.apMaterialIndex = srCreate.apMaterialData;
 
 	gShaderData[ pipeline ] = shaderData;
+
+	// check for any default textures
+	for ( u32 varI = 0; varI < shaderData.aMaterialVarCount; varI++ )
+	{
+		ShaderMaterialVarDesc& desc = shaderData.apMaterialVars[ varI ];
+
+		if ( desc.type == EMatVar_Texture )
+		{
+			// TODO: probably expose this in the shader material var descriptors?
+			TextureCreateData_t createData{};
+			createData.aUsage = EImageUsage_Sampled;
+
+			render->LoadTexture( desc.defaultTextureHandle, desc.defaultTexture, createData );
+		}
+	}
+
+	if ( shaderData.aMaterialVarCount )
+	{
+		gShaderMaterials[ pipeline ];
+	}
 
 	if ( !sRecreate )
 	{
@@ -270,6 +384,19 @@ void Shader_Destroy( Handle sShader )
 	}
 
 	ShaderData_t& shaderData = it->second;
+
+	// check for any default textures
+	for ( u32 varI = 0; varI < shaderData.aMaterialVarCount; varI++ )
+	{
+		ShaderMaterialVarDesc& desc = shaderData.apMaterialVars[ varI ];
+
+		if ( desc.type == EMatVar_Texture )
+		{
+			render->FreeTexture( desc.defaultTextureHandle );
+		}
+	}
+
+	gShaderMaterials.erase( sShader );
 
 	render->DestroyPipelineLayout( shaderData.aLayout );
 	render->DestroyPipeline( sShader );
@@ -311,6 +438,7 @@ bool Graphics_ShaderInit( bool sRecreate )
 
 void Graphics_ShaderDestroy()
 {
+	Log_Error( gLC_ClientGraphics, "TODO: Delete Shaders!!!!!\n" );
 }
 
 
@@ -422,7 +550,13 @@ void Shader_ResetPushData()
 	{
 		if ( data.apPush )
 			data.apPush->apReset();
+		
+		if ( data.aPushSize == 0 )
+			continue;
+
+
 	}
+
 	
 	// for ( auto& [ renderable, data ] : gShaderPushData )
 	// {
@@ -433,7 +567,7 @@ void Shader_ResetPushData()
 }
 
 
-bool Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
+bool Shader_SetupRenderableDrawData( ChHandle_t sShader, ChHandle_t sMat, u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable )
 {
 	PROF_SCOPE();
 
@@ -442,10 +576,17 @@ bool Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, R
 
 	if ( spShaderData->aFlags & EShaderFlags_PushConstant )
 	{
+		if ( spShaderData->apPushSetup )
+		{
+
+		}
+
 		if ( !spShaderData->apPush )
 			return false;
 
-		spShaderData->apPush->apSetup( sRenderableIndex, sViewportIndex, spModelDraw, srRenderable );
+		// this can be nullptr, as some shaders don't use materials
+		ShaderMaterialData* matData = Shader_GetMaterialData( sShader, sMat );
+		spShaderData->apPush->apSetup( sRenderableIndex, sViewportIndex, spModelDraw, srRenderable, matData );
 	}
 
 	return true;
@@ -488,5 +629,374 @@ VertexFormat Shader_GetVertexFormat( Handle sShader )
 
 	return it->second;
 #endif
+}
+
+
+// BAD
+// gets the total count of material buffers for this shader
+//ChVector< DeviceBufferStaging_t* > Shader_GetMaterialBufferCount( ChHandle_t sShader, ShaderData_t* sShaderData )
+//{
+//	i = 0;
+//	for ( const auto& [ mat, buffer ] : gMaterialBuffers )
+//	{
+//		gMaterialBufferIndex[ mat ]          = i;
+//		update.apBindings[ 0 ].apData[ i++ ] = buffer;
+//	}
+//}
+
+
+void Shader_UpdateMaterialDescriptorSets( ChHandle_t shader, ShaderData_t* shaderData, ChVector< ShaderMaterialData >& shaderMatDataList )
+{
+	_heapchk();
+
+	CH_ASSERT_MSG( shaderData->aBindingCount != 0, "Shader has no bindings, but we need one for materials!" );
+
+	const char* shaderName = gGraphics.GetShaderName( shader );
+
+	// update the descriptor sets
+	WriteDescSet_t update{};
+
+	update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ shaderName ].aCount;
+	update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ shaderName ].apSets;
+
+	// update.aBindingCount = CH_ARR_SIZE( gBasic3D_Bindings );
+	update.aBindingCount = shaderData->aBindingCount;
+	update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
+
+	size_t i             = 0;
+	for ( size_t binding = 0; binding < update.aBindingCount; binding++ )
+	{
+		update.apBindings[ i ].aBinding = shaderData->apBindings[ binding ].aBinding;
+		update.apBindings[ i ].aType    = shaderData->apBindings[ binding ].aType;
+		update.apBindings[ i ].aCount   = shaderData->apBindings[ binding ].aCount;
+		i++;
+	}
+
+	// GOD - update material indexes
+	u32 matIndex = 0;
+	for ( ShaderMaterialData& shaderMat : shaderMatDataList )
+	{
+		shaderMat.matIndex = matIndex++;
+	}
+
+	// update.apBindings[ shaderData->aMaterialBufferIndex ].apData = ch_calloc_count< ChHandle_t >( CH_BASIC3D_MAX_MATERIALS );
+	update.apBindings[ shaderData->aMaterialBufferIndex ].apData = ch_calloc_count< ChHandle_t >( shaderMatDataList.size_bytes() );
+	update.apBindings[ shaderData->aMaterialBufferIndex ].aCount = shaderMatDataList.size();
+
+	i                                                            = 0;
+
+	// for ( ChHandle_t buffer : bufferList )
+	// {
+	// 	update.apBindings[ shaderData->aMaterialBufferIndex ].apData[ i++ ] = buffer;
+	// }
+
+	for ( const auto& [ mat, matBuffer ] : gMaterialBuffers )
+	{
+		if ( gGraphics.Mat_GetShader( mat ) != shader )
+			continue;
+
+		// ew
+		for ( ShaderMaterialData& shaderMat : shaderMatDataList )
+		{
+			if ( shaderMat.material == mat )
+			{
+				update.apBindings[ shaderData->aMaterialBufferIndex ].apData[ shaderMat.matIndex ] = matBuffer.aBuffer;
+			}
+		}
+
+		// update.apBindings[ shaderData->aMaterialBufferIndex ].apData[ i++ ] = matBuffer.aBuffer;
+	}
+
+	// update.aImages = gViewportBuffers;
+	render->UpdateDescSets( &update, 1 );
+
+	free( update.apBindings[ shaderData->aMaterialBufferIndex ].apData );
+	free( update.apBindings );
+
+	_heapchk();
+}
+
+
+void Shader_RemoveMaterial( ChHandle_t sMat )
+{
+	ChHandle_t shader = gGraphics.Mat_GetShader( sMat );
+
+	if ( shader == CH_INVALID_HANDLE )
+	{
+		Log_Error( gLC_ClientGraphics, "Material does not have shader!\n" );
+		return;
+	}
+
+	auto shaderIt = gShaderMaterials.find( shader );
+
+	if ( shaderIt == gShaderMaterials.end() )
+	{
+		// shader does not use materials probably
+		return;
+	}
+
+	ShaderData_t* shaderData = Shader_GetData( shader );
+	if ( shaderData->aUseMaterialBuffer )
+	{
+		auto it = gMaterialBuffers.find( sMat );
+
+		if ( it == gMaterialBuffers.end() )
+		{
+			const char* matName = gGraphics.Mat_GetName( sMat );
+			Log_ErrorF( "Failed to find buffer to free for material %s\n", matName );
+		}
+		else
+		{
+			Graphics_FreeStagingBuffer( it->second );
+		}
+
+		Shader_UpdateMaterialDescriptorSets( shader, shaderData, shaderIt->second );
+	}
+
+	ChVector< ShaderMaterialData > & matData = shaderIt->second;
+	for ( u32 i = 0; i < matData.size(); i++ )
+	{
+		if ( matData[ i ].material == sMat )
+		{
+			matData.remove( i );
+			return;
+		}
+	}
+
+	Log_Error( gLC_ClientGraphics, "Failed to find material in use by shader\n" );
+}
+
+
+void Shader_AddMaterial( ChHandle_t sMat )
+{
+	// Check Material List - SLOW
+	ChHandle_t shader = gGraphics.Mat_GetShader( sMat );
+
+	if ( shader == CH_INVALID_HANDLE )
+	{
+		Log_Error( gLC_ClientGraphics, "Material does not have shader!\n" );
+		return;
+	}
+
+	auto shaderIt = gShaderMaterials.find( shader );
+
+	if ( shaderIt == gShaderMaterials.end() )
+	{
+		// shader does not use materials probably
+		return;
+	}
+
+	ShaderMaterialData data = { sMat };
+	
+	// TODO: find shader data, and write vars
+	ShaderData_t*      shaderData = Shader_GetData( shader );
+	
+	shaderIt->second.push_back( data );
+
+	if ( shaderData->aUseMaterialBuffer )
+	{
+		const char*            matName    = gGraphics.Mat_GetName( sMat );
+		DeviceBufferStaging_t& buffer     = gMaterialBuffers[ sMat ];
+
+		if ( !Graphics_CreateStagingBuffer( buffer, shaderData->aMaterialSize, matName, matName ) )
+		{
+			Log_FatalF( "Failed to create buffer for material %s\n", matName );
+		}
+
+		Shader_UpdateMaterialDescriptorSets( shader, shaderData, shaderIt->second );
+	}
+}
+
+
+void Shader_WriteMaterialBuffer( ChHandle_t mat, ChHandle_t shader, ShaderData_t* shaderData, ShaderMaterialData* materialData )
+{
+	auto bufIt = gMaterialBuffers.find( mat );
+
+	if ( bufIt == gMaterialBuffers.end() )
+		return;
+
+	// Prepare New Data
+	char* writeData = (char*)calloc( 1, shaderData->aMaterialSize );
+
+	for ( u32 varI = 0; varI < shaderData->aMaterialVarCount; varI++ )
+	{
+		ShaderMaterialVarDesc& desc = shaderData->apMaterialVars[ varI ];
+
+		switch ( desc.type )
+		{
+			case EMatVar_Texture:
+			{
+				int texIndex = render->GetTextureIndex( materialData->vars[ varI ].aTexture );
+				memcpy( writeData + desc.dataOffset, &texIndex, desc.dataSize );
+				break;
+			}
+			case EMatVar_Float:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aFloat, desc.dataSize );
+				break;
+			}
+			case EMatVar_Int:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aInt, desc.dataSize );
+				break;
+			}
+			case EMatVar_Bool:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aBool, desc.dataSize );
+				break;
+			}
+			case EMatVar_Vec2:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aVec2, desc.dataSize );
+				break;
+			}
+			case EMatVar_Vec3:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aVec3, desc.dataSize );
+				break;
+			}
+			case EMatVar_Vec4:
+			{
+				memcpy( writeData + desc.dataOffset, &materialData->vars[ varI ].aVec4, desc.dataSize );
+				break;
+			}
+
+			default:
+				Log_ErrorF( "Unknown Material Var Type: %d", desc.type );
+				break;
+		}
+	}
+
+	render->BufferWrite( bufIt->second.aStagingBuffer, shaderData->aMaterialSize, writeData );
+
+	free( writeData );
+
+	// write new material data to the buffer
+	BufferRegionCopy_t copy;
+	copy.aSrcOffset = 0;
+	copy.aDstOffset = 0;
+	copy.aSize      = shaderData->aMaterialSize;
+
+	render->BufferCopyQueued( bufIt->second.aStagingBuffer, bufIt->second.aBuffer, &copy, 1 );
+}
+
+
+void Shader_UpdateMaterialVars()
+{
+	for ( const auto& mat : gGraphicsData.aDirtyMaterials )
+	{
+		ChHandle_t    shader     = gGraphics.Mat_GetShader( mat );
+		ShaderData_t* shaderData = Shader_GetData( shader );
+
+		if ( shaderData->aMaterialVarCount == 0 )
+			continue;
+
+		ShaderMaterialData* data = Shader_GetMaterialData( shader, mat );
+
+		// ?????
+		if ( !data )
+		{
+			Log_Error( gLC_ClientGraphics, "Shader does not have material data?\n" );
+			continue;
+		}
+
+		// update vars
+		data->vars.resize( shaderData->aMaterialVarCount );
+		for ( u32 varI = 0; varI < shaderData->aMaterialVarCount; varI++ )
+		{
+			ShaderMaterialVarDesc& desc = shaderData->apMaterialVars[ varI ];
+			data->vars[ varI ].aType    = desc.type;
+
+			switch ( desc.type )
+			{
+				case EMatVar_Texture:
+				{
+					data->vars[ varI ].aTexture = gGraphics.Mat_GetTexture( mat, desc.name, desc.defaultTextureHandle );
+					break;
+				}
+				case EMatVar_Float:
+				{
+					data->vars[ varI ].aFloat = gGraphics.Mat_GetFloat( mat, desc.name, desc.defaultFloat );
+					break;
+				}
+				case EMatVar_Int:
+				{
+					data->vars[ varI ].aInt = gGraphics.Mat_GetInt( mat, desc.name, desc.defaultInt );
+					break;
+				}
+				case EMatVar_Bool:
+				{
+					data->vars[ varI ].aBool = gGraphics.Mat_GetBool( mat, desc.name, desc.defaultBool );
+					break;
+				}
+				case EMatVar_Vec2:
+				{
+					data->vars[ varI ].aVec2 = gGraphics.Mat_GetVec2( mat, desc.name, desc.defaultVec2 );
+					break;
+				}
+				case EMatVar_Vec3:
+				{
+					data->vars[ varI ].aVec3 = gGraphics.Mat_GetVec3( mat, desc.name, desc.defaultVec3 );
+					break;
+				}
+				case EMatVar_Vec4:
+				{
+					data->vars[ varI ].aVec4 = gGraphics.Mat_GetVec4( mat, desc.name, desc.defaultVec4 );
+					break;
+				}
+
+				default:
+					Log_ErrorF( "Unknown Material Var Type: %d", desc.type );
+					break;
+			}
+		}
+
+		// update buffer if needed
+		if ( shaderData->aUseMaterialBuffer )
+		{
+			Shader_WriteMaterialBuffer( mat, shader, shaderData, data );
+		}
+	}
+
+	gGraphicsData.aDirtyMaterials.clear();
+}
+
+
+ShaderMaterialData* Shader_GetMaterialData( ChHandle_t sShader, ChHandle_t sMat )
+{
+	auto shaderIt = gShaderMaterials.find( sShader );
+
+	if ( shaderIt == gShaderMaterials.end() )
+	{
+		// shader does not use materials probably
+		return nullptr;
+	}
+
+	ChVector< ShaderMaterialData >& matData = shaderIt->second;
+	void*                           data    = nullptr;
+	for ( u32 i = 0; i < matData.size(); i++ )
+	{
+		if ( matData[ i ].material == sMat )
+		{
+			return &matData[ i ];
+		}
+	}
+
+	return nullptr;
+}
+
+
+CONCMD( r_update_material_descriptors )
+{
+	for ( auto& [ shader, matList ] : gShaderMaterials )
+	{
+		// TODO: find shader data, and write vars
+		ShaderData_t* shaderData = Shader_GetData( shader );
+
+		if ( !shaderData->aUseMaterialBuffer )
+			continue;
+
+		Shader_UpdateMaterialDescriptorSets( shader, shaderData, matList );
+	}
 }
 

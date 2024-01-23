@@ -347,13 +347,17 @@ void                  Graphics_RemoveShaderBuffer( ShaderBufferList_t& srBufferL
 ChHandle_t            Graphics_GetShaderBuffer( const ShaderBufferList_t& srBufferList, u32 sHandle );
 u32                   Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 sHandle );
 
+bool                  Graphics_CreateStagingBuffer( DeviceBufferStaging_t& srStaging, size_t sSize, const char* spStagingName, const char* spName );
+bool                  Graphics_CreateStagingUniformBuffer( DeviceBufferStaging_t& srStaging, size_t sSize, const char* spStagingName, const char* spName );
+void                  Graphics_FreeStagingBuffer( DeviceBufferStaging_t& srStaging );
+
 void                  Graphics_FreeQueuedResources();
 
 bool                  Graphics_ShaderInit( bool sRecreate );
 
 bool                  Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void                  Shader_ResetPushData();
-bool                  Shader_SetupRenderableDrawData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
+bool                  Shader_SetupRenderableDrawData( ChHandle_t sShader, ChHandle_t sMat, u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
 bool                  Shader_PreRenderableDraw( Handle sCmd, u32 sIndex, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
 bool                  Shader_ParseRequirements( ShaderRequirmentsList_t& srOutput );
 
@@ -363,6 +367,11 @@ ShaderSets_t*         Shader_GetSets( Handle sShader );
 ShaderSets_t*         Shader_GetSets( std::string_view sShader );
 
 Handle                Shader_RegisterDescriptorData( EShaderSlot sSlot, FShader_DescriptorData* sCallback );
+
+void                  Shader_RemoveMaterial( ChHandle_t sMat );
+void                  Shader_AddMaterial( ChHandle_t sMat );
+void                  Shader_UpdateMaterialVars();
+ShaderMaterialData*   Shader_GetMaterialData( ChHandle_t sShader, ChHandle_t sMat );
 
 
 // interface
@@ -454,7 +463,10 @@ class Graphics : public IGraphics
 	virtual Handle             FindMaterial( const char* spName )                                                                                                                             override;
 
 	// Get the total amount of materials created
-	virtual size_t             GetMaterialCount()                                                                                                                                             override;
+	virtual u32                GetMaterialCount()                                                                                                                                             override;
+
+	// Get a material by index
+	virtual ChHandle_t         GetMaterialByIndex( u32 sIndex )                                                                                                                               override;
 
 	// Get the path to the material
 	virtual const std::string& GetMaterialPath( Handle sMaterial )                                                                                                                            override;
@@ -466,6 +478,7 @@ class Graphics : public IGraphics
 	virtual const char*        Mat_GetName( Handle mat )                                                                                                                                      override;
 	virtual size_t             Mat_GetVarCount( Handle mat )                                                                                                                                  override;
 	virtual EMatVar            Mat_GetVarType( Handle mat, size_t sIndex )                                                                                                                    override;
+	virtual const char*        Mat_GetVarName( Handle mat, size_t sIndex )                                                                                                                    override;
 
 	virtual Handle             Mat_GetShader( Handle mat )                                                                                                                                    override;
 	virtual void               Mat_SetShader( Handle mat, Handle shShader )                                                                                                                   override;
@@ -489,11 +502,20 @@ class Graphics : public IGraphics
 	virtual int                Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                                                      override;
 	virtual Handle             Mat_GetTexture( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                                                           override;
 	virtual float              Mat_GetFloat( Handle mat, std::string_view name, float fallback = 0.f )                                                                                        override;
-	virtual int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 ) override;
+	virtual int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 )                                                                                              override;
 	virtual bool               Mat_GetBool( Handle mat, std::string_view name, bool fallback = false )                                                                                        override;
 	virtual const glm::vec2&   Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback = {} )                                                                               override;
 	virtual const glm::vec3&   Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback = {} )                                                                               override;
 	virtual const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback = {} )                                                                               override;
+
+	virtual int                Mat_GetTextureIndex( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                 override;
+	virtual Handle             Mat_GetTexture( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                      override;
+	virtual float              Mat_GetFloat( Handle mat, u32 sIndex, float fallback = 0.f )                                                                                                   override;
+	virtual int                Mat_GetInt( Handle mat, u32 sIndex, int fallback = 0 )                                                                                                         override;
+	virtual bool               Mat_GetBool( Handle mat, u32 sIndex, bool fallback = false )                                                                                                   override;
+	virtual const glm::vec2&   Mat_GetVec2( Handle mat, u32 sIndex, const glm::vec2& fallback = {} )                                                                                          override;
+	virtual const glm::vec3&   Mat_GetVec3( Handle mat, u32 sIndex, const glm::vec3& fallback = {} )                                                                                          override;
+	virtual const glm::vec4&   Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4& fallback = {} )                                                                                          override;
 
 	// ---------------------------------------------------------------------------------------
 	// Shaders
@@ -501,6 +523,15 @@ class Graphics : public IGraphics
 	// virtual bool               Shader_Init( bool sRecreate )                                                                                                                                  override;
 	virtual Handle             GetShader( std::string_view sName )                                                                                                                            override;
 	virtual const char*        GetShaderName( Handle sShader )                                                                                                                                override;
+
+	virtual u32                GetShaderCount()                                                                                                                                               override;
+	virtual ChHandle_t         GetShaderByIndex( u32 sIndex )                                                                                                                                 override;
+
+	virtual u32                GetGraphicsShaderCount()                                                                                                                                       override;
+	virtual ChHandle_t         GetGraphicsShaderByIndex( u32 sIndex )                                                                                                                         override;
+
+	virtual u32                GetComputeShaderCount()                                                                                                                                        override;
+	virtual ChHandle_t         GetComputeShaderByIndex( u32 sIndex )                                                                                                                          override;
 
 	// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 	// virtual bool               Shader_IsMaterialTransparent( Handle sMat ) override;

@@ -862,6 +862,19 @@ bool Graphics_CreateStagingUniformBuffer( DeviceBufferStaging_t& srStaging, size
 }
 
 
+void Graphics_FreeStagingBuffer( DeviceBufferStaging_t& srStaging )
+{
+	if ( srStaging.aStagingBuffer )
+		render->DestroyBuffer( srStaging.aStagingBuffer );
+
+	if ( srStaging.aBuffer )
+		render->DestroyBuffer( srStaging.aBuffer );
+
+	srStaging.aStagingBuffer = CH_INVALID_HANDLE;
+	srStaging.aBuffer        = CH_INVALID_HANDLE;
+}
+
+
 bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 {
 	// ------------------------------------------------------
@@ -1502,11 +1515,24 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 
 #endif
 
-	renderable->aModel       = sModel;
-	renderable->aModelMatrix = glm::identity< glm::mat4 >();
-	renderable->aTestVis     = true;
-	renderable->aCastShadow  = true;
-	renderable->aVisible     = true;
+	renderable->aModel         = sModel;
+	renderable->aModelMatrix   = glm::identity< glm::mat4 >();
+	renderable->aTestVis       = true;
+	renderable->aCastShadow    = true;
+	renderable->aVisible       = true;
+
+	// Setup Materials
+	renderable->aMaterialCount = model->aMeshes.size();
+
+	if ( renderable->aMaterialCount )
+	{
+		renderable->apMaterials = ch_malloc_count< ChHandle_t >( renderable->aMaterialCount );
+
+		for ( u32 i = 0; i < renderable->aMaterialCount; i++ )
+		{
+			renderable->apMaterials[ i ] = model->aMeshes[ i ].aMaterial;
+		}
+	}
 
 	// TODO: queue this stuff for when the model is finished loading
 
