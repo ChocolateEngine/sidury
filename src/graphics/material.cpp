@@ -255,7 +255,21 @@ bool Graphics::Mat_RemoveRef( ChHandle_t sMat )
 	// have that implement reference counting itself
 	CH_ASSERT( data->aRefCount != 0 );
 
-	Log_DevF( gLC_ClientGraphics, 2, "Decremented Ref Count for Material \"%zd\" from %u to %u\n", sMat, data->aRefCount, data->aRefCount - 1 );
+	std::string_view matName;
+
+	for ( auto& [ name, mat ] : gMaterialNames )
+	{
+		if ( mat == sMat )
+		{
+			matName = name;
+			break;
+		}
+	}
+
+	if ( matName.size() )
+		Log_DevF( gLC_ClientGraphics, 2, "Decremented Ref Count for Material \"%s\" from %u to %u\n", matName.data(), data->aRefCount, data->aRefCount - 1 );
+	else
+		Log_DevF( gLC_ClientGraphics, 2, "Decremented Ref Count for Material \"%zd\" from %u to %u\n", sMat, data->aRefCount, data->aRefCount - 1 );
 
 	data->aRefCount--;
 
@@ -276,20 +290,16 @@ bool Graphics::Mat_RemoveRef( ChHandle_t sMat )
 	delete data;
 	gMaterials.Remove( sMat );
 
-	bool foundMatName = false;
-	for ( auto& [ name, mat ] : gMaterialNames )
+	if ( matName.size() )
 	{
-		if ( mat == sMat )
-		{
-			foundMatName = true;
-			Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%s\" - Handle \"%zd\"\n", name.data(), sMat );
-			gMaterialNames.erase( name );  // name is freed here
-			break;
-		}
+		// Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%s\" - Handle \"%zd\"\n", matName.data(), sMat );
+		Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%s\"\n", matName.data() );
+		gMaterialNames.erase( matName );
 	}
-
-	if ( !foundMatName )
+	else
+	{
 		Log_DevF( gLC_ClientGraphics, 1, "Freeing Material \"%zd\"\n", sMat );
+	}
 
 	// make sure it's not in the dirty materials list
 	if ( gGraphicsData.aDirtyMaterials.contains( sMat ) )
@@ -804,6 +814,18 @@ void Graphics::SetAllMaterialsDirty()
 CONCMD( r_mark_all_materials_dirty )
 {
 	gGraphics.SetAllMaterialsDirty();
+}
+
+
+CONCMD( r_dump_materials )
+{
+	Log_MsgF( gLC_ClientGraphics, "%d Materials Loaded\n", gMaterialNames.size() );
+
+	u32 i = 0;
+	for ( auto& [ name, mat ] : gMaterialNames )
+	{
+		Log_MsgF( gLC_ClientGraphics, "%zd - \"%s\"\n", i++, name.data() );
+	}
 }
 
 

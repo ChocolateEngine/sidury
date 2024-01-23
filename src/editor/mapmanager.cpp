@@ -183,6 +183,10 @@ bool MapManager_LoadWorldModel( EditorContext_t* spContext )
 	
 	worldEnt->aTransform.aAng = spContext->aMap.aMapInfo->ang;
 
+#if _DEBUG
+	graphics->SetRenderableDebugName( worldEnt->aRenderable, spContext->aMap.aMapInfo->modelPath );
+#endif
+
 	return true;
 }
 

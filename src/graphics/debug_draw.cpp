@@ -114,6 +114,8 @@ void Graphics_DebugDrawNewFrame()
 		renderable->aTestVis    = false;
 		renderable->aCastShadow = false;
 		renderable->aVisible    = true;
+
+		gGraphics.SetRenderableDebugName( gDebugLineDraw, "Debug Draw Renderable" );
 	}
 }
 

@@ -290,6 +290,7 @@ struct GraphicsData_t
 	std::unordered_map< ChHandle_t, ModelBBox_t > aModelBBox;
 
 	std::unordered_set< ChHandle_t >              aModelsToFree;
+	std::unordered_set< ChHandle_t >              aRenderablesToFree;
 
 	ResourceList< Scene_t >                       aScenes;
 	std::unordered_map< std::string, ChHandle_t > aScenePaths;
@@ -584,9 +585,7 @@ class Graphics : public IGraphics
 	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                                                                 override;
 	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    override;
 
-#if DEBUG
 	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       override;
-#endif
 
 	// virtual void               ConsolidateRenderables()                                                                                                                                       override;
 

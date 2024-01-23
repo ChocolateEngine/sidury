@@ -590,16 +590,6 @@ void Graphics_PrepareDrawData()
 	// Update Light Data
 	Graphics_PrepareLights();
 
-	// if ( gGraphicsData.aViewData.aUpdate )
-	// {
-	// 	gGraphicsData.aViewData.aUpdate = false;
-	// 	// for ( size_t i = 0; i < gViewportBuffers.size(); i++ )
-	// 	for ( size_t i = 0; i < 1; i++ )
-	// 	{
-	// 		render->BufferWrite( gGraphicsData.aViewData.aBuffers[ i ], sizeof( UBO_Viewport_t ), &gGraphicsData.aViewData.aViewports[ i ] );
-	// 	}
-	// }
-
 	// update view frustums (CHANGE THIS, SHOULD NOT UPDATE EVERY SINGLE ONE PER FRAME  !!!!)
 	if ( !r_vis_lock.GetBool() || gGraphicsData.aViewData.aFrustums.size() != gGraphicsData.aViewData.aViewports.size() )
 	{
@@ -670,6 +660,20 @@ void Graphics_PrepareDrawData()
 			continue;
 		}
 
+		// update data on gpu
+		// NOTE: we actually use the handle index for this and not the allocator
+		// if this works well, we could just get rid of the allocator entirely and use handle indexes
+		// u32 renderIndex = CH_GET_HANDLE_INDEX( gGraphicsData.aRenderables.aHandles[ i ] );
+		u32 renderIndex    = i;
+		renderable->aIndex = renderIndex;
+
+		if ( renderIndex >= CH_R_MAX_RENDERABLES )
+		{
+			Log_WarnF( gLC_ClientGraphics, "Renderable Index %zd is greater than max shader renderable count of %zd\n", renderIndex, CH_R_MAX_RENDERABLES );
+			i++;
+			continue;
+		}
+
 		if ( !renderable->aVisible )
 		{
 			i++;
@@ -681,18 +685,6 @@ void Graphics_PrepareDrawData()
 		{
 			Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
 			gGraphicsData.aRenderables.Remove( gGraphicsData.aRenderables.aHandles[ i ] );
-			continue;
-		}
-
-		// update data on gpu
-		// NOTE: we actually use the handle index for this and not the allocator
-		// if this works well, we could just get rid of the allocator entirely and use handle indexes
-		u32 renderIndex = CH_GET_HANDLE_INDEX( gGraphicsData.aRenderables.aHandles[ i ] );
-
-		if ( renderIndex >= CH_R_MAX_RENDERABLES )
-		{
-			Log_WarnF( gLC_ClientGraphics, "Renderable Index %zd is greater than max shader renderable count of %zd\n", renderIndex, CH_R_MAX_RENDERABLES );
-			i++;
 			continue;
 		}
 
@@ -780,9 +772,6 @@ void Graphics_PrepareDrawData()
 					// surfDraw.aSurface       = surf;
 					// surfDraw.aShaderSlot    = surfDrawIndex;
 				}
-				
-				if ( !shaderData->apMaterialIndex )
-					continue;
 
 				// shaderSurfDraw.aMaterial = shaderData->apMaterialIndex( surfIndex, renderable, surfDraw );
 			}
@@ -970,14 +959,14 @@ void Graphics_PrepareDrawData()
 				continue;
 			}
 
-			if ( !renderable->aVisible )
-			{
-				i++;
-				continue;
-			}
+			// if ( !renderable->aVisible )
+			// {
+			// 	i++;
+			// 	continue;
+			// }
 
-			gGraphicsData.aRenderableData[ i ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
-			gGraphicsData.aRenderableData[ i ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
+			gGraphicsData.aRenderableData[ renderable->aIndex ].aVertexBuffer = Graphics_GetShaderBufferIndex( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+			gGraphicsData.aRenderableData[ renderable->aIndex ].aIndexBuffer  = Graphics_GetShaderBufferIndex( gGraphicsData.aIndexBuffers, renderable->aIndexHandle );
 
 			i++;
 		}

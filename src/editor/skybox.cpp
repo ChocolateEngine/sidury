@@ -120,7 +120,8 @@ bool Skybox_Init()
 	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
 #if DEBUG
-		renderable->aDebugName  = "skybox";
+		// renderable->aDebugName  = "skybox";
+		graphics->SetRenderableDebugName( gSkyboxDraw, "skybox" );
 #endif
 		renderable->aCastShadow = false;
 		renderable->aTestVis    = false;

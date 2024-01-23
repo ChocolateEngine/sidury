@@ -333,21 +333,6 @@ struct ModelBuffers_t
 	u32        aVertexHandle     = UINT32_MAX;
 	u32        aIndexHandle      = UINT32_MAX;
 	u32        aBlendShapeHandle = UINT32_MAX;
-
-	~ModelBuffers_t()
-	{
-		if ( aVertex )
-			render->DestroyBuffer( aVertex );
-
-		if ( aIndex )
-			render->DestroyBuffer( aIndex );
-
-		if ( aBlendShape )
-			render->DestroyBuffer( aBlendShape );
-
-		if ( aSkin )
-			render->DestroyBuffer( aSkin );
-	}
 };
 
 
@@ -394,9 +379,7 @@ struct ModelBBox_t
 // It also contains an AABB, and bools for testing vis, casting a shadow, and whether it's visible or not
 struct Renderable_t
 {
-#if DEBUG
-	std::string                 aDebugName;
-#endif
+	char*                       apDebugName;
 
 	// used in actual drawing
 	ChHandle_t                  aModel;
@@ -430,6 +413,8 @@ struct Renderable_t
 	// u32               aBlendShapeWeightsMagic = UINT32_MAX;
 	u32                         aBlendShapeWeightsIndex = UINT32_MAX;
 	u32                         aBoneTransformHandle    = UINT32_MAX;
+
+	u32                         aIndex                  = UINT32_MAX;
 
 	// -------------------------------------------------
 	// User Defined Bools
@@ -617,8 +602,6 @@ struct ShaderMaterialData
 	ChHandle_t                    material;
 	u32                           matIndex;
 	ChVector< ShaderMaterialVar > vars;
-
-	// void*                         pData;
 };
 
 
@@ -640,14 +623,7 @@ using FShader_GetPipelineLayoutCreate   = void( PipelineLayoutCreate_t& srPipeli
 using FShader_GetGraphicsPipelineCreate = void( GraphicsPipelineCreate_t& srCreate );
 using FShader_GetComputePipelineCreate  = void( ComputePipelineCreate_t& srCreate );
 
-using FShader_AddMaterial               = void( ChHandle_t sMat );
-using FShader_RemoveMaterial            = void( ChHandle_t sMat );
-using FShader_UpdateMaterial            = void( ChHandle_t sMat, void* spData );
-
 using FShader_DescriptorData            = void();
-
-// blech
-using FShader_MaterialData              = u32( u32 sRenderableIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo );
 
 
 struct IShaderPush
@@ -664,14 +640,6 @@ struct IShaderPushComp
 	FShader_ResetPushData*     apReset = nullptr;
 	FShader_SetupPushDataComp* apSetup = nullptr;
 	FShader_PushConstantsComp* apPush  = nullptr;
-};
-
-
-struct IShaderMaterial
-{
-	FShader_AddMaterial*    apAdd    = nullptr;
-	FShader_RemoveMaterial* apRemove = nullptr;
-	FShader_UpdateMaterial* apUpdate = nullptr;
 };
 
 
@@ -751,6 +719,12 @@ struct ShaderMaterialVarDesc
 };
 
 
+#define CH_SHADER_MATERIAL_VAR( type, name, desc, default )                \
+	{                                                                      \
+		#name, desc, default, offsetof( type, name ), sizeof( type::name ) \
+	}
+
+
 struct ShaderCreate_t
 {
 	const char*                        apName               = nullptr;
@@ -768,23 +742,20 @@ struct ShaderCreate_t
 	FShader_GetGraphicsPipelineCreate* apGraphicsCreate     = nullptr;
 	FShader_GetComputePipelineCreate*  apComputeCreate      = nullptr;
 
-	u16                                aPushSize            = 0;
-	FShader_SetupPushData2*            apPushSetup          = nullptr;
+	// u16                                aPushSize            = 0;
+	// FShader_SetupPushData2*            apPushSetup          = nullptr;
 
 	IShaderPush*                       apShaderPush         = nullptr;
 	IShaderPushComp*                   apShaderPushComp     = nullptr;
-	FShader_MaterialData*              apMaterialData       = nullptr;
-
-	FShader_UpdateMaterial*            apUpdateMaterial     = nullptr;
-	u32                                aMaterialSize        = 0;
-	bool                               aUseMaterialBuffer   = false;
-	u32                                aMaterialBufferIndex = 0;
 
 	CreateDescBinding_t*               apBindings           = nullptr;
 	u32                                aBindingCount        = 0;
 
 	ShaderMaterialVarDesc*             apMaterialVars       = nullptr;
 	u32                                aMaterialVarCount    = 0;
+	u32                                aMaterialSize        = 0;
+	bool                               aUseMaterialBuffer   = false;
+	u32                                aMaterialBufferIndex = 0;
 };
 
 
@@ -797,10 +768,9 @@ struct ShaderData_t
 	ChHandle_t              aLayout              = CH_INVALID_HANDLE;
 	IShaderPush*            apPush               = nullptr;
 	IShaderPushComp*        apPushComp           = nullptr;
-	FShader_MaterialData*   apMaterialIndex      = nullptr;
 
-	u16                     aPushSize            = 0;
-	FShader_SetupPushData2* apPushSetup          = nullptr;
+	// u16                     aPushSize            = 0;
+	// FShader_SetupPushData2* apPushSetup          = nullptr;
 
 	CreateDescBinding_t*    apBindings           = nullptr;
 	u32                     aBindingCount        = 0;
@@ -1045,9 +1015,7 @@ class IGraphics : public ISystem
 	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    = 0;
 	// virtual void               ConsolidateRenderables()                                                                                                                                       = 0;
 
-#if DEBUG
 	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       = 0;
-#endif
 
 	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                                                              = 0;
 
@@ -1079,5 +1047,5 @@ class IGraphics : public ISystem
 
 
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  3
+#define IGRAPHICS_VER  4
 

@@ -313,6 +313,11 @@ void Graphics_FreeQueuedResources()
 {
 	PROF_SCOPE();
 
+	// Free Renderables
+	for ( ChHandle_t renderHandle : gGraphicsData.aRenderablesToFree )
+	{
+	}
+
 	// Free Models
 	for ( ChHandle_t modelHandle : gGraphicsData.aModelsToFree )
 	{
@@ -345,12 +350,26 @@ void Graphics_FreeQueuedResources()
 				if ( model->apBuffers->aVertexHandle != UINT32_MAX )
 				{
 					Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, model->apBuffers->aVertexHandle );
+					render->DestroyBuffer( model->apBuffers->aVertex );
 				}
 
 				if ( model->apBuffers->aIndexHandle != UINT32_MAX )
 				{
 					Graphics_RemoveShaderBuffer( gGraphicsData.aIndexBuffers, model->apBuffers->aIndexHandle );
+					render->DestroyBuffer( model->apBuffers->aIndex );
 				}
+
+				if ( model->apBuffers->aBlendShapeHandle != UINT32_MAX )
+				{
+					Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeDataBuffers, model->apBuffers->aBlendShapeHandle );
+					render->DestroyBuffer( model->apBuffers->aBlendShape );
+				}
+
+				// if ( model->apBuffers->aBlendShapeHandle != UINT32_MAX )
+				// {
+				// 	Graphics_RemoveShaderBuffer();
+				// 	render->DestroyBuffer( model->apBuffers->aSkin );
+				// }
 
 				delete model->apBuffers;
 			}
@@ -1345,15 +1364,9 @@ bool Graphics::Init()
 	if ( !Graphics_DebugDrawInit() )
 		return false;
 
-	// TEMP: make a world light
-	// gpWorldLight = Graphics_CreateLight( ELightType_Directional );
-	// gpWorldLight->aColor = { 1.0, 1.0, 1.0, 1.0 };
-	// gpWorldLight->aColor = { 0.1, 0.1, 0.1 };
-
 	// Rml::SetRenderInterface( &gRmlRender );
 
 	return render->InitImGui( gGraphicsData.aRenderPassGraphics );
-	// return render->InitImGui( gGraphicsData.aRenderPassGraphics );
 }
 
 
@@ -1484,43 +1497,54 @@ ModelBBox_t Graphics::CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& s
 }
 
 
-ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
+void UpdateRenderableDescSets()
 {
-	Model* model = nullptr;
-	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
+	// Skinning Shader
+}
+
+
+void FreeRenderableModel( Renderable_t* renderable )
+{
+	if ( !renderable->aModel )
+		return;
+
+	if ( renderable->aBlendShapeWeightsBuffer )
 	{
-		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
-		return InvalidHandle;
+		if ( renderable->aVertexIndex != UINT32_MAX )
+		{
+			Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
+		}
+
+		if ( renderable->aBlendShapeWeightsIndex != UINT32_MAX )
+		{
+			Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsIndex );
+		}
+
+		render->DestroyBuffer( renderable->aBlendShapeWeightsBuffer );
+		renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
+
+		// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
+		render->DestroyBuffer( renderable->aVertexBuffer );
 	}
 
-	Log_Dev( gLC_ClientGraphics, 1, "Created Renderable\n" );
+	renderable->aVertexBuffer = CH_INVALID_HANDLE;
+	renderable->aVertexIndex  = UINT32_MAX;
+	renderable->aIndexHandle  = UINT32_MAX;
+}
 
-	Renderable_t* renderable  = nullptr;
-	ChHandle_t    drawHandle = InvalidHandle;
 
-	if ( !( drawHandle = gGraphicsData.aRenderables.Create( &renderable ) ) )
+void SetRenderableModel( ChHandle_t modelHandle, Model* model, Renderable_t* renderable )
+{
+	// HACK - REMOVE WHEN WE ADD QUEUED DELETION FOR ASSETS
+	render->WaitForQueues();
+
+	if ( renderable->aModel )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Failed to create Renderable_t\n" );
-		return InvalidHandle;
+		FreeRenderableModel( renderable );
 	}
 
-#if DEBUG
+	renderable->aModel = modelHandle;
 	
-	std::string_view modelPath = gGraphics.GetModelPath( sModel );
-
-	if ( modelPath.size() )
-	{
-		renderable->aDebugName = modelPath;
-	}
-
-#endif
-
-	renderable->aModel         = sModel;
-	renderable->aModelMatrix   = glm::identity< glm::mat4 >();
-	renderable->aTestVis       = true;
-	renderable->aCastShadow    = true;
-	renderable->aVisible       = true;
-
 	// Setup Materials
 	renderable->aMaterialCount = model->aMeshes.size();
 
@@ -1534,24 +1558,22 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 		}
 	}
 
-	// TODO: queue this stuff for when the model is finished loading
-
 	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
 	// Graphics_UpdateModelAABB( modelDraw );
-	renderable->aAABB        = gGraphics.CreateWorldAABB( renderable->aModelMatrix, gGraphicsData.aModelBBox[ renderable->aModel ] );
+	renderable->aAABB = gGraphics.CreateWorldAABB( renderable->aModelMatrix, gGraphicsData.aModelBBox[ renderable->aModel ] );
 
 	renderable->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
 
 	if ( renderable->aBlendShapeWeights.size() )
 	{
 		// we need new vertex buffers for the modified vertices
-		size_t bufferSize        = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
+		size_t bufferSize         = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
 
 		renderable->aVertexBuffer = render->CreateBuffer(
-			"output renderable vertices idfk",
-			bufferSize,
-			EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
-			EBufferMemory_Device );
+		  "output renderable vertices idfk",
+		  bufferSize,
+		  EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
+		  EBufferMemory_Device );
 
 		BufferRegionCopy_t copy;
 		copy.aSrcOffset = 0;
@@ -1574,23 +1596,23 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 		// update the descriptor sets for the skinning shader
 		WriteDescSet_t update{};
 
-		update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].aCount;
-		update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].apSets;
+		update.aDescSetCount            = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].aCount;
+		update.apDescSets               = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].apSets;
 
-		update.aBindingCount = 2;
-		update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
+		update.aBindingCount            = 2;
+		update.apBindings               = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
 
-		update.apBindings[ 0 ].aBinding  = 0;
-		update.apBindings[ 0 ].aType     = EDescriptorType_StorageBuffer;
-		update.apBindings[ 0 ].aCount    = gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size();
-		update.apBindings[ 0 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size() );
+		update.apBindings[ 0 ].aBinding = 0;
+		update.apBindings[ 0 ].aType    = EDescriptorType_StorageBuffer;
+		update.apBindings[ 0 ].aCount   = gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size();
+		update.apBindings[ 0 ].apData   = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size() );
 
-		update.apBindings[ 1 ].aBinding  = 1;
-		update.apBindings[ 1 ].aType     = EDescriptorType_StorageBuffer;
-		update.apBindings[ 1 ].aCount    = gGraphicsData.aBlendShapeDataBuffers.aBuffers.size();
-		update.apBindings[ 1 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeDataBuffers.aBuffers.size() );
+		update.apBindings[ 1 ].aBinding = 1;
+		update.apBindings[ 1 ].aType    = EDescriptorType_StorageBuffer;
+		update.apBindings[ 1 ].aCount   = gGraphicsData.aBlendShapeDataBuffers.aBuffers.size();
+		update.apBindings[ 1 ].apData   = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeDataBuffers.aBuffers.size() );
 
-		int i                            = 0;
+		int i                           = 0;
 		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeWeightBuffers.aBuffers )
 		{
 			update.apBindings[ 0 ].apData[ i++ ] = buffer;
@@ -1615,8 +1637,45 @@ ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
 		renderable->aVertexIndex  = model->apBuffers->aVertexHandle;
 	}
 
-	renderable->aIndexHandle = model->apBuffers->aIndexHandle;
+	renderable->aIndexHandle                = model->apBuffers->aIndexHandle;
+
 	gGraphicsData.aRenderableStaging.aDirty = true;
+}
+
+
+ChHandle_t Graphics::CreateRenderable( ChHandle_t sModel )
+{
+	Model* model = nullptr;
+	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
+	{
+		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
+		return InvalidHandle;
+	}
+
+	Log_Dev( gLC_ClientGraphics, 1, "Created Renderable\n" );
+
+	Renderable_t* renderable  = nullptr;
+	ChHandle_t    drawHandle = InvalidHandle;
+
+	if ( !( drawHandle = gGraphicsData.aRenderables.Create( &renderable ) ) )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to create Renderable_t\n" );
+		return InvalidHandle;
+	}
+
+	renderable->aModelMatrix   = glm::identity< glm::mat4 >();
+	renderable->aTestVis       = true;
+	renderable->aCastShadow    = true;
+	renderable->aVisible       = true;
+
+	::SetRenderableModel( sModel, model, renderable );
+
+	std::string_view modelPath = gGraphics.GetModelPath( sModel );
+
+	if ( modelPath.size() )
+	{
+		SetRenderableDebugName( drawHandle, modelPath );
+	}
 
 	return drawHandle;
 }
@@ -1646,125 +1705,16 @@ void Graphics::SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )
 		Log_Warn( gLC_ClientGraphics, "Failed to find Renderable!\n" );
 		return;
 	}
-
-	if ( renderable->aModel )
-	{
-		// HACK - REMOVE WHEN WE ADD QUEUED DELETION FOR ASSETS
-		render->WaitForQueues();
-
-		if ( renderable->aBlendShapeWeightsBuffer )
-		{
-			render->DestroyBuffer( renderable->aBlendShapeWeightsBuffer );
-			renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
-
-			// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
-			render->DestroyBuffer( renderable->aVertexBuffer );
-
-			if ( renderable->aVertexIndex != UINT32_MAX )
-			{
-				Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
-			}
-
-			if ( renderable->aBlendShapeWeightsIndex != UINT32_MAX )
-			{
-				Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
-			}
-		}
-
-		renderable->aVertexBuffer = CH_INVALID_HANDLE;
-	}
-
+	
 	Model* model = nullptr;
 	if ( !gGraphicsData.aModels.Get( sModel, &model ) )
 	{
-		Log_Warn( gLC_ClientGraphics, "Failed to find Model!\n" );
+		// TODO: ERROR Model
+		Log_Warn( gLC_ClientGraphics, "Renderable has no model!\n" );
 		return;
 	}
 
-	renderable->aModel       = sModel;
-
-	// memset( &modelDraw->aAABB, 0, sizeof( ModelBBox_t ) );
-	// Graphics_UpdateModelAABB( modelDraw );
-	renderable->aAABB        = gGraphics.CreateWorldAABB(renderable->aModelMatrix, gGraphicsData.aModelBBox[ renderable->aModel ] );
-
-	renderable->aBlendShapeWeights.resize( model->apVertexData->aBlendShapeCount );
-
-	if (renderable->aBlendShapeWeights.size() )
-	{
-		// we need new vertex buffers for the modified vertices
-		size_t bufferSize        = sizeof( Shader_VertexData_t ) * model->apVertexData->aCount;
-
-		renderable->aVertexBuffer = render->CreateBuffer(
-			"output renderable vertices idfk",
-			bufferSize,
-			EBufferFlags_Storage | EBufferFlags_Vertex | EBufferFlags_TransferDst,
-			EBufferMemory_Device );
-
-		BufferRegionCopy_t copy;
-		copy.aSrcOffset = 0;
-		copy.aDstOffset = 0;
-		copy.aSize      = bufferSize;
-
-		render->BufferCopyQueued( model->apBuffers->aVertex, renderable->aVertexBuffer, &copy, 1 );
-
-		// Now Create a Blend Shape Weights Storage Buffer
-		renderable->aBlendShapeWeightsBuffer = render->CreateBuffer(
-		  "BlendShape Weights",
-		  sizeof( float ) * renderable->aBlendShapeWeights.size(),
-		  EBufferFlags_Storage,
-		  EBufferMemory_Host );
-
-		// Allocate Indexes for these
-		renderable->aVertexIndex            = Graphics_AddShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexBuffer );
-		renderable->aBlendShapeWeightsIndex = Graphics_AddShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
-
-		// update the descriptor sets for the skinning shader
-		WriteDescSet_t update{};
-
-		update.aDescSetCount = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].aCount;
-		update.apDescSets    = gShaderDescriptorData.aPerShaderSets[ "__skinning" ].apSets;
-
-		update.aBindingCount = 2;
-		update.apBindings    = ch_calloc_count< WriteDescSetBinding_t >( update.aBindingCount );
-
-		update.apBindings[ 0 ].aBinding  = 0;
-		update.apBindings[ 0 ].aType     = EDescriptorType_StorageBuffer;
-		update.apBindings[ 0 ].aCount    = gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size();
-		update.apBindings[ 0 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeWeightBuffers.aBuffers.size() );
-
-		update.apBindings[ 1 ].aBinding  = 1;
-		update.apBindings[ 1 ].aType     = EDescriptorType_StorageBuffer;
-		update.apBindings[ 1 ].aCount    = gGraphicsData.aBlendShapeDataBuffers.aBuffers.size();
-		update.apBindings[ 1 ].apData    = ch_calloc_count< ChHandle_t >( gGraphicsData.aBlendShapeDataBuffers.aBuffers.size() );
-
-		int i                            = 0;
-		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeWeightBuffers.aBuffers )
-		{
-			update.apBindings[ 0 ].apData[ i++ ] = buffer;
-		}
-
-		i = 0;
-		for ( const auto& [ index, buffer ] : gGraphicsData.aBlendShapeDataBuffers.aBuffers )
-		{
-			update.apBindings[ 1 ].apData[ i++ ] = buffer;
-		}
-
-		// update.aImages = gViewportBuffers;
-		render->UpdateDescSets( &update, 1 );
-
-		free( update.apBindings[ 0 ].apData );
-		free( update.apBindings[ 1 ].apData );
-		free( update.apBindings );
-	}
-	else
-	{
-		renderable->aVertexBuffer = model->apBuffers->aVertex;
-		renderable->aVertexIndex  = model->apBuffers->aVertexHandle;
-	}
-
-	renderable->aIndexHandle = model->apBuffers->aIndexHandle;
-
-	gGraphicsData.aRenderableStaging.aDirty = true;
+	::SetRenderableModel( sModel, model, renderable );
 }
 
 
@@ -1785,29 +1735,18 @@ void Graphics::FreeRenderable( Handle sRenderable )
 	// HACK - REMOVE WHEN WE ADD QUEUED DELETION FOR ASSETS
 	render->WaitForQueues();
 
-	if ( renderable->aBlendShapeWeightsBuffer )
-	{
-		render->DestroyBuffer( renderable->aBlendShapeWeightsBuffer );
-		renderable->aBlendShapeWeightsBuffer = CH_INVALID_HANDLE;
+	::FreeRenderableModel( renderable );
 
-		// If we have a blend shape weights buffer, then we have custom vertex buffers for this renderable
-		render->DestroyBuffer( renderable->aVertexBuffer );
-
-		if ( renderable->aVertexIndex != UINT32_MAX )
-		{
-			Graphics_RemoveShaderBuffer( gGraphicsData.aVertexBuffers, renderable->aVertexIndex );
-		}
-
-		if ( renderable->aBlendShapeWeightsIndex != UINT32_MAX )
-		{
-			Graphics_RemoveShaderBuffer( gGraphicsData.aBlendShapeWeightBuffers, renderable->aBlendShapeWeightsBuffer );
-		}
-	}
-
-	renderable->aVertexBuffer = CH_INVALID_HANDLE;
+	// Reset this renderable in the shader
+	gGraphicsData.aRenderableData[ renderable->aIndex ].aVertexBuffer = 0;
+	gGraphicsData.aRenderableData[ renderable->aIndex ].aIndexBuffer  = 0;
+	gGraphicsData.aRenderableData[ renderable->aIndex ].aLightCount   = 0;
 
 	gGraphicsData.aRenderables.Remove( sRenderable );
+	gGraphicsData.aRenderAABBUpdate.erase( sRenderable );
 	gGraphicsData.aRenderableStaging.aDirty = true;
+
+	Log_Dev( gLC_ClientGraphics, 1, "Freed Renderable\n" );
 }
 
 
@@ -1835,17 +1774,29 @@ ModelBBox_t Graphics::GetRenderableAABB( Handle sRenderable )
 }
 
 
-#if DEBUG
+void FreeRenderableDebugName( Renderable_t* renderable )
+{
+	if ( !renderable->apDebugName )
+		return;
+
+	free( renderable->apDebugName );
+}
+
 
 void Graphics::SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )
 {
-	if ( Renderable_t* renderable = gGraphics.GetRenderableData(sRenderable) )
+	if ( Renderable_t* renderable = gGraphics.GetRenderableData( sRenderable ) )
 	{
-		renderable->aDebugName = sName;
+		if ( renderable->apDebugName )
+		{
+			FreeRenderableDebugName( renderable );
+		}
+
+		renderable->apDebugName = ch_malloc_count< char >( sName.size() + 1 );
+		memcpy( renderable->apDebugName, sName.data(), sName.size() );
+		renderable->apDebugName[ sName.size() ] = '\0';
 	}
 }
-
-#endif
 
 
 void Graphics_ConsolidateRenderables()
@@ -2235,8 +2186,82 @@ void Graphics_CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVer
 #endif
 
 
-CONCMD( r_dump_vertex_buffers )
+CONCMD( r_dump_renderables )
 {
+	for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); i++ )
+	{
+		ChHandle_t renderHandle = gGraphicsData.aRenderables.GetHandleByIndex( i );
+
+		Renderable_t* renderable   = nullptr;
+		if ( !gGraphicsData.aRenderables.Get( renderHandle, &renderable ) )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "Invalid Handle Found for Renderable: %zd\n", renderHandle );
+			continue;
+		}
+
+		Log_MsgF(
+		  gLC_ClientGraphics, "\n------------------------------------------------------------\n"
+							  "Renderable %zd\n",
+		  renderHandle );
+
+#ifdef _DEBUG
+		Log_MsgF( gLC_ClientGraphics, "    Name \"%s\"\n", renderable->apDebugName );
+#endif
+
+#if 0
+		// used in actual drawing
+	ChHandle_t                  aModel;
+	glm::mat4                   aModelMatrix;
+
+	// TODO: store the materials for each mesh here so you can override them for this renderable
+	// all material handles are 0 by default, which means no custom materials are being used
+	// also will start with 1 material by default for async loading, and then will expand upon model loading finish
+	// or
+	u32                         aMaterialCount;
+	ChHandle_t*                 apMaterials = nullptr;
+
+	// used for blend shapes and skeleton data, i don't like this here because very few models will have blend shapes/skeletons
+	ChVector< float >           aBlendShapeWeights;
+	ChVector< BoneTransform_t > aBoneTransforms;
+
+	// -------------------------------------------------
+	// Internal Rendering Parts
+
+	// used for calculating render lists
+	ModelBBox_t                 aAABB;
+
+	// technically we could have this here for skinning results if needed
+	// I don't like this here as only very few models will use skinning
+	ChHandle_t                  aVertexBuffer;
+	ChHandle_t                  aBlendShapeWeightsBuffer;
+	ChHandle_t                  aBoneTransformBuffer;
+
+	u32                         aVertexIndex            = UINT32_MAX;
+	u32                         aIndexHandle            = UINT32_MAX;
+	// u32               aBlendShapeWeightsMagic = UINT32_MAX;
+	u32                         aBlendShapeWeightsIndex = UINT32_MAX;
+	u32                         aBoneTransformHandle    = UINT32_MAX;
+
+	// -------------------------------------------------
+	// User Defined Bools
+
+	// I don't like these bools that have to be checked every frame
+	bool                        aTestVis;
+	bool                        aCastShadow;
+	bool                        aVisible;
+	bool                        aBlendShapesDirty;  // AAAAAAA
+	bool                        aBonesDirty;        // AAAAAAA
+#endif
+
+		Log_MsgF( gLC_ClientGraphics, "    Model %zd\n", renderable->aModel );
+		Log_MsgF( gLC_ClientGraphics, "    Material Count %d\n", renderable->aMaterialCount );
+		Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer %zd\n\n", renderable->aVertexBuffer );
+
+		Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer Shader Handle %d\n", renderable->aVertexIndex );
+		Log_MsgF( gLC_ClientGraphics, "    Index Buffer Shader Handle %d\n", renderable->aIndexHandle );
+	}
+
+
 	// Dump Vertex Buffer Index for each renderable
 
 	gGraphicsData.aVertexBuffers;

@@ -201,6 +201,10 @@ void Phys_DrawGeometry(
 	{
 		renderHandle                  = graphics->CreateRenderable( sGeometry );
 		gPhysRenderables[ sGeometry ] = renderHandle;
+
+#if _DEBUG
+		graphics->SetRenderableDebugName( renderHandle, "Physics Model" );
+#endif
 	}
 
 	if ( Renderable_t* renderable = graphics->GetRenderableData( renderHandle ) )
