@@ -72,10 +72,10 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 	if ( info.aPath.size() )
 		ImGui::Text( info.aPath.data() );
 
-	ImGui::Text( "Size: %d x %d", info.aSize.x, info.aSize.y );
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
-	ImGui::Text( "Memory Usage: %.6f MB", Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+	ImGui::Text( "Ref Count: TODO" );
 }
 
 
@@ -335,6 +335,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 	if ( ImGui::Button( "Edit" ) )
 	{
 		// Focus Material Editor and Show this material
+		MaterialEditor_SetMaterial( mat );
 	}
 	// 
 	// ImGui::Separator();
@@ -1090,6 +1091,7 @@ void EntEditor_DrawEntityList()
 
 		if ( ImGui::BeginTabItem( "Material Editor" ) )
 		{
+			MaterialEditor_Draw();
 			ImGui::EndTabItem();
 		}
 
