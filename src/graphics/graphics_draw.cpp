@@ -755,7 +755,7 @@ void Graphics_PrepareDrawData()
 				surfDraw.aSurface        = surf;
 				surfDraw.aShaderSlot     = surfDrawIndex++;
 
-				Shader_SetupRenderableDrawData( shader, mat, renderIndex, viewIndex, renderable, shaderData, surfDraw );
+				// Shader_SetupRenderableDrawData( shader, mat, renderIndex, viewIndex, renderable, shaderData, surfDraw );
 
 				if ( !renderable->aCastShadow )
 					continue;
@@ -829,7 +829,7 @@ void Graphics_PrepareDrawData()
 	// Update Shader Draw Data
 	// TODO: can this be merged into the above for loop for viewports and renderables?
 
-#if 0
+#if 01
 	for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
 	{
 		PROF_SCOPE_NAMED( "Update Shader Draw Data" );
@@ -842,17 +842,19 @@ void Graphics_PrepareDrawData()
 			if ( !shaderData )
 				continue;
 
-			for ( auto& renderable : modelList )
+			for ( SurfaceDraw_t& surfaceDraw : modelList )
 			{
 				Renderable_t* renderable = nullptr;
-				if ( !gGraphicsData.aRenderables.Get( renderable.aDrawData, &renderable ) )
+				if ( !gGraphicsData.aRenderables.Get( surfaceDraw.aRenderable, &renderable ) )
 				{
 					Log_Warn( gLC_ClientGraphics, "Draw Data does not exist for renderable!\n" );
 					continue;
 				}
 
-				u64 renderableIndex = CH_GET_HANDLE_INDEX( renderable.aDrawData );
-				Shader_SetupRenderableDrawData( renderableIndex, viewIndex, renderable, shaderData, renderable );
+				ChHandle_t mat = gGraphics.Model_GetMaterial( renderable->aModel, surfaceDraw.aSurface );
+
+				Shader_SetupRenderableDrawData( shader, mat, renderable->aIndex, viewIndex, renderable, shaderData, surfaceDraw );
+				// Shader_SetupRenderableDrawData( renderableIndex, viewIndex, renderable, shaderData, renderable );
 
 				if ( !renderable->aCastShadow )
 					continue;
@@ -1039,10 +1041,10 @@ void Graphics::Present()
 
 		// Animate Materials in a Compute Shader
 		// Run Skinning Compute Shader
-		Graphics_DoSkinning( c, cmdIndex );
+		// Graphics_DoSkinning( c, cmdIndex );
 
 		// Draw Shadow Maps
-		// Graphics_DrawShadowMaps( c, cmdIndex );
+		Graphics_DrawShadowMaps( c, cmdIndex );
 
 		// ----------------------------------------------------------
 		// Main RenderPass

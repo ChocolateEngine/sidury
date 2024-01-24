@@ -158,16 +158,16 @@ vec4 AddLighting( vec4 albedo, vec3 inPositionWorld, vec3 inNormalWorld )
 		vec3 diff = albedo.rgb * lightColor * gCore.aLightCone[ i ].aColor.a * intensity * atten;
 
 		// shadow
-		//if ( gCore.aLightCone[ i ].aShadow != -1 )
-		//{
-		//	mat4 depthBiasMVP = gBiasMat * gCore.aLightCone[ i ].aProjView;
-		//	vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
-		//
-		//	// TODO: this could go out of bounds and lose the device
-		//	// maybe add a check here to make sure we don't go out of bounds?
-		//	float shadow = SampleShadowMapPCF( gCore.aLightCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
-		//	diff *= shadow;
-		//}
+		if ( gCore.aLightCone[ i ].aShadow != -1 )
+		{
+			mat4 depthBiasMVP = gBiasMat * gCore.aLightCone[ i ].aProjView;
+			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
+		
+			// TODO: this could go out of bounds and lose the device
+			// maybe add a check here to make sure we don't go out of bounds?
+			float shadow = SampleShadowMapPCF( gCore.aLightCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
+			diff *= shadow;
+		}
 
 		outColor.rgb += diff;
 	}

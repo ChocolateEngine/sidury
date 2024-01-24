@@ -5,12 +5,14 @@
 
 struct ShadowMap_Push
 {
+	int aAlbedo     = 0;       // albedo texture index
+	u32 aRenderable = 0;       // renderable index
+	u32 aViewport   = 0;       // viewport index
 	alignas( 16 ) glm::mat4 aModelMatrix{};  // model matrix
-	alignas( 16 ) int aAlbedo     = 0;       // albedo texture index
-	alignas( 16 ) u32 aRenderable = 0;       // renderable index
-	alignas( 16 ) u32 aViewport   = 0;       // viewport index
 };
 
+
+constexpr auto test = offsetof( ShadowMap_Push, aModelMatrix );
 
 static std::unordered_map< SurfaceDraw_t*, ShadowMap_Push > gPushData;
 static int                                                  gShadowViewInfoIndex = 0;
@@ -54,7 +56,7 @@ static void Shader_ShadowMap_SetupPushData( u32 sRenderableIndex, u32 sViewportI
 	ShadowMap_Push& push = gPushData[ &srDrawInfo ];
 	push.aModelMatrix    = spModelDraw->aModelMatrix;
 	push.aViewport       = gShadowViewInfoIndex;
-	push.aRenderable     = sRenderableIndex;
+	push.aRenderable     = spModelDraw->aIndex;
 	push.aAlbedo         = -1;
 
 	Handle mat           = gGraphics.Model_GetMaterial( spModelDraw->aModel, srDrawInfo.aSurface );

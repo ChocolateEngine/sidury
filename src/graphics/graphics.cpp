@@ -88,23 +88,6 @@ extern "C"
 	}
 }
 
-// TODO: rethink this so you can have draw ordering
-// use the RenderLayer idea you had
-
-// struct RenderList_t
-// {
-// 	std::forward_list< SurfaceDraw_t* > aSurfaces;
-// };
-
-
-// static std::unordered_map<
-//   Handle,
-//   ChVector< SurfaceDraw_t > >
-// 												 gModelDrawList;
-
-
-constexpr u32          MAX_MATERIALS_BASIC3D = 500;
-
 
 // --------------------------------------------------------------------------------------
 // Other
@@ -130,6 +113,7 @@ CONCMD( r_reload_textures )
 }
 
 
+// TODO: Handle Blend Shapes and Animations
 ModelBBox_t Graphics::CalcModelBBox( Handle sModel )
 {
 	PROF_SCOPE();

@@ -501,7 +501,7 @@ struct Light_t
 	ELightType aType = ELightType_Directional;
 	glm::vec4  aColor{ 1.f, 1.f, 1.f, 1.f };
 	glm::vec3  aPos{};
-	glm::vec3  aAng{};
+	glm::quat  aRot{};
 	float      aInnerFov = 45.f;
 	float      aOuterFov = 45.f;
 	float      aRadius   = 0.f;

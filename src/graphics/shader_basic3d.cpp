@@ -32,6 +32,9 @@ struct Basic3D_Push
 };
 
 
+// TODO: remove this, this is a useless struct
+// ...except for one tiny, itsy, bitsy issue
+// this automatically takes care of alignment for us
 struct Basic3D_Material
 {
 	int   diffuse       = 0;

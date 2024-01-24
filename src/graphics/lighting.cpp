@@ -15,8 +15,6 @@ std::vector< Light_t* >                     gLights;
 static std::vector< Light_t* >              gDirtyLights;
 static std::vector< Light_t* >              gDestroyLights;
 
-Handle                                      gRenderPassShadow;
-
 extern void                                 Shader_ShadowMap_SetViewInfo( int sViewInfo );
 
 // --------------------------------------------------------------------------------------
@@ -52,8 +50,8 @@ static_assert( CH_ARR_SIZE( gLightTypeStr ) == ELightType_Count );
 
 void Graphics_DestroyShadowRenderPass()
 {
-	if ( gRenderPassShadow != InvalidHandle )
-		render->DestroyRenderPass( gRenderPassShadow );
+	if ( gGraphicsData.aRenderPassShadow != InvalidHandle )
+		render->DestroyRenderPass( gGraphicsData.aRenderPassShadow );
 }
 
 
@@ -74,9 +72,9 @@ bool Graphics_CreateShadowRenderPass()
 	create.aSubpasses.resize( 1 );
 	create.aSubpasses[ 0 ].aBindPoint = EPipelineBindPoint_Graphics;
 
-	gRenderPassShadow                 = render->CreateRenderPass( create );
+	gGraphicsData.aRenderPassShadow   = render->CreateRenderPass( create );
 
-	return gRenderPassShadow;
+	return gGraphicsData.aRenderPassShadow;
 }
 
 
@@ -118,7 +116,7 @@ void Graphics_AddShadowMap( Light_t* spLight )
 
 	// Create Framebuffer
 	CreateFramebuffer_t frameBufCreate{};
-	frameBufCreate.aRenderPass        = gRenderPassShadow;  // ImGui will be drawn onto the graphics RenderPass
+	frameBufCreate.aRenderPass        = gGraphicsData.aRenderPassShadow;  // ImGui will be drawn onto the graphics RenderPass
 	frameBufCreate.aSize              = shadowMap.aSize;
 
 	// Create Color
@@ -420,7 +418,7 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aColor.w                = spLight->aEnabled ? spLight->aColor.w : 0.f;
 
 			glm::mat4 matrix;
-			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			Util_ToMatrix( matrix, &spLight->aPos, &spLight->aRot );
 			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
 
 			// glm::mat4 matrix;
@@ -507,8 +505,12 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			light.aFov.y           = glm::radians( spLight->aOuterFov );
 
 			glm::mat4 matrix;
-			Util_ToMatrix( matrix, spLight->aPos, spLight->aAng );
+			Util_ToMatrix( matrix, &spLight->aPos, &spLight->aRot );
 			Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
+			// Util_GetMatrixDirectionNoScale( matrix, nullptr, nullptr, &light.aDir );
+
+			glm::vec3 angTest = Util_GetMatrixAngles( matrix );
+
 #if 1
 			// update shadow map view info
 			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
@@ -519,15 +521,13 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 			// view.aFOV   = spLight->aOuterFov;
 			view.aFOV   = r_shadowmap_fov_hack;
 
-			Transform transform{};
-			transform.aPos   = spLight->aPos;
-			// transform.aAng = spLight->aAng;
+			glm::quat rot = spLight->aRot;
+			rot.w         = -rot.w;
 
-			transform.aAng.x = -spLight->aAng.z + 90.f;
-			transform.aAng.y = -spLight->aAng.y;
-			transform.aAng.z = spLight->aAng.x;
+			// rot = Util_RotateQuaternion( rot, { 1, 0, 0 }, 180 );
+			// rot = Util_RotateQuaternion( rot, { 0, 1, 0 }, 180 );
 
-			view.aViewMat    = transform.ToViewMatrixZ();
+			Util_ToViewMatrixY( view.aViewMat, spLight->aPos, rot );
 			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
 
 			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
@@ -724,7 +724,7 @@ void Graphics_DrawShadowMaps( Handle sCmd, size_t sIndex )
 		if ( !light->aEnabled || !light->aShadow )
 			continue;
 
-		renderPassBegin.aRenderPass  = gRenderPassShadow;
+		renderPassBegin.aRenderPass  = gGraphicsData.aRenderPassShadow;
 		renderPassBegin.aFrameBuffer = shadowMap.aFramebuffer;
 
 		if ( renderPassBegin.aFrameBuffer == InvalidHandle )

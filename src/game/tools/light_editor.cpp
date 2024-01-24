@@ -160,9 +160,14 @@ void LightEditor_UpdateLightDraw( Light_t* spLight )
 	renderable->aCastShadow = false;
 
 	if ( spLight->aType == ELightType_Directional )
-		Util_ToMatrix( renderable->aModelMatrix, spLight->aPos, spLight->aAng, { 2.f, 2.f, 2.f } );
+	{
+		glm::vec3 scale = { 2.f, 2.f, 2.f };
+		Util_ToMatrix( renderable->aModelMatrix, &spLight->aPos, &spLight->aRot, &scale );
+	}
 	else
-		Util_ToMatrix( renderable->aModelMatrix, spLight->aPos, spLight->aAng );
+	{
+		Util_ToMatrix( renderable->aModelMatrix, &spLight->aPos, &spLight->aRot );
+	}
 
 	if ( spLight == gpSelectedLight )
 	{
@@ -304,9 +309,9 @@ void LightEditor_DrawEditor()
 			light->aColor    = { 1, 1, 1, 10 };
 
 			// weird stuff to get the angle of the light correct from the player's view matrix stuff
-			light->aAng.x    = playerWorldTransform.aAng.z;
-			light->aAng.y    = -playerWorldTransform.aAng.y;
-			light->aAng.z    = -playerWorldTransform.aAng.x + 90.f;
+			// light->aAng.x    = playerWorldTransform.aAng.z;
+			// light->aAng.y    = -playerWorldTransform.aAng.y;
+			// light->aAng.z    = -playerWorldTransform.aAng.x + 90.f;
 
 			light->aInnerFov = 0.f;  // FOV
 			light->aOuterFov = 45.f;  // FOV
@@ -394,9 +399,9 @@ void LightEditor_DrawEditor()
 
 	if ( gpSelectedLight->aType == ELightType_Directional )
 	{
-		updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
-		updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
-		updateLight |= ImGui::SliderFloat( "Rotation Z", &gpSelectedLight->aAng.z, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation Z", &gpSelectedLight->aAng.z, -180, 180 );
 	}
 	else if ( gpSelectedLight->aType == ELightType_Point )
 	{
@@ -407,9 +412,9 @@ void LightEditor_DrawEditor()
 	{
 		updateLight |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &gpSelectedLight->aPos.x, 3, 1.f, nullptr, nullptr, nullptr, 1.f );
 
-		updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
-		updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
-		updateLight |= ImGui::SliderFloat( "Rotation Z", &gpSelectedLight->aAng.z, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation X", &gpSelectedLight->aAng.x, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation Y", &gpSelectedLight->aAng.y, -180, 180 );
+		//updateLight |= ImGui::SliderFloat( "Rotation Z", &gpSelectedLight->aAng.z, -180, 180 );
 
 		updateLight |= ImGui::SliderFloat( "Inner FOV", &gpSelectedLight->aInnerFov, 0, 180 );
 		updateLight |= ImGui::SliderFloat( "Outer FOV", &gpSelectedLight->aOuterFov, 0, 180 );

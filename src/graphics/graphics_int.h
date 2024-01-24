@@ -90,6 +90,9 @@ struct Shader_Viewport_t
 	glm::vec3 aViewPos{};
 	float     aNearZ = 0.f;
 	float     aFarZ  = 0.f;
+
+	// padding for shader????
+	glm::vec3 weirdPaddingIdk;
 };
 
 

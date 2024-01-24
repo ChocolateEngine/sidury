@@ -47,13 +47,14 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 		if ( GetEntitySystem()->GetWorldMatrix( matrix, sEntity ) )
 		{
 			spLight->apLight->aPos = Util_GetMatrixPosition( matrix );
-			spLight->apLight->aAng = glm::degrees( Util_GetMatrixAngles( matrix ) );
+			// spLight->apLight->aAng = glm::degrees( Util_GetMatrixAngles( matrix ) );
+			spLight->apLight->aRot = Util_GetMatrixRotation( matrix );
 		}
 	}
 	else
 	{
 		spLight->apLight->aPos = spLight->aPos;
-		spLight->apLight->aAng = spLight->aAng;
+		spLight->apLight->aRot = AngToQuat( glm::radians( spLight->aAng.Get() ) );
 	}
 
 	spLight->apLight->aType     = spLight->aType;

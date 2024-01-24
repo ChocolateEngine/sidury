@@ -6,10 +6,10 @@
 
 layout(push_constant) uniform Push
 {
-	mat4 aModel;
 	int  aAlbedo;
 	uint aRenderable;
 	uint aViewport;
+	mat4 aModel;
 } push;
 
 // layout(location = 0) in vec3 inPosition;

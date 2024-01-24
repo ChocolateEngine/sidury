@@ -48,7 +48,7 @@ void Entity_Update()
 		{
 			ent->apLight->aEnabled = !ent->aHidden;
 			ent->apLight->aPos     = Util_GetMatrixPosition( worldMatrix );
-			ent->apLight->aAng     = glm::degrees( Util_GetMatrixAngles( worldMatrix ) );
+			ent->apLight->aRot     = Util_GetMatrixRotation( worldMatrix );
 
 			// blech
 			graphics->UpdateLight( ent->apLight );

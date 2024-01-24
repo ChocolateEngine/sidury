@@ -256,6 +256,7 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 
 	bool updateLight = false;
 
+	updateLight |= ImGui::Checkbox( "Enabled", &spEntity->apLight->aEnabled );
 	updateLight |= ImGui::ColorEdit4( "Color", &spEntity->apLight->aColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
 
 	if ( spEntity->apLight->aType == ELightType_Directional )
@@ -278,6 +279,8 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 
 		updateLight |= ImGui::SliderFloat( "Inner FOV", &spEntity->apLight->aInnerFov, 0, 180 );
 		updateLight |= ImGui::SliderFloat( "Outer FOV", &spEntity->apLight->aOuterFov, 0, 180 );
+
+		updateLight |= ImGui::Checkbox( "Shadow Mapping", &spEntity->apLight->aShadow );
 	}
 	//else if ( spEntity->apLight->aType == ELightType_Capsule )
 	//{
