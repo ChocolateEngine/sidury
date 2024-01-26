@@ -59,14 +59,21 @@ link_directories(
 # ??????
 add_library( Editor SHARED ../graphics/mesh_builder.cpp ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 
-if (MSVC)
+target_link_libraries(
+	Editor
+	PRIVATE
+	Core
+	ImGui
+	SDL2
+	flatbuffers
+	jpeg
+	turbojpeg
+)
+
+if( MSVC )
 	target_link_libraries(
 		Editor
 		PRIVATE
-		Core
-		ImGui
-		SDL2
-		flatbuffers
 		jpeg-static
 		turbojpeg-static
 	)
@@ -74,10 +81,6 @@ else()
 	target_link_libraries(
 		Editor
 		PRIVATE
-		Core
-		ImGui
-		SDL2
-		flatbuffers
 		jpeg
 		turbojpeg
 	)
