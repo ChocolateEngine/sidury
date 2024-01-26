@@ -171,22 +171,6 @@ ChHandle_t Graphics::GetComputeShaderByIndex( u32 sIndex )
 }
 
 
-bool Graphics_AddPipelineLayouts( std::string_view sName, PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags )
-{
-	srPipeline.aLayouts.reserve( srPipeline.aLayouts.capacity() + EShaderSlot_Count );
-	srPipeline.aLayouts.push_back( gShaderDescriptorData.aGlobalLayout );
-
-	auto find = gShaderDescriptorData.aPerShaderLayout.find( sName );
-	if ( find == gShaderDescriptorData.aPerShaderLayout.end() )
-	{
-		Log_ErrorF( "No Shader Descriptor Set Layout made for shader \"%s\"\n", sName.data() );
-		return false;
-	}
-
-	srPipeline.aLayouts.push_back( find->second );
-}
-
-
 bool Shader_CreatePipelineLayout( std::string_view sName, Handle& srLayout, FShader_GetPipelineLayoutCreate fCreate )
 {
 	if ( fCreate == nullptr )
@@ -196,11 +180,17 @@ bool Shader_CreatePipelineLayout( std::string_view sName, Handle& srLayout, FSha
 	}
 
 	PipelineLayoutCreate_t pipelineCreate{};
-	if ( !Graphics_AddPipelineLayouts( sName, pipelineCreate, EShaderFlags_None ) )
+	pipelineCreate.aLayouts.reserve( pipelineCreate.aLayouts.capacity() + EShaderSlot_Count );
+	pipelineCreate.aLayouts.push_back( gShaderDescriptorData.aGlobalLayout );
+
+	auto find = gShaderDescriptorData.aPerShaderLayout.find( sName );
+	if ( find == gShaderDescriptorData.aPerShaderLayout.end() )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to add Descriptor Set Layouts for Pipeline\n" );
+		Log_ErrorF( gLC_ClientGraphics, "No Shader Descriptor Set Layout made for shader \"%s\"\n", sName.data() );
 		return false;
 	}
+
+	pipelineCreate.aLayouts.push_back( find->second );
 
 	fCreate( pipelineCreate );
 
