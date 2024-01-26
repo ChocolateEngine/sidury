@@ -173,7 +173,6 @@ ChHandle_t Graphics::GetComputeShaderByIndex( u32 sIndex )
 
 bool Graphics_AddPipelineLayouts( std::string_view sName, PipelineLayoutCreate_t& srPipeline, EShaderFlags sFlags )
 {
-	printf("%d\n", sizeof(ChHandle_t));
 	srPipeline.aLayouts.reserve( srPipeline.aLayouts.capacity() + EShaderSlot_Count );
 	srPipeline.aLayouts.push_back( gShaderDescriptorData.aGlobalLayout );
 

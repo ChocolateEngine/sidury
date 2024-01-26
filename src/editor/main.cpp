@@ -118,25 +118,37 @@ void Main_DrawGraphicsSettings()
 			Con_QueueCommandSilent( "r_msaa 0" );
 		}
 
+		int maxSamples = render->GetMaxMSAASamples();
+
 		// TODO: check what your graphics card actually supports
-		if ( ImGui::Selectable( "2X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 2 ) )
+		if ( maxSamples >= 2 && ImGui::Selectable( "2X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 2 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 2" );
 		}
 
-		if ( ImGui::Selectable( "4X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 4 ) )
+		if ( maxSamples >= 4 && ImGui::Selectable( "4X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 4 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 4" );
 		}
 
-		if ( ImGui::Selectable( "8X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 8 ) )
+		if ( maxSamples >= 8 && ImGui::Selectable( "8X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 8 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 8" );
 		}
 
-		if ( ImGui::Selectable( "16X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 16 ) )
+		if ( maxSamples >= 16 && ImGui::Selectable( "16X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 16 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 16" );
+		}
+
+		if ( maxSamples >= 32 && ImGui::Selectable( "32X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 32 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 32" );
+		}
+
+		if ( maxSamples >= 64 && ImGui::Selectable( "64X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 64 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 64" );
 		}
 
 		ImGui::EndCombo();
