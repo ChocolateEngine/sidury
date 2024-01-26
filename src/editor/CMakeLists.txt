@@ -49,6 +49,9 @@ link_directories(
 	"$<$<CONFIG:Release>:${MOZJPEG_DIR_RELEASE}>"
 	"$<$<CONFIG:RelWithDebInfo>:${MOZJPEG_DIR_RELEASE}>"
 	"$<$<CONFIG:Profile>:${MOZJPEG_DIR_RELEASE}>"
+
+	"${CH_THIRDPARTY}/flatbuffers/build"
+	"${CH_THIRDPARTY}/mozjpeg/build"
 )
 
 # include( ${CH_ROOT}/scripts/rmlui.cmake )
@@ -56,16 +59,29 @@ link_directories(
 # ??????
 add_library( Editor SHARED ../graphics/mesh_builder.cpp ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 
-target_link_libraries(
-	Editor
-	PRIVATE
-	Core
-	ImGui
-	SDL2
-	flatbuffers
-	jpeg-static
-	turbojpeg-static
-)
+if (MSVC)
+	target_link_libraries(
+		Editor
+		PRIVATE
+		Core
+		ImGui
+		SDL2
+		flatbuffers
+		jpeg-static
+		turbojpeg-static
+	)
+else()
+	target_link_libraries(
+		Editor
+		PRIVATE
+		Core
+		ImGui
+		SDL2
+		flatbuffers
+		jpeg
+		turbojpeg
+	)
+endif()
 
 add_dependencies( Editor "Core" "ImGui" )
 
@@ -74,8 +90,8 @@ set_target_properties(
 	RUNTIME_OUTPUT_NAME editor
 	LIBRARY_OUTPUT_NAME editor
 
-	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
-	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin
+	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
+	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/sidury/bin/${PLAT_FOLDER}
 )
 
 # set output directories for all builds (Debug, Release, etc.)

@@ -12,6 +12,12 @@
   #include <direct.h>
 #endif
 
+#ifdef __unix__
+  #include <string.h>
+  #include <unistd.h>
+  #include <dlfcn.h>	
+#endif /* __unix __  */
+
 Module core = 0;
 Module imgui = 0;
 Module client = 0;
@@ -180,8 +186,6 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 		return -1;
 	}
 
-	core_init( argc, argv, spGameName );
-
 	char name[ 512 ] = {};
 
 	strcat( name, spGameName );
@@ -191,6 +195,8 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 
 	if ( load_object( &client, name ) == -1 )
 		return -1;
+
+		core_init( argc, argv, spGameName );
 
 	// if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
 	// 	return -1;

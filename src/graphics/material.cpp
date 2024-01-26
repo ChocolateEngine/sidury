@@ -368,7 +368,7 @@ MaterialVar* Mat_GetVarInternal( Handle mat, std::string_view name )
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
 	{
-		Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": No Vars found, material must of been freed\n" );
+		Log_ErrorF( gLC_ClientGraphics, "%s : No Vars found, material must of been freed\n", CH_FUNC_NAME_CLASS );
 		return nullptr;
 	}
 
@@ -392,13 +392,13 @@ MaterialVar* Mat_GetVarInternal( Handle mat, u32 sIndex )
 	MaterialData_t* data = nullptr;
 	if ( !gMaterials.Get( mat, &data ) )
 	{
-		Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": No Vars found, material must of been freed\n" );
+		Log_ErrorF( gLC_ClientGraphics, "%s : No Vars found, material must of been freed\n",  CH_FUNC_NAME_CLASS );
 		return nullptr;
 	}
 
 	if ( sIndex >= data->aVars.size() )
 	{
-		Log_ErrorF( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": Index out of bounds (index: %zu - size: %zd)\n", sIndex, data->aVars.size() );
+		Log_ErrorF( gLC_ClientGraphics, "%s, : Index out of bounds (index: %zu - size: %zd)\n", CH_FUNC_NAME_CLASS, sIndex, data->aVars.size() );
 		return nullptr;
 	}
 

@@ -252,8 +252,9 @@ bool Game_Init()
 	gMainViewportIndex = graphics->CreateViewport();
 
 	Game_UpdateProjection();
-
+#ifdef _WIN32
 	Sys_SetResizeCallback( WindowResizeCallback );
+#endif /* _WIN32  */
 
 	srand( ( unsigned int )time( 0 ) );  // setup rand(  )
 

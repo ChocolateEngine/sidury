@@ -389,7 +389,7 @@ void Graphics_DoSkinning( ChHandle_t sCmd, u32 sCmdIndex )
 		Model* model = gGraphics.GetModelData( renderable->aModel );
 		if ( !model )
 		{
-			Log_Error( gLC_ClientGraphics, CH_FUNC_NAME_CLASS ": model is nullptr\n" );
+			Log_ErrorF( gLC_ClientGraphics, "%s : model is nullptr\n", CH_FUNC_NAME_CLASS );
 			continue;
 		}
 

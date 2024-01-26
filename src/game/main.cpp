@@ -25,8 +25,6 @@
 
 #include "tools/tools.h"
 
-#include "rmlui_interface.h"
-
 #include <SDL_system.h>
 #include <SDL_hints.h>
 

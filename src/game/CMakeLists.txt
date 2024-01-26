@@ -15,8 +15,8 @@ set(
 	network/net_main.h
 	
 	# flatbuffers
-	flatbuffers/sidury.capnp.c++
-	flatbuffers/sidury.capnp.h
+	##flatbuffers/sidury.capnp.c++
+	##flatbuffers/sidury.capnp.h
 	
 	# tools
 	tools/light_editor.cpp

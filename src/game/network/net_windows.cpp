@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include "flatbuffers/flatbuffers.h"
 #include "net_main.h"
 
@@ -611,3 +613,4 @@ int Net_MakeSocketBroadcastCapable( Socket_t sSocket )
 	return 0;
 }
 
+#endif /* _WIN32  */

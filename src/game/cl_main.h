@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../steam/ch_isteam.h"
 
 //
 // The Client, always running unless a dedicated server
