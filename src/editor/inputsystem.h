@@ -4,7 +4,7 @@
 #include <string>
 
 
-enum : u16
+enum : u8
 {
 	EModMask_None   = 0,
 	EModMask_CtrlL  = ( 1 << 0 ),
@@ -18,7 +18,8 @@ enum : u16
 };
 
 
-using EModMask = u16;
+using EModMask                    = u8;
+constexpr EModMask EModMask_Count = 8;
 
 
 enum EBinding : u16
@@ -72,6 +73,9 @@ struct InputContext_t
 void                 Input_Init();
 void                 Input_Update();
 
+void                 Input_ResetBindings();
+void                 Input_ClearBindings();
+
 void                 Input_CalcMouseDelta();
 glm::vec2            Input_GetMouseDelta();
 
@@ -103,8 +107,6 @@ void                 Input_BindKeys( SDL_Scancode* spKeys, u8 sKeyCount, EBindin
 
 void                 Input_BindKeys( std::vector< EButton > sKeys, EBinding sKeyBind );
 void                 Input_BindKeys( std::vector< SDL_Scancode > sKeys, EBinding sKeyBind );
-
-void                 Input_ResetBinds();
 
 bool                 Input_KeyPressed( EBinding sKeyBind );
 bool                 Input_KeyReleased( EBinding sKeyBind );

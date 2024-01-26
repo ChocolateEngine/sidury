@@ -72,14 +72,14 @@ static bool                                         gResetBindings = Args_Regist
 // bind "ctrl+c" "move_forward"
 
 
-CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
+CONCMD_VA( in_dump_all_buttons, "Dump a List of All Button Names" )
 {
 	LogGroup group = Log_GroupBegin( gLC_EditorInput );
 
-	Log_Group( group, "SDL2 Scancodes:\n\n" );
+	Log_Group( group, "Buttons:\n\n" );
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
 	{
-		const char* name = SDL_GetScancodeName( (SDL_Scancode)i );
+		const char* name = input->GetKeyName( (EButton)i );
 
 		if ( strlen( name ) == 0 )
 			continue;
@@ -128,6 +128,21 @@ const char* Input_BindingToStr( EBinding sBinding )
 }
 
 
+EBinding Input_StrToBinding( std::string_view sBindingName )
+{
+	std::string lower = str_lower2( sBindingName.data() );
+
+	for ( u16 i = 0; i < EBinding_Count; i++ )
+	{
+		if ( lower == str_lower2( gInputBindingStr[ i ] ) )
+			return (EBinding)i;
+	}
+
+	Log_ErrorF( gLC_EditorInput, "Unknown Binding: %s\n", sBindingName );
+	return EBinding_Count;
+}
+
+
 //static void PrintBinding( EButton sScancode )
 //{
 //	// Find the command for this key and print it
@@ -146,13 +161,382 @@ const char* Input_BindingToStr( EBinding sBinding )
 CONVAR( in_show_scancodes, 0 );
 
 
+CONCMD( bind_reset_all )
+{
+	Input_ResetBindings();
+}
+
+
+static void bind_dropdown_keys(
+  const std::vector< std::string >& args,  // arguments currently typed in by the user
+  std::vector< std::string >&       results )    // results to populate the dropdown list with
+{
+	std::vector< std::string > buttonNames;
+
+	size_t                     buttonNameIndex = 0;
+	buttonNames.push_back( "" );
+
+	if ( args.size() )
+	{
+		for ( size_t i = 0; i < args[ 0 ].size(); i++ )
+		{
+			if ( args[ 0 ][ i ] == '+' )
+			{
+				buttonNameIndex++;
+				buttonNames.push_back( "" );
+			}
+			else
+			{
+				buttonNames[ buttonNameIndex ] += args[ 0 ][ i ];
+			}
+		}
+	}
+
+	// all button results before "+", used only if multiple buttons are present
+	std::vector< std::string > firstButtonResults;
+
+	if ( buttonNames.size() > 1 )
+	{
+		// leave the last button name for the 2nd search section
+		for ( size_t btnI = 0; btnI < buttonNames.size() - 1; btnI++ )
+		{
+			std::string_view buttonName = buttonNames[ btnI ];
+
+			for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
+			{
+				const char* name = input->GetKeyName( (EButton)i );
+
+				if ( name == nullptr )
+					continue;
+
+				size_t nameLen = strlen( name );
+
+				// Check if they are both equal
+				if ( nameLen != buttonName.size() )
+					continue;
+
+#ifdef _WIN32
+				// if ( _strnicmp( name, currentButton.data(), strlen( name ) ) != 0 )
+				if ( _strnicmp( name, buttonName.data(), nameLen ) != 0 )
+					continue;
+#else
+				if ( strncasecmp( name, buttonName.data(), nameLen ) != 0 )
+					continue;
+#endif
+				firstButtonResults.push_back( name );
+				break;
+			}
+		}
+	}
+
+	if ( firstButtonResults.size() != buttonNames.size() - 1 )
+		return;
+
+	// Match Last button name
+	// all results after the last "+", used even if only one button is present
+	std::vector< std::string > lastButtonResults;
+
+	std::string_view lastButtonName = buttonNames[ buttonNames.size() - 1 ];
+	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
+	{
+		const char* name = input->GetKeyName( (EButton)i );
+
+		if ( name == nullptr )
+			continue;
+
+		size_t nameLen = strlen( name );
+
+		if ( nameLen == 0 )
+			continue;
+
+		if ( lastButtonName.size() )
+		{
+			// Check if this string is inside this other string
+			const char* find = strcasestr( name, lastButtonName.data() );
+
+			if ( !find )
+				continue;
+
+			lastButtonResults.push_back( name );
+		}
+		else
+		{
+			lastButtonResults.push_back( name );
+		}
+	}
+
+	if ( lastButtonResults.empty() && firstButtonResults.empty() )
+		return;
+
+	// populate first button results
+	std::string buttonPrefix;
+
+	if ( firstButtonResults.size() )
+	{
+		buttonPrefix = firstButtonResults[ 0 ];
+
+		for ( size_t i = 1; i < firstButtonResults.size(); i++ )
+		{
+			buttonPrefix += "+" + firstButtonResults[ i ];
+		}
+	}
+
+	// are we also typing in a binding?
+	if ( args.size() > 1 && lastButtonResults.size() )
+	{
+		// look if we have any exact matches for the lastButtonResults
+		for ( size_t btnI = 0; btnI < lastButtonResults.size(); btnI++ )
+		{
+			std::string_view buttonName = lastButtonResults[ btnI ];
+
+			bool foundMatch = false;
+			for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
+			{
+				const char* name = input->GetKeyName( (EButton)i );
+
+				if ( name == nullptr )
+					continue;
+
+				size_t nameLen = strlen( name );
+
+				// Check if they are both equal
+				if ( nameLen != buttonName.size() )
+					continue;
+
+#ifdef _WIN32
+				// if ( _strnicmp( name, currentButton.data(), strlen( name ) ) != 0 )
+				if ( _strnicmp( name, buttonName.data(), nameLen ) != 0 )
+					continue;
+#else
+				if ( strncasecmp( name, buttonName.data(), nameLen ) != 0 )
+					continue;
+#endif
+				if ( buttonPrefix.size() )
+					buttonPrefix += "+";
+
+				buttonPrefix += name;
+				foundMatch = true;
+				break;
+			}
+
+			if ( foundMatch )
+				break;
+		}
+
+		lastButtonResults.clear();
+	}
+	
+	// populate last button results
+
+	if ( lastButtonResults.empty() )
+	{
+		std::string& result = results.emplace_back();
+		result              = "\"" + buttonPrefix + "\"";
+		return;
+	}
+
+	for ( size_t i = 0; i < lastButtonResults.size(); i++ )
+	{
+		std::string& result = results.emplace_back();
+
+		result += "\"";
+
+		if ( buttonPrefix.size() )
+		{
+			result += buttonPrefix + "+" + lastButtonResults[ i ];
+		}
+		else
+		{
+			result += lastButtonResults[ i ];
+		}
+
+		result += "\"";
+	}
+}
+
+
+static void bind_dropdown(
+  const std::vector< std::string >& args,  // arguments currently typed in by the user
+  std::vector< std::string >&       results )    // results to populate the dropdown list with
+{
+	bind_dropdown_keys( args, results );
+	
+	if ( results.size() > 1 )
+		return;
+	
+	if ( args.size() < 2 )
+		return;
+
+	if ( results.empty() )
+	{
+		results.push_back( "INVALID BUTTON LIST" );
+		return;
+	}
+	
+	std::string key = results[ 0 ] + " ";
+	results.clear();
+
+	std::string command = args[ 1 ];
+	std::vector< std::string > bindingResults;
+
+	for ( u16 i = 0; i < EBinding_Count; i++ )
+	{
+		const char* binding = Input_BindingToStr( (EBinding)i );
+
+		if ( binding == nullptr )
+			continue;
+
+		size_t bindingLen = strlen( binding );
+
+		if ( bindingLen == 0 )
+			continue;
+
+		if ( command.size() )
+		{
+			// Check if this string is inside this other string
+			const char* find = strcasestr( binding, command.data() );
+
+			if ( !find )
+				continue;
+		}
+
+		bindingResults.push_back( binding );
+	}
+
+	for ( std::string_view binding : bindingResults )
+	{
+		results.push_back( key + binding.data() );
+	}
+	
+	//// Search Through ConVars
+	//std::vector< std::string > searchResults;
+	//Con_BuildAutoCompleteList( command, searchResults );
+	//
+	//for ( auto& cvar : searchResults )
+	//{
+	//	results.push_back( key + cvar );
+	//}
+}
+
+
+CONCMD_DROP_VA( bind, bind_dropdown, 0, "Bind a key to a command" )
+{
+	if ( args.empty() )
+		return;
+
+	if ( args.size() == 1 )
+	{
+		Log_Error( "Please add a command after the keys for the binding command\n" );
+		return;
+	}
+
+	// Split Buttons to a list
+	std::vector< std::string > buttonNames;
+
+	size_t buttonNameIndex = 0;
+	buttonNames.push_back( "" );
+	for ( size_t i = 0; i < args[ 0 ].size(); i++ )
+	{
+		if ( args[ 0 ][ i ] == '+' )
+		{
+			buttonNameIndex++;
+			buttonNames.push_back( "" );
+		}
+		else
+		{
+			buttonNames[ buttonNameIndex ] += args[ 0 ][ i ];
+		}
+	}
+
+	// Convert to Button Enums
+	ChVector< EButton > buttons;
+	for ( std::string_view buttonName : buttonNames )
+	{
+		EButton button = input->GetKeyFromName( buttonName );
+
+		if ( button == SDL_SCANCODE_UNKNOWN )
+		{
+			Log_ErrorF( gLC_EditorInput, "Unknown Key: %s\n", buttonName );
+			return;
+		}
+
+		buttons.push_back( button );
+	}
+
+	// Convert the command to an enum
+	EBinding binding = Input_StrToBinding( args[ 1 ] );
+
+	if ( binding == EBinding_Count )
+		return;
+
+	Input_BindKeys( buttons.data(), buttons.size(), binding );
+}
+
+
+static void CmdBindArchive( std::string& srOutput )
+{
+	srOutput += "// Bindings\n\n";
+
+	for ( auto& [ buttonList, binding ] : gKeyBinds )
+	{
+		// Handle Modifier Mask
+		std::vector< std::string > buttons;
+
+		if ( buttonList.aModMask & EModMask_CtrlL )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LCTRL ) );
+
+		if ( buttonList.aModMask & EModMask_CtrlR )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RCTRL ) );
+
+		if ( buttonList.aModMask & EModMask_ShiftL )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LSHIFT ) );
+
+		if ( buttonList.aModMask & EModMask_ShiftR )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RSHIFT ) );
+
+		if ( buttonList.aModMask & EModMask_AltL )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LALT ) );
+
+		if ( buttonList.aModMask & EModMask_AltR )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RALT ) );
+
+		if ( buttonList.aModMask & EModMask_GuiL )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LGUI ) );
+
+		if ( buttonList.aModMask & EModMask_GuiR )
+			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RGUI ) );
+
+		for ( u8 i = 0; i < buttonList.aCount; i++ )
+		{
+			buttons.push_back( input->GetKeyName( buttonList.apButtons[ i ] ) );
+		}
+
+		if ( buttons.empty() )
+			continue;
+		
+		srOutput += "bind \"" + buttons[ 0 ];
+
+		for ( size_t i = 1; i < buttons.size(); i++ )
+		{
+			srOutput += "+" + buttons[ i ];
+		}
+
+		srOutput += "\" \"";
+		srOutput += Input_BindingToStr( binding );
+		srOutput += "\"\n";
+	}
+}
+
+
 void Input_Init()
 {
 	Input_CalcMouseDelta();
 
-	// if ( gResetBindings )
+	Con_AddArchiveCallback( CmdBindArchive );
+
+	if ( gResetBindings )
 	{
-		Input_ResetBinds();
+		Input_ResetBindings();
 	}
 }
 
@@ -317,8 +701,10 @@ void Input_Update()
 }
 
 
-void Input_ResetBinds()
+void Input_ResetBindings()
 {
+	Input_ClearBindings();
+
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_Z }, EBinding_General_Undo );
 	Input_BindKeys( { SDL_SCANCODE_LCTRL, SDL_SCANCODE_Y }, EBinding_General_Redo );
 	
@@ -339,6 +725,19 @@ void Input_ResetBinds()
 	Input_BindKey( SDL_SCANCODE_LCTRL, EBinding_Viewport_Slow );
 
 	Input_BindKey( EButton_MouseLeft, EBinding_Viewport_Select );
+}
+
+
+void Input_ClearBindings()
+{
+	// Free Button Memory
+	for ( auto& [ buttonList, binding ] : gKeyBinds )
+	{
+		if ( buttonList.apButtons )
+			free( buttonList.apButtons );
+	}
+	
+	gKeyBinds.clear();
 }
 
 
@@ -489,10 +888,10 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	{
 		if ( newKeyList.size() != key.aCount )
 			continue;
-
+	
 		if ( modMask != key.aModMask )
 			continue;
-
+	
 		bool found = true;
 		for ( u8 i = 0; i < key.aCount; i++ )
 		{
@@ -502,18 +901,24 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 				break;
 			}
 		}
-
+	
 		if ( found )
 		{
-			value = sBinding;
+			Input_ClearBinding( value );
 
-			Input_ClearBinding( sBinding );
+			//value = sBinding;
+	
+			//Input_ClearBinding( sBinding );
 			// gBindingToKey[ sBinding ] = key;
+	
+			//Input_PrintNewBinding( spKeys, sKeyCount, sBinding );
+			//return;
 
-			Input_PrintNewBinding( spKeys, sKeyCount, sBinding );
-			return;
+			break;
 		}
 	}
+
+	Input_ClearBinding( sBinding );
 
 	// Did not find key, allocate new one
 

@@ -75,7 +75,7 @@ extern "C"
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
 
-		Con_SetDefaultArchive( "cfg" PATH_SEP_STR "config_editor.cfg", "cfg" PATH_SEP_STR "config_editor_default.cfg" );
+		Con_SetDefaultArchive( "cfg" PATH_SEP_STR "editor" PATH_SEP_STR "config.cfg", "cfg" PATH_SEP_STR "editor" PATH_SEP_STR "config_default.cfg" );
 
 		IMGUI_CHECKVERSION();
 
@@ -107,7 +107,7 @@ extern "C"
 			return;
 		}
 
-		Con_QueueCommandSilent( "exec autoexec_editor", false );
+		Con_QueueCommandSilent( "exec editor/autoexec", false );
 
 		// ftl::TaskSchedulerInitOptions schedOptions;
 		// schedOptions.Behavior = ftl::EmptyQueueBehavior::Sleep;
