@@ -13,49 +13,6 @@ CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
 CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 
-struct ButtonList_t 
-{
-	EModMask aModMask;
-	u8       aCount;
-	EButton* apButtons;
-
-	inline bool operator==( const ButtonList_t& srOther ) const
-	{
-		// Guard self assignment
-		if ( this == &srOther )
-			return true;
-
-		if ( aModMask != srOther.aModMask )
-			return false;
-
-		if ( aCount != srOther.aCount )
-			return false;
-
-		return std::memcmp( &apButtons, &srOther.apButtons, sizeof( EButton* ) ) == 0;
-	}
-};
-
-
-// Hashing Support
-namespace std
-{
-	template<>
-	struct hash< ButtonList_t >
-	{
-		size_t operator()( ButtonList_t const& list ) const
-		{
-			size_t value = 0;
-
-			value ^= ( hash< EModMask >()( list.aModMask ) );
-			value ^= ( hash< u8 >()( list.aCount ) );
-			value ^= ( hash< EButton* >()( list.apButtons ) );
-
-			return value;
-		}
-	};
-}
-
-
 static glm::vec2                                    gMouseDelta{};
 static glm::vec2                                    gMouseDeltaScale{ 1.f, 1.f };
 static std::unordered_map< ButtonList_t, EBinding > gKeyBinds;
@@ -479,49 +436,12 @@ static void CmdBindArchive( std::string& srOutput )
 
 	for ( auto& [ buttonList, binding ] : gKeyBinds )
 	{
-		// Handle Modifier Mask
-		std::vector< std::string > buttons;
+		std::string buttonStr = Input_ButtonListToStr( &buttonList );
 
-		if ( buttonList.aModMask & EModMask_CtrlL )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LCTRL ) );
-
-		if ( buttonList.aModMask & EModMask_CtrlR )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RCTRL ) );
-
-		if ( buttonList.aModMask & EModMask_ShiftL )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LSHIFT ) );
-
-		if ( buttonList.aModMask & EModMask_ShiftR )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RSHIFT ) );
-
-		if ( buttonList.aModMask & EModMask_AltL )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LALT ) );
-
-		if ( buttonList.aModMask & EModMask_AltR )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RALT ) );
-
-		if ( buttonList.aModMask & EModMask_GuiL )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LGUI ) );
-
-		if ( buttonList.aModMask & EModMask_GuiR )
-			buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RGUI ) );
-
-		for ( u8 i = 0; i < buttonList.aCount; i++ )
-		{
-			buttons.push_back( input->GetKeyName( buttonList.apButtons[ i ] ) );
-		}
-
-		if ( buttons.empty() )
+		if ( buttonStr.empty() )
 			continue;
 		
-		srOutput += "bind \"" + buttons[ 0 ];
-
-		for ( size_t i = 1; i < buttons.size(); i++ )
-		{
-			srOutput += "+" + buttons[ i ];
-		}
-
-		srOutput += "\" \"";
+		srOutput += "bind \"" + buttonStr + "\" \"";
 		srOutput += Input_BindingToStr( binding );
 		srOutput += "\"\n";
 	}
@@ -738,6 +658,74 @@ void Input_ClearBindings()
 	}
 	
 	gKeyBinds.clear();
+}
+
+
+const std::unordered_map< ButtonList_t, EBinding >& Input_GetBindings()
+{
+	return gKeyBinds;
+}
+
+
+const ButtonList_t* Input_GetKeyBinding( EBinding sBinding )
+{
+	for ( auto& [ buttonList, binding ] : gKeyBinds )
+	{
+		if ( binding == sBinding )
+			return &buttonList;
+	}
+
+	return nullptr;
+}
+
+
+std::string Input_ButtonListToStr( const ButtonList_t* spButtonList )
+{
+	if ( !spButtonList )
+		return "";
+
+	std::vector< std::string > buttons;
+
+	if ( spButtonList->aModMask & EModMask_CtrlL )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LCTRL ) );
+
+	if ( spButtonList->aModMask & EModMask_CtrlR )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RCTRL ) );
+
+	if ( spButtonList->aModMask & EModMask_ShiftL )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LSHIFT ) );
+
+	if ( spButtonList->aModMask & EModMask_ShiftR )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RSHIFT ) );
+
+	if ( spButtonList->aModMask & EModMask_AltL )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LALT ) );
+
+	if ( spButtonList->aModMask & EModMask_AltR )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RALT ) );
+
+	if ( spButtonList->aModMask & EModMask_GuiL )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_LGUI ) );
+
+	if ( spButtonList->aModMask & EModMask_GuiR )
+		buttons.push_back( input->GetKeyName( (EButton)SDL_SCANCODE_RGUI ) );
+
+	for ( u8 i = 0; i < spButtonList->aCount; i++ )
+	{
+		buttons.push_back( input->GetKeyName( spButtonList->apButtons[ i ] ) );
+	}
+
+	if ( buttons.empty() )
+		return "";
+
+	std::string output = buttons[ 0 ];
+
+	for ( size_t i = 1; i < buttons.size(); i++ )
+	{
+		output += "+" + buttons[ i ];
+	}
+
+	return output;
 }
 
 

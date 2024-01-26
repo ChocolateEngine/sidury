@@ -75,7 +75,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
-	ImGui::Text( "Ref Count: TODO" );
+	ImGui::Text( "Ref Count: %d", info.aRefCount );
 }
 
 

@@ -70,11 +70,59 @@ struct InputContext_t
 };
 
 
+struct ButtonList_t
+{
+	EModMask    aModMask;
+	u8          aCount;
+	EButton*    apButtons;
+
+	inline bool operator==( const ButtonList_t& srOther ) const
+	{
+		// Guard self assignment
+		if ( this == &srOther )
+			return true;
+
+		if ( aModMask != srOther.aModMask )
+			return false;
+
+		if ( aCount != srOther.aCount )
+			return false;
+
+		return std::memcmp( &apButtons, &srOther.apButtons, sizeof( EButton* ) ) == 0;
+	}
+};
+
+
+// Hashing Support
+namespace std
+{
+	template<>
+	struct hash< ButtonList_t >
+	{
+		size_t operator()( ButtonList_t const& list ) const
+		{
+			size_t value = 0;
+
+			value ^= ( hash< EModMask >()( list.aModMask ) );
+			value ^= ( hash< u8 >()( list.aCount ) );
+			value ^= ( hash< EButton* >()( list.apButtons ) );
+
+			return value;
+		}
+	};
+}
+
+
 void                 Input_Init();
 void                 Input_Update();
 
 void                 Input_ResetBindings();
 void                 Input_ClearBindings();
+
+const std::unordered_map< ButtonList_t, EBinding >& Input_GetBindings();
+
+const ButtonList_t*  Input_GetKeyBinding( EBinding sBinding );
+std::string          Input_ButtonListToStr( const ButtonList_t* spButtonList );
 
 void                 Input_CalcMouseDelta();
 glm::vec2            Input_GetMouseDelta();

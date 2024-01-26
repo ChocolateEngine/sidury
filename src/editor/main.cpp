@@ -52,6 +52,7 @@ CONVAR( r_render, 1 );
 
 int                             gMainMenuBarHeight    = 0.f;
 static bool                     gShowQuitConfirmation = false;
+static bool                     gShowSettingsMenu     = false;
 
 
 EditorData_t                    gEditorData{};
@@ -80,12 +81,186 @@ void Game_Shutdown()
 
 void DrawQuitConfirmation();
 
+
+void Main_DrawGraphicsSettings()
+{
+	auto windowSize = ImGui::GetWindowSize();
+	windowSize.x -= 60;
+	windowSize.y -= 60;
+
+	//ImGui::SetNextWindowContentSize( windowSize );
+
+	if ( !ImGui::BeginChild( "Graphics Settings", {}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Border ) )
+	{
+		ImGui::EndChild();
+		return;
+	}
+
+	static ConVarRef r_msaa( "r_msaa" );
+	static ConVarRef r_msaa_samples( "r_msaa_samples" );
+	static ConVarRef r_msaa_textures( "r_msaa_textures" );
+	static ConVarRef r_fov( "r_fov" );
+
+	bool             msaa_textures = r_msaa_textures.GetBool();
+	float            fov           = r_fov.GetFloat();
+
+	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
+	{
+		std::string fovStr = ToString( fov );
+		Con_QueueCommandSilent( "r_fov " + fovStr );
+	}
+
+	std::string msaaPreview = r_msaa.GetBool() ? ToString( r_msaa_samples ) + "X" : "Off";
+	if ( ImGui::BeginCombo( "MSAA", msaaPreview.c_str() ) )
+	{
+		if ( ImGui::Selectable( "Off", !r_msaa.GetBool() ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 0" );
+		}
+
+		// TODO: check what your graphics card actually supports
+		if ( ImGui::Selectable( "2X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 2 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 2" );
+		}
+
+		if ( ImGui::Selectable( "4X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 4 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 4" );
+		}
+
+		if ( ImGui::Selectable( "8X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 8 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 8" );
+		}
+
+		if ( ImGui::Selectable( "16X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 16 ) )
+		{
+			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 16" );
+		}
+
+		ImGui::EndCombo();
+	}
+
+	if ( ImGui::Checkbox( "MSAA Textures - Very Expensive", &msaa_textures ) )
+	{
+		if ( msaa_textures )
+			Con_QueueCommandSilent( "r_msaa_textures 1" );
+		else
+			Con_QueueCommandSilent( "r_msaa_textures 0" );
+	}
+
+	//ImGui::SetWindowSize( windowSize );
+
+	ImGui::EndChild();
+}
+
+
+void Main_DrawInputSettings()
+{
+	if ( !ImGui::BeginChild( "Input", {}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Border ) )
+	{
+		ImGui::EndChild();
+		return;
+	}
+
+	if ( ImGui::BeginTable( "Bindings", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable ) )
+	{
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex( 0 );
+
+		ImGui::Text( "Keys" );
+
+		ImGui::TableSetColumnIndex( 1 );
+		ImGui::Text( "Binding" );
+
+		for ( u16 binding = 0; binding < EBinding_Count; binding++ )
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex( 0 );
+
+			const char*         bindingStr = Input_BindingToStr( (EBinding)binding );
+			const ButtonList_t* buttonList = Input_GetKeyBinding( (EBinding)binding );
+
+			if ( buttonList )
+			{
+				ImGui::Text( Input_ButtonListToStr( buttonList ).c_str() );
+			}
+
+			ImGui::TableSetColumnIndex( 1 );
+			ImGui::Text( bindingStr );
+		}
+
+		ImGui::EndTable();
+	}
+
+	ImGui::EndChild();
+}
+
+
+void Main_DrawSettingsMenu()
+{
+	if ( !gShowSettingsMenu )
+		return;
+
+	ImGui::SetNextWindowSizeConstraints( { 200, 200 }, {4000, 4000} );
+
+	if ( !ImGui::Begin( "Settings Menu" ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	if ( ImGui::BeginTabBar( "settings tabs" ) )
+	{
+		if ( ImGui::BeginTabItem( "Input" ) )
+		{
+			Main_DrawInputSettings();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Graphics" ) )
+		{
+			Main_DrawGraphicsSettings();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Other" ) )
+		{
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
+
+	ImVec2 windowSize = ImGui::GetWindowSize();
+
+	ImGui::SetCursorPosY( windowSize.y - 28 );
+
+	if ( ImGui::Button( "Save" ) )
+	{
+		Con_Archive();
+	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "Close" ) )
+	{
+		gShowSettingsMenu = false;
+	}
+
+	ImGui::End();
+}
+
+
 void Main_DrawMenuBar()
 {
 	if ( gShowQuitConfirmation )
 	{
 		DrawQuitConfirmation();
 	}
+
+	Main_DrawSettingsMenu();
 
 	if ( ImGui::BeginMainMenuBar() )
 	{
@@ -127,8 +302,9 @@ void Main_DrawMenuBar()
 
 		if ( ImGui::BeginMenu( "Edit" ) )
 		{
-			if ( ImGui::MenuItem( "Bindings" ) )
+			if ( ImGui::MenuItem( "Settings" ) )
 			{
+				gShowSettingsMenu = true;
 			}
 
 			ImGui::EndMenu();
