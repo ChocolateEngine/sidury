@@ -370,7 +370,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 }
 
 
-template< typename T, typename VAR_TYPE >
+template< typename COMPONENT_TYPE, typename VAR_TYPE >
 inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, size_t sVarHash, ECompRegFlag sFlags = 0 )
 {
 	CH_ASSERT( spName );
@@ -378,12 +378,12 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 	if ( !spName )
 		return;
 
-	size_t typeHash = typeid( T ).hash_code();
+	size_t typeHash = typeid( COMPONENT_TYPE ).hash_code();
 	auto   it       = GetEntComponentRegistry().aComponents.find( typeHash );
 
 	if ( it == GetEntComponentRegistry().aComponents.end() )
 	{
-		Log_ErrorF( "Component not registered, can't add var: \"%s\" - \"%s\"\n", typeid( T ).name() );
+		Log_ErrorF( "Component not registered, can't add var: \"%s\" - \"%s\"\n", typeid( COMPONENT_TYPE ).name() );
 		return;
 	}
 
@@ -392,7 +392,7 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 
 	if ( varFind != data.aVars.end() )
 	{
-		Log_ErrorF( "Component Var already registered: \"%s::%s\" - \"%s\"\n", typeid( T ).name(), typeid( VAR_TYPE ).name(), spName );
+		Log_ErrorF( "Component Var already registered: \"%s::%s\" - \"%s\"\n", typeid( COMPONENT_TYPE ).name(), typeid( VAR_TYPE ).name(), spName );
 		return;
 	}
 
@@ -464,7 +464,7 @@ inline void EntComp_RegisterComponentVarEx2( EEntNetField sVarType, const char* 
 #endif
 
 
-template< typename T, typename VAR_TYPE >
+template< typename COMPONENT_TYPE, typename VAR_TYPE >
 inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, size_t sVarHash, ECompRegFlag sFlags = 0 )
 {
 	// Get Var Type
@@ -477,7 +477,7 @@ inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, si
 		return;
 	}
 
-	EntComp_RegisterComponentVarEx< T, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash, sFlags );
+	EntComp_RegisterComponentVarEx< COMPONENT_TYPE, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash, sFlags );
 }
 
 
