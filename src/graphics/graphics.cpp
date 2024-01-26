@@ -1776,6 +1776,9 @@ void Graphics::SetRenderableDebugName( ChHandle_t sRenderable, std::string_view 
 			FreeRenderableDebugName( renderable );
 		}
 
+		if ( sName.empty() )
+			return;
+
 		renderable->apDebugName = ch_malloc_count< char >( sName.size() + 1 );
 		memcpy( renderable->apDebugName, sName.data(), sName.size() );
 		renderable->apDebugName[ sName.size() ] = '\0';
@@ -1806,6 +1809,10 @@ GraphicsFmt Graphics::GetVertexAttributeFormat( VertexAttribute attrib )
 
 		// NOTE: could be smaller probably
 		case VertexAttribute_Normal:
+			return GraphicsFmt::RGB323232_SFLOAT;
+
+		case VertexAttribute_Tangent:
+		case VertexAttribute_BiTangent:
 			return GraphicsFmt::RGB323232_SFLOAT;
 
 		case VertexAttribute_Color:
@@ -1859,6 +1866,9 @@ size_t Graphics::GetVertexAttributeSize( VertexAttribute attrib )
 
 		case GraphicsFmt::RG3232_SFLOAT:
 			return ( 2 * sizeof( float ) );
+
+		case GraphicsFmt::R32_SFLOAT:
+			return sizeof( float );
 	}
 }
 
@@ -2053,6 +2063,18 @@ void Graphics::CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVe
 					memcpy( &dataHack[ v ].aColor, dataSrc, elemSize );
 					break;
 				}
+
+				//case VertexAttribute_Tangent:
+				//{
+				//	memcpy( &dataHack[ v ].aTangentXYZ_BiTanX, dataSrc, elemSize );
+				//	break;
+				//}
+				//
+				//case VertexAttribute_BiTangent:
+				//{
+				//	memcpy( &dataHack[ v ].aBiTangentYZ, dataSrc, elemSize );
+				//	break;
+				//}
 			}
 
 			dataOffset += elemSize;

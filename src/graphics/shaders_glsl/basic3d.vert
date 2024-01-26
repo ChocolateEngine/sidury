@@ -28,24 +28,11 @@ layout(location = 2) out vec3 outPositionWorld;
 layout(location = 3) out vec3 outNormal;
 layout(location = 4) out vec3 outNormalWorld;
 layout(location = 5) out vec3 outTangent;
+// layout(location = 6) out mat4 outTBN;
 // layout(location = 3) out float lightIntensity;
 
 void main()
 {
-	// TODO: for morph targets:
-	// https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-4-animation-dawn-demo
-	// float4 position = (1.0f - interp) * vertexIn.prevPositionKey + interp * vertexIn.nextPositionKey;
-
-	// // vertexIn.positionDiffN = position morph target N - neutralPosition
-	// float4 position = neutralPosition;
-	// position += weight0 * vertexIn.positionDiff0;
-	// position += weight1 * vertexIn.positionDiff1;
-	// position += weight2 * vertexIn.positionDiff2;
-	// etc.
-
-	// or, for each blend shape
-	// for ( int i = 0; i < ubo.morphCount; i++ )
-
 	Renderable_t renderable = gRenderables[ push.aRenderable ];
 	uint         vertIndex  = gl_VertexIndex;
 
@@ -63,6 +50,7 @@ void main()
 	outPosition = inPos;
 
 	outPositionWorld = (inMatrix * vec4(outPosition, 1.0)).rgb;
+	// outMatrix = inMatrix;
 
 	gl_Position = gViewports[ push.aViewport ].aProjView * inMatrix * vec4(inPos, 1.0);
 	// gl_Position = projView[push.projView].projView * vec4(inPosition, 1.0);
@@ -99,5 +87,12 @@ void main()
 	{
 		outTangent = vec3(0, 0, 0);
 	}
+
+
+	//vec3 T = normalize(vec3(normalMat * ModelSpaceTangent));
+	//vec3 B = normalize(vec3(normalMat * ModelSpaceBiTangent));
+	//vec3 N = normalize(vec3(normalMat * ModelSpaceNormal));
+	//mat3 tbn = mat3(T, B, N);
+	//outTBN = tbn;
 }
 

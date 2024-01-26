@@ -37,14 +37,16 @@ struct Basic3D_Push
 // this automatically takes care of alignment for us
 struct Basic3D_Material
 {
-	int   diffuse       = 0;
-	int   ao            = 0;
-	int   emissive      = 0;
+	int   diffuse;
+	int   ao;
+	int   emissive;
+	int   normalMap;
 
-	float aoPower       = 1.f;
-	float emissivePower = 1.f;
+	float aoPower;
+	float emissivePower;
 
-	bool  alphaTest     = false;
+	bool  alphaTest;
+	bool  useNormalMap;  // TODO: have an option to detect if a texture is in the normal map option or not
 };
 
 
@@ -64,11 +66,13 @@ static ShaderMaterialVarDesc gBasic3D_MaterialVars[] = {
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, diffuse, "Diffuse Texture", "" ),
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, ao, "Ambient Occlusion Texture", gpFallbackAOPath ),
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, emissive, "Emission Texture", gpFallbackEmissivePath ),
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, normalMap, "Normal Map Texture", "materials/models/protogen_wip_25d/protogen25d_normal" ),
 
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, aoPower, "Ambient Occlusion Strength", 0.f ),
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, emissivePower, "Emission Strength", 0.f ),
 
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, alphaTest, "Alpha Testing", false ),
+	CH_SHADER_MATERIAL_VAR( Basic3D_Material, useNormalMap, "Use Normal Map", true ),
 };
 
 
@@ -78,6 +82,7 @@ enum : u32
 	EBasic3D_Diffuse,
 	EBasic3D_AmbientOcclusion,
 	EBasic3D_Emissive,
+	EBasic3D_NormalMap,
 
 	EBasic3D_AmbientOcclusionPower,
 	EBasic3D_EmissivePower,

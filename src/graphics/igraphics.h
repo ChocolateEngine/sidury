@@ -34,6 +34,8 @@ enum VertexAttribute : u8
 	VertexAttribute_Normal,    // vec3
 	VertexAttribute_TexCoord,  // vec2
 	VertexAttribute_Color,     // vec4
+	VertexAttribute_Tangent,   // vec3
+	VertexAttribute_BiTangent, // vec3
 
 	// this and morphs will be calculated in a compute shader
 	// VertexAttribute_BoneIndex,        // uvec4
@@ -47,13 +49,15 @@ enum VertexAttribute : u8
 using VertexFormat = u16;
 enum : VertexFormat
 {
-	VertexFormat_None     = 0,
-	VertexFormat_Position = ( 1 << VertexAttribute_Position ),
-	VertexFormat_Normal   = ( 1 << VertexAttribute_Normal ),
-	VertexFormat_TexCoord = ( 1 << VertexAttribute_TexCoord ),
-	VertexFormat_Color    = ( 1 << VertexAttribute_Color ),
+	VertexFormat_None      = 0,
+	VertexFormat_Position  = ( 1 << VertexAttribute_Position ),
+	VertexFormat_Normal    = ( 1 << VertexAttribute_Normal ),
+	VertexFormat_TexCoord  = ( 1 << VertexAttribute_TexCoord ),
+	VertexFormat_Color     = ( 1 << VertexAttribute_Color ),
+	VertexFormat_Tangent   = ( 1 << VertexAttribute_Tangent ),
+	VertexFormat_BiTangent = ( 1 << VertexAttribute_BiTangent ),
 
-	VertexFormat_All      = ( 1 << VertexAttribute_Count ) - 1,
+	VertexFormat_All       = ( 1 << VertexAttribute_Count ) - 1,
 	// VertexFormat_All      = VertexFormat_Position | VertexFormat_Normal | VertexFormat_TexCoord | VertexFormat_Color,
 };
 
@@ -251,6 +255,8 @@ struct Shader_VertexData_t
 	glm::vec4 aPosNormX;
 	glm::vec4 aNormYZ_UV;
 	glm::vec4 aColor;
+	//glm::vec4 aTangentXYZ_BiTanX;
+	//glm::vec2 aBiTangentYZ;
 };
 
 
