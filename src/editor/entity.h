@@ -13,7 +13,7 @@
 // not sure i really need much of a component system for an editor
 struct Entity_t
 {
-	std::string aName;
+	char*       apName;
 
 	Transform   aTransform;
 
@@ -23,7 +23,7 @@ struct Entity_t
 	bool        aHidden;
 
 	// Physics
-	std::string aPhysicsModel;
+	char       *apPhysicsModel;
 
 	// Lighting
 	Light_t*    apLight;

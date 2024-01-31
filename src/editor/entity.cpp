@@ -2,6 +2,8 @@
 #include "main.h"
 #include "core/resource.h"
 
+#define NAME_LEN 64
+
 
 LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
 
@@ -84,6 +86,16 @@ ChHandle_t Entity_Create()
 	ent->aTransform.aScale.z = 1.f;
 
 	context->aMap.aMapEntities.push_back( entHandle );
+
+	ent->apName = realloc( ent->apName, NAME_LEN );
+	if ( ent->apName == nullptr )
+	{
+		Log_Error( "Failed to allocate memory for entity name\n" );
+		return;
+	}
+
+	strcpy( ent->apName, vstring( "Entity %zd", entHandle ).c_str() );
+
 	return entHandle;
 }
 

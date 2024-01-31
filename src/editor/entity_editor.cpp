@@ -296,15 +296,6 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 #define NAME_LEN 64
 
 
-static int EntityNameInput( ImGuiInputTextCallbackData* data )
-{
-	Entity_t* entity = (Entity_t*)data->UserData;
-	entity->aName.resize( data->BufTextLen );
-
-	return 0;
-}
-
-
 void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 {
 	// if ( !ImGui::BeginChild( matI + 1, {}, ImGuiChildFlags_Border ) )
@@ -622,8 +613,7 @@ void EntEditor_DrawEntityData()
 		return;
 	}
 
-	entity->aName.reserve( NAME_LEN );
-	ImGui::InputText( "Name", entity->aName.data(), NAME_LEN, ImGuiInputTextFlags_CallbackAlways, EntityNameInput, entity );
+	ImGui::InputText( "Name", entity->apName, NAME_LEN );
 
 	// std::string entName = vstring( "Entity %zd", gSelectedEntity );
 	// ImGui::Text( entName.data() );
@@ -642,7 +632,7 @@ void EntEditor_DrawEntityData()
 	if ( parent )
 	{
 		Entity_t* parentData = Entity_GetData( parent );
-		parentName = parentData->aName.size() ? parentData->aName : vstring( "Entity %zd", parent );
+		parentName = parentData->apName ? parentData->apName : vstring( "Entity %zd", parent );
 	}
 	
 	if ( ImGui::BeginCombo( "Set Parent", parentName.c_str() ) )
@@ -681,7 +671,7 @@ void EntEditor_DrawEntityData()
 
 			ImGui::PushID( entityHandle );
 	
-			if ( ImGui::Selectable( entityToParent->aName.size() ? entityToParent->aName.c_str() : entName.c_str() ) )
+			if ( ImGui::Selectable( entityToParent->apName ? entityToParent->apName : entName.c_str() ) )
 			{
 				Entity_SetParent( gSelectedEntity, entityHandle );
 			}
@@ -958,7 +948,7 @@ void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
 
 	ImGui::SameLine();
 
-	if ( ImGui::Selectable( entity->aName.size() ? entity->aName.c_str() : entName.c_str(), gSelectedEntity == sParent ) )
+	if ( ImGui::Selectable( entity->apName ? entity->apName : entName.c_str(), gSelectedEntity == sParent ) )
 	{
 		gSelectedEntity        = sParent;
 		gModelBrowserData.open = false;
