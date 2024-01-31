@@ -186,8 +186,12 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 		return -1;
 	}
 
+	// MUST LOAD THIS FIRST TO REGISTER LAUNCH ARGUMENTS
+	core_init( argc, argv, spGameName );
+
 	char name[ 512 ] = {};
 
+	strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
 	strcat( name, spGameName );
 	strcat( name, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER CH_PATH_SEP_STR );
 	strcat( name, spModuleName );
@@ -195,8 +199,6 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 
 	if ( load_object( &client, name ) == -1 )
 		return -1;
-
-		core_init( argc, argv, spGameName );
 
 	// if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
 	// 	return -1;

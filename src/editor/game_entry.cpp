@@ -1,4 +1,4 @@
-#include "../../src/game/main.h"
+#include "main.h"
 
 #include "core/profiler.h"
 
