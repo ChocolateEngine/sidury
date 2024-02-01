@@ -1257,7 +1257,9 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 
 	int width, height;
 	render->GetSurfaceSize( width, height );
-	gGraphicsData.aViewData.aViewports[ 0 ].aSize = { width, height };
+
+	if ( gGraphicsData.aViewData.aViewports.size() )
+		gGraphicsData.aViewData.aViewports[ 0 ].aSize = { width, height };
 
 	if ( sFlags & ERenderResetFlags_MSAA )
 	{
