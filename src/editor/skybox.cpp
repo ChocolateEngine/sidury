@@ -155,8 +155,7 @@ void Skybox_SetAng( const glm::vec3& srAng )
 	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
 		Util_ToViewMatrixY( renderable->aModelMatrix, srAng );
-		renderable->aVisible     = r_skybox.GetBool();
-		renderable->aModelMatrix = renderable->aModelMatrix;
+		renderable->aVisible = r_skybox.GetBool();
 	}
 }
 
@@ -209,8 +208,6 @@ void Skybox_SetMaterial( const std::string& srPath )
 
 	renderable->aVisible = true;
 	gSkyboxValid         = true;
-
-	graphics->Mat_SetVar( mat, "ang", vec3_zero );
 }
 
 
