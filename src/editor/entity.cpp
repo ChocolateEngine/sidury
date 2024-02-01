@@ -87,11 +87,12 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->apName = realloc( ent->apName, NAME_LEN );
+	ent->apName = static_cast< char* >( realloc( ent->apName, NAME_LEN ) );
 	if ( ent->apName == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
-		return;
+		Entity_Delete( entHandle );
+		return CH_INVALID_HANDLE;
 	}
 
 	strcpy( ent->apName, vstring( "Entity %zd", entHandle ).c_str() );
@@ -110,6 +111,12 @@ void Entity_Delete( ChHandle_t sHandle )
 	{
 		Log_ErrorF( "Invalid Entity: %d", sHandle );
 		return;
+	}
+
+	if ( ent->apName )
+	{
+		free( ent->apName );
+		ent->apName = nullptr;
 	}
 
 	// Check if we have a renderable on this entity
