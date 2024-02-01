@@ -153,7 +153,7 @@ void EntSys_Sound::Update()
 		if ( sound->aEffects & AudioEffect_World )
 		{
 			glm::mat4 matrix;
-			GetEntitySystem()->GetWorldMatrix( matrix, entity );
+			Entity_GetWorldMatrix( matrix, entity );
 
 			if ( !audio->HasEffects( sound->aHandle, AudioEffect_World ) )
 				audio->AddEffects( sound->aHandle, AudioEffect_World );

@@ -22,7 +22,7 @@ CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
 
 
 // Read and write from the network
-void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
+void Entity_ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 {
 	PROF_SCOPE();
 
@@ -42,9 +42,9 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 
 		if ( entityUpdate->destroyed() )
 		{
-			Entity entity = TranslateEntityID( entId, false );
+			Entity entity = Entity_TranslateEntityID( entId, false );
 			if ( entity != CH_ENT_INVALID )
-				DeleteEntity( entity );
+				Entity_DeleteEntity( entity );
 			else
 				Log_Error( gLC_Entity, "Trying to delete entity not in translation list\n" );
 
@@ -52,9 +52,9 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 		}
 		else
 		{
-			Entity entity = TranslateEntityID( entId, true );
+			Entity entity = Entity_TranslateEntityID( entId, true );
 
-			if ( !EntityExists( entity ) )
+			if ( !Entity_EntityExists( entity ) )
 			{
 				Log_Error( gLC_Entity, "wtf entity in translation list doesn't actually exist?\n" );
 				continue;
@@ -62,12 +62,12 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 			else
 			{
 				// Check for an entity parent
-				Entity parent = TranslateEntityID( entityUpdate->parent(), true );
+				Entity parent = Entity_TranslateEntityID( entityUpdate->parent(), true );
 
 				if ( parent == CH_ENT_INVALID )
 					continue;
 
-				ParentEntity( entity, parent );
+				Entity_ParentEntity( entity, parent );
 			}
 		}
 	}
@@ -77,23 +77,19 @@ void EntitySystem::ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg )
 // TODO: redo this by having it loop through component pools, and not entitys
 // right now, it's doing a lot of entirely unnecessary checks
 // we can avoid those if we loop through the pools instead
-void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sSavingMap )
+void Entity_WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder )
 {
 	PROF_SCOPE();
 
-	CH_ASSERT( GetEntityCount() == aEntityFlags.size() );
+	CH_ASSERT( Entity_GetEntityCount() == EntSysData().aEntityFlags.size() );
 
 	std::vector< flatbuffers::Offset< NetMsg_EntityUpdate > > updateOut;
-	updateOut.reserve( GetEntityCount() );
+	updateOut.reserve( Entity_GetEntityCount() );
 
-	for ( auto& [ entity, flags ] : aEntityFlags )
+	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
 	{
 		// Make sure this and all the parents are networked
-		if ( !IsNetworked( entity, flags ) )
-			continue;
-
-		// Make sure this entity is allowed to be saved to the map
-		if ( sSavingMap && !CanSaveToMap( entity ) )
+		if ( !Entity_IsNetworked( entity, flags ) )
 			continue;
 
 		// NetMsg_EntityUpdateBuilder& update = updateBuilderList.emplace_back( srBuilder );
@@ -110,7 +106,7 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 		{
 			// doesn't matter if it returns CH_ENT_INVALID
 			if ( flags & EEntityFlag_Parented )
-				update.add_parent( GetParent( entity ) );
+				update.add_parent( Entity_GetParent( entity ) );
 			else
 				update.add_parent( CH_ENT_INVALID );
 		}
@@ -129,7 +125,7 @@ void EntitySystem::WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder
 
 
 // Read and write from the network
-//void EntitySystem::ReadComponentUpdates( capnp::MessageReader& srReader )
+//void Entity_ReadComponentUpdates( capnp::MessageReader& srReader )
 //{
 //}
 
@@ -257,7 +253,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 					break;
 				}
 
-				Entity convertEntity = GetEntitySystem()->TranslateEntityID( recvEntity );
+				Entity convertEntity = Entity_TranslateEntityID( recvEntity );
 
 				if ( convertEntity == CH_ENT_INVALID )
 				{
@@ -329,7 +325,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 }
 
 
-bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate, bool sSavingMap )
+bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, const void* spData, bool sFullUpdate )
 {
 	PROF_SCOPE();
 
@@ -347,16 +343,6 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 		auto IsVarDirty = [ & ]( bool isBool = false )
 		{
-			// Make the var is allowed to be saved to the map
-			if ( sSavingMap )
-			{
-				if ( !( var.aFlags & ECompRegFlag_DontSaveToMap ) )
-				{
-					srBuilder.Bool( false );
-					return false;
-				}
-			}
-
 			// We always write this if it's a full update
 			if ( sFullUpdate )
 			{
@@ -610,19 +596,19 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 }
 
 
-void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate, bool sSavingMap )
+void Entity_WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sFullUpdate )
 {
 	PROF_SCOPE();
 
 	std::vector< fb::Offset< NetMsg_ComponentUpdate > > componentsBuilt;
-	componentsBuilt.reserve( aComponentPools.size() );
+	componentsBuilt.reserve( EntSysData().aComponentPools.size() );
 
 	size_t i = 0;
 	size_t poolCount = 0;
 
 	flexb::Builder flexBuilder;
 
-	for ( auto& [ poolName, pool ] : aComponentPools )
+	for ( auto& [ poolName, pool ] : EntSysData().aComponentPools )
 	{
 		// If there are no components in existence, don't even bother to send anything here
 		if ( !pool->aMapComponentToEntity.size() )
@@ -651,7 +637,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 		{
 			PROF_SCOPE_NAMED( "Entity" );
 
-			EEntityFlag entFlags = aEntityFlags.at( entity );
+			EEntityFlag entFlags = EntSysData().aEntityFlags.at( entity );
 
 			// skip the IsNetworked or CanSaveToMap call
 			if ( entFlags & EEntityFlag_Destroyed )
@@ -668,21 +654,12 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 			// check if the entity itself will be destroyed
 			// shouldSkipComponent |= ( (entFlags & EEntityFlag_Destroyed) && !sFullUpdate );
 
-			if ( sSavingMap )
-			{
-				shouldSkipComponent |= compFlags & EEntityFlag_DontSaveToMap;
-				shouldSkipComponent |= !CanSaveToMap( entity );
-				shouldSkipComponent |= regData->aFlags & ECompRegFlag_DontSaveToMap;
-			}
-			else
-			{
-				// check if the entity isn't networked
-				shouldSkipComponent |= !IsNetworked( entity, entFlags );
-				shouldSkipComponent |= compFlags & EEntityFlag_Local;
+			// check if the entity isn't networked
+			shouldSkipComponent |= !Entity_IsNetworked( entity, entFlags );
+			shouldSkipComponent |= compFlags & EEntityFlag_Local;
 
-				if ( !sFullUpdate && !( compFlags & EEntityFlag_Created ) )
-					shouldSkipComponent |= regData->aVars.empty();
-			}
+			if ( !sFullUpdate && !( compFlags & EEntityFlag_Created ) )
+				shouldSkipComponent |= regData->aVars.empty();
 
 			// Have we determined we should skip this component?
 			if ( shouldSkipComponent )
@@ -702,7 +679,7 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 
 				// Write Component Data
 				flexBuilder.Clear();
-				wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate, sSavingMap );
+				wroteData = WriteComponent( flexBuilder, regData, data, ent_always_full_update ? true : sFullUpdate );
 
 				if ( wroteData )
 				{
@@ -816,12 +793,12 @@ void EntitySystem::WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, 
 }
 
 
-void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
+void Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
 {
 	PROF_SCOPE();
 
 	// First, reset all dirty variables
-	for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		EntComponentData_t* regData = pool->GetRegistryData();
 
@@ -863,9 +840,9 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 		if ( !componentUpdate->components() )
 			continue;
 
-		std::string_view componentName = componentUpdate->name()->string_view();
+		std::string_view     componentName = componentUpdate->name()->string_view();
 
-		EntityComponentPool* pool = GetComponentPool( componentName );
+		EntityComponentPool* pool          = Entity_GetComponentPool( componentName );
 
 		if ( CH_IF_ASSERT_MSG( pool, "Failed to find component pool" ) )
 		{
@@ -897,7 +874,7 @@ void EntitySystem::ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader
 				continue;
 
 			// Is this entity in the translation system?
-			Entity entity = TranslateEntityID( componentUpdateData->id(), false );
+			Entity entity = Entity_TranslateEntityID( componentUpdateData->id(), false );
 			if ( entity == CH_ENT_INVALID )
 			{
 				Log_Error( gLC_Entity, "Failed to find entity while updating components from server\n" );

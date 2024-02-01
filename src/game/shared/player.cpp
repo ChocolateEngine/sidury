@@ -143,7 +143,7 @@ CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 
 static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 {
-	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( sPlayer );
+	// auto& move = Entity_GetComponent< CPlayerMoveData >( sPlayer );
 	// SetMoveType( move, sMoveType );
 
 	auto move = GetPlayerMoveData( sPlayer );
@@ -234,31 +234,31 @@ PlayerManager::~PlayerManager()
 }
 
 
-CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, EEntComponentNetType_Both, ECompRegFlag_DontSaveToMap )
+CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, EEntComponentNetType_Both, ECompRegFlag_None )
 {
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, EPlayerMoveType, aMoveType, moveType, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPlayerFlags, playerFlags, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, EPlayerMoveType, aMoveType, moveType, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPlayerFlags, playerFlags, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_U8, unsigned char, aPrevPlayerFlags, prevPlayerFlags, ECompRegFlag_None );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxSpeed, maxSpeed, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aMaxSpeed, maxSpeed, ECompRegFlag_None );
 
 	// View Bobbing
 	//CH_REGISTER_COMPONENT_VAR( EEntNetField_Float, float, aWalkTime, walkTime, true );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aBobOffsetAmount, bobOffsetAmount, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewTilt, prevViewTilt, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aBobOffsetAmount, bobOffsetAmount, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewTilt, prevViewTilt, ECompRegFlag_None );
 
 	// Smooth Land
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandPower, landPower, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandTime, landTime, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandPower, landPower, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLandTime, landTime, ECompRegFlag_None );
 
 	// Smooth Duck
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewHeight, prevViewHeight, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aTargetViewHeight, targetViewHeight, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOutViewHeight, outViewHeight, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckDuration, duckDuration, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aPrevViewHeight, prevViewHeight, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aTargetViewHeight, targetViewHeight, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOutViewHeight, outViewHeight, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckDuration, duckDuration, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, ECompRegFlag_None );
 
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, ECompRegFlag_None );
 }
 
 
@@ -272,24 +272,24 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Se
 
 void PlayerManager::RegisterComponents()
 {
-	CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_DontSaveToMap );  // don't mess with this
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_None );  // don't mess with this
 
-	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, ECompRegFlag_DontSaveToMap | ECompRegFlag_DontOverrideClient );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, ECompRegFlag_DontSaveToMap );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, ECompRegFlag_DontOverrideClient );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aNewFov, newFov, ECompRegFlag_None );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomChangeFov, zoomChangeFov );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomTime, zoomTime );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aZoomDuration, zoomDuration );
-	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, bool, aWasZoomed, wasZoomed, ECompRegFlag_None );
 
-	// GetEntitySystem()->RegisterComponent< Model* >();
-	// GetEntitySystem()->RegisterComponent< Model >();
-	//GetEntitySystem()->RegisterComponent<PhysicsObject*>();
+	// Entity_RegisterComponent< Model* >();
+	// Entity_RegisterComponent< Model >();
+	//Entity_RegisterComponent<PhysicsObject*>();
 }
 
 
@@ -301,19 +301,19 @@ void PlayerManager::ComponentAdded( Entity sEntity, void* spData )
 
 void PlayerManager::ComponentUpdated( Entity sEntity, void* spData )
 {
-#if CH_SERVER
 	CPlayerInfo* playerInfo = static_cast< CPlayerInfo* >( spData );
 
 	if ( playerInfo->aCamera != CH_ENT_INVALID )
 	{
+#if CH_SERVER
 		// Parent the Entities to the Player Entity
-		GetEntitySystem()->ParentEntity( playerInfo->aCamera, sEntity );
-
-		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "transform", true );
-		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "direction", true );
-		GetEntitySystem()->SetComponentPredicted( playerInfo->aCamera, "camera", true );
-	}
+		Entity_ParentEntity( playerInfo->aCamera, sEntity );
+#else
+		Entity_SetComponentPredicted( playerInfo->aCamera, "transform", true );
+		Entity_SetComponentPredicted( playerInfo->aCamera, "direction", true );
+		Entity_SetComponentPredicted( playerInfo->aCamera, "camera", true );
 #endif
+	}
 }
 
 
@@ -372,14 +372,12 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 
 void PlayerManager::Init()
 {
-	// apMove = GetEntitySystem()->RegisterSystem<PlayerMovement>();
+	// apMove = Entity_RegisterSystem<PlayerMovement>();
 }
 
 
 void PlayerManager::Create( Entity player )
 {
-	GetEntitySystem()->SetAllowSavingToMap( player, false );
-
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
 	CH_ASSERT( playerInfo );
 	playerInfo->aIsLocalPlayer = player == gLocalPlayer;
@@ -418,12 +416,12 @@ void PlayerManager::Create( Entity player )
 
 	// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
 	// And we parent them to the player
-	playerInfo->aCamera = GetEntitySystem()->CreateEntity();
-	// playerInfo->aFlashlight = GetEntitySystem()->CreateEntity( true );
+	playerInfo->aCamera = Entity_CreateEntity();
+	// playerInfo->aFlashlight = Entity_CreateEntity( true );
 
 	// Parent the Entities to the Player Entity
-	GetEntitySystem()->ParentEntity( playerInfo->aCamera, player );
-	// GetEntitySystem()->ParentEntity( playerInfo->aFlashlight, player );
+	Entity_ParentEntity( playerInfo->aCamera, player );
+	// Entity_ParentEntity( playerInfo->aFlashlight, player );
 
 	Ent_AddComponent( playerInfo->aCamera, "transform" );
 	Ent_AddComponent( playerInfo->aCamera, "direction" );
@@ -1032,7 +1030,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	transformView.aPos += camTransform->aPos;
 	transformView.aAng = camTransform->aAng;
 
-	// Transform transformViewTmp = GetEntitySystem()->GetWorldTransform( info->aCamera );
+	// Transform transformViewTmp = Entity_GetWorldTransform( info->aCamera );
 	// Transform transformView    = transformViewTmp;
 
 	//transformView.aAng[ PITCH ] = transformViewTmp.aAng[ YAW ];
@@ -1228,7 +1226,7 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 	CH_ASSERT( transform );
 	CH_ASSERT( physObj );
 
-	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
+	//auto& physObj = Entity_GetComponent< PhysicsObject* >( player );
 	transform->aPos.Edit().z += phys_player_offset;
 
 	physObj->SetPos( transform->aPos );
@@ -1359,7 +1357,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 
 	CH_ASSERT( playerInfo->aCamera );
 
-	// auto& move = GetEntitySystem()->GetComponent< CPlayerMoveData >( player );
+	// auto& move = Entity_GetComponent< CPlayerMoveData >( player );
 	auto rigidBody = GetRigidBody( player );
 	auto transform = GetTransform( player );
 
@@ -1506,7 +1504,7 @@ void PlayerMovement::UpdatePosition( Entity player )
 	CH_ASSERT( apPhysObjComp );
 	CH_ASSERT( apPhysObj );
 
-	//auto& physObj = GetEntitySystem()->GetComponent< PhysicsObject* >( player );
+	//auto& physObj = Entity_GetComponent< PhysicsObject* >( player );
 
 	//if ( aMoveType == MoveType::Fly )
 		//aTransform = apPhysObj->GetWorldTransform();

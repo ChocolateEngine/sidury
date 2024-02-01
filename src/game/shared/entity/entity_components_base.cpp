@@ -156,7 +156,7 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_RW( CCamera, camera, ECompRegFlag_DontOverrideClient );
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov, true );
 	
-	CH_REGISTER_COMPONENT_FL( CMap, map, EEntComponentNetType_Both, ECompRegFlag_DontSaveToMap );
+	CH_REGISTER_COMPONENT_FL( CMap, map, EEntComponentNetType_Both, ECompRegFlag_None );
 }
 
 

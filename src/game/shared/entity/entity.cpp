@@ -11,10 +11,15 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LOG_REGISTER_CHANNEL2( Entity, LogColor::Purple );
+LogChannel gLC_Entity = Log_RegisterChannel( "Entity - " CH_MODULE_NAME, LogColor::Purple );
 
 
-EntitySystem* entities = nullptr;
+EntitySystemData& EntSysData()
+{
+	static EntitySystemData entSysData;
+	return entSysData;
+}
+
 
 extern Entity gLocalPlayer;
 
@@ -330,38 +335,9 @@ std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNe
 }
 
 
-void EntComp_AddRegisterCallback( EntitySystem* spSystem )
-{
-	if ( CH_IF_ASSERT_MSG( spSystem, "Trying to register nullptr for a Entity Component Register Callback\n" ) )
-	{
-		Log_Warn( gLC_Entity, "Trying to register nullptr for a Entity Component Register Callback\n" );
-		return;
-	}
-
-	GetEntComponentRegistry().aCallbacks.push_back( spSystem );
-}
-
-
-void EntComp_RemoveRegisterCallback( EntitySystem* spSystem )
-{
-	size_t index = vec_index( GetEntComponentRegistry().aCallbacks, spSystem );
-	if ( index != SIZE_MAX )
-	{
-		GetEntComponentRegistry().aCallbacks.erase( GetEntComponentRegistry().aCallbacks.begin() + index );
-	}
-	else
-	{
-		Log_Warn( gLC_Entity, "Trying to remove component register callback that was isn't registered\n" );
-	}
-}
-
-
 void EntComp_RunRegisterCallbacks( const char* spName )
 {
-	for ( auto system : GetEntComponentRegistry().aCallbacks )
-	{
-		system->CreateComponentPool( spName );
-	}
+	Entity_CreateComponentPool( spName );
 }
 
 
@@ -370,53 +346,48 @@ void EntComp_RunRegisterCallbacks( const char* spName )
 // ===================================================================================
 
 
-EntitySystem* GetEntitySystem()
-{
-	CH_ASSERT( entities );
-	return entities;
-}
-
-
-bool EntitySystem::Init()
+bool Entity_Init()
 {
 	PROF_SCOPE();
 
-	aEntityPool.clear();
-	aComponentPools.clear();
-	aEntityIDConvert.clear();
+	EntSysData().aActive = true;
+
+#if CH_CLIENT
+	EntSysData().aIsClient = true;
+#endif
+
+	EntSysData().aEntityPool.clear();
+	EntSysData().aComponentPools.clear();
+	EntSysData().aEntityIDConvert.clear();
 
 	// Initialize the queue with all possible entity IDs
 	// for ( Entity entity = 0; entity < CH_MAX_ENTITIES; ++entity )
 	// 	aEntityPool.push( entity );
 
-	aEntityPool.resize( CH_MAX_ENTITIES );
+	EntSysData().aEntityPool.resize( CH_MAX_ENTITIES );
 	for ( Entity entity = CH_MAX_ENTITIES - 1, index = 0; entity > 0; --entity, ++index )
-		aEntityPool[ index ] = entity;
+		EntSysData().aEntityPool[ index ] = entity;
 
-	CreateComponentPools();
-
-	// Add callback
-	EntComp_AddRegisterCallback( this );
+	Entity_CreateComponentPools();
 
 	return true;
 }
 
 
-void EntitySystem::Shutdown()
+void Entity_Shutdown()
 {
 	PROF_SCOPE();
 
-	// Remove callback
-	EntComp_RemoveRegisterCallback( this );
+	EntSysData().aActive = false;
 
 	// Mark all entities as destroyed
-	for ( auto& [ entity, flags ] : aEntityFlags )
+	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
 	{
 		flags |= EEntityFlag_Destroyed;
 	}
 
 	// Destroy entities marked as destroyed
-	DeleteQueuedEntities();
+	Entity_DeleteQueuedEntities();
 
 	// Tell all component pools every entity was destroyed
 	// for ( Entity entity : aUsedEntities )
@@ -428,11 +399,11 @@ void EntitySystem::Shutdown()
 	// }
 
 	// Free component pools
-	for ( auto& [ name, pool ] : aComponentPools )
+	for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		if ( pool->apComponentSystem )
 		{
-			aComponentSystems.erase( typeid( pool->apComponentSystem ).hash_code() );
+			EntSysData().aComponentSystems.erase( typeid( pool->apComponentSystem ).hash_code() );
 			delete pool->apComponentSystem;
 			pool->apComponentSystem = nullptr;
 		}
@@ -440,17 +411,17 @@ void EntitySystem::Shutdown()
 		delete pool;
 	}
 
-	aEntityPool.clear();
-	aComponentPools.clear();
-	aEntityIDConvert.clear();
+	EntSysData().aEntityPool.clear();
+	EntSysData().aComponentPools.clear();
+	EntSysData().aEntityIDConvert.clear();
 }
 
 
-void EntitySystem::UpdateSystems()
+void Entity_UpdateSystems()
 {
 	PROF_SCOPE();
 
-	for ( auto& [ name, pool ] : aComponentPools )
+	for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		if ( pool->apComponentSystem )
 			pool->apComponentSystem->Update();
@@ -458,52 +429,52 @@ void EntitySystem::UpdateSystems()
 }
 
 
-void EntitySystem::UpdateStates()
+void Entity_UpdateStates()
 {
 	PROF_SCOPE();
 
 	// Remove Components Queued for Deletion
-	for ( auto& [ name, pool ] : aComponentPools )
+	for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		pool->RemoveAllQueued();
 	}
 
-	DeleteQueuedEntities();
+	Entity_DeleteQueuedEntities();
 
-	for ( auto& [ id, flags ] : aEntityFlags )
+	for ( auto& [ id, flags ] : EntSysData().aEntityFlags )
 	{
 		// Remove the created flag if it has that
 		if ( flags & EEntityFlag_Created )
-			aEntityFlags[ id ] &= ~EEntityFlag_Created;
+			EntSysData().aEntityFlags[ id ] &= ~EEntityFlag_Created;
 	}
 }
 
 
-void EntitySystem::InitCreatedComponents()
+void Entity_InitCreatedComponents()
 {
 	PROF_SCOPE();
 
 	// Remove Components Queued for Deletion
-	for ( auto& [ name, pool ] : aComponentPools )
+	for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		pool->InitCreatedComponents();
 	}
 }
 
 
-void EntitySystem::CreateComponentPools()
+void Entity_CreateComponentPools()
 {
 	PROF_SCOPE();
 
 	// iterate through all registered components and create a component pool for them
 	for ( auto& [ name, componentData ] : GetEntComponentRegistry().aComponentNames )
 	{
-		CreateComponentPool( name.data() );
+		Entity_CreateComponentPool( name.data() );
 	}
 }
 
 
-void EntitySystem::CreateComponentPool( const char* spName )
+void Entity_CreateComponentPool( const char* spName )
 {
 	PROF_SCOPE();
 
@@ -516,7 +487,7 @@ void EntitySystem::CreateComponentPool( const char* spName )
 		return;
 	}
 		
-	aComponentPools[ spName ] = pool;
+	EntSysData().aComponentPools[ spName ] = pool;
 
 	// Create component system if it has one registered for it
 	if ( !pool->apData->aFuncNewSystem )
@@ -526,8 +497,8 @@ void EntitySystem::CreateComponentPool( const char* spName )
 
 	if ( pool->apComponentSystem )
 	{
-		pool->apComponentSystem->apPool                                    = pool;
-		aComponentSystems[ typeid( pool->apComponentSystem ).hash_code() ] = pool->apComponentSystem;
+		pool->apComponentSystem->apPool                                                = pool;
+		EntSysData().aComponentSystems[ typeid( pool->apComponentSystem ).hash_code() ] = pool->apComponentSystem;
 	}
 	else
 	{
@@ -536,11 +507,11 @@ void EntitySystem::CreateComponentPool( const char* spName )
 }
 
 
-IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
+IEntityComponentSystem* Entity_GetComponentSystem( const char* spName )
 {
 	PROF_SCOPE();
 
-	EntityComponentPool* pool = GetComponentPool( spName );
+	EntityComponentPool* pool = Entity_GetComponentPool( spName );
 
 	if ( pool == nullptr )
 	{
@@ -552,69 +523,67 @@ IEntityComponentSystem* EntitySystem::GetComponentSystem( const char* spName )
 }
 
 
-Entity EntitySystem::CreateEntity( bool sLocal )
+Entity Entity_CreateEntity( bool sLocal )
 {
 	PROF_SCOPE();
 
-	if ( CH_IF_ASSERT_MSG( GetEntityCount() < CH_MAX_ENTITIES, "Hit Entity Limit!" ) )
+	if ( CH_IF_ASSERT_MSG( Entity_GetEntityCount() < CH_MAX_ENTITIES, "Hit Entity Limit!" ) )
 		return CH_ENT_INVALID;
 	
-	CH_ASSERT_MSG( GetEntityCount() + aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
+	CH_ASSERT_MSG( Entity_GetEntityCount() + EntSysData().aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
 
 	// Take an ID from the front of the queue
-	// Entity id = aEntityPool.front();
-	Entity id = aEntityPool.back();
-	// aEntityPool.pop();
-	aEntityPool.pop_back();
+	Entity id = EntSysData().aEntityPool.back();
+	EntSysData().aEntityPool.pop_back();
 
 	// SANITY CHECK
-	CH_ASSERT( !EntityExists( id ) );
+	CH_ASSERT( !Entity_EntityExists( id ) );
 
 	// Create Entity Flags for this and add the Created Flag to tit
-	aEntityFlags[ id ] = EEntityFlag_Created;
+	EntSysData().aEntityFlags[ id ] = EEntityFlag_Created;
 
 	// If we want the entity to be local on the client or server, add that flag to it
 	if ( sLocal )
-		aEntityFlags[ id ] |= EEntityFlag_Local;
+		EntSysData().aEntityFlags[ id ] |= EEntityFlag_Local;
 
-	Log_DevF( gLC_Entity, 2, "%s - Created Entity %zd\n", aIsClient ? "CLIENT" : "SERVER", id );
+	Log_DevF( gLC_Entity, 2, "Created Entity %zd\n", id );
 
 	return id;
 }
 
 
-void EntitySystem::DeleteEntity( Entity sEntity )
+void Entity_DeleteEntity( Entity sEntity )
 {
 	PROF_SCOPE();
 
 	CH_ASSERT_MSG( sEntity < CH_MAX_ENTITIES, "Entity out of range" );
 
-	CH_ASSERT_MSG( GetEntityCount() + aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
+	CH_ASSERT_MSG( Entity_GetEntityCount() + EntSysData().aEntityPool.size() == CH_MAX_ENTITIES, "Entity Count and Free Entities are out of sync!" );
 
-	aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
-	Log_DevF( gLC_Entity, 2, "%s - Marked Entity to be Destroyed: %zd\n", aIsClient ? "CLIENT" : "SERVER", sEntity );
+	EntSysData().aEntityFlags[ sEntity ] |= EEntityFlag_Destroyed;
+	Log_DevF( gLC_Entity, 2, "Marked Entity to be Destroyed: %zd\n", sEntity );
 
 	// Get all children attached to this entity
 	ChVector< Entity > children;
-	GetChildrenRecurse( sEntity, children );
+	Entity_GetChildrenRecurse( sEntity, children );
 
 	// Mark all of them as destroyed
 	for ( Entity child : children )
 	{
-		aEntityFlags[ child ] |= EEntityFlag_Destroyed;
-		Log_DevF( gLC_Entity, 2, "%s - Marked Child Entity to be Destroyed (parent %zd): %zd\n", aIsClient ? "CLIENT" : "SERVER", sEntity, child );
+		EntSysData().aEntityFlags[ child ] |= EEntityFlag_Destroyed;
+		Log_DevF( gLC_Entity, 2, "Marked Child Entity to be Destroyed (parent %zd): %zd\n", sEntity, child );
 	}
 }
 
 
-void EntitySystem::DeleteQueuedEntities()
+void Entity_DeleteQueuedEntities()
 {
 	PROF_SCOPE();
 
 	ChVector< Entity > deleteEntities;
 
 	// well this sucks
-	for ( auto& [ entity, flags ] : aEntityFlags )
+	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
 	{
 		// Check the entity's flags to see if it's marked as deleted
 		if ( flags & EEntityFlag_Destroyed )
@@ -624,17 +593,17 @@ void EntitySystem::DeleteQueuedEntities()
 	for ( auto entity : deleteEntities )
 	{
 		// Tell each Component Pool that this entity was destroyed
-		for ( auto& [ name, pool ] : aComponentPools )
+		for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 		{
 			pool->EntityDestroyed( entity );
 		}
 
 		// Remove this entity from the translation list if it's in it
-		for ( auto it = aEntityIDConvert.begin(); it != aEntityIDConvert.end(); it++ )
+		for ( auto it = EntSysData().aEntityIDConvert.begin(); it != EntSysData().aEntityIDConvert.end(); it++ )
 		{
 			if ( it->second == entity )
 			{
-				aEntityIDConvert.erase( it );
+				EntSysData().aEntityIDConvert.erase( it );
 				break;
 			}
 		}
@@ -642,38 +611,38 @@ void EntitySystem::DeleteQueuedEntities()
 		// Put the destroyed ID at the back of the queue
 		
 		// SANITY CHECK
-		size_t sanityCheckPool = vec_index( aEntityPool, entity );
+		size_t sanityCheckPool = vec_index( EntSysData().aEntityPool, entity );
 		CH_ASSERT( sanityCheckPool == SIZE_MAX );  // can't be in pool already
 
 		// aEntityPool.push( ent );
 		// aEntityPool.push_back( ent );
-		aEntityPool.insert( aEntityPool.begin(), entity );
+		EntSysData().aEntityPool.insert( EntSysData().aEntityPool.begin(), entity );
 
-		aEntityFlags.erase( entity );
+		EntSysData().aEntityFlags.erase( entity );
 
-		Log_DevF( gLC_Entity, 2, "%s - Destroyed Entity %zd\n", aIsClient ? "CLIENT" : "SERVER", entity );
+		Log_DevF( gLC_Entity, 2, "Destroyed Entity %zd\n", entity );
 	}
 }
 
 
-Entity EntitySystem::GetEntityCount()
+Entity Entity_GetEntityCount()
 {
-	return aEntityFlags.size();
+	return EntSysData().aEntityFlags.size();
 }
 
 
-bool EntitySystem::EntityExists( Entity desiredId )
+bool Entity_EntityExists( Entity desiredId )
 {
 	PROF_SCOPE();
 
-	auto it = aEntityFlags.find( desiredId );
+	auto it = EntSysData().aEntityFlags.find( desiredId );
 
 	// if the entity does not have any flags, it exists
-	return it != aEntityFlags.end();
+	return it != EntSysData().aEntityFlags.end();
 }
 
 
-void EntitySystem::ParentEntity( Entity sSelf, Entity sParent )
+void Entity_ParentEntity( Entity sSelf, Entity sParent )
 {
 	if ( sSelf == CH_ENT_INVALID || sSelf == sParent )
 		return;
@@ -681,33 +650,33 @@ void EntitySystem::ParentEntity( Entity sSelf, Entity sParent )
 	if ( sParent == CH_ENT_INVALID )
 	{
 		// Clear the parent
-		aEntityFlags[ sSelf ] |= EEntityFlag_Parented;
-		aEntityParents.erase( sSelf );
+		EntSysData().aEntityFlags[ sSelf ] |= EEntityFlag_Parented;
+		EntSysData().aEntityParents.erase( sSelf );
 	}
 	else
 	{
-		aEntityParents[ sSelf ] = sParent;
-		aEntityFlags[ sSelf ] &= ~EEntityFlag_Parented;
+		EntSysData().aEntityParents[ sSelf ] = sParent;
+		EntSysData().aEntityFlags[ sSelf ] &= ~EEntityFlag_Parented;
 	}
 }
 
 
-Entity EntitySystem::GetParent( Entity sSelf )
+Entity Entity_GetParent( Entity sSelf )
 {
-	auto it = aEntityParents.find( sSelf );
+	auto it = EntSysData().aEntityParents.find( sSelf );
 
-	if ( it != aEntityParents.end() )
+	if ( it != EntSysData().aEntityParents.end() )
 		return it->second;
 
 	return CH_ENT_INVALID;
 }
 
 
-bool EntitySystem::IsParented( Entity sSelf )
+bool Entity_IsParented( Entity sSelf )
 {
-	auto it = aEntityFlags.find( sSelf );
+	auto it = EntSysData().aEntityFlags.find( sSelf );
 
-	if ( it != aEntityFlags.end() )
+	if ( it != EntSysData().aEntityFlags.end() )
 		return it->second & EEntityFlag_Parented;
 
 	return false;
@@ -715,37 +684,37 @@ bool EntitySystem::IsParented( Entity sSelf )
 
 
 // Get the highest level parent for this entity, returns self if not parented
-Entity EntitySystem::GetRootParent( Entity sSelf )
+Entity Entity_GetRootParent( Entity sSelf )
 {
 	PROF_SCOPE();
 
-	auto it = aEntityParents.find( sSelf );
+	auto it = EntSysData().aEntityParents.find( sSelf );
 
-	if ( it != aEntityParents.end() )
-		return GetRootParent( it->second );
+	if ( it != EntSysData().aEntityParents.end() )
+		return Entity_GetRootParent( it->second );
 
 	return sSelf;
 }
 
 
 // Recursively get all entities attached to this one (SLOW)
-void EntitySystem::GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren )
+void Entity_GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren )
 {
 	PROF_SCOPE();
 
 #pragma message( "could probably speed up GetChildrenRecurse() by instead iterating through aEntityParents, and checking the value for each one" )
 
-	for ( auto& [ otherEntity, flags ] : aEntityFlags )
+	for ( auto& [ otherEntity, flags ] : EntSysData().aEntityFlags )
 	{
 		if ( !( flags & EEntityFlag_Parented ) )
 			continue;
 
-		Entity otherParent = GetParent( otherEntity );
+		Entity otherParent = Entity_GetParent( otherEntity );
 
 		if ( otherParent == sEntity )
 		{
 			srChildren.push_back( otherEntity );
-			GetChildrenRecurse( otherEntity, srChildren );
+			Entity_GetChildrenRecurse( otherEntity, srChildren );
 
 #pragma message( "CHECK IF THIS BREAKS THE CODE" )
 			break;
@@ -755,22 +724,22 @@ void EntitySystem::GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChi
 
 
 // Returns a Model Matrix with parents applied in world space IF we have a transform component
-bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
+bool Entity_GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 {
 	PROF_SCOPE();
 
 	// Entity    parent = IsParented( sEntity ) ? GetParent( sEntity ) : CH_ENT_INVALID;
-	Entity    parent = GetParent( sEntity );
+	Entity    parent = Entity_GetParent( sEntity );
 	glm::mat4 parentMat( 1.f );
 
 	if ( parent != CH_ENT_INVALID )
 	{
 		// Get the world matrix recursively
-		GetWorldMatrix( parentMat, parent );
+		Entity_GetWorldMatrix( parentMat, parent );
 	}
 
 	// Check if we have a transform component
-	auto transform = static_cast< CTransform* >( GetComponent( sEntity, "transform" ) );
+	auto transform = static_cast< CTransform* >( Entity_GetComponent( sEntity, "transform" ) );
 
 	if ( !transform )
 	{
@@ -819,14 +788,14 @@ bool EntitySystem::GetWorldMatrix( glm::mat4& srMat, Entity sEntity )
 }
 
 
-Transform EntitySystem::GetWorldTransform( Entity sEntity )
+Transform Entity_GetWorldTransform( Entity sEntity )
 {
 	PROF_SCOPE();
 
 	Transform final{};
 
 	glm::mat4 matrix;
-	if ( !GetWorldMatrix( matrix, sEntity ) )
+	if ( !Entity_GetWorldMatrix( matrix, sEntity ) )
 		return final;
 
 	final.aPos   = Util_GetMatrixPosition( matrix );
@@ -838,11 +807,11 @@ Transform EntitySystem::GetWorldTransform( Entity sEntity )
 
 
 // Add a component to an entity
-void* EntitySystem::AddComponent( Entity entity, std::string_view sName )
+void* Entity_AddComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -855,11 +824,11 @@ void* EntitySystem::AddComponent( Entity entity, std::string_view sName )
 
 
 // Does this entity have this component?
-bool EntitySystem::HasComponent( Entity entity, std::string_view sName )
+bool Entity_HasComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -872,11 +841,11 @@ bool EntitySystem::HasComponent( Entity entity, std::string_view sName )
 
 
 // Get a component from an entity
-void* EntitySystem::GetComponent( Entity entity, std::string_view sName )
+void* Entity_GetComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -889,11 +858,11 @@ void* EntitySystem::GetComponent( Entity entity, std::string_view sName )
 
 
 // Remove a component from an entity
-void EntitySystem::RemoveComponent( Entity entity, std::string_view sName )
+void Entity_RemoveComponent( Entity entity, std::string_view sName )
 {
 	PROF_SCOPE();
 
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -905,17 +874,11 @@ void EntitySystem::RemoveComponent( Entity entity, std::string_view sName )
 }
 
 
+#if CH_CLIENT
 // Sets Prediction on this component
-void EntitySystem::SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted )
+void Entity_SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted )
 {
-	if ( !aIsClient )
-	{
-		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( gLC_Entity, "Tried to mark entity component as predicted on server - \"%s\"\n", sName.data() );
-		return;
-	}
-
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -928,16 +891,9 @@ void EntitySystem::SetComponentPredicted( Entity entity, std::string_view sName,
 
 
 // Is this component predicted for this Entity?
-bool EntitySystem::IsComponentPredicted( Entity entity, std::string_view sName )
+bool Entity_IsComponentPredicted( Entity entity, std::string_view sName )
 {
-	if ( !aIsClient )
-	{
-		// The server does not need to know if it's predicted, the client will have special handling for this
-		Log_ErrorF( gLC_Entity, "Tried to find a predicted entity component on server - \"%s\"\n", sName.data() );
-		return false;
-	}
-
-	auto pool = GetComponentPool( sName );
+	auto pool = Entity_GetComponentPool( sName );
 
 	if ( pool == nullptr )
 	{
@@ -947,13 +903,14 @@ bool EntitySystem::IsComponentPredicted( Entity entity, std::string_view sName )
 
 	return pool->IsPredicted( entity );
 }
+#endif
 
 
 // Enables/Disables Networking on this Entity
-void EntitySystem::SetNetworked( Entity entity, bool sNetworked )
+void Entity_SetNetworked( Entity entity, bool sNetworked )
 {
-	auto it = aEntityFlags.find( entity );
-	if ( it == aEntityFlags.end() )
+	auto it = EntSysData().aEntityFlags.find( entity );
+	if ( it == EntSysData().aEntityFlags.end() )
 	{
 		Log_Error( gLC_Entity, "Failed to set Entity Networked State - Entity not found\n" );
 		return;
@@ -967,12 +924,12 @@ void EntitySystem::SetNetworked( Entity entity, bool sNetworked )
 
 
 // Is this Entity Networked?
-bool EntitySystem::IsNetworked( Entity sEntity )
+bool Entity_IsNetworked( Entity sEntity )
 {
 	PROF_SCOPE();
 
-	auto it = aEntityFlags.find( sEntity );
-	if ( it == aEntityFlags.end() )
+	auto it = EntSysData().aEntityFlags.find( sEntity );
+	if ( it == EntSysData().aEntityFlags.end() )
 	{
 		Log_Error( gLC_Entity, "Failed to get Entity Networked State - Entity not found\n" );
 		return false;
@@ -986,17 +943,17 @@ bool EntitySystem::IsNetworked( Entity sEntity )
 	if ( !( it->second & EEntityFlag_Parented ) )
 		return true;
 
-	Entity parent = GetParent( sEntity );
+	Entity parent = Entity_GetParent( sEntity );
 	CH_ASSERT( parent != CH_ENT_INVALID );
 	if ( parent == CH_ENT_INVALID )
 		return true;
 
 	// We make sure the parents are also networked before networking this one
-	return IsNetworked( parent );
+	return Entity_IsNetworked( parent );
 }
 
 
-bool EntitySystem::IsNetworked( Entity sEntity, EEntityFlag sFlags )
+bool Entity_IsNetworked( Entity sEntity, EEntityFlag sFlags )
 {
 	PROF_SCOPE();
 
@@ -1008,87 +965,45 @@ bool EntitySystem::IsNetworked( Entity sEntity, EEntityFlag sFlags )
 	if ( !( sFlags & EEntityFlag_Parented ) )
 		return true;
 
-	Entity parent = GetParent( sEntity );
+	Entity parent = Entity_GetParent( sEntity );
 	CH_ASSERT( parent != CH_ENT_INVALID );
 	if ( parent == CH_ENT_INVALID )
 		return true;
 
 	// We make sure the parents are also networked before networking this one
-	return IsNetworked( parent );
+	return Entity_IsNetworked( parent );
 }
 
 
-void EntitySystem::SetAllowSavingToMap( Entity entity, bool sSaveToMap )
-{
-	auto it = aEntityFlags.find( entity );
-	if ( it == aEntityFlags.end() )
-	{
-		Log_Error( gLC_Entity, "Failed to get Entity SaveToMap State - Entity not found\n" );
-		return;
-	}
-
-	if ( sSaveToMap )
-		it->second &= ~EEntityFlag_DontSaveToMap;
-	else
-		it->second |= EEntityFlag_DontSaveToMap;
-}
-
-
-bool EntitySystem::CanSaveToMap( Entity entity )
+EntityComponentPool* Entity_GetComponentPool( std::string_view spName )
 {
 	PROF_SCOPE();
 
-	auto it = aEntityFlags.find( entity );
-	if ( it == aEntityFlags.end() )
-	{
-		Log_Error( gLC_Entity, "Failed to get Entity SaveToMap State - Entity not found\n" );
-		return false;
-	}
+	auto it = EntSysData().aComponentPools.find( spName );
 
-	if ( it->second & EEntityFlag_DontSaveToMap )
-		return false;
-
-	if ( it->second & EEntityFlag_Parented )
-	{
-		// Check if our parent can be saved to a map
-		Entity parent = GetParent( entity );
-		if ( parent != CH_ENT_INVALID )
-			return CanSaveToMap( parent );
-	}
-
-	return true;
-}
-
-
-EntityComponentPool* EntitySystem::GetComponentPool( std::string_view spName )
-{
-	PROF_SCOPE();
-
-	auto it = aComponentPools.find( spName );
-
-	if ( it == aComponentPools.end() )
+	if ( it == EntSysData().aComponentPools.end() )
 		Log_FatalF( gLC_Entity, "Component not registered before use: \"%s\"\n", spName.data() );
 
 	return it->second;
 }
 
 
-Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
+Entity Entity_TranslateEntityID( Entity sEntity, bool sCreate )
 {
 	PROF_SCOPE();
 
 	if ( sEntity == CH_ENT_INVALID )
 		return CH_ENT_INVALID;
 
-	auto it = aEntityIDConvert.find( sEntity );
-	if ( it != aEntityIDConvert.end() )
+	auto it = EntSysData().aEntityIDConvert.find( sEntity );
+	if ( it != EntSysData().aEntityIDConvert.end() )
 	{
 		// Make sure it actually exists
-		if ( !EntityExists( it->second ) )
+		if ( !Entity_EntityExists( it->second ) )
 		{
 			Log_ErrorF( gLC_Entity, "Failed to find entity while translating Entity ID: %zd -> %zd\n", sEntity, it->second );
 			// remove it from the list
-			aEntityIDConvert.erase( it );
+			EntSysData().aEntityIDConvert.erase( it );
 			return CH_ENT_INVALID;
 		}
 
@@ -1104,7 +1019,7 @@ Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
 		return CH_ENT_INVALID;
 	}
 
-	Entity entity = CreateEntity();
+	Entity entity = Entity_CreateEntity();
 
 	if ( entity == CH_ENT_INVALID )
 	{
@@ -1113,42 +1028,8 @@ Entity EntitySystem::TranslateEntityID( Entity sEntity, bool sCreate )
 	}
 
 	Log_DevF( gLC_Entity, 2, "Added Translation of Entity ID %zd -> %zd\n", sEntity, entity );
-	aEntityIDConvert[ sEntity ] = entity;
+	EntSysData().aEntityIDConvert[ sEntity ] = entity;
 	return entity;
-}
-
-
-// ===================================================================================
-// Helpers
-// ===================================================================================
-
-
-bool Entity_Init()
-{
-	CH_ASSERT( !entities );
-	if ( entities )
-		return false;
-
-	entities = new EntitySystem;
-
-#if CH_CLIENT
-	entities->aIsClient = true;
-#endif
-
-	return entities->Init();
-}
-
-
-void Entity_Shutdown()
-{
-	if ( entities )
-	{
-		// Make sure it's shut down
-		entities->Shutdown();
-		delete entities;
-	}
-
-	entities = nullptr;
 }
 
 
@@ -1161,7 +1042,7 @@ GAME_CONCMD( ent_dump_registry )
 {
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->GetEntityCount() );
+	Log_GroupF( group, "Entity Count: %zd\n", Entity_GetEntityCount() );
 	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
 	for ( const auto& [ name, regData ] : GetEntComponentRegistry().aComponentNames )
@@ -1190,11 +1071,11 @@ GAME_CONCMD( ent_dump )
 {
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
-	Log_GroupF( group, "Entity Count: %zd\n", GetEntitySystem()->GetEntityCount() );
+	Log_GroupF( group, "Entity Count: %zd\n", Entity_GetEntityCount() );
 
 	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
 
-	for ( const auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+	for ( const auto& [ name, pool ] : EntSysData().aComponentPools )
 	{
 		CH_ASSERT( pool );
 
@@ -1204,16 +1085,16 @@ GAME_CONCMD( ent_dump )
 		Log_GroupF( group, "Component Pool: %s - %zd Components in Pool\n", name.data(), pool->GetCount() );
 	}
 
-	Log_GroupF( group, "Components: %zd\n", GetEntitySystem()->aComponentPools.size() );
+	Log_GroupF( group, "Components: %zd\n", EntSysData().aComponentPools.size() );
 
-	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
+	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
 	{
 		// this is the worst thing ever
 		std::vector< EntityComponentPool* > pools;
 
 		// Find all component pools that contain this Entity
 		// That means the Entity has the type of component that pool is for
-		for ( auto& [ name, pool ] : GetEntitySystem()->aComponentPools )
+		for ( auto& [ name, pool ] : EntSysData().aComponentPools )
 		{
 			if ( pool->Contains( entity ) )
 				pools.push_back( pool );
@@ -1246,10 +1127,10 @@ GAME_CONCMD( ent_mem )
 {
 	LogGroup group = Log_GroupBegin( gLC_Entity );
 
-	size_t componentPoolMapSize = Util_SizeOfUnordredMap( GetEntitySystem()->aComponentPools );
+	size_t   componentPoolMapSize = Util_SizeOfUnordredMap( EntSysData().aComponentPools );
 	size_t componentPoolSize    = 0;
 
-	for ( auto& [name, pool] : GetEntitySystem()->aComponentPools )
+	for ( auto& [name, pool] : EntSysData().aComponentPools )
 	{
 		size_t              curSize       = sizeof( EntityComponentPool );
 		size_t              compSize      = 0;
@@ -1278,7 +1159,7 @@ GAME_CONCMD( ent_mem )
 
 	Log_GroupF( group, "Component Pool Base Size: %.6f KB\n", Util_BytesToKB( sizeof( EntityComponentPool ) ) );
 	Log_GroupF( group, "Component Pool Map Size: %.6f KB\n", Util_BytesToKB( componentPoolMapSize ) );
-	Log_GroupF( group, "Component Pools: %.6f KB (%zd pools)\n", Util_BytesToKB( componentPoolSize ), GetEntitySystem()->aComponentPools.size() );
+	Log_GroupF( group, "Component Pools: %.6f KB (%zd pools)\n", Util_BytesToKB( componentPoolSize ), EntSysData().aComponentPools.size() );
 
 	Log_GroupEnd( group );
 }

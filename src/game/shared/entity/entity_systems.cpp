@@ -44,7 +44,7 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 	if ( spLight->aUseTransform )
 	{
 		glm::mat4 matrix;
-		if ( GetEntitySystem()->GetWorldMatrix( matrix, sEntity ) )
+		if ( Entity_GetWorldMatrix( matrix, sEntity ) )
 		{
 			spLight->apLight->aPos = Util_GetMatrixPosition( matrix );
 			// spLight->apLight->aAng = glm::degrees( Util_GetMatrixAngles( matrix ) );
@@ -225,7 +225,7 @@ void EntSys_Transform::Update()
 
 			// We have to draw them in world space
 			glm::mat4 matrix;
-			if ( !GetEntitySystem()->GetWorldMatrix( matrix, entity ) )
+			if ( !Entity_GetWorldMatrix( matrix, entity ) )
 				continue;
 
 			// graphics->DrawAxis( transform->aPos, transform->aAng, transform->aScale );
@@ -310,7 +310,7 @@ void EntSys_Renderable::Update()
 	{
 		// TODO: check if any of the transforms are dirty, including the parents, unsure how that would work
 		glm::mat4 matrix;
-		if ( !GetEntitySystem()->GetWorldMatrix( matrix, entity ) )
+		if ( !Entity_GetWorldMatrix( matrix, entity ) )
 			continue;
 
 		auto renderComp = Ent_GetComponent< CRenderable >( entity, "renderable" );

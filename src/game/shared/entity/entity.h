@@ -178,9 +178,6 @@ enum EEntityFlag_ : EEntityFlag
 	// Ignore data from the server on the client, useful for first person camera entity
 	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
 	EEntityFlag_IgnoreOnClient = ( 1 << 5 ),
-
-	// Don't save this Entity/Component To the Map
-	EEntityFlag_DontSaveToMap  = ( 1 << 6 ),
 };
 
 
@@ -194,11 +191,8 @@ enum ECompRegFlag_ : ECompRegFlag
 	// Hack
 	ECompRegFlag_DontOverrideClient = ( 1 << 0 ),
 
-	// Don't save this Component To the Map
-	ECompRegFlag_DontSaveToMap      = ( 1 << 1 ),
-
 	// This variable is a network variable
-	ECompRegFlag_IsNetVar           = ( 1 << 2 ),
+	ECompRegFlag_IsNetVar           = ( 1 << 1 ),
 };
 
 
@@ -275,11 +269,6 @@ struct EntComponentRegistry_t
 	// [type hash of var] = Var Read/Write Function
 	// std::unordered_map< size_t, FEntComp_VarRead* >             aVarRead;
 	// std::unordered_map< size_t, FEntComp_VarWrite* >            aVarWrite;
-
-	// Callback Functions for when a new component is registered at runtime
-	// Used for creating a new component pool for client and/or server entity system
-	// std::vector< FEntComp_Register* >                           aCallbacks;
-	std::vector< EntitySystem* >                                aCallbacks;
 };
 
 
@@ -685,164 +674,18 @@ struct EntityEventListener_t
 };
 
 
-struct EntityData_t
+// truct EntityData_t
+// 
+// 	EEntityFlag aFlags;
+// 	Entity      aParent;
+// 	std::string aName;
+// ;
+
+
+struct EntitySystemData
 {
-	EEntityFlag aFlags;
-	Entity      aParent;
-	std::string aName;
-};
+	bool                                                         aActive   = false;
 
-
-class EntitySystem
-{
-  public:
-	bool                    Init();
-	void                    Shutdown();
-
-	void                    UpdateSystems();
-
-	// Update Entity and Component States, and Delete Queued Entities
-	void                    UpdateStates();
-	void                    InitCreatedComponents();
-
-	void                    CreateComponentPools();
-	void                    CreateComponentPool( const char* spName );
-
-	// Get a system for managing this component
-	IEntityComponentSystem* GetComponentSystem( const char* spName );
-
-	// if sLocal is true, then the entity is only created on client or server, and is never networked
-	// Useful for client or server only entities, if we ever have those
-	Entity                  CreateEntity( bool sLocal = false );
-	void                    DeleteEntity( Entity ent );
-	void                    DeleteQueuedEntities();
-	Entity                  GetEntityCount();
-
-	bool                    EntityExists( Entity sDesiredId );
-
-	// Parents an entity to another one
-	// TODO: tackle parenting with physics objects
-	void                    ParentEntity( Entity sSelf, Entity sParent );
-	Entity                  GetParent( Entity sEntity );
-	bool                    IsParented( Entity sEntity );
-
-	// Get the highest level parent for this entity, returns self if not parented
-	Entity                  GetRootParent( Entity sEntity );
-
-	// Recursively get all entities attached to this one (SLOW)
-	void                    GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren );
-
-	// Returns a Model Matrix with parents applied in world space IF we have a transform component
-	bool                    GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
-
-	// Same as GetWorldMatrix, but returns in a Transform struct
-	Transform               GetWorldTransform( Entity sEntity );
-
-	// having local versions of these functions are useless, that's just the transform component
-	// GetWorldMatrix
-	// GetWorldTransform
-	// GetWorldPosition
-	// GetWorldAngles
-	// GetWorldScale
-
-	// Read and write from the network
-	void                    ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
-	void                    WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sSavingMap = false );
-
-	void                    ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
-	void                    WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate, bool sSavingMap = false );
-
-	// Add a component to an entity
-	void*                   AddComponent( Entity entity, std::string_view sName );
-
-	// Does this entity have this component?
-	bool                    HasComponent( Entity entity, std::string_view sName );
-
-	// Get a component from an entity
-	void*                   GetComponent( Entity entity, std::string_view sName );
-
-	// Remove a component from an entity
-	void                    RemoveComponent( Entity entity, std::string_view sName );
-
-	// Sets Prediction on this component
-	void                    SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted );
-
-	// Is this component predicted for this Entity?
-	bool                    IsComponentPredicted( Entity entity, std::string_view sName );
-
-	// Enables/Disables Networking on this Entity
-	void                    SetNetworked( Entity entity, bool sNetworked = true );
-
-	// Is this Entity Networked?
-	bool                    IsNetworked( Entity sEntity );
-
-	// Faster version of IsNetworked with the option to pass in the entity flags if you already have them
-	bool                    IsNetworked( Entity sEntity, EEntityFlag sFlags );
-
-	// Sets whether this entity can be saved to a map or not
-	void                    SetAllowSavingToMap( Entity sEntity, bool sSaveToMap = true );
-
-	// Is this Entity able to be saved to a map?
-	bool                    CanSaveToMap( Entity entity );
-
-	// void                    SetComponentNetworked( Entity ent, const char* spName );
-
-	// Get the Component Pool for this Component
-	EntityComponentPool*    GetComponentPool( std::string_view sName );
-
-	Entity                  TranslateEntityID( Entity sEntity, bool sCreate = false );
-
-	// ---------------------------------------------------------
-	// Entity Names
-
-	void                    SetName( Entity sEntity, std::string_view sName );
-	std::string_view        GetName( Entity sEntity );
-
-	// Multiple Entities can have the same name
-	void                    GetEntitiesByName( std::string_view sName, ChVector< Entity >& sEntities );
-
-	// ---------------------------------------------------------
-	// Entity Event System
-
-	// void                    ProcessEventQueue();
-	// 
-	// // Fire an event (Server Only, Event's will be networked to the client)
-	// // We also pass in the component name to avoid event name clashing
-	// void                    FireEvent( Entity sEntity, std::string_view sComponent, std::string_view sName, void* spData = nullptr );
-	// 
-	// // Add a listener to listen for an event
-	// // If CH_ENT_INVALID is passed in, it will listen globally for this event
-	// // If an entity is passed in, it will only listen for events from that entity
-	// // We also pass in the component name to avoid event name clashing
-	// Handle                  AddEventListener( Entity sEntity, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
-	// 
-	// // Same as above, but with an entity name
-	// Handle                  AddEventListener( std::string_view sEntityName, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
-	// 
-	// // how tf will this work, will AddEventListener return a handle? idfk
-	// void                    RemoveEventListener( Handle sListenerHandle );
-
-	// ---------------------------------------------------------
-	// Gets a component system by type_hash()
-
-	template< typename T >
-	inline T* GetSystem()
-	{
-		size_t hash = typeid( T ).hash_code();
-		auto   it   = aComponentSystems.find( hash );
-
-		if ( it != aComponentSystems.end() )
-		{
-			return static_cast< T* >( it->second );
-		}
-
-		Log_ErrorF( "Failed to find Component System \"%s\"\n", typeid( T ).name() );
-		return nullptr;
-	}
-
-	// ---------------------------------------------------------
-	// Variables
-	
 	// TEMP DEBUG
 	bool                                                         aIsClient = false;
 
@@ -877,37 +720,153 @@ class EntitySystem
 };
 
 
-EntitySystem* GetEntitySystem();
+// Get Entity System Data
+EntitySystemData&       EntSysData();
+
+
+bool                    Entity_Init();
+void                    Entity_Shutdown();
+
+void                    Entity_UpdateSystems();
+
+// Update Entity and Component States, and Delete Queued Entities
+void                    Entity_UpdateStates();
+void                    Entity_InitCreatedComponents();
+
+void                    Entity_CreateComponentPools();
+void                    Entity_CreateComponentPool( const char* spName );
+
+// Get a system for managing this component
+IEntityComponentSystem* Entity_GetComponentSystem( const char* spName );
+
+// if sLocal is true, then the entity is only created on client or server, and is never networked
+// Useful for client or server only entities, if we ever have those
+Entity                  Entity_CreateEntity( bool sLocal = false );
+void                    Entity_DeleteEntity( Entity ent );
+void                    Entity_DeleteQueuedEntities();
+Entity                  Entity_GetEntityCount();
+
+bool                    Entity_EntityExists( Entity sDesiredId );
+
+// Parents an entity to another one
+// TODO: tackle parenting with physics objects
+void                    Entity_ParentEntity( Entity sSelf, Entity sParent );
+Entity                  Entity_GetParent( Entity sEntity );
+bool                    Entity_IsParented( Entity sEntity );
+
+// Get the highest level parent for this entity, returns self if not parented
+Entity                  Entity_GetRootParent( Entity sEntity );
+
+// Recursively get all entities attached to this one (SLOW)
+void                    Entity_GetChildrenRecurse( Entity sEntity, ChVector< Entity >& srChildren );
+
+// Returns a Model Matrix with parents applied in world space IF we have a transform component
+bool                    Entity_GetWorldMatrix( glm::mat4& srMat, Entity sEntity );
+
+// Same as GetWorldMatrix, but returns in a Transform struct
+Transform               Entity_GetWorldTransform( Entity sEntity );
+
+// having local versions of these functions are useless, that's just the transform component
+// GetWorldMatrix
+// GetWorldTransform
+// GetWorldPosition
+// GetWorldAngles
+// GetWorldScale
+
+// Read and write from the network
+void                    Entity_ReadEntityUpdates( const NetMsg_EntityUpdates* spMsg );
+void                    Entity_WriteEntityUpdates( flatbuffers::FlatBufferBuilder& srBuilder );
+
+void                    Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader );
+void                    Entity_WriteComponentUpdates( flatbuffers::FlatBufferBuilder& srBuilder, bool sFullUpdate );
+
+// Add a component to an entity
+void*                   Entity_AddComponent( Entity entity, std::string_view sName );
+
+// Does this entity have this component?
+bool                    Entity_HasComponent( Entity entity, std::string_view sName );
+
+// Get a component from an entity
+void*                   Entity_GetComponent( Entity entity, std::string_view sName );
+
+// Remove a component from an entity
+void                    Entity_RemoveComponent( Entity entity, std::string_view sName );
+
+#if CH_CLIENT
+// Sets Prediction on this component
+void                    Entity_SetComponentPredicted( Entity entity, std::string_view sName, bool sPredicted );
+
+// Is this component predicted for this Entity?
+bool                    Entity_IsComponentPredicted( Entity entity, std::string_view sName );
+#endif
+
+// Enables/Disables Networking on this Entity
+void                    Entity_SetNetworked( Entity entity, bool sNetworked = true );
+
+// Is this Entity Networked?
+bool                    Entity_IsNetworked( Entity sEntity );
+
+// Faster version of IsNetworked with the option to pass in the entity flags if you already have them
+bool                    Entity_IsNetworked( Entity sEntity, EEntityFlag sFlags );
+
+// Get the Component Pool for this Component
+EntityComponentPool*    Entity_GetComponentPool( std::string_view sName );
+
+Entity                  Entity_TranslateEntityID( Entity sEntity, bool sCreate = false );
+
+// ---------------------------------------------------------
+// Entity Names
+
+void                    Entity_SetName( Entity sEntity, std::string_view sName );
+std::string_view        Entity_GetName( Entity sEntity );
+
+// Multiple Entities can have the same name
+void                    Entity_GetEntitiesByName( std::string_view sName, ChVector< Entity >& sEntities );
+
+// ---------------------------------------------------------
+// Entity Event System
+
+// void                    Entity_ProcessEventQueue();
+//
+// // Fire an event (Server Only, Event's will be networked to the client)
+// // We also pass in the component name to avoid event name clashing
+// void                    Entity_FireEvent( Entity sEntity, std::string_view sComponent, std::string_view sName, void* spData = nullptr );
+//
+// // Add a listener to listen for an event
+// // If CH_ENT_INVALID is passed in, it will listen globally for this event
+// // If an entity is passed in, it will only listen for events from that entity
+// // We also pass in the component name to avoid event name clashing
+// Handle                  Entity_AddEventListener( Entity sEntity, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+//
+// // Same as above, but with an entity name
+// Handle                  Entity_AddEventListener( std::string_view sEntityName, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+//
+// // how tf will this work, will AddEventListener return a handle? idfk
+// void                    Entity_RemoveEventListener( Handle sListenerHandle );
+
 
 inline void*  Ent_AddComponent( Entity sEnt, const char* spName )
 {
-	return GetEntitySystem()->AddComponent( sEnt, spName );
+	return Entity_AddComponent( sEnt, spName );
 }
 
 template< typename T >
 inline T* Ent_AddComponent( Entity sEnt, const char* spName )
 {
-	return ch_pointer_cast< T >( GetEntitySystem()->AddComponent( sEnt, spName ) );
+	return ch_pointer_cast< T >( Entity_AddComponent( sEnt, spName ) );
 }
 
 
 inline void* Ent_GetComponent( Entity sEnt, const char* spName )
 {
-	return GetEntitySystem()->GetComponent( sEnt, spName );
+	return Entity_GetComponent( sEnt, spName );
 }
 
 // Gets a component and static cast's it to the desired type
 template< typename T >
 inline T* Ent_GetComponent( Entity sEnt, const char* spName )
 {
-	return ch_pointer_cast< T >( GetEntitySystem()->GetComponent( sEnt, spName ) );
-}
-
-// Gets a component system by type_hash()
-template< typename T >
-inline T* Ent_GetSystem()
-{
-	return ch_pointer_cast< T >( GetEntitySystem()->GetSystem< T >() );
+	return ch_pointer_cast< T >( Entity_GetComponent( sEnt, spName ) );
 }
 
 
@@ -1355,7 +1314,7 @@ struct CHealth
 
 
 // convinence
-// inline auto &GetDirection( Entity ent ) { return GetEntitySystem()->GetComponent< CDirection >( ent ); }
+// inline auto &GetDirection( Entity ent ) { return Entity_GetComponent< CDirection >( ent ); }
 
 
 // Helper Macros

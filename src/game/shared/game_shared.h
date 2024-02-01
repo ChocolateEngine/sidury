@@ -30,6 +30,8 @@ EXT_CVAR_FLAG( CVARF_REPLICATED );
 
 
 #if CH_CLIENT
+	#define CH_MODULE_NAME "Client"
+
 	#define GAME_CONCMD( name )                                           \
 		void       name##_func( const std::vector< std::string >& args ); \
 		ConCommand name##_cmd( "cl_" #name, name##_func );                \
@@ -50,6 +52,8 @@ EXT_CVAR_FLAG( CVARF_REPLICATED );
 		ConCommand name##_cmd( "cl_" #name, name, __VA_ARGS__, func ); \
 		void       name( const std::vector< std::string >& args )
 #else
+	#define CH_MODULE_NAME "Server"
+
 	#define GAME_CONCMD( name ) \
 		void       name##_func( const std::vector< std::string >& args ); \
 		ConCommand name##_cmd( "sv_" #name, name##_func );                \

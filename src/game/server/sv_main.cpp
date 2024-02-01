@@ -166,7 +166,7 @@ void SV_Update( float frameTime )
 		if ( client.aState == ESV_ClientState_Disconnected )
 		{
 			// Remove their player entity
-			GetEntitySystem()->DeleteEntity( client.aEntity );
+			Entity_DeleteEntity( client.aEntity );
 
 			// Remove this client from the list
 			SV_FreeClient( client );
@@ -217,7 +217,7 @@ void SV_Update( float frameTime )
 	}
 
 	// Update Entity and Component States after everything is processed
-	GetEntitySystem()->UpdateStates();
+	Entity_UpdateStates();
 
 	// if ( Game_IsClient() )
 	{
@@ -234,7 +234,7 @@ void SV_GameUpdate( float frameTime )
 {
 	PROF_SCOPE();
 
-	GetEntitySystem()->InitCreatedComponents();
+	Entity_InitCreatedComponents();
 
 	MapManager_Update();
 
@@ -242,7 +242,7 @@ void SV_GameUpdate( float frameTime )
 
 	Phys_Simulate( GetPhysEnv(), frameTime );
 
-	GetEntitySystem()->UpdateSystems();
+	Entity_UpdateSystems();
 
 	// Update player positions after physics simulation
 	// NOTE: This probably needs to be done for everything with physics
@@ -459,14 +459,14 @@ bool SV_BuildServerMsg( flatbuffers::FlatBufferBuilder& srBuilder, EMsgSrc_Serve
 		}
 		case EMsgSrc_Server_EntityList:
 		{
-			GetEntitySystem()->WriteEntityUpdates( messageBuilder );
+			Entity_WriteEntityUpdates( messageBuilder );
 			wroteData = true;
 			//Log_DevF( gLC_Server, 2, "Sending ENTITY_LIST to Clients\n" );
 			break;
 		}
 		case EMsgSrc_Server_ComponentList:
 		{
-			GetEntitySystem()->WriteComponentUpdates( messageBuilder, sFullUpdate );
+			Entity_WriteComponentUpdates( messageBuilder, sFullUpdate );
 			wroteData = true;
 			//Log_DevF( gLC_Server, 2, "Sending COMPONENT_LIST to Clients\n" );
 			break;
@@ -751,12 +751,12 @@ void SV_ProcessClientMsg( SV_Client_t& srClient, const MsgSrc_Client* spMessage 
 				if ( srClient.aState == ESV_ClientState_WaitForClientInfo )
 				{
 					// Add the playerInfo Component
-					void* playerInfo = GetEntitySystem()->AddComponent( srClient.aEntity, "playerInfo" );
+					void* playerInfo = Entity_AddComponent( srClient.aEntity, "playerInfo" );
 
 					if ( playerInfo == nullptr )
 					{
 						Log_ErrorF( gLC_Server, "Failed to Connect Client - Failed to create a playerInfo component: \"%s\"\n", Net_AddrToString( srClient.aAddr ) );
-						GetEntitySystem()->DeleteEntity( srClient.aEntity );
+						Entity_DeleteEntity( srClient.aEntity );
 						srClient.aState = ESV_ClientState_Disconnected;
 						return;
 					}
@@ -930,7 +930,7 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	}
 
 	// Make an entity for them
-	Entity      entity  = GetEntitySystem()->CreateEntity();
+	Entity      entity  = Entity_CreateEntity();
 
 	if ( entity == CH_ENT_INVALID )
 	{
@@ -944,7 +944,7 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	if ( !client )
 	{
 		Log_ErrorF( gLC_Server, "Failed to Connect Client - At Max Players Limit: \"%s\"\n", Net_AddrToString( srAddr ) );
-		GetEntitySystem()->DeleteEntity( entity );
+		Entity_DeleteEntity( entity );
 		return;
 	}
 
@@ -952,18 +952,15 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 	client->aState  = ESV_ClientState_WaitForClientInfo;
 	client->aEntity = entity;
 
-	// Don't try to save the player in the map
-	GetEntitySystem()->SetAllowSavingToMap( entity, false );
-
 	Log_MsgF( gLC_Server, "Connecting Client: \"%s\"\n", Net_AddrToString( srAddr ) );
 
 	// Add the playerInfo Component
-	// void* playerInfo = GetEntitySystem()->AddComponent( entity, "playerInfo" );
+	// void* playerInfo = Entity_AddComponent( entity, "playerInfo" );
 	// 
 	// if ( playerInfo == nullptr )
 	// {
 	// 	Log_MsgF( gLC_Server, "Failed to Connect Client - Failed to create a playerInfo component: \"%s\"\n", Net_AddrToString( srAddr ) );
-	// 	GetEntitySystem()->DeleteEntity( entity );
+	// 	Entity_DeleteEntity( entity );
 	// 	client->aState = ESV_ClientState_Disconnected;
 	// 	return;
 	// }

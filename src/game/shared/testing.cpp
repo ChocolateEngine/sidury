@@ -149,7 +149,7 @@ class ProtogenSystem : public IEntityComponentSystem
 		aTurnMap.erase( sEntity );
 		aLookMap.erase( sEntity );
 
-		// GetEntitySystem()->RemoveComponent( sEntity, "renderable" );
+		// Entity_RemoveComponent( sEntity, "renderable" );
 #endif
 	}
 
@@ -196,7 +196,7 @@ void CreateProtogen_f( const std::string& path )
 	if ( !player )
 		return;
 
-	Entity proto = GetEntitySystem()->CreateEntity();
+	Entity proto = Entity_CreateEntity();
 
 	Ent_AddComponent( proto, "protogen" );
 
@@ -221,13 +221,13 @@ void CreateProtogen_f( const std::string& path )
 void CreateModelEntity( const std::string& path )
 {
 #if 0
-	Entity physEnt = GetEntitySystem()->CreateEntity();
+	Entity physEnt = Entity_CreateEntity();
 
 	Model* model   = graphics->LoadModel( path );
-	GetEntitySystem()->AddComponent< Model* >( physEnt, model );
-	Transform& transform = GetEntitySystem()->AddComponent< Transform >( physEnt );
+	Entity_AddComponent< Model* >( physEnt, model );
+	Transform& transform = Entity_AddComponent< Transform >( physEnt );
 
-	Transform& playerTransform = GetEntitySystem()->GetComponent< Transform >( game->aLocalPlayer );
+	Transform& playerTransform = Entity_GetComponent< Transform >( game->aLocalPlayer );
 	transform = playerTransform;
 
 	g_staticEnts.push_back( physEnt );
@@ -237,11 +237,11 @@ void CreateModelEntity( const std::string& path )
 void CreatePhysEntity( const std::string& path )
 {
 #if 0
-	Entity         physEnt    = GetEntitySystem()->CreateEntity();
+	Entity         physEnt    = Entity_CreateEntity();
 
 	Handle         model      = graphics->LoadModel( path );
 
-	CRenderable_t& renderComp = GetEntitySystem()->AddComponent< CRenderable_t >( physEnt );
+	CRenderable_t& renderComp = Entity_AddComponent< CRenderable_t >( physEnt );
 	renderComp.aHandle        = graphics->CreateRenderable( model );
 
 	PhysicsShapeInfo shapeInfo( PhysShapeType::Convex );
@@ -256,7 +256,7 @@ void CreatePhysEntity( const std::string& path )
 		return;
 	}
 
-	Transform&        transform = GetEntitySystem()->GetComponent< Transform >( gLocalPlayer );
+	Transform&        transform = Entity_GetComponent< Transform >( gLocalPlayer );
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aPos         = transform.aPos;  // NOTE: THIS IS THE CENTER OF MASS
@@ -270,8 +270,8 @@ void CreatePhysEntity( const std::string& path )
 
 	Phys_SetMaxVelocities( phys );
 
-	GetEntitySystem()->AddComponent< IPhysicsShape* >( physEnt, shape );
-	GetEntitySystem()->AddComponent< IPhysicsObject* >( physEnt, phys );
+	Entity_AddComponent< IPhysicsShape* >( physEnt, shape );
+	Entity_AddComponent< IPhysicsObject* >( physEnt, phys );
 
 	g_otherEnts.push_back( physEnt );
 #endif
@@ -316,9 +316,9 @@ CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 	// while ( GetProtogenSys()->aEntities.size() )
 	for ( auto& proto : GetProtogenSys()->aEntities )
 	{
-		// graphics->FreeModel( GetEntitySystem()->GetComponent< Model* >( proto ) );
-		// graphics->FreeRenderable( GetEntitySystem()->GetComponent< CRenderable_t >( proto ).aHandle );
-		GetEntitySystem()->DeleteEntity( proto );
+		// graphics->FreeModel( Entity_GetComponent< Model* >( proto ) );
+		// graphics->FreeRenderable( Entity_GetComponent< CRenderable_t >( proto ).aHandle );
+		Entity_DeleteEntity( proto );
 	}
 }
 
@@ -428,17 +428,17 @@ void TEST_EntUpdate()
 	// blech
 	for ( auto& ent : g_otherEnts )
 	{
-		CRenderable_t& renderComp = GetEntitySystem()->GetComponent< CRenderable_t >( ent );
+		CRenderable_t& renderComp = Entity_GetComponent< CRenderable_t >( ent );
 
 		if ( Renderable_t* renderable = graphics->GetRenderableData( renderComp.aHandle ) )
 		{
 			if ( renderable->aModel == InvalidHandle )
 				continue;
 
-			// Model *physObjList = &GetEntitySystem()->GetComponent< Model >( ent );
+			// Model *physObjList = &Entity_GetComponent< Model >( ent );
 
-			// Transform& transform = GetEntitySystem()->GetComponent< Transform >( ent );
-			IPhysicsObject* phys = GetEntitySystem()->GetComponent< IPhysicsObject* >( ent );
+			// Transform& transform = Entity_GetComponent< Transform >( ent );
+			IPhysicsObject* phys = Entity_GetComponent< IPhysicsObject* >( ent );
 
 			if ( !phys )
 				continue;
@@ -479,8 +479,8 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 	// also could thread this as a test
 	for ( auto& proto : lookData->aProtos )
 	{
-		DefaultRenderable* renderable = (DefaultRenderable*)GetEntitySystem()->GetComponent< RenderableHandle_t >( proto );
-		auto& protoTransform = GetEntitySystem()->GetComponent< Transform >( proto );
+		DefaultRenderable* renderable = (DefaultRenderable*)Entity_GetComponent< RenderableHandle_t >( proto );
+		auto& protoTransform = Entity_GetComponent< Transform >( proto );
 
 		bool matrixChanged = false;
 
@@ -579,7 +579,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 
 		if ( renderData )
 		{
-			GetEntitySystem()->GetWorldMatrix( renderData->aModelMatrix, proto );
+			Entity_GetWorldMatrix( renderData->aModelMatrix, proto );
 			graphics->UpdateRenderableAABB( renderComp->aRenderable );
 		}
 
@@ -636,10 +636,10 @@ void TEST_SV_UpdateProtos( float frameTime )
 				protoLook.aLookTarget = 0;
 
 				// Don't look at yourself or the world, only pick the world if there are no other entities to pick
-				if ( GetEntitySystem()->GetEntityCount() > 2 )
+				if ( Entity_GetEntityCount() > 2 )
 				{
 					while ( protoLook.aLookTarget == 0 || protoLook.aLookTarget == proto )
-						protoLook.aLookTarget = RandomInt( 0, GetEntitySystem()->GetEntityCount() - 1 );
+						protoLook.aLookTarget = RandomInt( 0, Entity_GetEntityCount() - 1 );
 				}
 			}
 			else
@@ -783,9 +783,6 @@ constexpr const char* SND_TEST_PATH = "sound/fiery_no_ext.ogg";
 
 static void cmd_sound_test( const std::string& srPath, bool sServer )
 {
-	if ( !GetEntitySystem() )
-		return;
-
 #if CH_CLIENT
 	if ( !audio )
 		return;
@@ -796,7 +793,7 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 		return;
 #endif
 
-	Entity soundEnt = GetEntitySystem()->CreateEntity( !sServer );
+	Entity soundEnt = Entity_CreateEntity( !sServer );
 
 	if ( soundEnt == CH_ENT_INVALID )
 	{
@@ -865,7 +862,7 @@ CONCMD( snd_test_cl_clear )
 			}
 		}
 
-		GetEntitySystem()->DeleteEntity( entity );
+		Entity_DeleteEntity( entity );
 	}
 
 	gAudioTestEntitiesCl.clear();
@@ -877,7 +874,7 @@ CONCMD_VA( snd_test_sv_clear, CVARF( CL_EXEC ) )
 {
 	for ( Entity entity : gAudioTestEntitiesSv )
 	{
-		GetEntitySystem()->DeleteEntity( entity );
+		Entity_DeleteEntity( entity );
 	}
 
 	gAudioTestEntitiesSv.clear();

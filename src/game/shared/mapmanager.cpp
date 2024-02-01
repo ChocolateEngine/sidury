@@ -47,7 +47,7 @@ void MapManager_CloseMap()
 
 	for ( Entity entity : gpMap->aMapEntities )
 	{
-		GetEntitySystem()->DeleteEntity( entity );
+		Entity_DeleteEntity( entity );
 	}
 	
 	gpMap->aMapEntities.clear();
@@ -90,7 +90,7 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 		return false;
 	}
 
-	Entity skyboxEnt = GetEntitySystem()->CreateEntity();
+	Entity skyboxEnt = Entity_CreateEntity();
 	
 	if ( skyboxEnt == CH_ENT_INVALID )
 	{
@@ -105,7 +105,7 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 	skybox->aMaterialPath = mapInfo->skybox;
 
 #if CH_SERVER
-	Entity playerSpawnEnt = GetEntitySystem()->CreateEntity( false );
+	Entity playerSpawnEnt = Entity_CreateEntity( false );
 
 	if ( playerSpawnEnt == CH_ENT_INVALID )
 	{
@@ -130,6 +130,7 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 }
 
 
+#if 0
 bool MapManager_ReadMapHeader( const std::vector< char >& srMapData )
 {
 	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
@@ -220,7 +221,7 @@ void MapManager_ReadCommand( const SMF_Command* spCommand )
 			// the server will send this data to us
 #if CH_SERVER
 			if ( auto msg = Map_GetCommandData< NetMsg_EntityUpdates >( spCommand, cmdVerify ) )
-				GetEntitySystem()->ReadEntityUpdates( msg );
+				Entity_ReadEntityUpdates( msg );
 #endif
 			break;
 		}
@@ -230,7 +231,7 @@ void MapManager_ReadCommand( const SMF_Command* spCommand )
 			// IDEA: for reading multiple maps to stream in, maybe have an option to insert our own entity translation table?
 			// This would be so the translation table doesn't conflict with the previous map
 			if ( auto msg = Map_GetCommandData< NetMsg_ComponentUpdates >( spCommand, cmdVerify ) )
-				GetEntitySystem()->ReadComponentUpdates( msg );
+				Entity_ReadComponentUpdates( msg );
 #endif
 			break;
 		}
@@ -266,13 +267,13 @@ void MapManager_BuildCommand( fb::FlatBufferBuilder& srBuilder, std::vector< fb:
 		}
 		case ESMF_Command_EntityList:
 		{
-			GetEntitySystem()->WriteEntityUpdates( messageBuilder, true );
+			Entity_WriteEntityUpdates( messageBuilder );
 			wroteData = true;
 			break;
 		}
 		case ESMF_Command_ComponentList:
 		{
-			GetEntitySystem()->WriteComponentUpdates( messageBuilder, true, true );
+			Entity_WriteComponentUpdates( messageBuilder, true );
 			wroteData = true;
 			break;
 		}
@@ -299,6 +300,7 @@ void MapManager_BuildCommand( fb::FlatBufferBuilder& srBuilder, std::vector< fb:
 	srBuilder.Finish( offset );
 	srCommandsBuilt.push_back( offset );
 }
+#endif
 
 
 bool MapManager_LoadMap( const std::string &path )
@@ -326,6 +328,7 @@ bool MapManager_LoadMap( const std::string &path )
 	// ======================================================
 	// Reading the new Map Format
 
+#if 0
 	std::string mapDataPath = FileSys_FindFile( absPath + "/mapData.smf" );
 
 	if ( mapDataPath.empty() )
@@ -376,12 +379,13 @@ bool MapManager_LoadMap( const std::string &path )
 	// After all entities are parsed, copy them into the SiduryMap structure
 	gpMap               = new SiduryMap;
 	gpMap->aMapPath     = path;
-	gpMap->aMapEntities.reserve( GetEntitySystem()->aEntityFlags.size() );
+	gpMap->aMapEntities.reserve( EntSysData().aEntityFlags.size() );
 
-	for ( auto& [ entity, flags ] : GetEntitySystem()->aEntityFlags )
+	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
 		gpMap->aMapEntities.push_back( entity );
 
 	return true;
+#endif
 }
 
 
@@ -391,6 +395,7 @@ SiduryMap* MapManager_CreateMap()
 }
 
 
+#if 0
 void MapManager_WriteMap( const std::string& srPath )
 {
 	// Must be in a map to save it
@@ -463,6 +468,7 @@ void MapManager_WriteMap( const std::string& srPath )
 	{
 	}
 }
+#endif
 
 
 bool MapManager_HasMap()
@@ -491,7 +497,7 @@ std::string_view MapManager_GetMapPath()
 
 bool MapManager_LoadWorldModel()
 {
-	Entity worldEntity = GetEntitySystem()->CreateEntity();
+	Entity worldEntity = Entity_CreateEntity();
 
 	if ( worldEntity == CH_ENT_INVALID )
 	{

@@ -114,25 +114,25 @@ CH_STRUCT_REGISTER_COMPONENT( CPhysObject, physObject, EEntComponentNetType_Both
 	// 
 	// // example
 	// CPhysObjectEvent_OnContactStart onContactStartData{};
-	// GetEntitySystem()->FireEvent( physObject, "ContactStart", onContactStartData );
+	// Entity_FireEvent( physObject, "ContactStart", onContactStartData );
 	// 
 	// // Event Firing Example
 	// CPlayerUse_Event_t* onUseEvent = new CPlayerUse_Event_t;
 	// onUseEvent->aPos               = PLAYER_VIEW_POS;
 	// onUseEvent->aAng               = PLAYER_VIEW_ANG;
 	// 
-	// GetEntitySystem()->FireEvent( playerEntity, "playerUse", "Use", onUseEvent );
+	// Entity_FireEvent( playerEntity, "playerUse", "Use", onUseEvent );
 	// 
 	// // somewhere else (thinking of having the component name here to avoid event name clashing)
-	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "ContactStart", CallbackFunction );
-	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction2 );
+	// Entity_AddEventListener( physObjectEnt, "physObject", "ContactStart", CallbackFunction );
+	// Entity_AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction2 );
 	// 
 	// 
 	// // On a renderable component
-	// GetEntitySystem()->AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction );
+	// Entity_AddEventListener( physObjectEnt, "physObject", "TransformUpdated", CallbackFunction );
 	// 
 	// // On a physics component - pass in CH_ENT_INVALID to listen for this event on all entities
-	// GetEntitySystem()->AddEventListener( CH_ENT_INVALID, "playerUse", "Use", CallbackFunction );
+	// Entity_AddEventListener( CH_ENT_INVALID, "playerUse", "Use", CallbackFunction );
 
 	
 
@@ -951,7 +951,7 @@ IPhysicsShape* Phys_CreateShape( Entity sEntity, PhysicsShapeInfo& srShapeInfo )
 	}
 
 	// Attach it to the Entity
-	auto shapeWrapper     = static_cast< CPhysShape* >( GetEntitySystem()->AddComponent( sEntity, "physShape" ) );
+	auto shapeWrapper     = static_cast< CPhysShape* >( Entity_AddComponent( sEntity, "physShape" ) );
 	shapeWrapper->apShape = shape;
 	shapeWrapper->aBounds = srShapeInfo.aBounds;
 
@@ -985,7 +985,7 @@ CPhysObject* Phys_CreateObject( Entity sEntity, IPhysicsShape* spShape, PhysicsO
 		return nullptr;
 	}
 
-	CPhysObject* objWrapper         = static_cast< CPhysObject* >( GetEntitySystem()->AddComponent( sEntity, "physObject" ) );
+	CPhysObject* objWrapper         = static_cast< CPhysObject* >( Entity_AddComponent( sEntity, "physObject" ) );
 	objWrapper->apObj               = object;
 
 	objWrapper->aStartActive        = srObjectInfo.aStartActive;

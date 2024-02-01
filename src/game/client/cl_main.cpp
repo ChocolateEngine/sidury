@@ -287,8 +287,8 @@ void CL_Update( float frameTime )
 	}
 
 	// Update Entity and Component States
-	if ( entities )
-		entities->UpdateStates();
+	if ( EntSysData().aActive )
+		Entity_UpdateStates();
 
 	if ( CL_IsMenuShown() )
 	{
@@ -312,8 +312,8 @@ void CL_GameUpdate( float frameTime )
 		gui->DebugMessage( "CONNECTION PROBLEM - %.3f SECONDS LEFT\n", gClientTimeout );
 	}
 
-	GetEntitySystem()->InitCreatedComponents();
-	GetEntitySystem()->UpdateSystems();
+	Entity_InitCreatedComponents();
+	Entity_UpdateSystems();
 
 	GetPlayers()->UpdateLocalPlayer();
 
@@ -912,7 +912,7 @@ void CL_GetServerMessages()
 				if ( auto msg = CL_ReadMsg< NetMsg_ComponentUpdates >( msgType, msgDataVerify, msgData ) )
 				{
 					gClientWait_ComponentList = true;
-					GetEntitySystem()->ReadComponentUpdates( msg );
+					Entity_ReadComponentUpdates( msg );
 				}
 				break;
 			}
@@ -922,7 +922,7 @@ void CL_GetServerMessages()
 				if ( auto msg = CL_ReadMsg< NetMsg_EntityUpdates >( msgType, msgDataVerify, msgData ) )
 				{
 					gClientWait_EntityList = true;
-					GetEntitySystem()->ReadEntityUpdates( msg );
+					Entity_ReadEntityUpdates( msg );
 				}
 				break;
 			}
