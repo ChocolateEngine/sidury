@@ -141,7 +141,7 @@ void ReadComponent( flexb::Reference& spSrc, EntComponentData_t* spRegData, void
 
 	for ( const auto& [ offset, var ] : spRegData->aVars )
 	{
-		if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
+		if ( var.aFlags & ECompRegFlag_LocalVar )
 		{
 			curOffset += var.aSize + offset;
 			continue;
@@ -335,7 +335,7 @@ bool WriteComponent( flexb::Builder& srBuilder, EntComponentData_t* spRegData, c
 
 	for ( const auto& [ offset, var ] : spRegData->aVars )
 	{
-		if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
+		if ( var.aFlags & ECompRegFlag_LocalVar )
 			continue;
 
 		PROF_SCOPE();
@@ -720,7 +720,7 @@ void Entity_WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sF
 			{
 				for ( const auto& [ offset, var ] : regData->aVars )
 				{
-					if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
+					if ( var.aFlags & ECompRegFlag_LocalVar )
 						continue;
 
 					char* dataChar = static_cast< char* >( data );
@@ -748,7 +748,7 @@ void Entity_WriteComponentUpdates( fb::FlatBufferBuilder& srRootBuilder, bool sF
 
 			NetMsg_ComponentUpdateBuilder compUpdate( srRootBuilder );
 			compUpdate.add_name( compNameOffset );
-			compUpdate.add_hash( regData->aHash );
+			// compUpdate.add_hash( regData->aHash );
 
 			//if ( wroteData )
 				compUpdate.add_components( compVector );
@@ -809,7 +809,7 @@ void Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
 			// Reset Component Var Dirty Values
 			for ( const auto& [ offset, var ] : regData->aVars )
 			{
-				if ( !( var.aFlags & ECompRegFlag_IsNetVar ) )
+				if ( var.aFlags & ECompRegFlag_LocalVar )
 					continue;
 
 				char* dataChar = static_cast< char* >( componentData );
@@ -857,12 +857,12 @@ void Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
 
 		CH_ASSERT_MSG( regData, "Failed to find component registry data" );
 
-		if ( componentUpdate->hash() != regData->aHash )
-		{
-			Log_ErrorF( "Hash of component \"%s\" differs from what we have (got %zd, expected %zd)\n",
-				componentName.data(), componentUpdate->hash(), regData->aHash );
-			continue;
-		}
+		// if ( componentUpdate->hash() != regData->aHash )
+		// {
+		// 	Log_ErrorF( "Hash of component \"%s\" differs from what we have (got %zd, expected %zd)\n",
+		// 		componentName.data(), componentUpdate->hash(), regData->aHash );
+		// 	continue;
+		// }
 
 		for ( size_t c = 0; c < componentUpdate->components()->size(); c++ )
 		{

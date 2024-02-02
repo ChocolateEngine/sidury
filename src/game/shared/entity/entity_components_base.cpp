@@ -31,7 +31,7 @@ void Ent_RegisterVarHandlers()
 
 CH_STRUCT_REGISTER_COMPONENT( CRigidBody, rigidBody, EEntComponentNetType_Both, ECompRegFlag_None )
 {
-	EntComp_RegisterComponentVarEx< TYPE, glm::vec3 >( EEntNetField_Vec3, "vel", offsetof( TYPE, aVel ), typeid( TYPE::aVel ).hash_code(), ECompRegFlag_None );
+	EntComp_RegisterComponentVarEx< TYPE, glm::vec3 >( EEntNetField_Vec3, "vel", offsetof( TYPE, aVel ), ECompRegFlag_None );
 
 	//CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aVel, vel, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aAccel, accel, ECompRegFlag_None );
@@ -133,9 +133,9 @@ void Ent_RegisterBaseComponents()
 	  [ & ]( void* spData )
 	  { delete (CTransform*)spData; } );
 
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "pos", offsetof( CTransform, aPos ), typeid( CTransform::aPos ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "ang", offsetof( CTransform, aAng ), typeid( CTransform::aAng ).hash_code() );
-	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "scale", offsetof( CTransform, aScale ), typeid( CTransform::aScale ).hash_code() );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "pos", offsetof( CTransform, aPos ), 0 );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "ang", offsetof( CTransform, aAng ), 0 );
+	EntComp_RegisterComponentVar< CTransform, glm::vec3 >( "scale", offsetof( CTransform, aScale ), 0 );
 	CH_REGISTER_COMPONENT_SYS( CTransform, EntSys_Transform, gEntSys_Transform );
 
 	// CH_REGISTER_COMPONENT_RW( CRigidBody, rigidBody, true );
@@ -156,7 +156,7 @@ void Ent_RegisterBaseComponents()
 	CH_REGISTER_COMPONENT_RW( CCamera, camera, ECompRegFlag_DontOverrideClient );
 	CH_REGISTER_COMPONENT_VAR( CCamera, float, aFov, fov, true );
 	
-	CH_REGISTER_COMPONENT_FL( CMap, map, EEntComponentNetType_Both, ECompRegFlag_None );
+	// CH_REGISTER_COMPONENT_FL( CMap, map, EEntComponentNetType_Both, ECompRegFlag_None );
 }
 
 

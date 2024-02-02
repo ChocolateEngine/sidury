@@ -335,12 +335,6 @@ std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNe
 }
 
 
-void EntComp_RunRegisterCallbacks( const char* spName )
-{
-	Entity_CreateComponentPool( spName );
-}
-
-
 // ===================================================================================
 // Entity System
 // ===================================================================================
@@ -497,7 +491,7 @@ void Entity_CreateComponentPool( const char* spName )
 
 	if ( pool->apComponentSystem )
 	{
-		pool->apComponentSystem->apPool                                                = pool;
+		pool->apComponentSystem->apPool                                                 = pool;
 		EntSysData().aComponentSystems[ typeid( pool->apComponentSystem ).hash_code() ] = pool->apComponentSystem;
 	}
 	else
@@ -988,6 +982,8 @@ EntityComponentPool* Entity_GetComponentPool( std::string_view spName )
 }
 
 
+// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
+// This is needed for client/server networking, the entity id on each end will be different, so we convert the id
 Entity Entity_TranslateEntityID( Entity sEntity, bool sCreate )
 {
 	PROF_SCOPE();

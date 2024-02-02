@@ -99,7 +99,7 @@ using FEntComp_VarWrite     = bool( flexb::Builder& srBuilder, EntComponentData_
 using FEntSys_EventListener = void( Entity sEntity, void* spData );
 
 
-// TODO: Rename this to EEntNetField
+// TODO: What is the purpose of this again?
 enum EEntNetField : u8
 {
 	EEntNetField_Invalid,
@@ -192,7 +192,7 @@ enum ECompRegFlag_ : ECompRegFlag
 	ECompRegFlag_DontOverrideClient = ( 1 << 0 ),
 
 	// This variable is a network variable
-	ECompRegFlag_IsNetVar           = ( 1 << 1 ),
+	ECompRegFlag_LocalVar           = ( 1 << 1 ),
 };
 
 
@@ -210,7 +210,6 @@ struct EntComponentVarData_t
 	EEntNetField aType;
 	ECompRegFlag aFlags;
 	size_t       aSize;
-	size_t       aHash;
 	const char*  apName;
 	size_t       aNameLen;
 };
@@ -221,7 +220,6 @@ struct EntComponentVarNetData_t
 	EEntNetField aType;
 	ECompRegFlag aFlags;
 	size_t       aSize;
-	size_t       aHash;
 	const char*  apName;
 	size_t       aNameLen;
 };
@@ -242,9 +240,6 @@ struct EntComponentData_t
 	std::map< size_t, EntComponentVarData_t > aVars;
 
 	size_t                                    aSize;
-
-	// // auto generated hash of all variables in a component, useful for checking for version changes in maps
-	size_t                                    aHash;
 
 	ECompRegFlag                              aFlags;
 	EEntComponentNetType                      aNetType;
@@ -294,13 +289,9 @@ const char* EntComp_VarTypeToStr( EEntNetField sVarType );
 std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType );
 std::string EntComp_GetStrValueOfVarOffset( size_t sOffset, void* spData, EEntNetField sVarType );
 
-// void        EntComp_AddRegisterCallback( FEntComp_Register* spFunc );
-// void        EntComp_RemoveRegisterCallback( FEntComp_Register* spFunc );
-void        EntComp_AddRegisterCallback( EntitySystem* spSystem );
-void        EntComp_RemoveRegisterCallback( EntitySystem* spSystem );
-void        EntComp_RunRegisterCallbacks( const char* spName );
-
 void        Ent_RegisterBaseComponents();
+
+void        Entity_CreateComponentPool( const char* spName );
 
 
 template< typename T >
@@ -336,8 +327,7 @@ inline void EntComp_RegisterComponent(
 
 	GetEntComponentRegistry().aComponentNames[ spName ] = &data;
 
-	// Run Callbacks
-	EntComp_RunRegisterCallbacks( spName );
+	Entity_CreateComponentPool( spName );
 }
 
 
@@ -360,7 +350,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 
 
 template< typename COMPONENT_TYPE, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, size_t sVarHash, ECompRegFlag sFlags = 0 )
+inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* spName, size_t sOffset, ECompRegFlag sFlags = 0 )
 {
 	CH_ASSERT( spName );
 
@@ -391,21 +381,13 @@ inline void EntComp_RegisterComponentVarEx( EEntNetField sVarType, const char* s
 	varData.aSize                  = sizeof( VAR_TYPE );
 	varData.aType                  = sVarType;
 	varData.aFlags                 = sFlags;
-	varData.aHash                  = sVarHash;
-
-	// Assert( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() );
-
-	if ( sVarHash == typeid( ComponentNetVar< VAR_TYPE > ).hash_code() )
-	{
-		varData.aFlags |= ECompRegFlag_IsNetVar;
-	}
 
 	// TODO: really should have this be done once, but im not adding a new function for this to add to every single component
-	data.aHash = 0;
-	for ( const auto& [ offset, var ] : data.aVars )
-	{
-		data.aHash ^= varData.aHash;
-	}
+	// data.aHash = 0;
+	// for ( const auto& [ offset, var ] : data.aVars )
+	// {
+	// 	data.aHash ^= varData.aHash;
+	// }
 }
 
 
@@ -454,7 +436,7 @@ inline void EntComp_RegisterComponentVarEx2( EEntNetField sVarType, const char* 
 
 
 template< typename COMPONENT_TYPE, typename VAR_TYPE >
-inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, size_t sVarHash, ECompRegFlag sFlags = 0 )
+inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, ECompRegFlag sFlags = 0 )
 {
 	// Get Var Type
 	size_t varTypeHash = typeid( VAR_TYPE ).hash_code();
@@ -466,7 +448,7 @@ inline void EntComp_RegisterComponentVar( const char* spName, size_t sOffset, si
 		return;
 	}
 
-	EntComp_RegisterComponentVarEx< COMPONENT_TYPE, VAR_TYPE >( findEnum->second, spName, sOffset, sVarHash, sFlags );
+	EntComp_RegisterComponentVarEx< COMPONENT_TYPE, VAR_TYPE >( findEnum->second, spName, sOffset, sFlags );
 }
 
 
@@ -812,6 +794,8 @@ bool                    Entity_IsNetworked( Entity sEntity, EEntityFlag sFlags )
 // Get the Component Pool for this Component
 EntityComponentPool*    Entity_GetComponentPool( std::string_view sName );
 
+// Used for converting a sent entity ID to what it actually is on the recieving end, so no conflicts occur
+// This is needed for client/server networking, the entity id on each end will be different, so we convert the id
 Entity                  Entity_TranslateEntityID( Entity sEntity, bool sCreate = false );
 
 // ---------------------------------------------------------
@@ -1338,10 +1322,10 @@ struct CHealth
 
 
 #define CH_REGISTER_COMPONENT_VAR( type, varType, varName, varStr, flags ) \
-  EntComp_RegisterComponentVar< type, varType >( #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code(), flags )
+  EntComp_RegisterComponentVar< type, varType >( #varStr, offsetof( type, varName ), flags )
 
 #define CH_REGISTER_COMPONENT_VAR_EX( type, netVarType, varType, varName, varStr, flags ) \
-  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varStr, offsetof( type, varName ), typeid( type::varName ).hash_code(), flags )
+  EntComp_RegisterComponentVarEx< type, varType >( netVarType, #varStr, offsetof( type, varName ), flags )
 
 
 //define CH_REGISTER_COMPONENT_VAR_EX( type, varType, varName, varStr ) \
@@ -1390,7 +1374,7 @@ struct CHealth
 
 
 #define CH_REGISTER_COMPONENT_VAR2( compVarType, varType, varName, varStr, flags ) \
-  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), typeid( TYPE::varName ).hash_code(), flags )
+  EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), flags )
 
 #define CH_REGISTER_COMPONENT_SYS2( systemClass, systemVar ) \
 	EntComp_RegisterComponentSystem< TYPE >( [ & ]() { \

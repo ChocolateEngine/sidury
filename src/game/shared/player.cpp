@@ -262,6 +262,15 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, EEntComponentNetT
 }
 
 
+CH_STRUCT_REGISTER_COMPONENT( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None )
+{
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
+
+	CH_REGISTER_COMPONENT_SYS2( PlayerManager, players );
+}
+
+
 #if CH_SERVER
 CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Server, ECompRegFlag_None )
 {
@@ -272,12 +281,11 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Se
 
 void PlayerManager::RegisterComponents()
 {
-	CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_SYS( CPlayerInfo, PlayerManager, players );
-	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_None );  // don't mess with this
+	// CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None );
+	// // CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
+	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
+	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_None );  // don't mess with this
 
 	CH_REGISTER_COMPONENT_RW( CPlayerZoom, playerZoom, ECompRegFlag_DontOverrideClient );
 	CH_REGISTER_COMPONENT_VAR( CPlayerZoom, float, aOrigFov, origFov, ECompRegFlag_None );
@@ -923,6 +931,7 @@ void CalcZoom( CCamera* camera, Entity player )
 	CH_ASSERT( zoom );
 
 	// If we have a usercmd to process on either client or server, process it
+#if 0
 	if ( userCmd )
 	{
 		if ( zoom->aOrigFov != r_fov.GetFloat() )
@@ -981,6 +990,10 @@ void CalcZoom( CCamera* camera, Entity player )
 			zoom->aNewFov = std::lerp( zoom->aZoomChangeFov, lerpTarget, timeCurve );
 		}
 	}
+#else
+	zoom->aOrigFov = r_fov.GetFloat();
+	zoom->aNewFov  = r_fov.GetFloat();
+#endif
 
 #if CH_CLIENT
 	if ( player == gLocalPlayer )
