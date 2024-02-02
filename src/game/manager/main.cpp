@@ -297,6 +297,9 @@ extern "C"
 
 		IMGUI_CHECKVERSION();
 
+		if ( gDedicatedServer )
+			Con_SetDefaultArchive( "cfg" PATH_SEP_STR "config_dedicated.cfg", "cfg" PATH_SEP_STR "config_dedicated_default.cfg" );
+
 #if CH_USE_MIMALLOC
 		Log_DevF( 1, "Using mimalloc version %d\n", mi_version() );
 #endif
