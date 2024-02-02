@@ -191,7 +191,7 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 
 	char name[ 512 ] = {};
 
-	strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
+	strcat( name, ".." CH_PATH_SEP_STR );
 	strcat( name, spGameName );
 	strcat( name, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER CH_PATH_SEP_STR );
 	strcat( name, spModuleName );

@@ -394,9 +394,9 @@ int Net_Read( Socket_t sSocket, char* spData, int sLen, ch_sockaddr* spFrom )
 
 
 // Write Data to a Socket
-int Net_Write( Socket_t sSocket, const char* spData, int sLen, ch_sockaddr* spAddr )
+int Net_Write( Socket_t sSocket, ch_sockaddr& srAddr, const char* spData, int sLen )
 {
-	int ret = sendto( sSocket, spData, sLen, 0, (struct sockaddr*)spAddr, sizeof( ch_sockaddr ) );
+	int ret = sendto( sSocket, spData, sLen, 0, (struct sockaddr*)&srAddr, sizeof( ch_sockaddr ) );
 
 	if ( ret == -1 )
 	{

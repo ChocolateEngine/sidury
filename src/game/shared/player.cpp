@@ -1364,7 +1364,7 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 
 	if ( !playerInfo )
 	{
-		Log_Error( "playerInfo compoment not found in " CH_FUNC_NAME_CLASS "\n" );
+		Log_ErrorF( "playerInfo compoment not found in %s\n", CH_FUNC_NAME_CLASS);
 		return;
 	}
 
