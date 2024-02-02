@@ -191,7 +191,13 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 
 	char name[ 512 ] = {};
 
+	// TODO: remove path change in core_init()
+#if _WIN32
+	strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
+#else
 	strcat( name, ".." CH_PATH_SEP_STR );
+#endif
+
 	strcat( name, spGameName );
 	strcat( name, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER CH_PATH_SEP_STR );
 	strcat( name, spModuleName );
