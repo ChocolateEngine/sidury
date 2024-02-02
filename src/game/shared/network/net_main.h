@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "flatbuffers/flatbuffers.h"
+
+
 enum ENetType : char
 {
 	ENetType_Invalid,

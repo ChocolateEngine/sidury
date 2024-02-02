@@ -1,6 +1,5 @@
 #ifdef _WIN32
 
-#include "flatbuffers/flatbuffers.h"
 #include "net_main.h"
 
 #define WIN32_LEAN_AND_MEAN
