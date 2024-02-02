@@ -238,7 +238,7 @@ void SV_GameUpdate( float frameTime )
 
 	MapManager_Update();
 
-	GetPlayers()->Update( frameTime );
+	players.Update( frameTime );
 
 	Phys_Simulate( GetPhysEnv(), frameTime );
 
@@ -246,9 +246,9 @@ void SV_GameUpdate( float frameTime )
 
 	// Update player positions after physics simulation
 	// NOTE: This probably needs to be done for everything with physics
-	for ( auto& player : GetPlayers()->aEntities )
+	for ( auto& player : players.aEntities )
 	{
-		GetPlayers()->apMove->UpdatePosition( player );
+		players.apMove->UpdatePosition( player );
 	}
 }
 
@@ -274,7 +274,7 @@ bool SV_StartServer()
 		return false;
 	}
 
-	GetPlayers()->Init();
+	players.Init();
 
 	gServerData.aActive = true;
 	return true;
@@ -887,7 +887,7 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 	Log_MsgF( gLC_Server, "Client Connected: \"%s\"\n", srClient.aName.c_str() );
 
 	// Spawn the player in!
-	GetPlayers()->Spawn( srClient.aEntity );
+	players.Spawn( srClient.aEntity );
 
 	// Tell the clients someone else connected
 	flatbuffers::FlatBufferBuilder message;

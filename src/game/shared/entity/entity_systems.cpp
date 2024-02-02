@@ -129,12 +129,11 @@ void LightSystem::Update()
 }
 
 
-LightSystem* gLightEntSystems;
+LightSystem gLightEntSystems;
 
 
-LightSystem* GetLightEntSys()
+LightSystem& GetLightEntSys()
 {
-	CH_ASSERT( gLightEntSystems );
 	return gLightEntSystems;
 }
 
@@ -236,7 +235,7 @@ void EntSys_Transform::Update()
 }
 
 
-EntSys_Transform* gEntSys_Transform;
+EntSys_Transform gEntSys_Transform;
 
 
 // ------------------------------------------------------------
@@ -336,12 +335,11 @@ void EntSys_Renderable::Update()
 }
 
 
-EntSys_Renderable* gEntSys_Renderable;
+EntSys_Renderable gEntSys_Renderable;
 
 
-EntSys_Renderable* GetRenderableEntSys()
+EntSys_Renderable& GetRenderableEntSys()
 {
-	CH_ASSERT( gEntSys_Renderable );
 	return gEntSys_Renderable;
 }
 

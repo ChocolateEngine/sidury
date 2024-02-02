@@ -32,6 +32,12 @@
 #endif
 
 
+PlayerManager players;
+
+#if CH_SERVER
+static PlayerSpawnManager playerSpawn;
+#endif
+
 constexpr float DEFAULT_SPEED = 250.f;
 
 CONVAR( sv_sprint_mult, 2.4, CVARF_DEF_SERVER_REPLICATED );
@@ -124,7 +130,7 @@ CONCMD_VA( respawn, CVARF( CL_EXEC ) )
 {
 	Entity player = SV_GetCommandClientEntity();
 
-	GetPlayers()->Respawn( player );
+	players.Respawn( player );
 }
 
 
@@ -154,14 +160,14 @@ static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 		return;
 	}
 
-	if ( !GetPlayers()->SetCurrentPlayer( sPlayer ) )
+	if ( !players.SetCurrentPlayer( sPlayer ) )
 		return;
 
 	// Toggle between the desired move type and walking
 	if ( move->aMoveType == sMoveType )
-		GetPlayers()->apMove->SetMoveType( *move, PlayerMoveType::Walk );
+		players.apMove->SetMoveType( *move, PlayerMoveType::Walk );
 	else
-		GetPlayers()->apMove->SetMoveType( *move, sMoveType );
+		players.apMove->SetMoveType( *move, sMoveType );
 }
 
 
@@ -204,20 +210,6 @@ float vec3_norm(glm::vec3& v)
 
 
 // ============================================================
-
-
-static PlayerManager*      players;
-
-#if CH_SERVER
-static PlayerSpawnManager* playerSpawn;
-#endif
-
-
-PlayerManager* GetPlayers()
-{
-	CH_ASSERT( players );
-	return players;
-}
 
 
 PlayerManager::PlayerManager()
@@ -511,7 +503,7 @@ void PlayerManager::Respawn( Entity player )
 	CH_ASSERT( physObj );
 
 #if CH_SERVER
-	Transform playerSpawnSpot = GetPlayerSpawn()->SelectSpawnTransform();
+	Transform playerSpawnSpot = playerSpawn.SelectSpawnTransform();
 
 	transform->aPos               = playerSpawnSpot.aPos;
 	transform->aAng.Edit()        = { 0, playerSpawnSpot.aAng.y, 0 };
@@ -2238,13 +2230,6 @@ Transform PlayerSpawnManager::SelectSpawnTransform()
 	spot.aAng = transform->aAng.Get();
 
 	return spot;
-}
-
-
-PlayerSpawnManager* GetPlayerSpawn()
-{
-	CH_ASSERT( playerSpawn );
-	return playerSpawn;
 }
 #endif
 

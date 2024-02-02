@@ -102,11 +102,8 @@ class EntSys_PhysObject : public IEntityComponentSystem
 };
 
 
-extern EntSys_PhysShape*  gEntSys_PhysShape;
-EntSys_PhysShape*         GetPhysShapeEntSys();
-
-extern EntSys_PhysObject* gEntSys_PhysObject;
-EntSys_PhysObject*        GetPhysObjectEntSys();
+extern EntSys_PhysShape   gEntSys_PhysShape;
+extern EntSys_PhysObject  gEntSys_PhysObject;
 
 
 IPhysicsEnvironment*      GetPhysEnv();

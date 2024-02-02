@@ -419,22 +419,8 @@ void EntSys_PhysObject::Update()
 // ==============================================================
 
 
-EntSys_PhysShape*  gEntSys_PhysShape;
-EntSys_PhysObject* gEntSys_PhysObject;
-
-
-EntSys_PhysShape* GetPhysShapeEntSys()
-{
-	CH_ASSERT( gEntSys_PhysShape );
-	return gEntSys_PhysShape;
-}
-
-
-EntSys_PhysObject* GetPhysObjectEntSys()
-{
-	CH_ASSERT( gEntSys_PhysObject );
-	return gEntSys_PhysObject;
-}
+EntSys_PhysShape  gEntSys_PhysShape;
+EntSys_PhysObject gEntSys_PhysObject;
 
 
 // ==============================================================

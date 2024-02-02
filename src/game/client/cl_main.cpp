@@ -268,7 +268,7 @@ void CL_Update( float frameTime )
 			CL_GetServerMessages();
 
 			if ( !Game_IsPaused() && input->WindowHasFocus() && !CL_IsMenuShown() )
-				GetPlayers()->DoMouseLook( gLocalPlayer );
+				players.DoMouseLook( gLocalPlayer );
 
 			CL_UpdateUserCmd();
 
@@ -280,7 +280,7 @@ void CL_Update( float frameTime )
 			// Send UserCmd
 			CL_SendUserCmd();
 
-			GetPlayers()->apMove->DisplayPlayerStats( gLocalPlayer );
+			players.apMove->DisplayPlayerStats( gLocalPlayer );
 
 			break;
 		}
@@ -315,7 +315,7 @@ void CL_GameUpdate( float frameTime )
 	Entity_InitCreatedComponents();
 	Entity_UpdateSystems();
 
-	GetPlayers()->UpdateLocalPlayer();
+	players.UpdateLocalPlayer();
 
 	if ( input->WindowHasFocus() && !CL_IsMenuShown() )
 	{
@@ -949,7 +949,7 @@ void CL_PrintStatus()
 {
 	if ( gClientState == EClientState_Connected )
 	{
-		size_t playerCount = GetPlayers()->aEntities.size();
+		size_t playerCount = players.aEntities.size();
 
 		Log_MsgF( "Connected To %s\n", Net_AddrToString( gClientAddr ) );
 

@@ -252,6 +252,7 @@ public:
 	PlayerMovement* apMove = nullptr;
 };
 
+extern PlayerManager players;
 
 #if CH_SERVER
 class PlayerSpawnManager : public IEntityComponentSystem
@@ -259,13 +260,6 @@ class PlayerSpawnManager : public IEntityComponentSystem
   public:
 	Transform SelectSpawnTransform();
 };
-#endif
-
-
-PlayerManager* GetPlayers();
-
-#if CH_SERVER
-PlayerSpawnManager* GetPlayerSpawn();
 #endif
 
 

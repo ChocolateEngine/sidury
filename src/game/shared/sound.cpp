@@ -19,14 +19,7 @@ CONVAR_CMD( snd_travel_speed, 6000 )
 }
 
 
-static EntSys_Sound* gEntSys_SoundSystem;
-
-
-EntSys_Sound* GetSoundSystem()
-{
-	CH_ASSERT( gEntSys_SoundSystem );
-	return gEntSys_SoundSystem;
-}
+static EntSys_Sound gEntSys_SoundSystem;
 
 
 CH_STRUCT_REGISTER_COMPONENT( CSound, sound, EEntComponentNetType_Both, ECompRegFlag_None )

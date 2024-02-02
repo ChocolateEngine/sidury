@@ -176,14 +176,7 @@ class ProtogenSystem : public IEntityComponentSystem
 };
 
 
-static ProtogenSystem* gProtoSystems;
-
-
-ProtogenSystem*        GetProtogenSys()
-{
-	CH_ASSERT( gProtoSystems );
-	return gProtoSystems;
-}
+static ProtogenSystem gProtoSystem;
 
 // ===========================================================================
 
@@ -313,8 +306,8 @@ CONCMD_DROP_VA( create_look_entity, model_dropdown, CVARF( CL_EXEC ) )
 
 CONCMD_VA( delete_protos, CVARF( CL_EXEC ) )
 {
-	// while ( GetProtogenSys()->aEntities.size() )
-	for ( auto& proto : GetProtogenSys()->aEntities )
+	// while ( gProtoSystem.aEntities.size() )
+	for ( auto& proto : gProtoSystem.aEntities )
 	{
 		// graphics->FreeModel( Entity_GetComponent< Model* >( proto ) );
 		// graphics->FreeRenderable( Entity_GetComponent< CRenderable_t >( proto ).aHandle );
@@ -348,7 +341,7 @@ CONCMD_VA( create_phys_ent, CVARF( CL_EXEC ) )
 void TEST_Init()
 {
 	CH_REGISTER_COMPONENT_FL( CProtogen, protogen, EEntComponentNetType_Both, ECompRegFlag_DontOverrideClient );
-	CH_REGISTER_COMPONENT_SYS( CProtogen, ProtogenSystem, gProtoSystems );
+	CH_REGISTER_COMPONENT_SYS( CProtogen, ProtogenSystem, gProtoSystem );
 
 	if ( IsSteamLoaded() )
 	{
@@ -529,7 +522,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 	PROF_SCOPE();
 
 	// TEMP
-	for ( auto& proto : GetProtogenSys()->aEntities )
+	for ( auto& proto : gProtoSystem.aEntities )
 	{
 		// auto protoTransform = Ent_GetComponent< CTransform >( proto, "transform" );
 		// 
@@ -590,7 +583,7 @@ void TEST_CL_UpdateProtos( float frameTime )
 		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
 	}
 
-	GetProtogenSys()->aUpdated.clear();
+	gProtoSystem.aUpdated.clear();
 }
 
 
@@ -621,9 +614,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 	// TODO: maybe make this into some kind of "look at player" component? idk lol
 	// also could thread this as a test
-	for ( auto& proto : GetProtogenSys()->aEntities )
+	for ( auto& proto : gProtoSystem.aEntities )
 	{
-		ProtoLookData_t& protoLook     = GetProtogenSys()->aLookMap[ proto ];
+		ProtoLookData_t& protoLook     = gProtoSystem.aLookMap[ proto ];
 		bool             targetChanged = false;
 
 		protoLook.aTimeToDuelCur += frameTime;
@@ -751,7 +744,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 
 			Util_GetMatrixDirection( protoMatrix, &modelForward, &modelRight, &modelUp );
 		
-			ProtoTurn_t& protoTurn = GetProtogenSys()->aTurnMap[ proto ];
+			ProtoTurn_t& protoTurn = gProtoSystem.aTurnMap[ proto ];
 		
 			if ( protoTurn.aNextTime <= gCurTime )
 			{

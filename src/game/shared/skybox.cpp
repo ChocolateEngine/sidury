@@ -248,7 +248,7 @@ void SkyboxSystem::Update()
 }
 
 
-static SkyboxSystem* gEntSys_Skybox;
+static SkyboxSystem gEntSys_Skybox;
 
 
 CH_STRUCT_REGISTER_COMPONENT( CSkybox, skybox, EEntComponentNetType_Both, ECompRegFlag_None )

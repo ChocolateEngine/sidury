@@ -15,8 +15,8 @@ class LightSystem : public IEntityComponentSystem
 	void Update() override;
 };
 
-extern LightSystem* gLightEntSystems;
-LightSystem*        GetLightEntSys();
+extern LightSystem gLightEntSystems;
+LightSystem&       GetLightEntSys();
 
 
 // ------------------------------------------------------------
@@ -32,7 +32,7 @@ class EntSys_Transform : public IEntityComponentSystem
 	void Update() override;
 };
 
-extern EntSys_Transform* gEntSys_Transform;
+extern EntSys_Transform gEntSys_Transform;
 
 
 // ------------------------------------------------------------
@@ -50,7 +50,7 @@ class EntSys_Renderable : public IEntityComponentSystem
 	void Update() override;
 };
 
-extern EntSys_Renderable* gEntSys_Renderable;
-EntSys_Renderable*        GetRenderableEntSys();
+extern EntSys_Renderable gEntSys_Renderable;
+EntSys_Renderable&       GetRenderableEntSys();
 
 

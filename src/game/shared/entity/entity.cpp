@@ -398,7 +398,6 @@ void Entity_Shutdown()
 		if ( pool->apComponentSystem )
 		{
 			EntSysData().aComponentSystems.erase( typeid( pool->apComponentSystem ).hash_code() );
-			delete pool->apComponentSystem;
 			pool->apComponentSystem = nullptr;
 		}
 
@@ -484,10 +483,10 @@ void Entity_CreateComponentPool( const char* spName )
 	EntSysData().aComponentPools[ spName ] = pool;
 
 	// Create component system if it has one registered for it
-	if ( !pool->apData->aFuncNewSystem )
+	if ( !pool->apData->apSystem )
 		return;
 
-	pool->apComponentSystem = pool->apData->aFuncNewSystem();
+	pool->apComponentSystem = pool->apData->apSystem;
 
 	if ( pool->apComponentSystem )
 	{

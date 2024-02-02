@@ -137,13 +137,14 @@ static ECurrentModule gCurrentModule;
 
 bool CvarF_ClientExecuteCallback( ConVarBase* spBase, const std::vector< std::string >& args )
 {
-	// Forward to server if we are the client
+	// Must be running a dedicated server
 	if ( !client )
-		return false;
+		return true;
 
 	if ( gCurrentModule == ECurrentModule_Server )
 		return true;
 
+	// Forward to server if we are the client
 	client->SendConVar( spBase->aName, args );
 	return false;
 }

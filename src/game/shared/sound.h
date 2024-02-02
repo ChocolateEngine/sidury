@@ -43,5 +43,3 @@ class EntSys_Sound : public IEntityComponentSystem
 };
 
 
-EntSys_Sound* GetEntSysSound();
-

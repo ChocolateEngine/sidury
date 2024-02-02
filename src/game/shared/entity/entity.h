@@ -246,7 +246,8 @@ struct EntComponentData_t
 
 	FEntComp_New                              aFuncNew;
 	FEntComp_Free                             aFuncFree;
-	FEntComp_NewSys                           aFuncNewSystem;
+
+	IEntityComponentSystem*                   apSystem;
 };
 
 
@@ -332,7 +333,7 @@ inline void EntComp_RegisterComponent(
 
 
 template< typename T >
-inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
+inline void EntComp_RegisterComponentSystem( IEntityComponentSystem* spSystem )
 {
 	size_t typeHash = typeid( T ).hash_code();
 
@@ -345,7 +346,7 @@ inline void EntComp_RegisterComponentSystem( FEntComp_NewSys sFuncNewSys )
 	}
 
 	EntComponentData_t& data = it->second;
-	data.aFuncNewSystem      = sFuncNewSys;
+	data.apSystem            = spSystem;
 }
 
 
@@ -1311,10 +1312,7 @@ struct CHealth
 	#name, netType, [ & ]() { return new type; }, [ & ]( void* spData ) { delete (type*)spData; }, flags )
 
 #define CH_REGISTER_COMPONENT_SYS( type, systemClass, systemVar ) \
-  EntComp_RegisterComponentSystem< type >( [ & ]() { \
-		systemVar = new systemClass; \
-		return systemVar; \
-	} )
+  EntComp_RegisterComponentSystem< type >( &systemVar )
 
 #define CH_REGISTER_COMPONENT_NEWFREE( type, name, overrideClient, netType, newFunc, freeFunc ) \
   EntComp_RegisterComponent< type >( #name, overrideClient, netType, newFunc, freeFunc )
@@ -1377,10 +1375,7 @@ struct CHealth
   EntComp_RegisterComponentVarEx< TYPE, varType >( compVarType, #varStr, offsetof( TYPE, varName ), flags )
 
 #define CH_REGISTER_COMPONENT_SYS2( systemClass, systemVar ) \
-	EntComp_RegisterComponentSystem< TYPE >( [ & ]() { \
-			systemVar = new systemClass; \
-			return systemVar; \
-		} )
+	EntComp_RegisterComponentSystem< TYPE >( &systemVar )
 
 
 #define CH_NET_WRITE_VEC2( varName, var ) \
