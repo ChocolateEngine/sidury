@@ -49,12 +49,13 @@ CONCMD( mimalloc_print )
 #endif
 
 
-extern IGuiSystem*   gui;
-extern IRender*      render;
-extern IInputSystem* input;
-extern IAudioSystem* audio;
-extern Ch_IPhysics*  ch_physics;
-extern IGraphics*    graphics;
+extern IGuiSystem*       gui;
+extern IRender*          render;
+extern IInputSystem*     input;
+extern IAudioSystem*     audio;
+extern Ch_IPhysics*      ch_physics;
+extern IGraphics*        graphics;
+extern IRenderSystemOld* renderOld;
 
 
 static AppModule_t gAppModules[] = 
@@ -64,6 +65,7 @@ static AppModule_t gAppModules[] =
 	{ (ISystem**)&audio,      "ch_aduio",     IADUIO_NAME, IADUIO_VER },
 	{ (ISystem**)&ch_physics, "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
     { (ISystem**)&graphics,   "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
+    { (ISystem**)&renderOld,  "ch_graphics",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,        "ch_gui",       IGUI_NAME, IGUI_HASH },
 };
 

@@ -32,7 +32,9 @@ struct Entity_t
 	// Audio
 
 	// Color for Selecting with the cursor
-	glm::vec3   aSelectColor;
+	// IDEA: eventually you might need to select renderables based on material
+	// so this would need to be an array of colors, with the same length as the material count on the current renderable
+	u8          aSelectColor[ 3 ];
 
 	// List of Components with general data
 };

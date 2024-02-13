@@ -41,7 +41,8 @@ enum EBinding : u16
 	EBinding_Viewport_MoveDown,
 	EBinding_Viewport_Sprint,
 	EBinding_Viewport_Slow,
-	EBinding_Viewport_Select,
+	EBinding_Viewport_SelectSingle,
+	EBinding_Viewport_SelectMulti,
 	EBinding_Viewport_IncreaseMoveSpeed,
 	EBinding_Viewport_DecreaseMoveSpeed,
 

@@ -24,11 +24,12 @@
 #include <algorithm>
 
 
-IGuiSystem*      gui          = nullptr;
-IRender*         render       = nullptr;
-IInputSystem*    input        = nullptr;
-IAudioSystem*    audio        = nullptr;
-IGraphics*       graphics     = nullptr;
+IGuiSystem*       gui          = nullptr;
+IRender*          render       = nullptr;
+IInputSystem*     input        = nullptr;
+IAudioSystem*     audio        = nullptr;
+IGraphics*        graphics     = nullptr;
+IRenderSystemOld* renderOld    = nullptr;
 
 static bool      gPaused      = false;
 float            gFrameTime   = 0.f;
@@ -376,12 +377,12 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	ImGui::ShowDemoWindow();
 
-	graphics->NewFrame();
+	renderOld->NewFrame();
 
 	if ( !sResize )
 		Game_UpdateGame( frameTime );
 	else
-		graphics->Reset();
+		renderOld->Reset();
 
 	gui->Update( frameTime );
 
@@ -398,7 +399,7 @@ void UpdateLoop( float frameTime, bool sResize )
 		if ( sResize )
 			Game_UpdateProjection();
 
-		graphics->Present();
+		renderOld->Present();
 	}
 	else
 	{
@@ -453,6 +454,8 @@ bool Game_Init()
 	Phys_Init();
 
 	EntEditor_Init();
+
+	renderOld->EnableSelection( true, gMainViewportIndex );
 
 	// TODO, mess with ImGui WantSaveIniSettings
 
@@ -673,7 +676,7 @@ void Game_HandleSystemEvents()
 					{
 						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
-						graphics->Reset();
+						renderOld->Reset();
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:

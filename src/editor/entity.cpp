@@ -13,9 +13,7 @@ static ResourceList< Entity_t >                      gEntityList;
 // Entity Parents
 // [ child ] = parent
 static std::unordered_map< ChHandle_t, ChHandle_t >  gEntityParents;
-
-//static std::unordered_map< glm::vec3, ChHandle_t > gColorToEntity;
-//static std::unordered_map< ChHandle_t, glm::vec3 > gEntityToColor;
+// static std::unordered_set< glm::vec3 >               gUsedColors;
 
 
 bool Entity_Init()
@@ -87,15 +85,23 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->apName = static_cast< char* >( realloc( ent->apName, NAME_LEN ) );
-	if ( ent->apName == nullptr )
+	char* newName = static_cast< char* >( realloc( ent->apName, NAME_LEN ) );
+	if ( newName == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
 		Entity_Delete( entHandle );
 		return CH_INVALID_HANDLE;
 	}
 
+	ent->apName = newName;
 	strcpy( ent->apName, vstring( "Entity %zd", entHandle ).c_str() );
+
+	// Pick a random color for it
+	ent->aSelectColor[ 0 ] = RandomU8( 0, 255 );
+	ent->aSelectColor[ 1 ] = RandomU8( 0, 255 );
+	ent->aSelectColor[ 2 ] = RandomU8( 0, 255 );
+
+	Log_DevF( 1, "Created Entity With Selection Color of (%d, %d, %d)\n", ent->aSelectColor[ 0 ], ent->aSelectColor[ 1 ], ent->aSelectColor[ 2 ] );
 
 	return entHandle;
 }

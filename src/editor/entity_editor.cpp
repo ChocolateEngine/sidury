@@ -14,7 +14,7 @@ FilePickerData_t  gModelBrowserData{};
 FilePickerData_t  gImporterFilePicker{};
 FilePickerData_t  gSkyboxFilePicker{};
 
-static ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
+ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
 
 extern glm::ivec2 gAssetBrowserSize;
 extern float      gAssetBrowserOffset;

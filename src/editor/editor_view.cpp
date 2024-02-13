@@ -10,6 +10,7 @@
 #include "igraphics.h"
 
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 
 
 CONVAR( r_fov, 106.f, CVARF_ARCHIVE );
@@ -30,6 +31,78 @@ CONVAR( view_move_max, 15.f );
 CONVAR( view_move_scroll_sens, 0.125f );
 
 CONVAR( editor_show_pos, 1.f );
+CONVAR( editor_spew_imgui_window_hover, 0 );
+
+
+// TODO: Remove This for multiselect
+extern ChHandle_t gSelectedEntity;
+
+
+// Check the function FindHoveredWindow() in imgui.cpp to see if you need to update this when updating imgui
+bool MouseHoveringImGuiWindow( glm::ivec2 mousePos )
+{
+	ImGuiContext& g = *ImGui::GetCurrentContext();
+
+	ImVec2        imMousePos{ (float)mousePos.x, (float)mousePos.y };
+
+	ImGuiWindow*  hovered_window                        = NULL;
+	ImGuiWindow*  hovered_window_ignoring_moving_window = NULL;
+	if ( g.MovingWindow && !( g.MovingWindow->Flags & ImGuiWindowFlags_NoMouseInputs ) )
+		hovered_window = g.MovingWindow;
+
+	ImVec2 padding_regular    = g.Style.TouchExtraPadding;
+	ImVec2 padding_for_resize = g.IO.ConfigWindowsResizeFromEdges ? g.WindowsHoverPadding : padding_regular;
+	for ( int i = g.Windows.Size - 1; i >= 0; i-- )
+	{
+		ImGuiWindow* window = g.Windows[ i ];
+		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+		if ( !window->WasActive || window->Hidden )
+			continue;
+		if ( window->Flags & ImGuiWindowFlags_NoMouseInputs )
+			continue;
+		IM_ASSERT( window->Viewport );
+		if ( window->Viewport != g.MouseViewport )
+			continue;
+
+		// Using the clipped AABB, a child window will typically be clipped by its parent (not always)
+		ImVec2 hit_padding = ( window->Flags & ( ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize ) ) ? padding_regular : padding_for_resize;
+		if ( !window->OuterRectClipped.ContainsWithPad( imMousePos, hit_padding ) )
+			continue;
+
+		// Support for one rectangular hole in any given window
+		// FIXME: Consider generalizing hit-testing override (with more generic data, callback, etc.) (#1512)
+		if ( window->HitTestHoleSize.x != 0 )
+		{
+			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
+			ImVec2 hole_size( (float)window->HitTestHoleSize.x, (float)window->HitTestHoleSize.y );
+			ImVec2 hole_pos_size{};
+
+			hole_pos_size.x = hole_pos.x + hole_size.x;
+			hole_pos_size.y = hole_pos.y + hole_size.y;
+
+			if ( ImRect( hole_pos, hole_pos_size ).Contains( imMousePos ) )
+				continue;
+		}
+
+		if ( hovered_window == NULL )
+			hovered_window = window;
+		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+		if ( hovered_window_ignoring_moving_window == NULL && ( !g.MovingWindow || window->RootWindowDockTree != g.MovingWindow->RootWindowDockTree ) )
+			hovered_window_ignoring_moving_window = window;
+		if ( hovered_window && hovered_window_ignoring_moving_window )
+			break;
+	}
+
+	if ( hovered_window )
+	{
+		if ( editor_spew_imgui_window_hover )
+			Log_DevF( 1, "HOVERING WINDOW \"%s\"\n", hovered_window->Name );
+
+		return true;
+	}
+
+	return false;
+}
 
 
 void EditorView_Init()
@@ -46,6 +119,7 @@ static bool gDrawMouseTrace = false;
 static glm::vec3 gMouseTraceStart{};
 static glm::vec3 gMouseTraceEnd{};
 static float gMoveScale = 1.f;
+static bool gCheckSelectionResult = false;
 
 
 bool EditorView_IsMouseInView()
@@ -67,7 +141,48 @@ bool EditorView_IsMouseInView()
 	if ( viewport->aOffset.y + viewport->aSize.y < mousePos.y )
 		return false;
 
+	if ( MouseHoveringImGuiWindow( mousePos ) )
+		return false;
+
 	return true;
+}
+
+
+static void UpdateSelectionRenderables()
+{
+	glm::ivec2                      mousePos = input->GetMousePos();
+	EditorContext_t*                context  = Editor_GetContext();
+
+	if ( ImGui::IsAnyItemHovered() )
+		return;
+
+	ChVector< SelectionRenderable > selectList;
+	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+	{
+		Entity_t* ent = Entity_GetData( entHandle );
+
+		if ( !ent )
+		{
+			continue;
+		}
+
+		if ( !ent->aRenderable )
+		{
+			continue;
+		}
+
+		SelectionRenderable selectRenderable;
+		selectRenderable.renderable = ent->aRenderable;
+		selectRenderable.color[ 0 ] = ent->aSelectColor[ 0 ];
+		selectRenderable.color[ 1 ] = ent->aSelectColor[ 1 ];
+		selectRenderable.color[ 2 ] = ent->aSelectColor[ 2 ];
+
+		selectList.push_back( selectRenderable );
+	}
+
+	renderOld->SetSelectionRenderablesAndCursorPos( selectList, mousePos );
+
+	gCheckSelectionResult = true;
 }
 
 
@@ -126,17 +241,15 @@ void EditorView_UpdateInputs()
 	if ( Input_KeyPressed( EBinding_Viewport_MoveDown ) )
 		gEditorData.aMove[ W_UP ] -= upSpeed;
 
-	if ( Input_KeyPressed( EBinding_Viewport_Select ) )
+	if ( Input_KeyJustPressed( EBinding_Viewport_SelectMulti ) )
 	{
-		//gDrawMouseTrace = true;
-
-		//
-
-		// calculate a mouse trace line
-		glm::ivec2 mousePos = input->GetMousePos();
-
-		Editor_GetContext()->aView.aResolution;
-		Editor_GetContext()->aView.aProjViewMat;
+		UpdateSelectionRenderables();
+	}
+	else if ( Input_KeyJustPressed( EBinding_Viewport_SelectSingle ) )
+	{
+		Editor_GetContext()->aEntitiesSelected.clear();
+		// gSelectedEntity = CH_INVALID_HANDLE;
+		UpdateSelectionRenderables();
 	}
 
 	if ( gDrawMouseTrace )
@@ -283,6 +396,35 @@ void EditorView_Update()
 
 	if ( !context )
 		return;
+
+	if ( gCheckSelectionResult )
+	{
+		gCheckSelectionResult = false;
+		u8        selectColor[ 3 ];
+
+		gSelectedEntity = CH_INVALID_HANDLE;
+
+		if ( renderOld->GetSelectionResult( selectColor[ 0 ], selectColor[ 1 ], selectColor[ 2 ] ) )
+		{
+			// scan entities to find a matching color
+			for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+			{
+				Entity_t* ent = Entity_GetData( entHandle );
+
+				if ( !ent )
+				{
+					continue;
+				}
+
+				if ( ent->aSelectColor[ 0 ] == selectColor[ 0 ] )
+				{
+					context->aEntitiesSelected.push_back( entHandle );
+					gSelectedEntity = entHandle;
+					break;
+				}
+			}
+		}
+	}
 
 	// for now until some focus thing
 	if ( !gui->IsConsoleShown() )

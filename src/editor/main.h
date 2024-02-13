@@ -28,15 +28,17 @@ class IRender;
 class IInputSystem;
 class IAudioSystem;
 class IGraphics;
+class IRenderSystemOld;
 
-extern IGuiSystem*      gui;
-extern IRender*         render;
-extern IInputSystem*    input;
-extern IAudioSystem*    audio;
-extern IGraphics*       graphics;
+extern IGuiSystem*       gui;
+extern IRender*          render;
+extern IInputSystem*     input;
+extern IAudioSystem*     audio;
+extern IGraphics*        graphics;
+extern IRenderSystemOld* renderOld;
 
-extern float            gFrameTime;
-extern double           gCurTime;
+extern float             gFrameTime;
+extern double            gCurTime;
 
 
 struct EditorView_t

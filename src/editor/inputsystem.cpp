@@ -67,7 +67,8 @@ static const char* gInputBindingStr[] = {
 	"Viewport_MoveDown",
 	"Viewport_Sprint",
 	"Viewport_Slow",
-	"Viewport_Select",
+	"Viewport_SelectSingle",
+	"Viewport_SelectMulti",
 	"Viewport_IncreaseMoveSpeed",
 	"Viewport_DecreaseMoveSpeed",
 };
@@ -644,7 +645,8 @@ void Input_ResetBindings()
 	Input_BindKey( SDL_SCANCODE_LSHIFT, EBinding_Viewport_Sprint );
 	Input_BindKey( SDL_SCANCODE_LCTRL, EBinding_Viewport_Slow );
 
-	Input_BindKey( EButton_MouseLeft, EBinding_Viewport_Select );
+	Input_BindKey( EButton_MouseLeft, EBinding_Viewport_SelectSingle );
+	// Input_BindKeys( { SDL_SCANCODE_LCTRL, EButton_MouseLeft }, EBinding_Viewport_SelectMulti );
 }
 
 
