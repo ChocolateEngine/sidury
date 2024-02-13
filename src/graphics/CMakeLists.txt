@@ -1,4 +1,4 @@
-message( "Current Project: Sidury Client" )
+message( "Current Project: Renderer" )
 
 file(
 	GLOB_RECURSE SRC_FILES_GLOB CONFIGURE_DEPENDS
@@ -25,6 +25,8 @@ set(
 )
 
 # include( ${CH_ROOT}/scripts/rmlui.cmake )
+
+include_directories( ${CMAKE_CURRENT_LIST_DIR} )
 
 add_library( Graphics SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
 

@@ -86,10 +86,12 @@ enum : EShaderFlags
 };
 
 
+// annoying
 enum ERenderPass
 {
 	ERenderPass_Graphics,
 	ERenderPass_Shadow,
+	ERenderPass_Select,
 	ERenderPass_Count,
 };
 
@@ -391,10 +393,7 @@ struct Renderable_t
 	ChHandle_t                  aModel;
 	glm::mat4                   aModelMatrix;
 
-	// TODO: store the materials for each mesh here so you can override them for this renderable
-	// all material handles are 0 by default, which means no custom materials are being used
-	// also will start with 1 material by default for async loading, and then will expand upon model loading finish
-	// or
+	// Materials to use on this renderable
 	u32                         aMaterialCount;
 	ChHandle_t*                 apMaterials = nullptr;
 
@@ -478,10 +477,39 @@ struct SceneDraw_t
 };
 
 
-struct RenderList_t
+// Used in RenderLists
+// This allows you to draw a renderable with modified data if you need it
+struct RenderableOverride
+{
+	// Renderable to override data for
+	ChHandle_t  renderable;
+
+	// Material Overrides
+	// any element in this array can be an invalid handle, so you can override specific items if you want
+	u32         materialCount;
+	ChHandle_t* pMaterials = nullptr;
+};
+
+
+struct RenderList
 {
 	// List of Renderables
-	ChVector< Renderable_t* > aModels;
+	ChVector< ChHandle_t >         renderables;
+
+	// If we have renderables here, we use this for drawing instead
+	ChVector< ChHandle_t >         culledRenderables;
+
+	bool                           useInShadowMap;
+
+	// Viewport data to be temporarily active when rendering
+	float                          minDepth;
+	float                          maxDepth;
+
+	// Whether to use viewport overrides or no
+	bool                           viewportOverride;
+
+	// Override Data for each renderable
+	ChVector< RenderableOverride > renderableOverrides;
 };
 
 
@@ -556,6 +584,7 @@ struct RenderFrameData_t
 };
 
 
+// TODO: change this name to CameraData or CameraView or something
 struct ViewportShader_t
 {
 	glm::mat4  aProjView{};
@@ -810,6 +839,61 @@ struct ShaderStaticRegistration
 #define CH_REGISTER_SHADER( srShaderCreate ) static ShaderStaticRegistration __gRegister__##srShaderCreate( srShaderCreate );
 
 
+// ---------------------------------------------------------------------------------------
+// Render Context System
+//
+// This system is similar to source in a way
+// It's goals are to remove the fixed render pipeline in the graphics code
+// so you can insert your own rendering needs
+// like running a compute shader
+// or rendering a skybox, viewmodel, reflection, or cubemap generation
+// 
+// Each command is stored in a list to be run later in a command buffer
+// 
+// Or, do we just record commands to a command buffer right there?
+// How do we handle multithreaded command buffer generation?
+// 
+// Also, use the pointer handle system like source does for this
+// 
+
+
+enum ERenderContextCommand
+{
+	ERenderContextCommand_Invalid,
+
+	ERenderContextCommand_DrawCmd,
+	ERenderContextCommand_DrawCmdIndexed,
+
+	ERenderContextCommand_Count,
+};
+
+
+// RCC stands for Render Context Command
+struct RCC_DrawCmd
+{
+
+};
+
+
+struct RenderContextCommand
+{
+	ERenderContextCommand type;
+	void*                 pData;
+};
+
+
+struct RenderContext
+{
+	ChVector< RenderContextCommand > cmds;
+};
+
+
+using RenderContextHandle = u64;
+
+
+// ---------------------------------------------------------------------------------------
+// Graphics Interface
+// ---------------------------------------------------------------------------------------
 class IGraphics : public ISystem
 {
    public:
@@ -832,7 +916,7 @@ class IGraphics : public ISystem
 	virtual Handle             Model_GetMaterial( Handle shModel, size_t sSurface )                                                                                                           = 0;
 
 	// ---------------------------------------------------------------------------------------
-	// Scenes
+	// Scenes (Currently unused and probably broken)
 
 	virtual Handle             LoadScene( const std::string& srPath )                                                                                                                         = 0;
 	virtual void               FreeScene( Handle sScene )                                                                                                                                     = 0;
@@ -845,10 +929,32 @@ class IGraphics : public ISystem
 
 	// ---------------------------------------------------------------------------------------
 	// Render Lists
+	// 
+	// Render Lists are a Vector of Renderables to draw
+	// which contain viewport properties and material overrides
+	// 
+	// These can be used for skyboxes, viewmodels, reflections, cubemap generation, etc.
+	// 
 
-	// virtual RenderList_t*      Graphics_CreateRenderList() = 0;
-	// virtual void               Graphics_DestroyRenderList( RenderList_t* spList ) = 0;
-	// virtual void               Graphics_DrawRenderList( RenderList_t* spList ) = 0;
+	// Create a RenderList
+	virtual RenderList*        RenderListCreate()                                                                                                                                              = 0;
+
+	// Free a RenderList
+	virtual void               RenderListFree( RenderList* pRenderList )                                                                                                                       = 0;
+
+	// Copy all data from one renderlist to another
+	// return true on success
+	virtual bool               RenderListCopy( RenderList* pSrc, RenderList* pDest )                                                                                                           = 0;
+
+	// Draw a Render List to a Frame Buffer
+	// if CH_INVALID_HANDLE is passed in as the Frame Buffer, it defaults to the backbuffer
+	// TODO: what if we want to pass in a render list to a compute shader?
+	virtual void               RenderListDraw( RenderList* pRenderList, ChHandle_t framebuffer )                                                                                               = 0;
+
+	// Do Frustum Culling based on the projection/view matrix of a viewport
+	// This is exposed so you can do basic frustum culling, and then more advanced vis of your own, then draw it
+	// The result is stored in "RenderList.culledRenderables"
+	virtual void               RenderListDoFrustumCulling( RenderList* pRenderList, u32 viewportIndex )                                                                                        = 0;
 
 	// ---------------------------------------------------------------------------------------
 	// Render Layers
@@ -870,6 +976,17 @@ class IGraphics : public ISystem
 	// how would this work with immediate mode style drawing? good for a rythem like game
 	// and how would it work for VR, or multiple viewports in a level editor or something?
 	// and shadowmapping? overthinking this? probably
+
+	// ---------------------------------------------------------------------------------------
+	// Render Context System
+
+	// virtual RenderContext*     CreateRenderContext()                                                                                                                                           = 0;
+	// virtual RenderContextHandle StartRenderContext()                                                                                                                                            = 0;
+	// 
+	// // virtual void               FreeRenderContext( RenderContext* pContext )                                                                                                                    = 0;
+	// virtual void                EndRenderContext( RenderContext* pContext )                                                                                                                     = 0;
+	// 
+	// virtual void                AddRenderContextCommand( RenderContext* pContext, ERenderContextCommand type, void* pData )                                                                     = 0;
 
 	// ---------------------------------------------------------------------------------------
 	// Textures
@@ -995,10 +1112,6 @@ class IGraphics : public ISystem
 	virtual bool               Init()                                                                                                                                                         = 0;
 	virtual void               Shutdown()                                                                                                                                                     = 0;
 
-	virtual void               NewFrame()                                                                                                                                                     = 0;
-	virtual void               Reset()                                                                                                                                                        = 0;
-	virtual void               Present()                                                                                                                                                      = 0;
-
 	// ChHandle_t         CreateRenderPass() = 0;
 	// virtual void               UpdateRenderPass( ChHandle_t sRenderPass ) = 0;
 
@@ -1020,6 +1133,9 @@ class IGraphics : public ISystem
 	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                                                                 = 0;
 	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    = 0;
 	// virtual void               ConsolidateRenderables()                                                                                                                                       = 0;
+
+	virtual u32                GetRenderableCount()                                                                                                                                           = 0;
+	virtual ChHandle_t         GetRenderableByIndex( u32 i )                                                                                                                                  = 0;
 
 	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       = 0;
 
@@ -1052,6 +1168,83 @@ class IGraphics : public ISystem
 };
 
 
+struct SelectionRenderable
+{
+	ChHandle_t renderable;
+	u8         color[ 3 ];
+};
+
+
+// Legacy Rendering System, has a fixed rendering pipeline
+class IRenderSystemOld : public ISystem
+{
+   public:
+	virtual void NewFrame()                                                                                                      = 0;
+	virtual void Reset()                                                                                                         = 0;
+	virtual void PreRender()                                                                                                     = 0;
+	virtual void Present()                                                                                                       = 0;
+
+	// ---------------------------------------------------------------------------------------
+
+	// HACK HACK - for editor, hopefully i can come up with a better solution later
+	// Maybe you can be able to register graphics and compute shaders in game/editor code
+	// and we can have functions for running compute shaders, or just use the GraphicsAPI/RenderVK directly
+	//
+	// What this does is add a render list to the compute shader for selecting entities in the editor
+	// The Selection Compute shader renders each renderable with a different solid color
+	// then it takes in your mouse position, and picks the color underneath it to find out what renderable you selected
+	// virtual void               AddRenderListToSelectionCompute( RenderList* pRenderList )                                                                                                      = 0;
+
+	// Enable Selection Task
+	virtual void EnableSelection( bool enabled, u32 viewport )                                                                   = 0;
+
+	// Set Renderables to use for selecting this frame
+	virtual void SetSelectionRenderablesAndCursorPos( const ChVector< SelectionRenderable >& renderables, glm::ivec2 cursorPos ) = 0;
+
+	// Gets the selection compute shader result from the last rendered frame
+	// Returns the color the cursor landed on
+	virtual bool GetSelectionResult( u8& red, u8& green, u8& blue )                                                              = 0;
+};
+
+
+// New Rendering System, allows you to define your own render pipeline
+// This system is similar to source in a way
+// It's goals are to remove the fixed render pipeline in the graphics code
+// so you can insert your own rendering needs
+// like running a compute shader
+// or rendering a skybox, viewmodel, reflection, or cubemap generation
+class IRenderSystem : public ISystem
+{
+   public:
+	virtual void NewFrame()                                             = 0;
+	virtual void Reset()                                                = 0;
+	virtual void PreRender()                                            = 0;
+	virtual void Present()                                              = 0;
+
+	virtual u64  StartRenderPass()                                      = 0;
+	virtual void EndRenderPass( u64 handle )                            = 0;
+
+	// Framebuffers
+	virtual void PushFramebuffer()                                      = 0;
+	virtual void PopFramebuffer()                                       = 0;
+	virtual void GetFramebuffer()                                       = 0;
+
+	// Viewports
+	virtual void PushViewport()                                         = 0;
+	virtual void PopViewport()                                          = 0;
+	virtual void GetViewport()                                          = 0;
+
+	// Drawing - Can be multithreaded internally
+	virtual void DrawRenderables( ChHandle_t* pRenderables, u32 count ) = 0;
+};
+
+
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  4
+#define IGRAPHICS_VER  5
+
+#define IRENDERSYSTEMOLD_NAME "IRenderSystemOld"
+#define IRENDERSYSTEMOLD_VER  1
+
+#define IRENDERSYSTEM_NAME "IRenderSystem"
+#define IRENDERSYSTEM_VER  1
 

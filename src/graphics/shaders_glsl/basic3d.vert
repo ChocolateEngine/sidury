@@ -37,7 +37,7 @@ void main()
 	uint         vertIndex  = gl_VertexIndex;
 
 	// is this renderable using an index buffer?
-	if ( renderable.aIndexBuffer != 4294967295 )
+	if ( renderable.aIndexBuffer != CH_INVALID_BUFFER )
 		vertIndex = gIndexBuffers[ renderable.aIndexBuffer ].aIndex[ gl_VertexIndex ];
 
 	VertexData_t vert = gVertexBuffers[ renderable.aVertexBuffer ].aVert[ vertIndex ];

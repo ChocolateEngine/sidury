@@ -241,7 +241,35 @@ struct ShaderSkinning_Push
 };
 
 
-constexpr u32 CH_SHADER_CORE_SLOT_INVALID = UINT32_MAX;
+struct ShaderSelect_Push
+{
+	u32       aRenderable  = 0;
+	u32       aViewport    = 0;
+	u32       aVertexCount = 0;
+	u32       aDiffuse;
+	glm::vec4 aColor{};
+	glm::vec2 aCursorPos{};
+};
+
+
+struct ShaderSelectResult_Push
+{
+	glm::vec2 aCursorPos{};
+};
+
+
+struct ShaderSelect_OutputBuffer
+{
+	bool      aSelected;
+	glm::vec3 aOutColor;
+};
+
+
+constexpr u32         CH_SHADER_CORE_SLOT_INVALID  = UINT32_MAX;
+
+constexpr const char* CH_SHADER_NAME_SKINNING      = "__skinning";
+constexpr const char* CH_SHADER_NAME_SELECT        = "__select";
+constexpr const char* CH_SHADER_NAME_SELECT_RESULT = "__select_result";
 
 
 // I don't like this at all
@@ -261,12 +289,18 @@ struct GraphicsData_t
 
 	ChHandle_t                                    aRenderPassGraphics;
 	ChHandle_t                                    aRenderPassShadow;
+	ChHandle_t                                    aRenderPassSelect;
 
 	// stores backbuffer color and depth
 	ChHandle_t                                    aBackBuffer[ 2 ];
 	ChHandle_t                                    aBackBufferTex[ 3 ];
 
 	std::unordered_set< ChHandle_t >              aDirtyMaterials;
+
+	// --------------------------------------------------------------------------------------
+	// RenderLists
+
+	ChVector< RenderList* >                       aRenderLists;
 
 	// --------------------------------------------------------------------------------------
 	// Descriptor Sets
@@ -359,6 +393,10 @@ void                  Graphics_FreeQueuedResources();
 
 bool                  Graphics_ShaderInit( bool sRecreate );
 
+void                  Graphics_DestroySelectRenderPass();
+bool                  Graphics_CreateSelectRenderPass();
+void                  Graphics_SelectionTexturePass( Handle sCmd, size_t sIndex );
+
 bool                  Shader_Bind( Handle sCmd, u32 sIndex, Handle sShader );
 void                  Shader_ResetPushData();
 bool                  Shader_SetupRenderableDrawData( ChHandle_t sShader, ChHandle_t sMat, u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spModelDraw, ShaderData_t* spShaderData, SurfaceDraw_t& srRenderable );
@@ -388,35 +426,70 @@ class Graphics : public IGraphics
 	// ---------------------------------------------------------------------------------------
 	// Models
 
-	virtual Handle             LoadModel( const std::string& srPath )                                                                                                                         override;
-	virtual Handle             CreateModel( Model** spModel )                                                                                                                                 override;
-	virtual void               FreeModel( Handle hModel )                                                                                                                                     override;
-	virtual Model*             GetModelData( Handle hModel )                                                                                                                                  override;
-	virtual std::string_view   GetModelPath( Handle sModel )                                                                                                                                  override;
-	virtual ModelBBox_t        CalcModelBBox( Handle sModel )                                                                                                                                 override;
-	virtual bool               GetModelBBox( Handle sModel, ModelBBox_t& srBBox )                                                                                                             override;
+	virtual Handle             LoadModel( const std::string& srPath )                                                                                       override;
+	virtual Handle             CreateModel( Model** spModel )                                                                                               override;
+	virtual void               FreeModel( Handle hModel )                                                                                                   override;
+	virtual Model*             GetModelData( Handle hModel )                                                                                                override;
+	virtual std::string_view   GetModelPath( Handle sModel )                                                                                                override;
+	virtual ModelBBox_t        CalcModelBBox( Handle sModel )                                                                                               override;
+	virtual bool               GetModelBBox( Handle sModel, ModelBBox_t& srBBox )                                                                           override;
 
-	virtual void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat )                                                                                             override;
-	virtual Handle             Model_GetMaterial( Handle shModel, size_t sSurface )                                                                                                           override;
+	virtual void               Model_SetMaterial( Handle shModel, size_t sSurface, Handle shMat )                                                           override;
+	virtual Handle             Model_GetMaterial( Handle shModel, size_t sSurface )                                                                         override;
 
 	// ---------------------------------------------------------------------------------------
 	// Scenes
 
-	virtual Handle             LoadScene( const std::string& srPath )                                                                                                                         override;
-	virtual void               FreeScene( Handle sScene )                                                                                                                                     override;
+	virtual Handle             LoadScene( const std::string& srPath )                                                                                       override;
+	virtual void               FreeScene( Handle sScene )                                                                                                   override;
 
-	virtual SceneDraw_t*       AddSceneDraw( Handle sScene )                                                                                                                                  override;
-	virtual void               RemoveSceneDraw( SceneDraw_t* spScene )                                                                                                                        override;
+	virtual SceneDraw_t*       AddSceneDraw( Handle sScene )                                                                                                override;
+	virtual void               RemoveSceneDraw( SceneDraw_t* spScene )                                                                                      override;
 
-	virtual size_t             GetSceneModelCount( Handle sScene )                                                                                                                            override;
-	virtual Handle             GetSceneModel( Handle sScene, size_t sIndex )                                                                                                                  override;
+	virtual size_t             GetSceneModelCount( Handle sScene )                                                                                          override;
+	virtual Handle             GetSceneModel( Handle sScene, size_t sIndex )                                                                                override;
 
 	// ---------------------------------------------------------------------------------------
 	// Render Lists
+	//
+	// Render Lists are a Vector of Renderables to draw
+	// which contain viewport properties and material overrides
+	//
 
-	// virtual RenderList_t*      Graphics_CreateRenderList() override;
-	// virtual void               Graphics_DestroyRenderList( RenderList_t* spList ) override;
-	// virtual void               Graphics_DrawRenderList( RenderList_t* spList ) override;
+	// Create a RenderList
+	virtual RenderList*        RenderListCreate() override;
+
+	// Free a RenderList
+	virtual void               RenderListFree( RenderList* pRenderList ) override;
+
+	// Copy all data from one renderlist to another
+	// return true on success
+	virtual bool               RenderListCopy( RenderList* pSrc, RenderList* pDest ) override;
+
+	// Draw a Render List to a Frame Buffer
+	// if CH_INVALID_HANDLE is passed in as the Frame Buffer, it defaults to the backbuffer
+	// TODO: what if we want to pass in a render list to a compute shader?
+	virtual void               RenderListDraw( RenderList* pRenderList, ChHandle_t framebuffer ) override;
+
+	// Do Frustum Culling based on the projection/view matrix of a viewport
+	// This is exposed so you can do basic frustum culling, and then more advanced vis of your own, then draw it
+	// The result is stored in "RenderList.culledRenderables"
+	virtual void               RenderListDoFrustumCulling( RenderList* pRenderList, u32 viewportIndex ) override;
+
+	// ---------------------------------------------------------------------------------------
+
+	// HACK HACK - for editor, hopefully i can come up with a better solution later
+	// Maybe you can be able to register graphics and compute shaders in game/editor code
+	// and we can have functions for running compute shaders, or just use the GraphicsAPI/RenderVK directly
+	//
+	// What this does is add a render list to the compute shader for selecting entities in the editor
+	// The Selection Compute shader renders each renderable with a different solid color
+	// then it takes in your mouse position, and picks the color underneath it to find out what renderable you selected
+	//virtual void               AddRenderListToSelectionCompute( RenderList* pRenderList )                                                                    override;
+
+	// Gets the selection compute shader result from the last rendered frame
+	// Returns a glm::vec3 for the color the cursor landed on
+	//virtual glm::vec3          GetSelectionComputeResult()                                                                                                   override;
 
 	// ---------------------------------------------------------------------------------------
 	// Render Layers
@@ -442,100 +515,100 @@ class Graphics : public IGraphics
 	// ---------------------------------------------------------------------------------------
 	// Textures
 
-	virtual ChHandle_t         LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData )                                                 override;
+	virtual ChHandle_t         LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData )               override;
 
-	virtual ChHandle_t         CreateTexture( const TextureCreateInfo_t& srTextureCreateInfo, const TextureCreateData_t& srCreateData )                                                       override;
+	virtual ChHandle_t         CreateTexture( const TextureCreateInfo_t& srTextureCreateInfo, const TextureCreateData_t& srCreateData )                     override;
 
-	virtual void               FreeTexture( ChHandle_t shTexture )                                                                                                                            override;
+	virtual void               FreeTexture( ChHandle_t shTexture )                                                                                          override;
 
 	// ---------------------------------------------------------------------------------------
 	// Materials
 
 	// Load a cmt file from disk, increments ref count
-	virtual Handle             LoadMaterial( const std::string& srPath )                                                                                                                      override;
+	virtual Handle             LoadMaterial( const std::string& srPath )                                                                                    override;
 
 	// Create a new material with a name and a shader
-	virtual Handle             CreateMaterial( const std::string& srName, Handle shShader )                                                                                                   override;
+	virtual Handle             CreateMaterial( const std::string& srName, Handle shShader )                                                                 override;
 
 	// Free a material
-	virtual void               FreeMaterial( Handle sMaterial )                                                                                                                               override;
+	virtual void               FreeMaterial( Handle sMaterial )                                                                                             override;
 
 	// Find a material by name
 	// Name is a path to the cmt file if it was loaded on disk
 	// EXAMPLE: C:/chocolate/sidury/materials/dev/grid01.cmt
 	// NAME: materials/dev/grid01
-	virtual Handle             FindMaterial( const char* spName )                                                                                                                             override;
+	virtual Handle             FindMaterial( const char* spName )                                                                                           override;
 
 	// Get the total amount of materials created
-	virtual u32                GetMaterialCount()                                                                                                                                             override;
+	virtual u32                GetMaterialCount()                                                                                                           override;
 
 	// Get a material by index
-	virtual ChHandle_t         GetMaterialByIndex( u32 sIndex )                                                                                                                               override;
+	virtual ChHandle_t         GetMaterialByIndex( u32 sIndex )                                                                                             override;
 
 	// Get the path to the material
-	virtual const std::string& GetMaterialPath( Handle sMaterial )                                                                                                                            override;
+	virtual const std::string& GetMaterialPath( Handle sMaterial )                                                                                          override;
 
 	// Tell all materials to rebuild
-	virtual void               SetAllMaterialsDirty()                                                                                                                                         override;
+	virtual void               SetAllMaterialsDirty()                                                                                                       override;
 
 	// Modifying Material Data
-	virtual const char*        Mat_GetName( Handle mat )                                                                                                                                      override;
-	virtual size_t             Mat_GetVarCount( Handle mat )                                                                                                                                  override;
-	virtual EMatVar            Mat_GetVarType( Handle mat, size_t sIndex )                                                                                                                    override;
-	virtual const char*        Mat_GetVarName( Handle mat, size_t sIndex )                                                                                                                    override;
+	virtual const char*        Mat_GetName( Handle mat )                                                                                                    override;
+	virtual size_t             Mat_GetVarCount( Handle mat )                                                                                                override;
+	virtual EMatVar            Mat_GetVarType( Handle mat, size_t sIndex )                                                                                  override;
+	virtual const char*        Mat_GetVarName( Handle mat, size_t sIndex )                                                                                  override;
 
-	virtual Handle             Mat_GetShader( Handle mat )                                                                                                                                    override;
-	virtual void               Mat_SetShader( Handle mat, Handle shShader )                                                                                                                   override;
+	virtual Handle             Mat_GetShader( Handle mat )                                                                                                  override;
+	virtual void               Mat_SetShader( Handle mat, Handle shShader )                                                                                 override;
 
-	virtual VertexFormat       Mat_GetVertexFormat( Handle mat )                                                                                                                              override;
+	virtual VertexFormat       Mat_GetVertexFormat( Handle mat )                                                                                            override;
 
 	// Increments Reference Count for material
-	virtual void               Mat_AddRef( ChHandle_t sMat )                                                                                                                                  override;
+	virtual void               Mat_AddRef( ChHandle_t sMat )                                                                                                override;
 
 	// Decrements Reference Count for material - returns true if the material is deleted
-	virtual bool               Mat_RemoveRef( ChHandle_t sMat )                                                                                                                               override;
+	virtual bool               Mat_RemoveRef( ChHandle_t sMat )                                                                                             override;
 
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, Handle texture )                                                                                              override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, float data )                                                                                                  override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, int data )                                                                                                    override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, bool data )                                                                                                   override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& data )                                                                                       override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& data )                                                                                       override;
-	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& data )                                                                                       override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, Handle texture )                                                            override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, float data )                                                                override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, int data )                                                                  override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, bool data )                                                                 override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec2& data )                                                     override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec3& data )                                                     override;
+	virtual void               Mat_SetVar( Handle mat, const std::string& name, const glm::vec4& data )                                                     override;
 
-	virtual int                Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                                                      override;
-	virtual Handle             Mat_GetTexture( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                                                           override;
-	virtual float              Mat_GetFloat( Handle mat, std::string_view name, float fallback = 0.f )                                                                                        override;
-	virtual int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 )                                                                                              override;
-	virtual bool               Mat_GetBool( Handle mat, std::string_view name, bool fallback = false )                                                                                        override;
-	virtual const glm::vec2&   Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback = {} )                                                                               override;
-	virtual const glm::vec3&   Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback = {} )                                                                               override;
-	virtual const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback = {} )                                                                               override;
+	virtual int                Mat_GetTextureIndex( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                    override;
+	virtual Handle             Mat_GetTexture( Handle mat, std::string_view name, Handle fallback = InvalidHandle )                                         override;
+	virtual float              Mat_GetFloat( Handle mat, std::string_view name, float fallback = 0.f )                                                      override;
+	virtual int                Mat_GetInt( Handle mat, std::string_view name, int fallback = 0 )                                                            override;
+	virtual bool               Mat_GetBool( Handle mat, std::string_view name, bool fallback = false )                                                      override;
+	virtual const glm::vec2&   Mat_GetVec2( Handle mat, std::string_view name, const glm::vec2& fallback = {} )                                             override;
+	virtual const glm::vec3&   Mat_GetVec3( Handle mat, std::string_view name, const glm::vec3& fallback = {} )                                             override;
+	virtual const glm::vec4&   Mat_GetVec4( Handle mat, std::string_view name, const glm::vec4& fallback = {} )                                             override;
 
-	virtual int                Mat_GetTextureIndex( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                 override;
-	virtual Handle             Mat_GetTexture( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                                                      override;
-	virtual float              Mat_GetFloat( Handle mat, u32 sIndex, float fallback = 0.f )                                                                                                   override;
-	virtual int                Mat_GetInt( Handle mat, u32 sIndex, int fallback = 0 )                                                                                                         override;
-	virtual bool               Mat_GetBool( Handle mat, u32 sIndex, bool fallback = false )                                                                                                   override;
-	virtual const glm::vec2&   Mat_GetVec2( Handle mat, u32 sIndex, const glm::vec2& fallback = {} )                                                                                          override;
-	virtual const glm::vec3&   Mat_GetVec3( Handle mat, u32 sIndex, const glm::vec3& fallback = {} )                                                                                          override;
-	virtual const glm::vec4&   Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4& fallback = {} )                                                                                          override;
+	virtual int                Mat_GetTextureIndex( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                               override;
+	virtual Handle             Mat_GetTexture( Handle mat, u32 sIndex, Handle fallback = InvalidHandle )                                                    override;
+	virtual float              Mat_GetFloat( Handle mat, u32 sIndex, float fallback = 0.f )                                                                 override;
+	virtual int                Mat_GetInt( Handle mat, u32 sIndex, int fallback = 0 )                                                                       override;
+	virtual bool               Mat_GetBool( Handle mat, u32 sIndex, bool fallback = false )                                                                 override;
+	virtual const glm::vec2&   Mat_GetVec2( Handle mat, u32 sIndex, const glm::vec2& fallback = {} )                                                        override;
+	virtual const glm::vec3&   Mat_GetVec3( Handle mat, u32 sIndex, const glm::vec3& fallback = {} )                                                        override;
+	virtual const glm::vec4&   Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4& fallback = {} )                                                        override;
 
 	// ---------------------------------------------------------------------------------------
 	// Shaders
 
-	// virtual bool               Shader_Init( bool sRecreate )                                                                                                                                  override;
-	virtual Handle             GetShader( std::string_view sName )                                                                                                                            override;
-	virtual const char*        GetShaderName( Handle sShader )                                                                                                                                override;
+	// virtual bool               Shader_Init( bool sRecreate )                                                                                                override;
+	virtual Handle             GetShader( std::string_view sName )                                                                                          override;
+	virtual const char*        GetShaderName( Handle sShader )                                                                                              override;
 
-	virtual u32                GetShaderCount()                                                                                                                                               override;
-	virtual ChHandle_t         GetShaderByIndex( u32 sIndex )                                                                                                                                 override;
+	virtual u32                GetShaderCount()                                                                                                             override;
+	virtual ChHandle_t         GetShaderByIndex( u32 sIndex )                                                                                               override;
 
-	virtual u32                GetGraphicsShaderCount()                                                                                                                                       override;
-	virtual ChHandle_t         GetGraphicsShaderByIndex( u32 sIndex )                                                                                                                         override;
+	virtual u32                GetGraphicsShaderCount()                                                                                                     override;
+	virtual ChHandle_t         GetGraphicsShaderByIndex( u32 sIndex )                                                                                       override;
 
-	virtual u32                GetComputeShaderCount()                                                                                                                                        override;
-	virtual ChHandle_t         GetComputeShaderByIndex( u32 sIndex )                                                                                                                          override;
+	virtual u32                GetComputeShaderCount()                                                                                                      override;
+	virtual ChHandle_t         GetComputeShaderByIndex( u32 sIndex )                                                                                        override;
 
 	// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 	// virtual bool               Shader_IsMaterialTransparent( Handle sMat ) override;
@@ -546,79 +619,127 @@ class Graphics : public IGraphics
 	// ---------------------------------------------------------------------------------------
 	// Buffers
 
-	virtual void               CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr )                                                 override;
-	virtual void               CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr )                                                   override;
+	virtual void               CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr )               override;
+	virtual void               CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVertexData, const char* spDebugName = nullptr )                 override;
 	// void               CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVertexData, bool sCreateIndex, const char* spDebugName ) override;
 
 	// ---------------------------------------------------------------------------------------
 	// Lighting
 
-	virtual Light_t*           CreateLight( ELightType sType )                                                                                                                                override;
-	virtual void               UpdateLight( Light_t* spLight )                                                                                                                                override;
-	virtual void               DestroyLight( Light_t* spLight )                                                                                                                               override;
+	virtual Light_t*           CreateLight( ELightType sType )                                                                                              override;
+	virtual void               UpdateLight( Light_t* spLight )                                                                                              override;
+	virtual void               DestroyLight( Light_t* spLight )                                                                                             override;
 
 	// ---------------------------------------------------------------------------------------
 	// Rendering
 
-	virtual bool               Init()                                                                                                                                                         override;
-	virtual void               Shutdown()                                                                                                                                                     override;
-
-	virtual void               NewFrame()                                                                                                                                                     override;
-	virtual void               Reset()                                                                                                                                                        override;
-	virtual void               Present()                                                                                                                                                      override;
+	virtual bool               Init()                                                                                                                       override;
+	virtual void               Shutdown()                                                                                                                   override;
 
 	// ChHandle_t         CreateRenderPass() override;
 	// virtual void               UpdateRenderPass( ChHandle_t sRenderPass ) override;
 
 	// Returns the Viewport Index - input is the address of a pointer
-	virtual u32                CreateViewport( ViewportShader_t** spViewport = nullptr )                                                                                                      override;
-	virtual void               FreeViewport( u32 sViewportIndex )                                                                                                                             override;
+	virtual u32                CreateViewport( ViewportShader_t** spViewport = nullptr )                                                                    override;
+	virtual void               FreeViewport( u32 sViewportIndex )                                                                                           override;
 
-	virtual ViewportShader_t*  GetViewportData( u32 sViewportIndex )                                                                                                                          override;
-	virtual void               SetViewportUpdate( bool sUpdate )                                                                                                                              override;
+	virtual ViewportShader_t*  GetViewportData( u32 sViewportIndex )                                                                                        override;
+	virtual void               SetViewportUpdate( bool sUpdate )                                                                                            override;
 
 	// virtual void               PushViewInfo( const ViewportShader_t& srViewInfo ) override;
 	// virtual void               PopViewInfo() override;
 	// virtual ViewportShader_t&  GetViewInfo() override;
 
-	virtual ChHandle_t         CreateRenderable( ChHandle_t sModel )                                                                                                                          override;
-	virtual Renderable_t*      GetRenderableData( ChHandle_t sRenderable )                                                                                                                    override;
-	virtual void               SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )                                                                                                override;
-	virtual void               FreeRenderable( ChHandle_t sRenderable )                                                                                                                       override;
-	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                                                                 override;
-	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                                                    override;
+	virtual ChHandle_t         CreateRenderable( ChHandle_t sModel )                                                                                        override;
+	virtual Renderable_t*      GetRenderableData( ChHandle_t sRenderable )                                                                                  override;
+	virtual void               SetRenderableModel( ChHandle_t sRenderable, ChHandle_t sModel )                                                              override;
+	virtual void               FreeRenderable( ChHandle_t sRenderable )                                                                                     override;
+	virtual void               UpdateRenderableAABB( ChHandle_t sRenderable )                                                                               override;
+	virtual ModelBBox_t        GetRenderableAABB( ChHandle_t sRenderable )                                                                                  override;
 
-	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       override;
+	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                     override;
 
-	// virtual void               ConsolidateRenderables()                                                                                                                                       override;
+	virtual u32                GetRenderableCount()                                                                                                         override;
+	virtual ChHandle_t         GetRenderableByIndex( u32 i )                                                                                                override;
 
-	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                                                              override;
+	// virtual void               ConsolidateRenderables()                                                                                                     override;
+
+	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                            override;
 
 	// ---------------------------------------------------------------------------------------
 	// Debug Rendering
 
-	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  override;
-	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                                                  override;
-	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                                                              override;
-	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                                                     override;
-	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                                                              override;
-	virtual void               DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  override;
-	virtual void               DrawProjView( const glm::mat4& srProjView )                                                                                                                    override;
-	virtual void               DrawFrustum( const Frustum_t& srFrustum )                                                                                                                      override;
-	virtual void               DrawNormals( ChHandle_t sModel, const glm::mat4& srMatrix )                                                                                                    override;
+	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                override;
+	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                override;
+	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                            override;
+	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                   override;
+	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                            override;
+	virtual void               DrawBBox( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                override;
+	virtual void               DrawProjView( const glm::mat4& srProjView )                                                                                  override;
+	virtual void               DrawFrustum( const Frustum_t& srFrustum )                                                                                    override;
+	virtual void               DrawNormals( ChHandle_t sModel, const glm::mat4& srMatrix )                                                                  override;
 
 	// ---------------------------------------------------------------------------------------
 	// Vertex Format/Attributes
 
-	virtual GraphicsFmt        GetVertexAttributeFormat( VertexAttribute attrib )                                                                                                             override;
-	virtual size_t             GetVertexAttributeTypeSize( VertexAttribute attrib )                                                                                                           override;
-	virtual size_t             GetVertexAttributeSize( VertexAttribute attrib )                                                                                                               override;
-	virtual size_t             GetVertexFormatSize( VertexFormat format )                                                                                                                     override;
+	virtual GraphicsFmt        GetVertexAttributeFormat( VertexAttribute attrib )                                                                           override;
+	virtual size_t             GetVertexAttributeTypeSize( VertexAttribute attrib )                                                                         override;
+	virtual size_t             GetVertexAttributeSize( VertexAttribute attrib )                                                                             override;
+	virtual size_t             GetVertexFormatSize( VertexFormat format )                                                                                   override;
 
-	virtual void               GetVertexBindingDesc( VertexFormat format, std::vector< VertexInputBinding_t >& srAttrib )                                                                     override;
-	virtual void               GetVertexAttributeDesc( VertexFormat format, std::vector< VertexInputAttribute_t >& srAttrib )                                                                 override;
+	virtual void               GetVertexBindingDesc( VertexFormat format, std::vector< VertexInputBinding_t >& srAttrib )                                   override;
+	virtual void               GetVertexAttributeDesc( VertexFormat format, std::vector< VertexInputAttribute_t >& srAttrib )                               override;
 };
 
 
 extern Graphics gGraphics;
+
+
+class RenderSystemOld : public IRenderSystemOld
+{
+   public:
+	virtual bool                    Init() override { return true; };
+	virtual void                    Shutdown() override{};
+	virtual void                    Update( float sDT ) override{};
+
+	virtual void                    NewFrame() override;
+	virtual void                    Reset() override;
+	virtual void                    PreRender() override;
+	virtual void                    Present() override;
+
+	virtual void                    EnableSelection( bool enabled, u32 viewport ) override;
+
+	// Set Renderables to use for selecting this frame
+	virtual void                    SetSelectionRenderablesAndCursorPos( const ChVector< SelectionRenderable >& renderables, glm::ivec2 cursorPos ) override;
+
+	// Gets the selection compute shader result from the last rendered frame
+	// Returns the color the cursor landed on
+	virtual bool                    GetSelectionResult( u8& red, u8& green, u8& blue ) override;
+
+	void                            DoSelectionCompute( ChHandle_t cmd, u32 cmdIndex );
+	void                            DoSelection( ChHandle_t cmd, u32 cmdIndex );
+
+	void                            FreeSelectionTexture();
+	void                            CreateSelectionTexture();
+
+	// ----------------------------------------------------------
+
+	bool                            aSelectionEnabled = false;
+	// ChHandle_t                      aSelectionBuffer      = CH_INVALID_HANDLE;
+	;
+	ChHandle_t                      aSelectionFramebuffer = CH_INVALID_HANDLE;
+	ChHandle_t                      aSelectionTexture     = CH_INVALID_HANDLE;
+	ChHandle_t                      aSelectionDepth       = CH_INVALID_HANDLE;
+	glm::ivec2                      aSelectionTextureSize{};
+
+	u32                             aSelectionViewportRef = 0;  // viewport data to copy from
+	u32                             aSelectionViewport    = CH_R_MAX_VIEWPORTS;
+	glm::ivec2                      aSelectionCursorPos{};
+	bool                            aSelectionThisFrame = false;
+
+	ChVector< SelectionRenderable > aSelectionRenderables;
+};
+
+
+extern RenderSystemOld gRenderOld;
 

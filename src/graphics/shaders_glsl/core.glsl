@@ -37,6 +37,9 @@
 #define CH_BINDING_VERTEX_BUFFERS            5
 #define CH_BINDING_INDEX_BUFFERS             6
 
+// UINT32_MAX
+#define CH_INVALID_BUFFER                    4294967295
+
 // ===================================================================================
 // Base Structs
 

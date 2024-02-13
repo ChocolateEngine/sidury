@@ -76,14 +76,15 @@ IRender*               render;
 Graphics               gGraphics;
 
 static ModuleInterface_t gInterfaces[] = {
-	{ &gGraphics, IGRAPHICS_NAME, IGRAPHICS_VER }
+	{ &gGraphics, IGRAPHICS_NAME, IGRAPHICS_VER },
+	{ &gRenderOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 };
 
 extern "C"
 {
 	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
 	{
-		srCount = 1;
+		srCount = 2;
 		return gInterfaces;
 	}
 }
@@ -663,6 +664,100 @@ Handle Graphics::GetSceneModel( Handle sScene, size_t sIndex )
 
 
 // ---------------------------------------------------------------------------------------
+// Render Lists
+//
+// Render Lists are a Vector of Renderables to draw
+// which contain viewport properties and material overrides
+//
+
+// Create a RenderList
+RenderList* Graphics::RenderListCreate()
+{
+	RenderList* renderList = new RenderList;
+	gGraphicsData.aRenderLists.push_back( renderList );
+	return renderList;
+}
+
+
+// Free a RenderList
+void Graphics::RenderListFree( RenderList* pRenderList )
+{
+	gGraphicsData.aRenderLists.erase( pRenderList );
+	delete pRenderList;
+}
+
+
+// Copy all data from one renderlist to another
+// return true on success
+bool Graphics::RenderListCopy( RenderList* pSrc, RenderList* pDest )
+{
+	if ( !pSrc )
+		Log_Error( gLC_ClientGraphics, "RenderListCopy: pSrc is nullptr!\n" );
+
+	if ( !pDest )
+		Log_Error( gLC_ClientGraphics, "RenderListCopy: pDest is nullptr!\n" );
+
+	if ( !pSrc || !pDest )
+		return false;
+
+	// Copy Renderables
+	if ( pSrc->renderables.size() )
+	{
+		pDest->renderables.resize( pSrc->renderables.size() );
+		memcpy( pDest->renderables.apData, pSrc->renderables.apData, pSrc->renderables.size_bytes() );
+	}
+
+	// Copy Culled Renderables
+	if ( pSrc->culledRenderables.size() )
+	{
+		pDest->culledRenderables.resize( pSrc->culledRenderables.size() );
+		memcpy( pDest->culledRenderables.apData, pSrc->culledRenderables.apData, pSrc->culledRenderables.size_bytes() );
+	}
+
+	// Copy Renderable Overrides
+	if ( pSrc->renderableOverrides.size() )
+	{
+		pDest->renderableOverrides.resize( pSrc->renderableOverrides.size() );
+		memcpy( pDest->renderableOverrides.apData, pSrc->renderableOverrides.apData, pSrc->renderableOverrides.size_bytes() );
+	}
+
+	pDest->useInShadowMap   = pSrc->useInShadowMap;
+	pDest->minDepth         = pSrc->minDepth;
+	pDest->maxDepth         = pSrc->maxDepth;
+	pDest->viewportOverride = pSrc->viewportOverride;
+
+	return true;
+}
+
+
+// Draw a Render List to a Frame Buffer
+// if CH_INVALID_HANDLE is passed in as the Frame Buffer, it defaults to the backbuffer
+// TODO: what if we want to pass in a render list to a compute shader?
+void Graphics::RenderListDraw( RenderList* pRenderList, ChHandle_t framebuffer )
+{
+	if ( framebuffer == CH_INVALID_HANDLE )
+	{
+	}
+
+	// Find Framebuffer and put this renderlist in a vector for it
+
+	// ---------------------------------------------------------------
+
+	if ( pRenderList->useInShadowMap )
+	{
+	}
+}
+
+
+// Do Frustum Culling based on the projection/view matrix of a viewport
+// This is exposed so you can do basic frustum culling, and then more advanced vis of your own, then draw it
+// The result is stored in "RenderList.culledRenderables"
+void Graphics::RenderListDoFrustumCulling( RenderList* pRenderList, u32 viewportIndex )
+{
+}
+
+
+// ---------------------------------------------------------------------------------------
 
 
 ChHandle_t Graphics::LoadTexture( ChHandle_t& srHandle, const std::string& srTexturePath, const TextureCreateData_t& srCreateData )
@@ -701,6 +796,13 @@ bool Graphics_CreateRenderPasses()
 	if ( !Graphics_CreateShadowRenderPass() )
 	{
 		Log_Error( "Failed to create Shadow Map Render Pass\n" );
+		return false;
+	}
+
+	// Selection Render Pass
+	if ( !Graphics_CreateSelectRenderPass() )
+	{
+		Log_Error( "Failed to create Selection Render Pass\n" );
 		return false;
 	}
 
@@ -1236,7 +1338,7 @@ u32 Graphics_GetShaderBufferIndex( const ShaderBufferList_t& srBufferList, u32 s
 
 void Graphics_OnTextureIndexUpdate()
 {
-	// Log_Msg( gLC_ClientGraphics, "TODO: HANDLE TEXTURE INDEX UPDATE !!!!\n" );
+	gGraphics.SetAllMaterialsDirty();
 }
 
 
@@ -1284,6 +1386,8 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 			return;
 		}
 	}
+
+	gRenderOld.CreateSelectionTexture();
 }
 
 
@@ -1785,6 +1889,18 @@ void Graphics::SetRenderableDebugName( ChHandle_t sRenderable, std::string_view 
 		memcpy( renderable->apDebugName, sName.data(), sName.size() );
 		renderable->apDebugName[ sName.size() ] = '\0';
 	}
+}
+
+
+u32 Graphics::GetRenderableCount()
+{
+	return gGraphicsData.aRenderables.size();
+}
+
+
+ChHandle_t Graphics::GetRenderableByIndex( u32 i )
+{
+	return gGraphicsData.aRenderables.GetHandleByIndex( i );
 }
 
 

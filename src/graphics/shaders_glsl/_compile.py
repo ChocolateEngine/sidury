@@ -13,6 +13,7 @@ SHADER_LIST = [
     "skybox",
     "shadow",
     "water",
+    "select",
 ]
 
 

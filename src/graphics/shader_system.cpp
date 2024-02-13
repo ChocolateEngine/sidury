@@ -413,6 +413,9 @@ bool Graphics_ShaderInit( bool sRecreate )
 		if ( shaderCreate->aRenderPass == ERenderPass_Shadow )
 			renderPass = gGraphicsData.aRenderPassShadow;
 
+		if ( shaderCreate->aRenderPass == ERenderPass_Select )
+			renderPass = gGraphicsData.aRenderPassSelect;
+
 		if ( !Graphics_CreateShader( sRecreate, renderPass, *shaderCreate ) )
 		{
 			Log_ErrorF( gLC_ClientGraphics, "Failed to create shader \"%s\"\n", shaderCreate->apName );

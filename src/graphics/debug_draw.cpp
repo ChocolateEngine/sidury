@@ -175,6 +175,11 @@ void Graphics_UpdateDebugDraw()
 		}
 	}
 
+	if ( gDebugLineDraw == CH_INVALID_HANDLE )
+	{
+		return;
+	}
+
 	Renderable_t* renderable = gGraphics.GetRenderableData( gDebugLineDraw );
 
 	if ( !renderable )

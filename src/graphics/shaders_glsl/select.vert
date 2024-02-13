@@ -4,16 +4,15 @@
 
 #include "core.glsl"
 
-layout(push_constant) uniform Push
-{
-	int  aAlbedo;
+layout(push_constant) uniform SelectParams {
 	uint aRenderable;
 	uint aViewport;
-	mat4 aModel;
-} push;
-
-// layout(location = 0) in vec3 inPosition;
-// layout(location = 1) in vec2 inTexCoord;
+	uint aVertexCount;
+	uint aDiffuse;
+	vec4 aColor;
+	vec2 aCursorPos;
+}
+push;
 
 layout(location = 0) out vec2 outTexCoord;
 
@@ -33,9 +32,7 @@ void main()
 
 	mat4 inMatrix = gModelMatrices[ push.aRenderable ];
 	vec3 inPos    = vert.aPosNormX.xyz;
-	// vec3 inNorm   = vec3(vert.aPosNormX.w, vert.aNormYZ_UV.xy);
 	vec2 inUV     = vert.aNormYZ_UV.zw;
-	vec4 inColor  = vert.aColor;
 
 	gl_Position = gViewports[ push.aViewport ].aProjView * inMatrix * vec4(inPos, 1.0);
 	outTexCoord = inUV;

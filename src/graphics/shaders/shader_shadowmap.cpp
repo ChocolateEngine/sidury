@@ -12,8 +12,6 @@ struct ShadowMap_Push
 };
 
 
-constexpr auto test = offsetof( ShadowMap_Push, aModelMatrix );
-
 static std::unordered_map< SurfaceDraw_t*, ShadowMap_Push > gPushData;
 static int                                                  gShadowViewInfoIndex = 0;
 
