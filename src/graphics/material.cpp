@@ -524,6 +524,37 @@ const glm::vec4& Graphics::Mat_GetVec4( Handle mat, u32 sIndex, const glm::vec4&
 // ---------------------------------------------------------------------------------------------------------
 
 
+template< typename VEC >
+static void ParseMaterialVarArray( VEC& value, JsonObject_t& cur )
+{
+	for ( int ii = 0; ii < value.length(); ii++ )
+	{
+		switch ( cur.aObjects[ ii ].aType )
+		{
+			default:
+				Log_ErrorF( "Invalid Material Array Value Type: %s, only accepts Int, Double, True, or False\n", Json_TypeToStr( cur.aObjects[ ii ].aType ) );
+				break;
+
+			case EJsonType_Int:
+				value[ ii ] = cur.aObjects[ ii ].aInt;
+				break;
+
+			case EJsonType_Double:
+				value[ ii ] = cur.aObjects[ ii ].aDouble;
+				break;
+
+			case EJsonType_True:
+				value[ ii ] = 1;
+				break;
+
+			case EJsonType_False:
+				value[ ii ] = 0;
+				break;
+		}
+	}
+}
+
+
 // Used in normal material loading, and eventually, live material reloading
 bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 {
@@ -677,7 +708,39 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 
 			case EJsonType_Array:
 			{
-				Log_Msg( "TODO: IMPLEMENT ARRAY PARSING\n" );
+				switch ( cur.aObjects.size() )
+				{
+					default:
+					{
+						Log_ErrorF( "Invalid Material Array Type: Has %d elements, only accepts 2, 3, or 4 elements\n", cur.aObjects.size() );
+						break;
+					}
+
+					case 2:
+					{
+						glm::vec2 value = {};
+						ParseMaterialVarArray( value, cur );
+						gGraphics.Mat_SetVar( handle, cur.apName, value );
+						break;
+					}
+
+					case 3:
+					{
+						glm::vec3 value = {};
+						ParseMaterialVarArray( value, cur );
+						gGraphics.Mat_SetVar( handle, cur.apName, value );
+						break;
+					}
+
+					case 4:
+					{
+						glm::vec4 value = {};
+						ParseMaterialVarArray( value, cur );
+						gGraphics.Mat_SetVar( handle, cur.apName, value );
+						break;
+					}
+				}
+
 				break;
 			}
 		}

@@ -4,6 +4,8 @@
 #include "file_picker.h"
 #include "skybox.h"
 #include "importer.h"
+#include "inputsystem.h"
+#include "gizmos.h"
 
 #include "imgui/imgui.h"
 
@@ -14,16 +16,94 @@ FilePickerData_t  gModelBrowserData{};
 FilePickerData_t  gImporterFilePicker{};
 FilePickerData_t  gSkyboxFilePicker{};
 
-ChHandle_t gSelectedEntity = CH_INVALID_HANDLE;
-
 extern glm::ivec2 gAssetBrowserSize;
 extern float      gAssetBrowserOffset;
 
 
+constexpr const char* CH_EDITOR_MODEL_LIGHT_CONE  = "dev/light_cone.glb";
+constexpr const char* CH_EDITOR_MODEL_LIGHT_POINT = "dev/light_point.glb";
+constexpr const char* CH_EDITOR_MODEL_GIZMO_POS   = "dev/axis.obj";
+constexpr const char* CH_EDITOR_MODEL_GIZMO_ANG   = "";
+constexpr const char* CH_EDITOR_MODEL_GIZMO_SCALE = "";
+
+
+EditorRenderables     gEditorRenderables;
+
+
+CONVAR( editor_gizmo_scale, 0.01, "Scale of the Editor Gizmos" );
+CONVAR( editor_gizmo_scale_enabled, 0, "Enable Editor Gizmo Scaling" );
+
+
+// adds the entity to the selection list, making sure it's not in the list multiple times
+void EntEditor_AddToSelection( EditorContext_t* context, ChHandle_t entity )
+{
+	u32 index = context->aEntitiesSelected.index( entity );
+	if ( index == UINT32_MAX )	
+		context->aEntitiesSelected.push_back( entity );
+}
+
+
+void EntEditor_LoadEditorRenderable( ChVector< const char* >& failList, ChHandle_t& handle, SelectionRenderable& select, const char* path )
+{
+	ChHandle_t model = graphics->LoadModel( path );
+
+	if ( !model )
+	{
+		failList.push_back( path );
+		return;
+	}
+
+	handle                   = graphics->CreateRenderable( model );
+	select.renderable        = handle;
+
+	// Setup the selection renderable colors
+	Renderable_t* renderable = graphics->GetRenderableData( handle );
+
+	select.colors.resize( renderable->aMaterialCount );
+
+	for ( u32 color : select.colors )
+	{
+		color = ( RandomU8( 0, 255 ) << 16 | RandomU8( 0, 255 ) << 8 | RandomU8( 0, 255 ) );
+	}
+}
+
+
 bool EntEditor_Init()
 {
+	// Setup Filters for File Pickers
 	gModelBrowserData.filterExt = { ".obj", ".glb", ".gltf" };
 	gSkyboxFilePicker.filterExt = { ".cmt", };
+
+	// Load Editor Models
+	ChVector< const char* > failed;
+
+	// EntEditor_LoadEditorRenderable( failed, gEditorRenderables.gizmoTranslation, gEditorRenderables.selectTranslation, CH_EDITOR_MODEL_GIZMO_POS );
+	// EntEditor_LoadEditorRenderable( failed, gEditorRenderables.gizmoRotation, CH_EDITOR_MODEL_GIZMO_ANG );
+	// EntEditor_LoadEditorRenderable( failed, gEditorRenderables.gizmoScale, CH_EDITOR_MODEL_GIZMO_SCALE );
+
+	if ( failed.size() )
+	{
+		LogGroup group = Log_GroupBeginEx( 0, LogType::Fatal );
+		Log_Group( group, "Failed to load editor models:\n" );
+
+		for ( const char* model : failed )
+		{
+			Log_GroupF( group, "%s\n", model );
+		}
+
+		Log_GroupEnd( group );
+		return false;
+	}
+
+	// setup materials for the gizmo
+	// ChHandle_t shader = graphics->GetShader( "debug" );
+	// 
+	// ChHandle_t matGizmoX = graphics->CreateMaterial( "gizmo_x", shader );
+	// ChHandle_t matGizmoY = graphics->CreateMaterial( "gizmo_y", shader );
+	// ChHandle_t matGizmoZ = graphics->CreateMaterial( "gizmo_z", shader );
+
+	if ( !Gizmo_Init() )
+		return false;
 
 	return true;
 }
@@ -280,7 +360,7 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 		updateLight |= ImGui::SliderFloat( "Inner FOV", &spEntity->apLight->aInnerFov, 0, 180 );
 		updateLight |= ImGui::SliderFloat( "Outer FOV", &spEntity->apLight->aOuterFov, 0, 180 );
 
-		updateLight |= ImGui::Checkbox( "Shadow Mapping", &spEntity->apLight->aShadow );
+		updateLight |= ImGui::Checkbox( "Shadows", &spEntity->apLight->aShadow );
 	}
 	//else if ( spEntity->apLight->aType == ELightType_Capsule )
 	//{
@@ -541,6 +621,13 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 		}
 	}
 
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "Clear Model" ) )
+	{
+
+	}
+
 	if ( spEntity->aRenderable )
 	{
 		Renderable_t* renderable = graphics->GetRenderableData( spEntity->aRenderable );
@@ -599,17 +686,44 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 
 void EntEditor_DrawEntityData()
 {
-	if ( gSelectedEntity == CH_INVALID_HANDLE )
+	EditorContext_t* context = Editor_GetContext();
+
+	if ( context == nullptr )
+		return;
+
+	if ( context->aEntitiesSelected.empty() )
 	{
 		ImGui::Text( "No Entity Selected" );
 		return;
 	}
 
-	Entity_t* entity = Entity_GetData( gSelectedEntity );
+	if ( context->aEntitiesSelected.size() > 1 )
+	{
+		ImGui::Text( "%d Entities Selected", context->aEntitiesSelected.size() );
+
+		for ( ChHandle_t entityHandle : context->aEntitiesSelected )
+		{
+			Entity_t* entity = Entity_GetData( entityHandle );
+			if ( entity == nullptr )
+			{
+				Log_ErrorF( "Selected Entity is nullptr?\n" );
+				context->aEntitiesSelected.clear();
+				return;
+			}
+
+			ImGui::Text( entity->apName );
+		}
+
+		return;
+	}
+
+	ChHandle_t selectedEntity = context->aEntitiesSelected[ 0 ];
+	Entity_t*  entity         = Entity_GetData( selectedEntity );
+
 	if ( entity == nullptr )
 	{
 		Log_ErrorF( "Selected Entity is nullptr?\n" );
-		gSelectedEntity = CH_INVALID_HANDLE;
+		context->aEntitiesSelected.clear();
 		return;
 	}
 
@@ -617,16 +731,11 @@ void EntEditor_DrawEntityData()
 
 	// std::string entName = vstring( "Entity %zd", gSelectedEntity );
 	// ImGui::Text( entName.data() );
-	
-	EditorContext_t* context = Editor_GetContext();
-
-	if ( context == nullptr )
-		return;
 
 	// -------------------------------------------------------------------------------------
 	// Entity Parenting
 
-	ChHandle_t parent = Entity_GetParent( gSelectedEntity );
+	ChHandle_t  parent     = Entity_GetParent( selectedEntity );
 	std::string parentName = "None";
 
 	if ( parent )
@@ -639,18 +748,18 @@ void EntEditor_DrawEntityData()
 	{
 		if ( ImGui::Selectable( "Clear Parent" ) )
 		{
-			Entity_SetParent( gSelectedEntity, CH_INVALID_HANDLE );
+			Entity_SetParent( selectedEntity, CH_INVALID_HANDLE );
 		}
 
 		// Can't parent it to any of these
 		std::unordered_set< ChHandle_t > children;
-		Entity_GetChildrenRecurse( gSelectedEntity, children );
+		Entity_GetChildrenRecurse( selectedEntity, children );
 
 		const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
 
 		for ( ChHandle_t entityHandle : entityHandles )
 		{
-			if ( Entity_GetParent( gSelectedEntity ) == entityHandle || gSelectedEntity == entityHandle )
+			if ( Entity_GetParent( selectedEntity ) == entityHandle || selectedEntity == entityHandle )
 				continue;
 
 			// Make sure this isn't one of our children
@@ -673,7 +782,7 @@ void EntEditor_DrawEntityData()
 	
 			if ( ImGui::Selectable( entityToParent->apName ? entityToParent->apName : entName.c_str() ) )
 			{
-				Entity_SetParent( gSelectedEntity, entityHandle );
+				Entity_SetParent( selectedEntity, entityHandle );
 			}
 	
 			ImGui::PopID();
@@ -731,6 +840,17 @@ void EntEditor_DrawEntityData()
 				else
 				{
 					entity->aRenderable = graphics->CreateRenderable( entity->aModel );
+				}
+
+				// Set Colors
+				Renderable_t* renderable = graphics->GetRenderableData( entity->aRenderable );
+				entity->aMaterialColors.resize( renderable->aMaterialCount );
+
+				for ( int i = 0; i < entity->aMaterialColors.size(); i++ )
+				{
+					entity->aMaterialColors[ i ].r = RandomU8( 0, 255 );
+					entity->aMaterialColors[ i ].g = RandomU8( 0, 255 );
+					entity->aMaterialColors[ i ].b = RandomU8( 0, 255 );
 				}
 			}
 		}
@@ -931,7 +1051,7 @@ void EntEditor_DrawMapDataUI()
 }
 
 
-void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
+void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent )
 {
 	Entity_t* entity = Entity_GetData( sParent );
 	if ( entity == nullptr )
@@ -948,9 +1068,22 @@ void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
 
 	ImGui::SameLine();
 
-	if ( ImGui::Selectable( entity->apName ? entity->apName : entName.c_str(), gSelectedEntity == sParent ) )
+	bool selected = false;
+	for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
 	{
-		gSelectedEntity        = sParent;
+		if ( selectedEnt == sParent )
+		{
+			selected = true;
+			break;
+		}
+	}
+
+	if ( ImGui::Selectable( entity->apName ? entity->apName : entName.c_str(), selected ) )
+	{
+		if ( !input->KeyPressed( (EButton)SDL_SCANCODE_LSHIFT ) )
+			context->aEntitiesSelected.clear();
+
+		EntEditor_AddToSelection( context, sParent );
 		gModelBrowserData.open = false;
 	}
 
@@ -962,7 +1095,7 @@ void EntEditor_DrawEntityChildTree( ChHandle_t sParent )
 
 		for ( ChHandle_t child : children )
 		{
-			EntEditor_DrawEntityChildTree( child );
+			EntEditor_DrawEntityChildTree( context, child );
 		}
 
 		ImGui::TreePop();
@@ -976,13 +1109,8 @@ extern int gMainMenuBarHeight;
 glm::vec2  gEntityListSize{};
 
 
-void EntEditor_DrawEntityList()
+void EntEditor_DrawEntityList( EditorContext_t* context )
 {
-	EditorContext_t* context = Editor_GetContext();
-
-	if ( !context )
-		return;
-
 	int width, height;
 	render->GetSurfaceSize( width, height );
 
@@ -1017,13 +1145,16 @@ void EntEditor_DrawEntityList()
 
 			if ( ImGui::Button( "Create" ) )
 			{
-				gSelectedEntity  = Entity_Create();
+				ChHandle_t selectedEntity = Entity_Create();
 
-				Entity_t* entity = Entity_GetData( gSelectedEntity );
+				context->aEntitiesSelected.clear();
+				context->aEntitiesSelected.push_back( selectedEntity );
+
+				Entity_t* entity = Entity_GetData( selectedEntity );
 				if ( entity == nullptr )
 				{
 					Log_ErrorF( "Created Entity is nullptr????\n" );
-					gSelectedEntity = CH_INVALID_HANDLE;
+					selectedEntity = CH_INVALID_HANDLE;
 				}
 				else
 				{
@@ -1035,10 +1166,12 @@ void EntEditor_DrawEntityList()
 
 			if ( ImGui::Button( "Delete" ) )
 			{
-				if ( gSelectedEntity )
-					Entity_Delete( gSelectedEntity );
+				for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+				{
+					Entity_Delete( selectedEnt );
+				}
 
-				gSelectedEntity = CH_INVALID_HANDLE;
+				context->aEntitiesSelected.clear();
 			}
 
 			// Entity List
@@ -1055,7 +1188,7 @@ void EntEditor_DrawEntityList()
 					if ( it != entityParents.end() )
 						continue;
 
-					EntEditor_DrawEntityChildTree( entityHandle );
+					EntEditor_DrawEntityChildTree( context, entityHandle );
 				}
 			}
 
@@ -1121,24 +1254,74 @@ void EntEditor_DrawUI()
 {
 	AssetBrowser_Draw();
 
-	EntEditor_DrawEntityList();
-	// EntEditor_DrawEntityData();
+	EditorContext_t* context = Editor_GetContext();
 
-	if ( gSelectedEntity == CH_INVALID_HANDLE )
+	if ( !context )
 		return;
 
-	Entity_t* entity = Entity_GetData( gSelectedEntity );
+	EntEditor_DrawEntityList( context );
 
-	if ( entity->aRenderable )
+	Renderable_t* gizmoTranslation = graphics->GetRenderableData( gEditorRenderables.gizmoTranslation );
+	gizmoTranslation->aVisible     = false;
+
+	// Renderable_t* gizmoRotation    = graphics->GetRenderableData( gEditorRenderables.gizmoRotation );
+	// gizmoRotation->aVisible        = false;
+	// 
+	// Renderable_t* gizmoScale       = graphics->GetRenderableData( gEditorRenderables.gizmoScale );
+	// gizmoScale->aVisible           = false;
+
+	if ( context->aEntitiesSelected.empty() )
+		return;
+
+	// Draw Axis and Bounding Boxes around selected entities
+	for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
 	{
-		// Draw a box around the selected entity
-		ModelBBox_t bbox = graphics->GetRenderableAABB( entity->aRenderable );
-		graphics->DrawBBox( bbox.aMin, bbox.aMax, gSelectBoxColor );
+		Entity_t* entity = Entity_GetData( selectedEnt );
+
+		if ( entity->aRenderable )
+		{
+			// Draw a box around the selected entity
+			ModelBBox_t bbox = graphics->GetRenderableAABB( entity->aRenderable );
+			graphics->DrawBBox( bbox.aMin, bbox.aMax, gSelectBoxColor );
+		}
+
+		// Draw an axis where the selected is (TODO: change this to arrows, rotation, and scaling)
+		glm::mat4 mat( 1.f );
+		Entity_GetWorldMatrix( mat, selectedEnt );
+		graphics->DrawAxis( mat, gSelectScale );
 	}
 
-	// Draw an axis where the selected is (TODO: change this to arrows, rotation, and scaling)
-	glm::mat4 mat( 1.f );
-	Entity_GetWorldMatrix( mat, gSelectedEntity );
-	graphics->DrawAxis( mat, gSelectScale );
+	// For Now, just draw a gizmo at the first selected entity
+	ChHandle_t selectedEnt  = context->aEntitiesSelected[ 0 ];
+	Entity_t*  entity       = Entity_GetData( selectedEnt );
+
+	glm::mat4  mat( 1.f );
+	Entity_GetWorldMatrix( mat, selectedEnt );
+
+	if ( gEditorData.gizmoMode == EGizmoMode_Translation )
+	{
+		glm::vec3 pos    = Util_GetMatrixPosition( mat );
+		glm::vec3 camPos = context->aView.aPos;
+		glm::mat4 gizmoPosMat;
+
+		if ( editor_gizmo_scale_enabled )
+		{
+			// Scale it based on distance so it always appears the same size, no matter how far or close you are
+			float     dist   = glm::sqrt( powf( camPos.x - pos.x, 2 ) + powf( camPos.y - pos.y, 2 ) + powf( camPos.z - pos.z, 2 ) );
+
+			glm::vec3 scale  = { dist, dist, dist };
+			scale *= editor_gizmo_scale.GetFloat();
+
+			gizmoPosMat = Util_ToMatrix( &pos, nullptr, &scale );
+		}
+		else
+		{
+			gizmoPosMat = Util_ToMatrix( &pos, nullptr, nullptr );
+		}
+
+		// Draw the Selection Gizmo
+		gizmoTranslation->aVisible     = true;
+		gizmoTranslation->aModelMatrix = gizmoPosMat;
+	}
 }
 

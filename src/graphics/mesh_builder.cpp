@@ -687,8 +687,8 @@ void MeshBuild_FinishMesh( IGraphics* spGraphics, MeshBuildData_t& srMeshBuildDa
 			MeshBuild_CopyVerts( vertAttribs[ 2 ].apData, baseSize, 2, material.apUV, material.aVertexCount );
 
 			// Copy Blend Shapes
-			// if ( material.aBlendShapes.empty() )
-			// 	continue;
+			if ( material.aBlendShapes.empty() )
+				continue;
 
 			if ( !realloc_free_cast( vertData->apBlendShapeData, baseBlendSize + material.aVertexCount * material.aBlendShapes.size() ) )
 				return;

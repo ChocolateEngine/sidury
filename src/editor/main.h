@@ -41,6 +41,30 @@ extern float             gFrameTime;
 extern double            gCurTime;
 
 
+enum EGizmoMode
+{
+	EGizmoMode_Translation,
+	EGizmoMode_Rotation,
+	EGizmoMode_Scale,
+	EGizmoMode_All,
+};
+
+
+enum EGizmoAxis
+{
+	EGizmoAxis_None,
+	EGizmoAxis_X,
+	EGizmoAxis_Y,
+	EGizmoAxis_Z,
+	EGizmoAxis_PlaneXY,
+	EGizmoAxis_PlaneXZ,
+	EGizmoAxis_PlaneYZ,
+	EGizmoAxis_Screen,
+
+	EGizmoAxis_Count,
+};
+
+
 struct EditorView_t
 {
 	glm::mat4        aViewMat;
@@ -81,7 +105,11 @@ struct EditorContext_t
 struct EditorData_t
 {
 	// Inputs
-	glm::vec3 aMove{};
+	glm::vec3  aMove{};
+
+	// Gizmo Data
+	EGizmoMode gizmoMode;
+	EGizmoAxis gizmoSelectedAxis;
 };
 
 
@@ -127,4 +155,8 @@ void                                   Editor_SetContext( ChHandle_t sContext );
 // maybe do this?
 // 
 // void                                  Editor_SetCurrentContext( u32 sContextId );
+
+
+// Helper function that uses stuff from the graphics viewport system
+glm::vec3 Util_GetRayFromScreenSpace( glm::ivec2 mousePos, u32 viewportIndex );
 

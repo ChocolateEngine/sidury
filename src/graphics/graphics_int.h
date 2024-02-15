@@ -40,21 +40,6 @@ struct ViewRenderList_t
 };
 
 
-constexpr glm::vec4 gFrustumFaceData[ 8u ] = {
-	// Near Face
-	{ 1, 1, -1, 1.f },
-	{ -1, 1, -1, 1.f },
-	{ 1, -1, -1, 1.f },
-	{ -1, -1, -1, 1.f },
-
-	// Far Face
-	{ 1, 1, 1, 1.f },
-	{ -1, 1, 1, 1.f },
-	{ 1, -1, 1, 1.f },
-	{ -1, -1, 1, 1.f },
-};
-
-
 struct ShaderDescriptorData_t
 {
 	// Descriptor Set Layouts for the Shader Slots
@@ -370,9 +355,6 @@ bool                  Graphics_CreateVariableUniformLayout( ShaderDescriptor_t& 
 
 void                  Graphics_DrawShaderRenderables( ChHandle_t cmd, size_t sIndex, ChHandle_t shader, size_t sViewIndex, ChVector< SurfaceDraw_t >& srRenderList );
 
-void                  Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat );
-Frustum_t             Graphics_CreateFrustum( const glm::mat4& srViewInfo );
-
 u32                   Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName );
 void                  Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName, u32 sIndex );
 
@@ -664,6 +646,9 @@ class Graphics : public IGraphics
 
 	// virtual void               ConsolidateRenderables()                                                                                                     override;
 
+	virtual void               CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )                                                            override;
+	virtual Frustum_t          CreateFrustum( const glm::mat4& srViewMat )                                                                                  override;
+
 	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                            override;
 
 	// ---------------------------------------------------------------------------------------
@@ -671,6 +656,7 @@ class Graphics : public IGraphics
 
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                override;
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                override;
+	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColorX, const glm::vec3& sColorY )                     override;
 	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                            override;
 	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                   override;
 	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                            override;

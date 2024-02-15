@@ -453,6 +453,7 @@ bool Game_Init()
 
 	Phys_Init();
 
+	Skybox_Init();
 	EntEditor_Init();
 
 	renderOld->EnableSelection( true, gMainViewportIndex );
@@ -871,5 +872,26 @@ void Editor_SetContext( ChHandle_t sContext )
 		Skybox_SetMaterial( "" );
 
 	// TODO: once multiple windows for the 3d view are supported, we will change focus of them here
+}
+
+
+// ------------------------------------------------------------------------
+
+
+glm::vec3 Util_GetRayFromScreenSpace( glm::ivec2 mousePos, u32 viewportIndex )
+{
+	ViewportShader_t* viewport = graphics->GetViewportData( viewportIndex );
+
+	if ( viewport == nullptr )
+	{
+		Log_ErrorF( "Invalid Viewport Index for \"%s\" func - %d", CH_FUNC_NAME, viewportIndex );
+		return {};
+	}
+
+	// Apply viewport offsets to mouse pos
+	mousePos.x -= viewport->aOffset.x;
+	mousePos.y -= viewport->aOffset.y;
+
+	return Util_GetRayFromScreenSpace( mousePos, viewport->aProjView, viewport->aSize );
 }
 

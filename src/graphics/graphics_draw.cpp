@@ -152,6 +152,15 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 {
 	PROF_SCOPE();
 
+	if ( srRenderList.empty() )
+		return;
+
+	// if ( Log_GetDevLevel() > 2 )
+	{
+		const char* name = gGraphics.GetShaderName( shader );
+		Log_DevF( 2, "Binding Shader: %s", name );
+	}
+
 	if ( !Shader_Bind( cmd, sIndex, shader ) )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Failed to bind shader: %s\n", gGraphics.GetShaderName( shader ) );
@@ -255,6 +264,7 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 
 	// here we go again
 	static Handle skybox    = gGraphics.GetShader( "skybox" );
+	static Handle gizmo     = gGraphics.GetShader( "gizmo" );
 
 	bool          hasSkybox = false;
 
@@ -277,14 +287,26 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 	viewPort.x        = viewportData->aOffset.x;
 	viewPort.y        = viewportData->aSize.y + viewportData->aOffset.y;
 
-	viewPort.minDepth = 0.f;
-	viewPort.maxDepth = 1.f;
-
 	// viewPort.width    = width;
 	// viewPort.height   = height * -1.f;
 
 	viewPort.width    = viewportData->aSize.x;
 	viewPort.height   = viewportData->aSize.y * -1.f;
+
+	auto findGizmo    = srViewList.aRenderLists.find( gizmo );
+
+	if ( findGizmo != srViewList.aRenderLists.end() )
+	{
+		viewPort.minDepth = 0.000f;
+		viewPort.maxDepth = 0.001f;
+
+		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+		Graphics_DrawShaderRenderables( cmd, sIndex, gizmo, sViewIndex, srViewList.aRenderLists[ gizmo ] );
+	}
+
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 1.f;
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
@@ -301,6 +323,9 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 			hasSkybox = true;
 			continue;
 		}
+
+		if ( shader == gizmo )
+			continue;
 
 		Graphics_DrawShaderRenderables( cmd, sIndex, shader, sViewIndex, renderList );
 	}

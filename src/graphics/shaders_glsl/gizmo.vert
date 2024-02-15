@@ -4,17 +4,34 @@
 
 #include "core.glsl"
 
+
+#define GIZMO_COLOR_MODE_NONE     0
+#define GIZMO_COLOR_MODE_HOVERED  ( 1 << 0 )
+#define GIZMO_COLOR_MODE_SELECTED ( 1 << 1 )
+
+#define GIZMO_COLOR_MULT_HOVERED  1.4
+#define GIZMO_COLOR_MULT_SELECTED 1.2
+
+
 layout(push_constant) uniform Push
 {
     mat4 aModelMatrix;
     vec4 aColor;
 	uint aRenderable;
 	uint aViewport;
+	uint aColorMode;
 } push;
 
 // layout(location = 0) in vec3 inPosition;
 
 layout(location = 0) out vec4 fragColor;
+
+vec4 Desaturate( vec3 color, float factor )
+{
+    vec3 lum = vec3(0.299, 0.587, 0.114);
+	vec3 gray = vec3(dot(lum, color));
+	return vec4(mix(color, gray, factor), 1.0);
+}
 
 void main()
 {
@@ -38,4 +55,20 @@ void main()
 
 	gl_Position = gViewports[ push.aViewport ].aProjView * push.aModelMatrix * vec4(inPos, 1.0);
     fragColor   = push.aColor;
+
+	vec4 baseMultColor = vec4( 0.1, 0.1, 0.1, 1.0 );
+
+	// uint hovered = push.aColorMode & GIZMO_COLOR_MODE_HOVERED;
+	// 
+	// if ( hovered > 0 )
+	// {
+	// 	fragColor *= baseMultColor;
+	// }
+
+	uint selected = push.aColorMode & GIZMO_COLOR_MODE_SELECTED;
+	
+	if ( selected > 0 )
+	{
+		fragColor *= baseMultColor;
+	}
 }

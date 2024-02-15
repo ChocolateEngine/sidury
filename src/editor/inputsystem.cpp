@@ -646,6 +646,7 @@ void Input_ResetBindings()
 	Input_BindKey( SDL_SCANCODE_LCTRL, EBinding_Viewport_Slow );
 
 	Input_BindKey( EButton_MouseLeft, EBinding_Viewport_SelectSingle );
+	Input_BindKey( EButton_MouseRight, EBinding_Viewport_SelectMulti );
 	// Input_BindKeys( { SDL_SCANCODE_LCTRL, EButton_MouseLeft }, EBinding_Viewport_SelectMulti );
 }
 

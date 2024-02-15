@@ -172,6 +172,21 @@ struct ViewportCamera_t
 };
 
 
+constexpr glm::vec4 gFrustumFaceData[ 8u ] = {
+	// Near Face
+	{ 1, 1, -1, 1.f },
+	{ -1, 1, -1, 1.f },
+	{ 1, -1, -1, 1.f },
+	{ -1, -1, -1, 1.f },
+
+	// Far Face
+	{ 1, 1, 1, 1.f },
+	{ -1, 1, 1, 1.f },
+	{ 1, -1, 1, 1.f },
+	{ -1, -1, 1, 1.f },
+};
+
+
 enum EFrustum
 {
 	EFrustum_Top,
@@ -1139,6 +1154,9 @@ class IGraphics : public ISystem
 
 	virtual void               SetRenderableDebugName( ChHandle_t sRenderable, std::string_view sName )                                                                                       = 0;
 
+	virtual void               CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )                                                                                               = 0;
+	virtual Frustum_t          CreateFrustum( const glm::mat4& srViewMat )                                                                                                                     = 0;
+
 	virtual ModelBBox_t        CreateWorldAABB( glm::mat4& srMatrix, const ModelBBox_t& srBBox )                                                                                              = 0;
 
 	// ---------------------------------------------------------------------------------------
@@ -1147,6 +1165,7 @@ class IGraphics : public ISystem
 
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColor )                                                                                  = 0;
 	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )                                                                                  = 0;
+	virtual void               DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColorX, const glm::vec3& sColorY )                                                       = 0;
 	virtual void               DrawAxis( const glm::vec3& sPos, const glm::vec3& sAng, const glm::vec3& sScale )                                                                              = 0;
 	virtual void               DrawAxis( const glm::mat4& sMat, const glm::vec3& sScale )                                                                                                     = 0;
 	virtual void               DrawAxis( const glm::mat4& sMat )                                                                                                                              = 0;
@@ -1170,8 +1189,8 @@ class IGraphics : public ISystem
 
 struct SelectionRenderable
 {
-	ChHandle_t renderable;
-	u8         color[ 3 ];
+	ChHandle_t      renderable;
+	ChVector< u32 > colors;
 };
 
 
@@ -1240,7 +1259,7 @@ class IRenderSystem : public ISystem
 
 
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  5
+#define IGRAPHICS_VER  6
 
 #define IRENDERSYSTEMOLD_NAME "IRenderSystemOld"
 #define IRENDERSYSTEMOLD_VER  1

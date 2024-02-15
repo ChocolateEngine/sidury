@@ -48,8 +48,6 @@ void Graphics_DrawSelectionTextureRenderables( Handle cmd, size_t sIndex )
 	Viewport_t viewPort{};
 	viewPort.x        = graphicsViewport->aOffset.x;
 	viewPort.y        = graphicsViewport->aSize.y + graphicsViewport->aOffset.y;
-	viewPort.minDepth = 0.f;
-	viewPort.maxDepth = 1.f;
 	viewPort.width    = graphicsViewport->aSize.x;
 	viewPort.height   = graphicsViewport->aSize.y * -1.f;
 
@@ -63,10 +61,58 @@ void Graphics_DrawSelectionTextureRenderables( Handle cmd, size_t sIndex )
 
 	ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ gRenderOld.aSelectionViewport ];
 
+	// HACK - EVIL
+	// always draw stuff with the gizmo shader on top of everything
+
+	ChVector< SurfaceDraw_t > gizmos;
+	ChVector< SurfaceDraw_t > otherRenderables;
+
+	static Handle     gizmo     = gGraphics.GetShader( "gizmo" );
+
 	for ( auto& [ shader, renderList ] : viewList.aRenderLists )
 	{
-		Graphics_DrawShaderRenderables( cmd, sIndex, shader, gRenderOld.aSelectionViewport, renderList );
+		for ( SurfaceDraw_t& surface : renderList )
+		{
+			Renderable_t* renderable = gGraphics.GetRenderableData( surface.aRenderable );
+			ChHandle_t    mat        = renderable->apMaterials[ surface.aSurface ];
+			ChHandle_t    matShader  = gGraphics.Mat_GetShader( mat );
+
+			if ( matShader == gizmo )
+				gizmos.push_back( surface );
+			else
+				otherRenderables.push_back( surface );
+		}
 	}
+
+	static Handle     select    = gGraphics.GetShader( "__select" );
+
+	auto findGizmo = viewList.aRenderLists.find( gizmo );
+
+	// Draw Gizmos
+	// if ( gizmos.size() )
+	// {
+	// 	viewPort.minDepth = 0.000f;
+	// 	viewPort.maxDepth = 0.001f;
+	// 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+	// 
+	// 	Graphics_DrawShaderRenderables( cmd, sIndex, select, gRenderOld.aSelectionViewport, gizmos );
+	// }
+
+	// Draw Normal Renderables
+
+	viewPort.minDepth = 0.f;
+	viewPort.maxDepth = 1.f;
+	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
+
+	Graphics_DrawShaderRenderables( cmd, sIndex, select, gRenderOld.aSelectionViewport, otherRenderables );
+
+	// for ( auto& [ shader, renderList ] : viewList.aRenderLists )
+	// {
+	// 	if ( shader == gizmo )
+	// 		continue;
+	// 
+	// 	Graphics_DrawShaderRenderables( cmd, sIndex, shader, gRenderOld.aSelectionViewport, renderList );
+	// }
 }
 
 
@@ -181,7 +227,7 @@ void Graphics_PrepareDrawData()
 
 		for ( size_t i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
 		{
-			Graphics_CreateFrustum( gGraphicsData.aViewData.aFrustums[ i ], gGraphicsData.aViewData.aViewports[ i ].aProjView );
+			gGraphics.CreateFrustum( gGraphicsData.aViewData.aFrustums[ i ], gGraphicsData.aViewData.aViewports[ i ].aProjView );
 			gGraphics.DrawFrustum( gGraphicsData.aViewData.aFrustums[ i ] );
 		}
 	}
@@ -779,8 +825,10 @@ void RenderSystemOld::Present()
 		//Graphics_DoSkinning( c, cmdIndex );
 
 		// Do Selection Rendering
-		if ( aSelectionEnabled )
+		if ( aSelectionEnabled && aSelectionThisFrame )
 			Graphics_SelectionTexturePass( c, cmdIndex );
+
+		aSelectionThisFrame = false;
 
 		// Draw Shadow Maps
 		Graphics_DrawShadowMaps( c, cmdIndex );
@@ -1049,11 +1097,14 @@ void RenderSystemOld::EnableSelection( bool enabled, u32 viewport )
 
 void RenderSystemOld::SetSelectionRenderablesAndCursorPos( const ChVector< SelectionRenderable >& renderables, glm::ivec2 cursorPos )
 {
-	if ( !aSelectionEnabled )
+	if ( !aSelectionEnabled || renderables.empty() )
 	{
 		return;
 	}
 
+	// TODO: resizing before assigning fixes a crash here ????
+	// need to look further into this
+	aSelectionRenderables.resize( renderables.size() );
 	aSelectionRenderables = renderables;
 	aSelectionCursorPos   = cursorPos;
 	aSelectionThisFrame   = true;

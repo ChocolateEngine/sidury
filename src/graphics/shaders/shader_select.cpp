@@ -61,9 +61,19 @@ static void Shader_Select_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw
 		if ( selectRenderable.renderable != srSurfaceDraw.aRenderable )
 			continue;
 
-		color[ 0 ] = selectRenderable.color[ 0 ];
-		color[ 1 ] = selectRenderable.color[ 1 ];
-		color[ 2 ] = selectRenderable.color[ 2 ];
+		if ( selectRenderable.colors.size() < srSurfaceDraw.aSurface )
+		{
+			Log_ErrorF( "No Material Color for material %d!\n", srSurfaceDraw.aSurface );
+		}
+		else
+		{
+			u32 colorSelect = selectRenderable.colors[ srSurfaceDraw.aSurface ];
+
+			color[ 0 ]      = ( colorSelect >> 16 ) & 0xFF;
+			color[ 1 ]      = ( colorSelect >> 8 ) & 0xFF;
+			color[ 2 ]      = colorSelect & 0xFF;
+		}
+
 		break;
 	}
 
@@ -76,21 +86,20 @@ static void Shader_Select_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw
 	push.aDiffuse            = -1;
 
 	Renderable_t* renderable = gGraphics.GetRenderableData( srSurfaceDraw.aRenderable );
+	ChHandle_t    mat        = gGraphics.Model_GetMaterial( renderable->aModel, srSurfaceDraw.aSurface );
 
-	Handle        mat        = gGraphics.Model_GetMaterial( renderable->aModel, srSurfaceDraw.aSurface );
+	if ( mat != CH_INVALID_HANDLE )
+	{
+		ChHandle_t texture = gGraphics.Mat_GetTexture( mat, "diffuse" );
 
-	if ( mat == InvalidHandle )
-		return;
+		if ( texture != CH_INVALID_HANDLE )
+		{
+			bool alphaTest = gGraphics.Mat_GetBool( mat, "alphaTest" );
 
-	Handle texture = gGraphics.Mat_GetTexture( mat, "diffuse" );
-
-	if ( texture == InvalidHandle )
-		return;
-
-	bool alphaTest = gGraphics.Mat_GetBool( mat, "alphaTest" );
-
-	if ( alphaTest )
-		push.aDiffuse = render->GetTextureIndex( texture );
+			if ( alphaTest )
+				push.aDiffuse = render->GetTextureIndex( texture );
+		}
+	}
 
 	render->CmdPushConstants( cmd, sLayout, ShaderStage_Vertex | ShaderStage_Fragment, 0, sizeof( ShaderSelect_Push ), &push );
 }

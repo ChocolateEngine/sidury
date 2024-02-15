@@ -67,6 +67,9 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 			std::string matPath = matName + ".cmt";
 			if ( FileSys_IsFile( matPath ) )
 				material = gGraphics.LoadMaterial( matPath );
+
+			else if ( FileSys_IsFile( "models/" + matPath ) )
+				material = gGraphics.LoadMaterial( "models/" + matPath );
 		}
 
 		// fallback if there is no cmt file

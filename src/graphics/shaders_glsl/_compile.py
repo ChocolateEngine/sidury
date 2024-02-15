@@ -14,6 +14,7 @@ SHADER_LIST = [
     "shadow",
     "water",
     "select",
+    "gizmo",
 ]
 
 

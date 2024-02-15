@@ -302,6 +302,37 @@ void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::ve
 }
 
 
+void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec3& sColorX, const glm::vec3& sColorY )
+{
+	PROF_SCOPE();
+
+	if ( !r_debug_draw || !gDebugLineModel )
+		return;
+
+	size_t index = gDebugLineVerts.size();
+	gDebugLineVerts.resize( gDebugLineVerts.size() + 2 );
+
+	gDebugLineVerts[ index ].aPosNormX.x = sX.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sX.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sX.z;
+
+	gDebugLineVerts[ index ].aColor.x    = sColorX.x;
+	gDebugLineVerts[ index ].aColor.y    = sColorX.y;
+	gDebugLineVerts[ index ].aColor.z    = sColorX.z;
+	gDebugLineVerts[ index ].aColor.w    = 1.f;
+
+	index++;
+	gDebugLineVerts[ index ].aPosNormX.x = sY.x;
+	gDebugLineVerts[ index ].aPosNormX.y = sY.y;
+	gDebugLineVerts[ index ].aPosNormX.z = sY.z;
+
+	gDebugLineVerts[ index ].aColor.x    = sColorY.x;
+	gDebugLineVerts[ index ].aColor.y    = sColorY.y;
+	gDebugLineVerts[ index ].aColor.z    = sColorY.z;
+	gDebugLineVerts[ index ].aColor.w    = 1.f;
+}
+
+
 void Graphics::DrawLine( const glm::vec3& sX, const glm::vec3& sY, const glm::vec4& sColor )
 {
 	PROF_SCOPE();
@@ -451,16 +482,19 @@ void Graphics::DrawFrustum( const Frustum_t& srFrustum )
 
 	gDebugLineVerts.reserve( gDebugLineVerts.size() + 24 );
 
+	// Draw the Near Plane of the Frustum
 	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 1 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 2 ], glm::vec3( 1, 1, 1 ) );
 
+	// Draw the lines conecting the near plane to the far plane
 	gGraphics.DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 4 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 7 ], srFrustum.aPoints[ 6 ], glm::vec3( 1, 1, 1 ) );
-
+	
+	// Draw the Far Plane of the Frustum
 	gGraphics.DrawLine( srFrustum.aPoints[ 0 ], srFrustum.aPoints[ 4 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 1 ], srFrustum.aPoints[ 5 ], glm::vec3( 1, 1, 1 ) );
 	gGraphics.DrawLine( srFrustum.aPoints[ 3 ], srFrustum.aPoints[ 7 ], glm::vec3( 1, 1, 1 ) );

@@ -3,6 +3,7 @@
 #include "game_shared.h"
 #include "skybox.h"
 #include "inputsystem.h"
+#include "entity_editor.h"
 
 #include "igui.h"
 #include "iinput.h"
@@ -34,8 +35,7 @@ CONVAR( editor_show_pos, 1.f );
 CONVAR( editor_spew_imgui_window_hover, 0 );
 
 
-// TODO: Remove This for multiselect
-extern ChHandle_t gSelectedEntity;
+static bool gClearSelection = false;
 
 
 // Check the function FindHoveredWindow() in imgui.cpp to see if you need to update this when updating imgui
@@ -115,9 +115,6 @@ void EditorView_Shutdown()
 }
 
 
-static bool gDrawMouseTrace = false;
-static glm::vec3 gMouseTraceStart{};
-static glm::vec3 gMouseTraceEnd{};
 static float gMoveScale = 1.f;
 static bool gCheckSelectionResult = false;
 
@@ -153,9 +150,6 @@ static void UpdateSelectionRenderables()
 	glm::ivec2                      mousePos = input->GetMousePos();
 	EditorContext_t*                context  = Editor_GetContext();
 
-	if ( ImGui::IsAnyItemHovered() )
-		return;
-
 	ChVector< SelectionRenderable > selectList;
 	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
 	{
@@ -173,9 +167,28 @@ static void UpdateSelectionRenderables()
 
 		SelectionRenderable selectRenderable;
 		selectRenderable.renderable = ent->aRenderable;
-		selectRenderable.color[ 0 ] = ent->aSelectColor[ 0 ];
-		selectRenderable.color[ 1 ] = ent->aSelectColor[ 1 ];
-		selectRenderable.color[ 2 ] = ent->aSelectColor[ 2 ];
+
+		Renderable_t* renderable    = graphics->GetRenderableData( ent->aRenderable );
+
+		selectRenderable.colors.resize( renderable->aMaterialCount );
+
+		if ( ent->aMaterialColors.size() && ent->aMaterialColors.size() == renderable->aMaterialCount )
+		{
+			for ( u32 i = 0; i < selectRenderable.colors.size(); i++ )
+			{
+				Color3& color3 = ent->aMaterialColors[ i ];
+				u32&    color  = selectRenderable.colors[ i ];
+				color          = ( color3.r << 16 | color3.g << 8 | color3.b );
+			}
+		}
+		else
+		{
+			for ( u32 i = 0; i < selectRenderable.colors.size(); i++ )
+			{
+				u32& color = selectRenderable.colors[ i ];
+				color      = ( ent->aSelectColor[ 0 ] << 16 | ent->aSelectColor[ 1 ] << 8 | ent->aSelectColor[ 2 ] );
+			}
+		}
 
 		selectList.push_back( selectRenderable );
 	}
@@ -223,6 +236,12 @@ void EditorView_UpdateInputs()
 	const float upSpeed      = view_move_up * moveScale;
 	// apMove->aMaxSpeed        = max_speed * moveScale;
 
+	EditorContext_t*  context      = Editor_GetContext();
+
+	static glm::vec3  rayPos{};
+	static glm::vec3  rayDir{};
+	static glm::mat4  tempView = context->aView.aProjViewMat;
+
 	if ( Input_KeyPressed( EBinding_Viewport_MoveForward ) )
 		gEditorData.aMove[ W_FORWARD ] = forwardSpeed;
 
@@ -247,14 +266,47 @@ void EditorView_UpdateInputs()
 	}
 	else if ( Input_KeyJustPressed( EBinding_Viewport_SelectSingle ) )
 	{
-		Editor_GetContext()->aEntitiesSelected.clear();
-		// gSelectedEntity = CH_INVALID_HANDLE;
+		gClearSelection = true;
 		UpdateSelectionRenderables();
 	}
 
-	if ( gDrawMouseTrace )
+	rayDir = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aViewportIndex );
+	rayPos = context->aView.aPos;
+
+	// do ray test against selection gizmos
+	Ray ray{};
+	ray.origin = rayPos;
+	ray.dir    = rayDir;
+
+	bolean hitX = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateX );
+	bolean hitY = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateY );
+	bolean hitZ = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateZ );
+
+	if ( hitX )
 	{
-		graphics->DrawLine( gMouseTraceStart, gMouseTraceEnd, {1.f, 0.6f, 0.6f, 1.f} );
+		graphics->DrawBBox( gEditorRenderables.baseTranslateX.min, gEditorRenderables.baseTranslateX.max, { 0.7, 0.3, 0.3 } );
+	}
+	else
+	{
+		graphics->DrawBBox( gEditorRenderables.baseTranslateX.min, gEditorRenderables.baseTranslateX.max, { 1, 0, 0 } );
+	}
+
+	if ( hitY )
+	{
+		graphics->DrawBBox( gEditorRenderables.baseTranslateY.min, gEditorRenderables.baseTranslateY.max, { 0.3, 0.7, 0.3 } );
+	}
+	else
+	{
+		graphics->DrawBBox( gEditorRenderables.baseTranslateY.min, gEditorRenderables.baseTranslateY.max, { 0, 1, 0 } );
+	}
+
+	if ( hitZ )
+	{
+		graphics->DrawBBox( gEditorRenderables.baseTranslateZ.min, gEditorRenderables.baseTranslateZ.max, { 0.3, 0.3, 0.7 } );
+	}
+	else
+	{
+		graphics->DrawBBox( gEditorRenderables.baseTranslateZ.min, gEditorRenderables.baseTranslateZ.max, { 0, 0, 1 } );
 	}
 }
 
@@ -390,6 +442,48 @@ static void CenterMouseOnScreen( EditorContext_t* context )
 }
 
 
+void EditorView_CheckSelectionResult( EditorContext_t* context )
+{
+	if ( gClearSelection )
+		context->aEntitiesSelected.clear();
+
+	gClearSelection = false;
+
+	u8 selectColor[ 3 ];
+	if ( !renderOld->GetSelectionResult( selectColor[ 0 ], selectColor[ 1 ], selectColor[ 2 ] ) )
+		return;
+
+	// scan entities to find a matching color
+	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+	{
+		Entity_t* ent = Entity_GetData( entHandle );
+
+		if ( !ent )
+		{
+			continue;
+		}
+
+		// Entity Color Selection
+		if ( ent->aSelectColor[ 0 ] == selectColor[ 0 ] && ent->aSelectColor[ 1 ] == selectColor[ 1 ] && ent->aSelectColor[ 2 ] == selectColor[ 2 ] )
+		{
+			EntEditor_AddToSelection( context, entHandle );
+			break;
+		}
+
+		// Multi-Texture Select
+		for ( u32 i = 0; i < ent->aMaterialColors.size(); i++ )
+		{
+			Color3& color = ent->aMaterialColors[ i ];
+			if ( color.r == selectColor[ 0 ] && color.g == selectColor[ 1 ] && color.b == selectColor[ 2 ] )
+			{
+				EntEditor_AddToSelection( context, entHandle );
+				break;
+			}
+		}
+	}
+}
+
+
 void EditorView_Update()
 {
 	EditorContext_t* context = Editor_GetContext();
@@ -397,33 +491,11 @@ void EditorView_Update()
 	if ( !context )
 		return;
 
+	// If we ran a selection texture render last frame, then get the result of it here
 	if ( gCheckSelectionResult )
 	{
 		gCheckSelectionResult = false;
-		u8        selectColor[ 3 ];
-
-		gSelectedEntity = CH_INVALID_HANDLE;
-
-		if ( renderOld->GetSelectionResult( selectColor[ 0 ], selectColor[ 1 ], selectColor[ 2 ] ) )
-		{
-			// scan entities to find a matching color
-			for ( ChHandle_t entHandle : context->aMap.aMapEntities )
-			{
-				Entity_t* ent = Entity_GetData( entHandle );
-
-				if ( !ent )
-				{
-					continue;
-				}
-
-				if ( ent->aSelectColor[ 0 ] == selectColor[ 0 ] )
-				{
-					context->aEntitiesSelected.push_back( entHandle );
-					gSelectedEntity = entHandle;
-					break;
-				}
-			}
-		}
+		EditorView_CheckSelectionResult( context );
 	}
 
 	// for now until some focus thing

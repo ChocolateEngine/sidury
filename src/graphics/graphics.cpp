@@ -223,6 +223,15 @@ Handle Graphics::LoadModel( const std::string& srPath )
 
 	if ( fullPath.empty() )
 	{
+		if ( FileSys_IsRelative( srPath.data() ) )
+		{
+			std::string newPath = vstring( "models" CH_PATH_SEP_STR "%s", srPath.data() );
+			fullPath            = FileSys_FindFile( newPath );
+		}
+	}
+
+	if ( fullPath.empty() )
+	{
 		Log_DevF( gLC_ClientGraphics, 1, "LoadModel: Failed to Find Model: %s\n", srPath.c_str() );
 		return InvalidHandle;
 	}
@@ -1512,7 +1521,7 @@ void Graphics::Shutdown()
 }
 
 
-void Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )
+void Graphics::CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )
 {
 	PROF_SCOPE();
 
@@ -1537,10 +1546,10 @@ void Graphics_CreateFrustum( Frustum_t& srFrustum, const glm::mat4& srViewMat )
 }
 
 
-Frustum_t Graphics_CreateFrustum( const glm::mat4& srViewInfo )
+Frustum_t Graphics::CreateFrustum( const glm::mat4& srViewInfo )
 {
 	Frustum_t frustum;
-	Graphics_CreateFrustum( frustum, srViewInfo );
+	gGraphics.CreateFrustum( frustum, srViewInfo );
 	return frustum;
 }
 

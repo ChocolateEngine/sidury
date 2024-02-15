@@ -10,31 +10,42 @@
 // using Entity = size_t;
 
 
+struct Color3
+{
+	u8 r;
+	u8 g;
+	u8 b;
+};
+
+
 // not sure i really need much of a component system for an editor
 struct Entity_t
 {
-	char*       apName;
+	char*              apName;
 
-	Transform   aTransform;
+	Transform          aTransform;
 
 	// Rendering
-	ChHandle_t  aModel;
-	ChHandle_t  aRenderable;
-	bool        aHidden;
+	ChHandle_t         aModel;
+	ChHandle_t         aRenderable;
+	bool               aHidden;
 
 	// Physics
-	char       *apPhysicsModel;
+	char*              apPhysicsModel;
 
 	// Lighting
-	Light_t*    apLight;
-	ChHandle_t  aLightRenderable;
+	Light_t*           apLight;
+	ChHandle_t         aLightRenderable;
 
 	// Audio
 
 	// Color for Selecting with the cursor
 	// IDEA: eventually you might need to select renderables based on material
 	// so this would need to be an array of colors, with the same length as the material count on the current renderable
-	u8          aSelectColor[ 3 ];
+	u8                 aSelectColor[ 3 ];
+
+	// This is used for selecting individual materials
+	ChVector< Color3 > aMaterialColors;
 
 	// List of Components with general data
 };

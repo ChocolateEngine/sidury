@@ -187,6 +187,17 @@ bool MapManager_LoadWorldModel( EditorContext_t* spContext )
 	graphics->SetRenderableDebugName( worldEnt->aRenderable, spContext->aMap.aMapInfo->modelPath );
 #endif
 
+	// Set Colors
+	Renderable_t* renderable = graphics->GetRenderableData( worldEnt->aRenderable );
+	worldEnt->aMaterialColors.resize( renderable->aMaterialCount );
+
+	for ( int i = 0; i < worldEnt->aMaterialColors.size(); i++ )
+	{
+		worldEnt->aMaterialColors[ i ].r = RandomU8( 0, 255 );
+		worldEnt->aMaterialColors[ i ].g = RandomU8( 0, 255 );
+		worldEnt->aMaterialColors[ i ].b = RandomU8( 0, 255 );
+	}
+
 	return true;
 }
 

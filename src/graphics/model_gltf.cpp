@@ -755,6 +755,12 @@ void Graphics_LoadGltfNew( const std::string& srBasePath, const std::string& srP
 				}
 			}
 
+			if ( matIndex >= gltf->materials_count )
+			{
+				Log_WarnF( "no material for primative %d on model \"%s\"?\n", p, srBasePath.data() );
+				continue;
+			}
+
 			MeshBuildMaterial_t& meshBuildMaterial = meshBuilder.aMaterials[ matIndex ];
 
 			// Get GTLF Accessors for each buffer
