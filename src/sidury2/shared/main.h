@@ -19,38 +19,30 @@ constexpr int W_FORWARD = 0;
 constexpr int W_RIGHT = 1;
 constexpr int W_UP = 2;
 
-//constexpr glm::vec3 vec3_forward(1, 0, 0);
-//constexpr glm::vec3 vec3_right(0, 1, 0);
-//constexpr glm::vec3 vec3_up(0, 0, 1);
-
-const glm::vec3 vec3_forward(1, 0, 0);
-const glm::vec3 vec3_right(0, 1, 0);
-const glm::vec3 vec3_up(0, 0, 1);
-
-//#include "game_rules.h"
-
 class IGuiSystem;
 class IRender;
 class IInputSystem;
 class IAudioSystem;
 class IGraphics;
+class IRenderSystemOld;
 class ISteamSystem;
 
-extern IInputSystem*    input;
-extern IGraphics*       graphics;
-extern ISteamSystem*    steam;
-extern bool             gSteamLoaded;
+extern IInputSystem*     input;
+extern IGraphics*        graphics;
+extern IRenderSystemOld* renderOld;
+extern ISteamSystem*     steam;
+extern bool              gSteamLoaded;
 
 #if CH_CLIENT
-extern IRender*         render;
-extern IGuiSystem*      gui;
-extern IAudioSystem*    audio;
+extern IRender*          render;
+extern IGuiSystem*       gui;
+extern IAudioSystem*     audio;
 #endif
 
-extern float            gFrameTime;
-extern double           gCurTime;
+extern float             gFrameTime;
+extern double            gCurTime;
 
-constexpr int           CH_MAX_USERNAME_LEN = 256;
+constexpr int            CH_MAX_USERNAME_LEN = 256;
 
 
 enum class GameState

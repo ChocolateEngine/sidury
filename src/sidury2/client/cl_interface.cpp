@@ -63,7 +63,7 @@ void Game_HandleSystemEvents()
 					{
 						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
-						graphics->Reset();
+						renderOld->Reset();
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:
@@ -135,6 +135,7 @@ public:
 		CH_GET_INTERFACE( audio, IAudioSystem, IADUIO_NAME, IADUIO_VER );
 		CH_GET_INTERFACE( ch_physics, Ch_IPhysics, IPHYSICS_NAME, IPHYSICS_HASH );
 		CH_GET_INTERFACE( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
+		CH_GET_INTERFACE( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
 		CH_GET_INTERFACE( gui, IGuiSystem, IGUI_NAME, IGUI_HASH );
 
 		// Now Init
@@ -186,7 +187,7 @@ public:
 
 		if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 		{
-			graphics->Present();
+			renderOld->Present();
 		}
 		else
 		{
@@ -205,7 +206,7 @@ public:
 			ImGui_ImplSDL2_NewFrame();
 		}
 
-		graphics->NewFrame();
+		renderOld->NewFrame();
 
 		if ( steam )
 			steam->Update( frameTime );
