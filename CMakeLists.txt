@@ -33,9 +33,9 @@ else()
 	add_subdirectory( src/sidury2 )
 endif( GAME_OLD )
 
-if( STEAM )
+if( EDITOR )
 	add_subdirectory( src/editor )
-endif( STEAM )
+endif( EDITOR )
 
 add_subdirectory( src/graphics )
 
