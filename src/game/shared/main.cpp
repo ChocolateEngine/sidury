@@ -23,14 +23,15 @@
 #include <algorithm>
 
 
-IInputSystem*    input        = nullptr;
-IGraphics*       graphics     = nullptr;
-ISteamSystem*    steam        = nullptr;
+IInputSystem*     input     = nullptr;
+IGraphics*        graphics  = nullptr;
+IRenderSystemOld* renderOld = nullptr;
+ISteamSystem*     steam     = nullptr;
 
 #if CH_CLIENT
-IGuiSystem*      gui          = nullptr;
-IRender*         render       = nullptr;
-IAudioSystem*    audio        = nullptr;
+IGuiSystem*   gui    = nullptr;
+IRender*      render = nullptr;
+IAudioSystem* audio  = nullptr;
 #endif
 
 static bool      gPaused      = false;

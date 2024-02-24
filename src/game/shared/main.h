@@ -35,17 +35,19 @@ class IRender;
 class IInputSystem;
 class IAudioSystem;
 class IGraphics;
+class IRenderSystemOld;
 class ISteamSystem;
 
-extern IInputSystem*    input;
-extern IGraphics*       graphics;
-extern ISteamSystem*    steam;
-extern bool             gSteamLoaded;
+extern IInputSystem*     input;
+extern IGraphics*        graphics;
+extern IRenderSystemOld* renderOld;
+extern ISteamSystem*     steam;
+extern bool              gSteamLoaded;
 
 #if CH_CLIENT
-extern IRender*         render;
-extern IGuiSystem*      gui;
-extern IAudioSystem*    audio;
+extern IRender*      render;
+extern IGuiSystem*   gui;
+extern IAudioSystem* audio;
 #endif
 
 extern ViewportCamera_t gView;

@@ -33,6 +33,7 @@ IRender*                   render           = nullptr;
 IInputSystem*              input            = nullptr;
 IAudioSystem*              audio            = nullptr;
 IGraphics*                 graphics         = nullptr;
+IRenderSystemOld*          renderOld        = nullptr;
 Ch_IPhysics*               physics          = nullptr;
 ISteamSystem*              steam            = nullptr;
 
@@ -107,21 +108,23 @@ CONCMD( mimalloc_print )
 
 static AppModule_t gAppModulesClient[] = 
 {
-	{ (ISystem**)&input,    "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,   "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
-	{ (ISystem**)&audio,    "ch_aduio",     IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&physics,  "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
-    { (ISystem**)&graphics, "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
-	{ (ISystem**)&gui,      "ch_gui",       IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&render,    "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
+	{ (ISystem**)&audio,     "ch_aduio",     IADUIO_NAME, IADUIO_VER },
+	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
+    { (ISystem**)&graphics,  "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
+    { (ISystem**)&renderOld, "ch_graphics", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&gui,       "ch_gui",       IGUI_NAME, IGUI_HASH },
 };
 
 
 static AppModule_t gAppModulesServer[] = {
-	{ (ISystem**)&input,    "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render  , "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
-	{ (ISystem**)&physics,  "ch_physics", IPHYSICS_NAME, IPHYSICS_HASH },
-	{ (ISystem**)&graphics, "ch_graphics", IGRAPHICS_NAME, IGRAPHICS_VER },
-	{ (ISystem**)&gui,      "ch_gui", IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&render,    "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
+	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&graphics,  "ch_graphics", IGRAPHICS_NAME, IGRAPHICS_VER },
+	{ (ISystem**)&renderOld, "ch_graphics", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&gui,       "ch_gui", IGUI_NAME, IGUI_HASH },
 };
 
 
@@ -434,12 +437,12 @@ extern "C"
 					ImGui_ImplSDL2_NewFrame();
 				}
 
-				graphics->NewFrame();
+				renderOld->NewFrame();
 				gui->Update( time );
 
 				if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) )
 				{
-					graphics->Present();
+					renderOld->Present();
 				}
 				else
 				{
