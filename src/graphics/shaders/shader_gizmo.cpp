@@ -56,6 +56,12 @@ static void Shader_Gizmo_ResetPushData()
 }
 
 
+static glm::vec4 AdjustColor( glm::vec4 baseColor, glm::vec4 darkenColor )
+{
+	return glm::mix( baseColor, darkenColor * 2.f, 0.5f );
+}
+
+
 static void Shader_Gizmo_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex, Renderable_t* spDrawData, SurfaceDraw_t& srDrawInfo, ShaderMaterialData* spMaterialData )
 {
 	Gizmo_Push& push  = gGizmoPushData[ &srDrawInfo ];
@@ -64,10 +70,16 @@ static void Shader_Gizmo_SetupPushData( u32 sRenderableIndex, u32 sViewportIndex
 	push.aColor       = gGraphics.Mat_GetVec4( mat, "color" );
 
 	if ( gGraphics.Mat_GetBool( mat, "hovered" ) )
-		push.aColorMode |= EGizmoColorMode_Hovered;
+	{
+		// push.aColor = AdjustColor( push.aColor, { 0.3f, 0.3f, 0.3f, 1.f } );
+		push.aColor = { 1.f, 1.f, 0.f, 1.f };
+	}
 
 	if ( gGraphics.Mat_GetBool( mat, "selected" ) )
-		push.aColorMode |= EGizmoColorMode_Selected;
+	{
+		// push.aColor = AdjustColor( push.aColor, { 0.15f, 0.15f, 0.15f, 1.f } );
+		push.aColor = { 1.f, 1.f, 1.f, 1.f };
+	}
 
 	push.aRenderable  = sRenderableIndex;
 	push.aViewport    = sViewportIndex;
