@@ -66,10 +66,9 @@ target_link_libraries(
 	ImGui
 	SDL2
 	flatbuffers
-	jpeg
-	turbojpeg
 )
 
+# TODO: will be moved to asset importer/exporter dll
 if( MSVC )
 	target_link_libraries(
 		Editor
