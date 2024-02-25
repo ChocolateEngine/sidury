@@ -350,7 +350,10 @@ extern "C"
 			return;
 		}
 
-		Mod_InitSystems();
+		if ( !Mod_InitSystems() )
+		{
+			return;
+		}
 
 		// Reset ConVar Flags
 		Con_SetConVarRegisterFlags( 0 );
