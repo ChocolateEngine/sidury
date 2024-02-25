@@ -853,7 +853,7 @@ bool Graphics_CreateDescLayout( CreateDescLayout_t& srCreate, Handle& srLayout, 
 
 	if ( srLayout == InvalidHandle )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to create descriptor layout\n" );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to create descriptor layout - %s\n", spSetName );
 		return false;
 	}
 
@@ -865,7 +865,7 @@ bool Graphics_CreateDescLayout( CreateDescLayout_t& srCreate, Handle& srLayout, 
 
 	if ( !render->AllocateDescLayout( allocLayout, spSets ) )
 	{
-		Log_Error( gLC_ClientGraphics, "Failed to allocate descriptor layout\n" );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to allocate descriptor layout - %s\n", spSetName );
 		return false;
 	}
 
