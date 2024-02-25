@@ -100,7 +100,11 @@ extern "C"
 			return;
 		}
 
-		Mod_InitSystems();
+		if ( !Mod_InitSystems() )
+		{
+			Log_Error( "Failed to Init Systems\n" );
+			return;
+		}
 
 		if ( !Game_Init() )
 		{
