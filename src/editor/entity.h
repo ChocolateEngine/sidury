@@ -81,6 +81,6 @@ void                                                Entity_SetParent( ChHandle_t
 const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap();
 
 // Returns a Model Matrix with parents applied in world space
-bool                                                Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity );
+void                                                Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity );
 
 

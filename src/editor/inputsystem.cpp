@@ -71,6 +71,9 @@ static const char* gInputBindingStr[] = {
 	"Viewport_SelectMulti",
 	"Viewport_IncreaseMoveSpeed",
 	"Viewport_DecreaseMoveSpeed",
+	"Viewport_GizmoSnap",
+	"Viewport_GizmoSnapIncrement",
+	"Viewport_GizmoSnapIncrement",
 };
 
 
@@ -648,6 +651,10 @@ void Input_ResetBindings()
 	Input_BindKey( EButton_MouseLeft, EBinding_Viewport_SelectSingle );
 	Input_BindKey( EButton_MouseRight, EBinding_Viewport_SelectMulti );
 	// Input_BindKeys( { SDL_SCANCODE_LCTRL, EButton_MouseLeft }, EBinding_Viewport_SelectMulti );
+
+	Input_BindKey( SDL_SCANCODE_LSHIFT, EBinding_Viewport_GizmoSnap );
+	Input_BindKey( SDL_SCANCODE_LEFTBRACKET, EBinding_Viewport_GizmoSnapDecrement );
+	Input_BindKey( SDL_SCANCODE_RIGHTBRACKET, EBinding_Viewport_GizmoSnapIncrement );
 }
 
 
@@ -874,6 +881,9 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	ChVector< EButton > newKeyList;
 	EModMask            modMask = Input_GetModMask( spKeys, sKeyCount, newKeyList );
 
+	// Clearing Old Bindings of this key, disabled so you can have a key do multiple things depending on the context
+	// For example, shift to sprint move, and shift to snap the gizmos in increments
+#if 0
 	// this is kind weird
 	for ( auto& [ key, value ] : gKeyBinds )
 	{
@@ -910,6 +920,7 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	}
 
 	Input_ClearBinding( sBinding );
+#endif
 
 	// Did not find key, allocate new one
 

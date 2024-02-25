@@ -4,6 +4,7 @@
 #include "skybox.h"
 #include "inputsystem.h"
 #include "entity_editor.h"
+#include "gizmos.h"
 
 #include "igui.h"
 #include "iinput.h"
@@ -203,9 +204,15 @@ void EditorView_UpdateInputs()
 {
 	PROF_SCOPE();
 
-	gEditorData.aMove = { 0.f, 0.f, 0.f };
+	EditorContext_t* context = Editor_GetContext();
 
-	if ( !EditorView_IsMouseInView() )
+	gEditorData.aMove        = { 0.f, 0.f, 0.f };
+
+	bool mouseInView         = EditorView_IsMouseInView();
+
+	Gizmo_UpdateInputs( context, mouseInView );
+
+	if ( !mouseInView )
 		return;
 
 	glm::ivec2 mouseScroll = input->GetMouseScroll();
@@ -236,8 +243,6 @@ void EditorView_UpdateInputs()
 	const float upSpeed      = view_move_up * moveScale;
 	// apMove->aMaxSpeed        = max_speed * moveScale;
 
-	EditorContext_t*  context      = Editor_GetContext();
-
 	static glm::vec3  rayPos{};
 	static glm::vec3  rayDir{};
 	static glm::mat4  tempView = context->aView.aProjViewMat;
@@ -260,53 +265,18 @@ void EditorView_UpdateInputs()
 	if ( Input_KeyPressed( EBinding_Viewport_MoveDown ) )
 		gEditorData.aMove[ W_UP ] -= upSpeed;
 
-	if ( Input_KeyJustPressed( EBinding_Viewport_SelectMulti ) )
+	// make sure to only allow selecting other entities if no axis is selected
+	if ( gEditorData.gizmo.selectedAxis == EGizmoAxis_None )
 	{
-		UpdateSelectionRenderables();
-	}
-	else if ( Input_KeyJustPressed( EBinding_Viewport_SelectSingle ) )
-	{
-		gClearSelection = true;
-		UpdateSelectionRenderables();
-	}
-
-	rayDir = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aViewportIndex );
-	rayPos = context->aView.aPos;
-
-	// do ray test against selection gizmos
-	Ray ray{};
-	ray.origin = rayPos;
-	ray.dir    = rayDir;
-
-	bolean hitX = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateX );
-	bolean hitY = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateY );
-	bolean hitZ = Util_RayIntersectsWithAABB( ray, gEditorRenderables.baseTranslateZ );
-
-	if ( hitX )
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateX.min, gEditorRenderables.baseTranslateX.max, { 0.7, 0.3, 0.3 } );
-	}
-	else
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateX.min, gEditorRenderables.baseTranslateX.max, { 1, 0, 0 } );
-	}
-
-	if ( hitY )
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateY.min, gEditorRenderables.baseTranslateY.max, { 0.3, 0.7, 0.3 } );
-	}
-	else
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateY.min, gEditorRenderables.baseTranslateY.max, { 0, 1, 0 } );
-	}
-
-	if ( hitZ )
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateZ.min, gEditorRenderables.baseTranslateZ.max, { 0.3, 0.3, 0.7 } );
-	}
-	else
-	{
-		graphics->DrawBBox( gEditorRenderables.baseTranslateZ.min, gEditorRenderables.baseTranslateZ.max, { 0, 0, 1 } );
+		if ( Input_KeyJustPressed( EBinding_Viewport_SelectMulti ) )
+		{
+			UpdateSelectionRenderables();
+		}
+		else if ( Input_KeyJustPressed( EBinding_Viewport_SelectSingle ) )
+		{
+			gClearSelection = true;
+			UpdateSelectionRenderables();
+		}
 	}
 }
 

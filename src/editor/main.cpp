@@ -50,6 +50,9 @@ CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 CONVAR( r_render, 1 );
 
+extern ConVar                   editor_gizmo_scale_enabled;
+extern ConVar                   editor_gizmo_scale;
+
 
 int                             gMainMenuBarHeight    = 0.f;
 static bool                     gShowQuitConfirmation = false;
@@ -240,6 +243,21 @@ void Main_DrawSettingsMenu()
 
 		if ( ImGui::BeginTabItem( "Other" ) )
 		{
+			bool scaleEnabled = editor_gizmo_scale_enabled.GetBool();
+			if ( ImGui::Checkbox( "Gizmo Scaling", &scaleEnabled ) )
+			{
+				if ( scaleEnabled )
+					Con_QueueCommandSilent( "editor_gizmo_scale_enabled 1" );
+				else
+					Con_QueueCommandSilent( "editor_gizmo_scale_enabled 0" );
+			}
+
+			float scale = editor_gizmo_scale.GetFloat();
+			if ( ImGui::DragFloat( "Gizmo Scale", &scale, 0.0005, 0.f, 0.1f, "%.6f" ) )
+			{
+				editor_gizmo_scale.SetValue( scale );
+			}
+
 			ImGui::EndTabItem();
 		}
 
@@ -878,7 +896,7 @@ void Editor_SetContext( ChHandle_t sContext )
 // ------------------------------------------------------------------------
 
 
-glm::vec3 Util_GetRayFromScreenSpace( glm::ivec2 mousePos, u32 viewportIndex )
+Ray Util_GetRayFromScreenSpace( glm::ivec2 mousePos, glm::vec3 origin, u32 viewportIndex )
 {
 	ViewportShader_t* viewport = graphics->GetViewportData( viewportIndex );
 
@@ -892,6 +910,12 @@ glm::vec3 Util_GetRayFromScreenSpace( glm::ivec2 mousePos, u32 viewportIndex )
 	mousePos.x -= viewport->aOffset.x;
 	mousePos.y -= viewport->aOffset.y;
 
-	return Util_GetRayFromScreenSpace( mousePos, viewport->aProjView, viewport->aSize );
+	Ray ray
+	{
+		.origin = origin,
+		.dir = Util_GetRayFromScreenSpace( mousePos, viewport->aProjView, viewport->aSize ),
+	};
+
+	return ray;
 }
 

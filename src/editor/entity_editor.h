@@ -13,14 +13,7 @@ struct EditorRenderables
 	ChHandle_t          gizmoScale;
 
 	// Base AABB's for translation axis
-	AABB                baseTranslateX;
-	AABB                baseTranslateY;
-	AABB                baseTranslateZ;
-
-	// AABB's for translation axis
-	// AABB                aabbTranslateX;
-	// AABB                aabbTranslateY;
-	// AABB                aabbTranslateZ;
+	AABB                baseTranslateAABB[ 3 ];
 };
 
 extern EditorRenderables gEditorRenderables;

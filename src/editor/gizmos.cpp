@@ -1,12 +1,16 @@
 #include "main.h"
 #include "entity_editor.h"
 #include "mesh_builder.h"
+#include "inputsystem.h"
 #include "gizmos.h"
 
 
 static ChHandle_t gGizmoTranslationModel = CH_INVALID_HANDLE;
 
 constexpr float   CH_GIZMO_SCALE         = 1.f;
+
+extern ConVar     editor_gizmo_scale_enabled;
+extern ConVar     editor_gizmo_scale;
 
 
 static ChHandle_t CreateAxisMaterial( const char* name, ChHandle_t shader, glm::vec3 color )
@@ -27,7 +31,7 @@ bool Gizmo_BuildTranslationMesh()
 
 	if ( shader == CH_INVALID_HANDLE )
 	{
-		Log_ErrorF( "Failed to find gizmo shader!\n" );
+		Log_FatalF( "Failed to find gizmo shader!\n" );
 		return false;
 	}
 
@@ -47,11 +51,6 @@ bool Gizmo_BuildTranslationMesh()
 	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "gizmo_translation" );
 	meshBuilder.SetSurfaceCount( 3 );
-
-	// std::unordered_map< vertex_cube_3d_t, uint32_t > vertIndexes;
-	//
-	// std::vector< vertex_cube_3d_t >& vertices = GetVertices();
-	// std::vector< uint32_t >&    indices  = GetIndices();
 
 	auto CreateVert = [ & ]( const glm::vec3& pos )
 	{
@@ -212,14 +211,17 @@ bool Gizmo_BuildTranslationMesh()
 	}
 
 	// AABB's for selecting an axis
-	gEditorRenderables.baseTranslateX.min = {1, 1, -1};
-	gEditorRenderables.baseTranslateX.max = {17, -1, 1};
+	// X Axis
+	gEditorRenderables.baseTranslateAABB[ 0 ].min = { 1, 1, -1 };
+	gEditorRenderables.baseTranslateAABB[ 0 ].max = { 18, -1, 1 };
 
-	gEditorRenderables.baseTranslateY.min = {-1, 1, -1};
-	gEditorRenderables.baseTranslateY.max = {1, 17, 1};
+	// Y Axis
+	gEditorRenderables.baseTranslateAABB[ 1 ].min = { -1, 1, -1 };
+	gEditorRenderables.baseTranslateAABB[ 1 ].max = { 1, 18, 1 };
 
-	gEditorRenderables.baseTranslateZ.min = {-1, -1, 1};
-	gEditorRenderables.baseTranslateZ.max = {1, 1, 17};
+	// Z Axis
+	gEditorRenderables.baseTranslateAABB[ 2 ].min = { -1, -1, 1 };
+	gEditorRenderables.baseTranslateAABB[ 2 ].max = { 1, 1, 18 };
 
 	return true;
 }
@@ -238,6 +240,227 @@ bool Gizmo_Init()
 
 void Gizmo_Shutdown()
 {
+}
+
+
+void Gizmo_UpdateSelectedAxis( EditorContext_t* context )
+{
+	Renderable_t* renderable = graphics->GetRenderableData( gEditorRenderables.gizmoTranslation );
+
+	if ( Input_KeyReleased( EBinding_Viewport_SelectSingle ) )
+	{
+		for ( u32 i = 0; i < renderable->aMaterialCount; i++ )
+		{
+			graphics->Mat_SetVar( renderable->apMaterials[ i ], "selected", false );
+		}
+
+		gEditorData.gizmo.selectedAxis = EGizmoAxis_None;
+		return;
+	}
+
+	// TEMP
+	// gEditorData.gizmo.offset = { 0, 0, 1 };
+
+	// calc distance between the current ray and last frame ray?
+}
+
+
+void Gizmo_UpdateTranslationInputs( EditorContext_t* context, Ray& ray, glm::mat4& entityWorldMatrix )
+{
+	// Reset hovered state on materials
+	Renderable_t* renderable = graphics->GetRenderableData( gEditorRenderables.gizmoTranslation );
+
+	for ( u32 i = 0; i < renderable->aMaterialCount; i++ )
+	{
+		graphics->Mat_SetVar( renderable->apMaterials[ i ], "hovered", false );
+	}
+
+	glm::vec3 entityPos = Util_GetMatrixPosition( entityWorldMatrix );
+
+	AABB      aabbList[ 3 ] = {};
+
+	for ( int i = 0; i < 3; i++ )
+	{
+		aabbList[ i ].min = gEditorRenderables.baseTranslateAABB[ i ].min;
+		aabbList[ i ].max = gEditorRenderables.baseTranslateAABB[ i ].max;
+	}
+
+	// First do gizmo scaling if enabled
+	if ( editor_gizmo_scale_enabled )
+	{
+		glm::vec3 camPos = context->aView.aPos;
+
+		// Scale it based on distance so it always appears the same size, no matter how far or close you are
+		float     dist  = glm::sqrt( powf( camPos.x - entityPos.x, 2 ) + powf( camPos.y - entityPos.y, 2 ) + powf( camPos.z - entityPos.z, 2 ) );
+
+		glm::vec3 scale = { dist, dist, dist };
+		scale *= editor_gizmo_scale.GetFloat();
+
+		for ( int i = 0; i < 3; i++ )
+		{
+			aabbList[ i ].min *= scale;
+			aabbList[ i ].max *= scale;
+		}
+	}
+
+	// Now Apply Entity Position Offsets
+	for ( int i = 0; i < 3; i++ )
+	{
+		aabbList[ i ].min += entityPos;
+		aabbList[ i ].max += entityPos;
+	}
+
+	// graphics->DrawBBox( translateX.min, translateX.max, { 1, 0, 0 } );
+
+	// do ray test against selection gizmos
+	EGizmoAxis hoveredAxis = EGizmoAxis_None;
+
+	glm::vec3  intersectionPoint;
+	u32        aabbIndex = UINT32_MAX;
+	if ( !Util_RayInteresectsWithAABBs( intersectionPoint, aabbIndex, ray, aabbList, 3 ) )
+		return;
+
+	ChHandle_t axisMatHandle = CH_INVALID_HANDLE;
+
+	switch ( aabbIndex )
+	{
+		default:
+			return;
+
+		case 0:
+			hoveredAxis   = EGizmoAxis_X;
+			axisMatHandle = renderable->apMaterials[ 0 ];
+			break;
+
+		case 1:
+			hoveredAxis   = EGizmoAxis_Y;
+			axisMatHandle = renderable->apMaterials[ 1 ];
+			break;
+
+		case 2:
+			hoveredAxis   = EGizmoAxis_Z;
+			axisMatHandle = renderable->apMaterials[ 2 ];
+			break;
+	}
+
+	graphics->Mat_SetVar( axisMatHandle, "hovered", true );
+
+	// Check Selection
+	if ( !Input_KeyJustPressed( EBinding_Viewport_SelectSingle ) )
+		return;
+
+	gEditorData.gizmo.selectedAxis          = hoveredAxis;
+	gEditorData.gizmo.lastIntersectionPoint = intersectionPoint;
+	graphics->Mat_SetVar( axisMatHandle, "selected", true );
+
+	// Build Translation Plane
+	glm::vec3 forward, right, up;
+
+	if ( gEditorData.gizmo.isWorldSpace )
+	{
+		forward = vec_forward;
+		right   = vec_right;
+		up      = vec_up;
+	}
+	else  // local space
+	{
+		Util_GetMatrixDirectionNoScale( entityWorldMatrix, &forward, &right, &up );
+	}
+
+	glm::vec3 movePlaneNormal;
+
+	switch ( hoveredAxis )
+	{
+		case EGizmoAxis_X:
+		case EGizmoAxis_PlaneXY:
+			movePlaneNormal = right;
+			break;
+
+		case EGizmoAxis_Y:
+		case EGizmoAxis_PlaneXZ:
+			movePlaneNormal = forward;
+			break;
+
+		case EGizmoAxis_Z:
+		case EGizmoAxis_PlaneYZ:
+			movePlaneNormal = up;
+			break;
+
+		case EGizmoAxis_Screen:
+			movePlaneNormal = -context->aView.aForward;
+			break;
+	}
+
+	// Creates a set of axis to draw a plane from based on camera angles, to interpret mouse movement properly (maybe idfk)
+	switch ( hoveredAxis )
+	{
+		case EGizmoAxis_X:
+		case EGizmoAxis_Y:
+		case EGizmoAxis_Z:
+		{
+			glm::vec3 cameraToModelNormalized = glm::normalize( entityPos - context->aView.aPos );
+			glm::vec3 orthoVector             = glm::cross( movePlaneNormal, cameraToModelNormalized );
+			movePlaneNormal                   = glm::cross( movePlaneNormal, orthoVector );
+			movePlaneNormal                   = glm::normalize( movePlaneNormal );
+			break;
+		}
+	}
+	
+	gEditorData.gizmo.translationPlane       = Util_BuildPlane( entityPos, movePlaneNormal );
+	float len                                = Util_RayPlaneIntersection( ray, gEditorData.gizmo.translationPlane );
+	gEditorData.gizmo.translationPlaneOrigin = ray.origin + ray.dir * len;
+	gEditorData.gizmo.matrixOrigin           = entityPos;
+	gEditorData.gizmo.relativeOrigin         = ( gEditorData.gizmo.translationPlaneOrigin - entityPos ) * ( 1.f / gEditorData.gizmo.screenFactor );
+}
+
+
+void Gizmo_UpdateInputs( EditorContext_t* context, bool mouseInView )
+{
+	gEditorData.gizmo.offset = {};
+
+	if ( context->aEntitiesSelected.empty() )
+	{
+		// Reset last frame ray data
+		gEditorData.gizmo.lastFrameRay = {};
+		gEditorData.gizmo.lastMousePos = {};
+		return;
+	}
+
+	Ray ray = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aPos, context->aView.aViewportIndex );
+
+	if ( gEditorData.gizmo.selectedAxis != EGizmoAxis_None )
+	{
+		Gizmo_UpdateSelectedAxis( context );
+	}
+
+	gEditorData.gizmo.lastFrameRay = ray;
+	gEditorData.gizmo.lastMousePos = input->GetMousePos();
+
+	// The Rest of this code will only run if the mouse is in the viewport and not hovering over any imgui window
+	if ( !mouseInView )
+		return;
+
+	glm::mat4 entityWorldMatrix( 1.f );
+	Entity_GetWorldMatrix( entityWorldMatrix, context->aEntitiesSelected[ 0 ] );
+
+	switch ( gEditorData.gizmo.mode )
+	{
+		default:
+			return;
+
+		case EGizmoMode_Translation:
+			Gizmo_UpdateTranslationInputs( context, ray, entityWorldMatrix );
+			break;
+
+		case EGizmoMode_Rotation:
+			break;
+
+		case EGizmoMode_Scale:
+			break;
+
+		case EGizmoMode_SuperGizmo:
+			break;
+	}
 }
 
 

@@ -10,14 +10,6 @@ constexpr int W_FORWARD = 0;
 constexpr int W_RIGHT = 1;
 constexpr int W_UP = 2;
 
-//constexpr glm::vec3 vec3_forward(1, 0, 0);
-//constexpr glm::vec3 vec3_right(0, 1, 0);
-//constexpr glm::vec3 vec3_up(0, 0, 1);
-
-const glm::vec3 vec3_forward(1, 0, 0);
-const glm::vec3 vec3_right(0, 1, 0);
-const glm::vec3 vec3_up(0, 0, 1);
-
 #include "game_physics.h"
 #include "entity.h"
 #include "igraphics.h"
@@ -46,7 +38,8 @@ enum EGizmoMode
 	EGizmoMode_Translation,
 	EGizmoMode_Rotation,
 	EGizmoMode_Scale,
-	EGizmoMode_All,
+	EGizmoMode_Bounds,
+	EGizmoMode_SuperGizmo,  // https://www.youtube.com/watch?v=jqtiCB1A5lI
 };
 
 
@@ -62,6 +55,29 @@ enum EGizmoAxis
 	EGizmoAxis_Screen,
 
 	EGizmoAxis_Count,
+};
+
+
+struct GizmoData
+{
+	EGizmoMode mode;
+	EGizmoAxis selectedAxis;
+	bool       isWorldSpace;
+	// bool       snapEnabled;
+	// float      snapUnit;
+
+	// Offset of gizmo from last frame to add onto entity position, rotation, or scale
+	glm::vec3  offset;
+
+	// Previous Mouse Ray from last frame
+	Ray        lastFrameRay;
+	glm::ivec2 lastMousePos;
+	glm::vec3  lastIntersectionPoint;
+	glm::vec4  translationPlane;
+	glm::vec3  translationPlaneOrigin;
+	glm::vec3  matrixOrigin;
+	glm::vec3  relativeOrigin;
+	float      screenFactor;
 };
 
 
@@ -108,8 +124,7 @@ struct EditorData_t
 	glm::vec3  aMove{};
 
 	// Gizmo Data
-	EGizmoMode gizmoMode;
-	EGizmoAxis gizmoSelectedAxis;
+	GizmoData  gizmo;
 };
 
 
@@ -158,5 +173,5 @@ void                                   Editor_SetContext( ChHandle_t sContext );
 
 
 // Helper function that uses stuff from the graphics viewport system
-glm::vec3 Util_GetRayFromScreenSpace( glm::ivec2 mousePos, u32 viewportIndex );
+Ray                                    Util_GetRayFromScreenSpace( glm::ivec2 mousePos, glm::vec3 origin, u32 viewportIndex );
 

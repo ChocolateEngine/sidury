@@ -45,6 +45,9 @@ enum EBinding : u16
 	EBinding_Viewport_SelectMulti,
 	EBinding_Viewport_IncreaseMoveSpeed,
 	EBinding_Viewport_DecreaseMoveSpeed,
+	EBinding_Viewport_GizmoSnap,
+	EBinding_Viewport_GizmoSnapIncrement,  // Increment Snap Distance
+	EBinding_Viewport_GizmoSnapDecrement,  // Decrement Snap Distance
 
 	EBinding_Count,
 };

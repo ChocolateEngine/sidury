@@ -355,7 +355,7 @@ const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap()
 
 
 // Returns a Model Matrix with parents applied in world space
-bool Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
+void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 {
 	PROF_SCOPE();
 
@@ -369,6 +369,13 @@ bool Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 	}
 
 	Entity_t* entity = Entity_GetData( sEntity );
+
+	if ( !entity )
+	{
+		Log_ErrorF( "Invalid Entity in GetWorldMatrix - %d\n", sEntity );
+		srMat = glm::identity< glm::mat4 >();
+		return;
+	}
 
 	// is this all the wrong order?
 
@@ -402,8 +409,6 @@ bool Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 	srMat = glm::scale( srMat, entity->aTransform.aScale );
 
 	srMat = parentMat * srMat;
-
-	return true;
 }
 
 

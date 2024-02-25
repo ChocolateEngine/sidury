@@ -30,8 +30,8 @@ constexpr const char* CH_EDITOR_MODEL_GIZMO_SCALE = "";
 EditorRenderables     gEditorRenderables;
 
 
-CONVAR( editor_gizmo_scale, 0.01, "Scale of the Editor Gizmos" );
-CONVAR( editor_gizmo_scale_enabled, 0, "Enable Editor Gizmo Scaling" );
+CONVAR( editor_gizmo_scale, 0.006, CVARF_ARCHIVE, "Scale of the Editor Gizmos" );
+CONVAR( editor_gizmo_scale_enabled, 1, "Enable Editor Gizmo Scaling" );
 
 
 // adds the entity to the selection list, making sure it's not in the list multiple times
@@ -1273,6 +1273,19 @@ void EntEditor_DrawUI()
 	if ( context->aEntitiesSelected.empty() )
 		return;
 
+	// is an axis selected?
+	if ( gEditorData.gizmo.selectedAxis != EGizmoAxis_None )
+	{
+		// offset all selected entities
+		for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+		{
+			Entity_t* entity = Entity_GetData( selectedEnt );
+
+			if ( gEditorData.gizmo.mode == EGizmoMode_Translation )
+				entity->aTransform.aPos += gEditorData.gizmo.offset;
+		}
+	}
+
 	// Draw Axis and Bounding Boxes around selected entities
 	for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
 	{
@@ -1298,7 +1311,7 @@ void EntEditor_DrawUI()
 	glm::mat4  mat( 1.f );
 	Entity_GetWorldMatrix( mat, selectedEnt );
 
-	if ( gEditorData.gizmoMode == EGizmoMode_Translation )
+	if ( gEditorData.gizmo.mode == EGizmoMode_Translation )
 	{
 		glm::vec3 pos    = Util_GetMatrixPosition( mat );
 		glm::vec3 camPos = context->aView.aPos;
@@ -1322,6 +1335,7 @@ void EntEditor_DrawUI()
 		// Draw the Selection Gizmo
 		gizmoTranslation->aVisible     = true;
 		gizmoTranslation->aModelMatrix = gizmoPosMat;
+
 	}
 }
 
