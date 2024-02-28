@@ -590,7 +590,7 @@ void SV_HandleMsg_UserCmd( SV_Client_t& srClient, const NetMsg_UserCmd* spMessag
 
 	srClient.aUserCmd.aButtons    = spMessage->buttons();
 	srClient.aUserCmd.aFlashlight = spMessage->flashlight();
-	srClient.aUserCmd.aMoveType   = static_cast< PlayerMoveType >( spMessage->move_type() );
+	srClient.aUserCmd.aMoveType   = static_cast< EPlayerMoveType >( spMessage->move_type() );
 }
 
 

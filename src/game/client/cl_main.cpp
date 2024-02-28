@@ -55,7 +55,6 @@ UserCmd_t                         gClientUserCmd{};
 
 std::vector< CL_Client_t >        gClClients;
 
-extern Entity                     gLocalPlayer;
 extern EntitySystem*              entities;
 
 std::vector< std::string >        gMapList;
@@ -633,10 +632,12 @@ void CL_BuildUserCmd( flatbuffers::FlatBufferBuilder& srBuilder )
 	Vec3                  posVec( gClientUserCmd.aAng.x, gClientUserCmd.aAng.y, gClientUserCmd.aAng.z );
 	builder.add_angles( &posVec );
 
+	Net_EPlayerMoveType moveType = static_cast< Net_EPlayerMoveType >( gClientUserCmd.aMoveType );
+
 	CH_NET_WRITE_OFFSET( builder, angles );
 	builder.add_buttons( gClientUserCmd.aButtons );
 	builder.add_flashlight( gClientUserCmd.aFlashlight );
-	builder.add_move_type( static_cast< EPlayerMoveType >( gClientUserCmd.aMoveType ) );
+	builder.add_move_type( moveType );
 
 	srBuilder.Finish( builder.Finish() );
 }

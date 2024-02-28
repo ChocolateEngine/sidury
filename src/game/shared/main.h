@@ -48,11 +48,14 @@ extern bool              gSteamLoaded;
 extern IRender*      render;
 extern IGuiSystem*   gui;
 extern IAudioSystem* audio;
+
+extern Entity        gLocalPlayer;
 #endif
 
 extern ViewportCamera_t gView;
 extern float            gFrameTime;
 extern double           gCurTime;
+
 
 constexpr int           CH_MAX_USERNAME_LEN = 256;
 

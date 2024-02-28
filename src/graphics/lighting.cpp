@@ -116,6 +116,7 @@ void Graphics_AddShadowMap( Light_t* spLight )
 
 	// Create Framebuffer
 	CreateFramebuffer_t frameBufCreate{};
+	frameBufCreate.apName             = "Shadow Map Framebuffer";
 	frameBufCreate.aRenderPass        = gGraphicsData.aRenderPassShadow;  // ImGui will be drawn onto the graphics RenderPass
 	frameBufCreate.aSize              = shadowMap.aSize;
 

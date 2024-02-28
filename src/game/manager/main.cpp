@@ -265,7 +265,7 @@ bool LoadGameSystems()
 	{
 		AppModule_t clientModule{ (ISystem**)&client, "ch_client", ICLIENT_NAME, ICLIENT_VER };
 
-		// Mark all convars from server dll with CVARF_CLIENT
+		// Mark all convars from client dll with CVARF_CLIENT
 		Con_SetConVarRegisterFlags( CVARF( CLIENT ) );
 		EModLoadError modLoadRet = Mod_LoadSystem( clientModule );
 
@@ -289,6 +289,158 @@ bool LoadGameSystems()
 	}
 
 	return true;
+}
+
+
+// Return true if we skip this frame
+bool UpdateFrameTime( std::chrono::steady_clock::time_point& startTime, std::chrono::steady_clock::time_point& currentTime, float& time )
+{
+	currentTime = std::chrono::high_resolution_clock::now();
+	time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
+
+	// don't let the time go too crazy, usually happens when in a breakpoint
+	time        = glm::min( time, host_max_frametime.GetFloat() );
+
+	if ( host_fps_max.GetFloat() > 0.f )
+	{
+		float maxFps       = glm::clamp( host_fps_max.GetFloat(), 10.f, 5000.f );
+
+		// check if we still have more than 2ms till next frame and if so, wait for "1ms"
+		float minFrameTime = 1.0f / maxFps;
+		if ( ( minFrameTime - time ) > ( 2.0f / 1000.f ) )
+			sys_sleep( 1 );
+
+		// framerate is above max
+		if ( time < minFrameTime )
+			return true;
+	}
+
+	return false;
+}
+
+
+void MainLoop()
+{
+	Log_Msg( "Entering Main Update Loop\n" );
+
+	auto  startTime   = std::chrono::high_resolution_clock::now();
+	auto  currentTime = startTime;
+	float time        = 0.f;
+
+	while ( gRunning )
+	{
+		PROF_SCOPE_NAMED( "Main Loop" );
+
+		if ( UpdateFrameTime( startTime, currentTime, time ) )
+			continue;
+
+		// ftl::TaskCounter taskCounter( &gTaskScheduler );
+
+		Map_UpdateTimer( time );
+
+		input->Update( time );
+
+		// may change from input update running the quit command
+		if ( !gRunning )
+			break;
+
+		gCurrentModule = ECurrentModule_Client;
+
+		client->PreUpdate( time );
+
+		float frameTimeScaled = time * host_timescale;
+		gCurrentModule        = ECurrentModule_Server;
+
+		// Update Game Logic
+		server->Update( frameTimeScaled );
+
+		gCurrentModule = ECurrentModule_Client;
+
+		client->Update( frameTimeScaled );
+
+		gCurrentModule = ECurrentModule_None;
+
+		Con_Update();
+		Resource_Update();
+
+		// Wait and help to execute unfinished tasks
+		// gTaskScheduler.WaitForCounter( &taskCounter );
+
+		startTime = currentTime;
+
+#ifdef TRACY_ENABLE
+		FrameMark;
+#endif
+	}
+}
+
+
+void MainLoopDedicated()
+{
+	Log_Msg( "Entering Main Update Loop for Dedicated Server\n" );
+
+	auto  startTime   = std::chrono::high_resolution_clock::now();
+	auto  currentTime = startTime;
+	float time        = 0.f;
+
+	while ( gRunning )
+	{
+		PROF_SCOPE_NAMED( "Main Loop Dedicated" );
+
+		if ( UpdateFrameTime( startTime, currentTime, time ) )
+			continue;
+
+		// ftl::TaskCounter taskCounter( &gTaskScheduler );
+
+		Map_UpdateTimer( time );
+
+		input->Update( time );
+
+		// may change from input update running the quit command
+		if ( !gRunning )
+			break;
+
+		float frameTimeScaled = time * host_timescale;
+		gCurrentModule        = ECurrentModule_Server;
+
+		// Update Game Logic
+		server->Update( frameTimeScaled );
+
+		gCurrentModule = ECurrentModule_None;
+
+		UpdateViewport();
+
+		{
+			PROF_SCOPE_NAMED( "Imgui New Frame" );
+			ImGui::NewFrame();
+			ImGui_ImplSDL2_NewFrame();
+		}
+
+		renderOld->NewFrame();
+		gui->Update( time );
+
+		if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) )
+		{
+			renderOld->Present();
+		}
+		else
+		{
+			PROF_SCOPE_NAMED( "Imgui End Frame" );
+			ImGui::EndFrame();
+		}
+
+		Con_Update();
+		Resource_Update();
+
+		// Wait and help to execute unfinished tasks
+		// gTaskScheduler.WaitForCounter( &taskCounter );
+
+		startTime = currentTime;
+
+#ifdef TRACY_ENABLE
+		FrameMark;
+#endif
+	}
 }
 
 
@@ -364,8 +516,6 @@ extern "C"
 		// schedOptions.Behavior = ftl::EmptyQueueBehavior::Sleep;
 		// 
 		// gTaskScheduler.Init( schedOptions );
-		
-		auto startTime = std::chrono::high_resolution_clock::now();
 
 		// Hack for Dedicated Server For now
 		if ( gDedicatedServer )
@@ -373,8 +523,23 @@ extern "C"
 			gDedicatedViewport = graphics->CreateViewport();
 		}
 
+		// IDEA: put autoexec built it again, and just store all convars in a list
+		// Then, when each convar is registered, we check what we read from config.cfg and autoexec.cfg
+		// only issue is queued concommands maybe, but we can just queue those, and then call a function run them here instead
+
+		// Init autoexec.cfg
+		Con_QueueCommandSilent( "exec autoexec.cfg", false );
+
 		// ---------------------------------------------------------------------------------------------
 		// Main Loop
+
+#if 1
+		if ( gDedicatedServer )
+			MainLoopDedicated();
+		else
+			MainLoop();
+#else
+		auto startTime = std::chrono::high_resolution_clock::now();
 
 		while ( gRunning )
 		{
@@ -466,6 +631,7 @@ extern "C"
 			FrameMark;
 #endif
 		}
+#endif
 
 		// ---------------------------------------------------------------------------------------------
 		// Shutdown

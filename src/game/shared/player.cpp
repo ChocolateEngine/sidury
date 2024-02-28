@@ -120,8 +120,6 @@ CONVAR( r_flashlight_offset_z, -4.f );
 
 extern ConVar   m_yaw, m_pitch;
 
-extern Entity   gLocalPlayer;
-
 constexpr float PLAYER_MASS = 200.f;
 
 
@@ -147,7 +145,7 @@ CONCMD_VA( reset_velocity, CVARF( CL_EXEC ) )
 #endif
 
 
-static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
+static void CmdSetPlayerMoveType( Entity sPlayer, EPlayerMoveType sMoveType )
 {
 	// auto& move = Entity_GetComponent< CPlayerMoveData >( sPlayer );
 	// SetMoveType( move, sMoveType );
@@ -165,7 +163,7 @@ static void CmdSetPlayerMoveType( Entity sPlayer, PlayerMoveType sMoveType )
 
 	// Toggle between the desired move type and walking
 	if ( move->aMoveType == sMoveType )
-		players.apMove->SetMoveType( *move, PlayerMoveType::Walk );
+		players.apMove->SetMoveType( *move, EPlayerMoveType_Walk );
 	else
 		players.apMove->SetMoveType( *move, sMoveType );
 }
@@ -180,7 +178,7 @@ CONCMD_VA( noclip, CVARF( CL_EXEC ) )
 	if ( !player )
 		return;
 
-	CmdSetPlayerMoveType( player, PlayerMoveType::NoClip );
+	CmdSetPlayerMoveType( player, EPlayerMoveType_NoClip );
 }
 
 
@@ -191,7 +189,7 @@ CONCMD_VA( fly, CVARF( CL_EXEC ) )
 	if ( !player )
 		return;
 
-	CmdSetPlayerMoveType( player, PlayerMoveType::Fly );
+	CmdSetPlayerMoveType( player, EPlayerMoveType_Fly );
 }
 #endif
 
@@ -251,6 +249,8 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerMoveData, playerMoveData, EEntComponentNetT
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aDuckTime, duckTime, ECompRegFlag_None );
 
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aLastStepTime, lastStepTime, ECompRegFlag_None );
+
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aPrevVel, prevVel, ECompRegFlag_None );
 }
 
 
@@ -380,8 +380,11 @@ void PlayerManager::Create( Entity player )
 {
 	CPlayerInfo* playerInfo = Ent_GetComponent< CPlayerInfo >( player, "playerInfo" );
 	CH_ASSERT( playerInfo );
+
+#if CH_CLIENT
 	playerInfo->aIsLocalPlayer = player == gLocalPlayer;
 	Log_Msg( "Client Creating Local Player\n" );
+#endif
 
 #if CH_SERVER
 
@@ -414,6 +417,8 @@ void PlayerManager::Create( Entity player )
 	if ( !client )
 		return;
 
+	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
+
 	// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
 	// And we parent them to the player
 	playerInfo->aCamera = Entity_CreateEntity();
@@ -425,9 +430,9 @@ void PlayerManager::Create( Entity player )
 
 	Ent_AddComponent( playerInfo->aCamera, "transform" );
 	Ent_AddComponent( playerInfo->aCamera, "direction" );
-	Ent_AddComponent( playerInfo->aCamera, "camera" );
 
-	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
+	CCamera* camera = Ent_AddComponent< CCamera >( playerInfo->aCamera, "camera" );
+	camera->aFov    = r_fov.GetFloat();
 
 	zoom->aOrigFov             = r_fov.GetFloat();
 	zoom->aNewFov              = r_fov.GetFloat();
@@ -451,11 +456,11 @@ void PlayerManager::Create( Entity player )
 
 	PhysicsObjectInfo physInfo;
 	physInfo.aMotionType = PhysMotionType::Dynamic;
-	physInfo.aPos = transform->aPos;
-	physInfo.aAng = transform->aAng;
+	physInfo.aPos        = transform->aPos;
+	physInfo.aAng        = transform->aAng;
 
 	physInfo.aCustomMass = true;
-	physInfo.aMass = PLAYER_MASS;
+	physInfo.aMass       = PLAYER_MASS;
 
 	CPhysObject* physObj = Phys_CreateObject( player, physShape, physInfo );
 
@@ -573,9 +578,16 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
 		// flashlight->aAng.Edit().z = -camTransform->aAng.Get().x + 90.f;
 
-		flashlight->aAng.Edit().x = camTransform->aAng.Get().z;
-		flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
-		flashlight->aAng.Edit().z = -camTransform->aAng.Get().y - 90.f;
+		//flashlight->aAng.Edit().x = -camTransform->aAng.Get().x + 90.f;
+		flashlight->aAng.Edit().y = camTransform->aAng.Get().y;
+
+		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
+		// flashlight->aAng.Edit().z = 0.f;
+
+		// flashlight->aAng.Edit().x = camTransform->aAng.Get().y + 90.f;
+		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
+		// flashlight->aAng.Edit().z = 0.f;
+		
 		//flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
 		//flashlight->aAng.Edit().z = -camTransform->aAng.Get().z;
 
@@ -728,11 +740,17 @@ void PlayerManager::UpdateLocalPlayer()
 		// bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround && !( playerMove->aPlayerFlags & PlyOnGround );
 		bool wasOnGround = playerMove->aPrevPlayerFlags & PlyOnGround;
 
-		if ( playerMove->aMoveType == PlayerMoveType::Walk )
+		if ( playerMove->aMoveType == EPlayerMoveType_Walk )
 		{
 			apMove->DoSmoothLand( wasOnGround );
 			apMove->DoViewBob();
 			apMove->DoViewTilt();
+		}
+		else
+		{
+			// Reset View Tilt
+			camTransform->aAng.Edit()[ ROLL ] = {};
+			playerMove->aPrevViewTilt.Edit()  = {};
 		}
 
 		UpdateView( playerInfo, player );
@@ -789,15 +807,17 @@ void PlayerManager::UpdateLocalPlayer()
 				ang = camTransform->aAng;
 				//ang[ YAW ] *= -1;
 				ang[ YAW ] += 180;
+				ang[ YAW ] *= -1;
 				ang[ ROLL ]  = ang[ PITCH ] + 90;
 				ang[ PITCH ] = 0;
 			}
 			else
 			{
 				ang = transform->aAng;
-				ang[ ROLL ] += 90;
+				 ang[ ROLL ] += 90;
 				//ang[ YAW ] *= -1;
 				ang[ YAW ] += 180;
+				ang[ YAW ] *= -1;
 			}
 
 			// Util_ToMatrix( renderData->aModelMatrix, transform->aPos, ang, scale );
@@ -923,7 +943,7 @@ void CalcZoom( CCamera* camera, Entity player )
 	CH_ASSERT( zoom );
 
 	// If we have a usercmd to process on either client or server, process it
-#if 0
+#if 1
 	if ( userCmd )
 	{
 		if ( zoom->aOrigFov != r_fov.GetFloat() )
@@ -1213,7 +1233,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 	CH_ASSERT( move );
 	CH_ASSERT( camTransform );
 
-	SetMoveType( *move, PlayerMoveType::Walk );
+	SetMoveType( *move, EPlayerMoveType_Walk );
 
 	camTransform->aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
 }
@@ -1272,10 +1292,13 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 	switch ( apMove->aMoveType )
 	{
-		case PlayerMoveType::Walk:    WalkMove();     break;
-		case PlayerMoveType::Fly:     FlyMove();      break;
-		case PlayerMoveType::NoClip:  NoClipMove();   break;
+		case EPlayerMoveType_Walk:    WalkMove();     break;
+		case EPlayerMoveType_Fly:     FlyMove();      break;
+		case EPlayerMoveType_NoClip:  NoClipMove();   break;
 	}
+
+	// HACK FOR IMPACT SOUND ON CLIENT
+	apMove->aPrevVel = apRigidBody->aVel;
 }
 
 
@@ -1299,27 +1322,42 @@ void PlayerMovement::DetermineMoveType()
 }
 
 
-void PlayerMovement::SetMoveType( CPlayerMoveData& move, PlayerMoveType type )
+void PlayerMovement::SetMoveType( CPlayerMoveData& move, EPlayerMoveType type )
 {
 	move.aMoveType = type;
 
-	switch (type)
+	switch ( type )
 	{
-		case PlayerMoveType::NoClip:
+		case EPlayerMoveType_NoClip:
+		case EPlayerMoveType_Fly:
 		{
 			EnableGravity( false );
+
+			// Remove the OnGround flag
+			move.aPlayerFlags.Edit() &= ~PlyOnGround;
+
+			// Remove the Ground Entity
+			apMove->apGroundObj = nullptr;
+
+			break;
+		}
+	}
+
+	switch (type)
+	{
+		case EPlayerMoveType_NoClip:
+		{
 			SetCollisionEnabled( false );
 			break;
 		}
 
-		case PlayerMoveType::Fly:
+		case EPlayerMoveType_Fly:
 		{
-			EnableGravity( false );
 			SetCollisionEnabled( true );
 			break;
 		}
 
-		case PlayerMoveType::Walk:
+		case EPlayerMoveType_Walk:
 		{
 			EnableGravity( true );
 			SetCollisionEnabled( true );
@@ -1517,14 +1555,14 @@ void PlayerMovement::UpdatePosition( Entity player )
 	apTransform->aPos = apPhysObj->GetPos();
 	apTransform->aPos.Edit().z -= phys_player_offset;
 
-	if ( apMove->aMoveType != PlayerMoveType::NoClip )
+	if ( apMove->aMoveType != EPlayerMoveType_NoClip )
 	{
 		PlayerCollisionCheck playerCollide( GetPhysEnv()->GetGravity(), apRigidBody->aVel, apMove );
 		apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
 	}
 
 	// um
-	if ( apMove->aMoveType == PlayerMoveType::Walk )
+	if ( apMove->aMoveType == EPlayerMoveType_Walk )
 	{
 		WalkMovePostPhys();
 	}
@@ -1561,7 +1599,7 @@ void PlayerMovement::DoSmoothDuck()
 	}
 
 #if CH_SERVER
-	if ( IsOnGround() && apMove->aMoveType == PlayerMoveType::Walk )
+	if ( IsOnGround() && apMove->aMoveType == EPlayerMoveType_Walk )
 	{
 		if ( apMove->aTargetViewHeight != GetViewHeight() )
 		{
@@ -1608,7 +1646,7 @@ bool PlayerMovement::CalcOnGround( bool sSetFlag )
 {
 	PROF_SCOPE();
 
-	if ( apMove->aMoveType != PlayerMoveType::Walk )
+	if ( apMove->aMoveType != EPlayerMoveType_Walk )
 		return false;
 
 	// static float maxSlopeAngle = cos( apMove->aMaxSlopeAngle );
@@ -1785,7 +1823,7 @@ void PlayerMovement::PlayImpactSound()
 		return;
 
 	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
-	float vel         = glm::length( glm::vec3( apRigidBody->aVel.Get().x, apRigidBody->aVel.Get().y, apRigidBody->aVel.Get().z * cl_step_sound_gravity_scale ) );
+	float vel         = glm::length( glm::vec3( apMove->aPrevVel.Get().x, apMove->aPrevVel.Get().y, apMove->aPrevVel.Get().z * cl_step_sound_gravity_scale ) );
 	float speedFactor = glm::min( glm::log( vel * cl_step_sound_speed_vol + cl_step_sound_speed_offset ), 1.f );
 
 	if ( speedFactor < cl_step_sound_min_speed )
@@ -1924,7 +1962,7 @@ void PlayerMovement::WalkMove()
 
 	if ( IsOnGround() && !onGround )
 	{
-	//	PlayImpactSound();
+		PlayImpactSound();
 
 		//glm::vec2 vel( apRigidBody->aVel.x, apRigidBody->aVel.y );
 		//if ( glm::length( vel ) < cl_land_sound_threshold )
@@ -1987,9 +2025,17 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 		apMove->aLandPower = 0.f;
 		apMove->aLandTime  = 0.f;
 	}
+#else
+	// Log_Msg( "Smooth Land\n" );
+
+	// if ( CalcOnGround() && !wasOnGround )
+	if ( IsOnGround() && !wasOnGround )
+	{
+		PlayImpactSound();
+	}
 #endif
 
-	if ( sv_land_smoothing && apMove->aMoveType == PlayerMoveType::Walk )
+	if ( sv_land_smoothing )
 	{
 		if ( apMove->aLandPower > 0.f )
 			// apCamera->aTransform.aPos[W_UP] += (- landPower * sin(landTime / landPower / 2) / exp(landTime / landPower)) * cl_land_power_scale;

@@ -15,8 +15,6 @@
 
 LOG_CHANNEL2( Entity );
 
-extern Entity          gLocalPlayer;
-
 CONVAR( ent_always_full_update, 0, "For debugging, always send a full update" );
 CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
 
@@ -919,6 +917,7 @@ void Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
 				componentID = pool->aMapEntityToComponent.at( entity );
 			}
 
+#if CH_CLIENT
 			// Now, update component data
 			// NOTE: i could try to check if it's predicted here and get rid of aOverrideClient
 			if ( ( regData->aFlags & ECompRegFlag_DontOverrideClient ) && entity == gLocalPlayer )
@@ -927,6 +926,7 @@ void Entity_ReadComponentUpdates( const NetMsg_ComponentUpdates* spReader )
 			// a bit of a hack and not implemented properly
 			if ( pool->aComponentFlags.at( componentID ) & EEntityFlag_Predicted )
 				continue;
+#endif
 
 			if ( componentUpdateData->values() )
 			{

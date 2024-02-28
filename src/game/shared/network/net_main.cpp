@@ -34,7 +34,7 @@ void Net_TestPacked()
 
 	clientInfoBuild.setButtons( 47 );
 	clientInfoBuild.setFlashlight( true );
-	clientInfoBuild.setMoveType( EPlayerMoveType::NO_CLIP );
+	clientInfoBuild.setMoveType( EEPlayerMoveType_NO_CLIP );
 
 	NetOutputStream outputStream;
 

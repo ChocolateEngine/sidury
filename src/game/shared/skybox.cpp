@@ -189,6 +189,7 @@ void Skybox_SetMaterial( const std::string& srPath )
 
 	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
+		graphics->SetRenderableDebugName( gSkyboxDraw, "skybox" );
 		renderable->aCastShadow = false;
 		renderable->aTestVis    = false;
 		gSkyboxValid            = true;

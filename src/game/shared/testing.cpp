@@ -32,8 +32,6 @@ CONVAR( proto_look_at_entities, 1 );
 extern ConVar                 phys_friction;
 extern ConVar                 cl_view_height;
 
-extern Entity                 gLocalPlayer;
-
 // Audio Channels
 Handle                        hAudioMusic = InvalidHandle;
 
@@ -786,6 +784,20 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 		return;
 #endif
 
+#if CH_CLIENT
+	auto playerTransform = Ent_GetComponent< CTransform >( gLocalPlayer, "transform" );
+#else
+	Entity player = SV_GetCommandClientEntity();
+
+	if ( player == CH_ENT_INVALID )
+		return;
+
+	auto playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
+#endif
+
+	if ( !playerTransform )
+		return;
+
 	Entity soundEnt = Entity_CreateEntity( !sServer );
 
 	if ( soundEnt == CH_ENT_INVALID )
@@ -801,8 +813,6 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 
 	auto transform           = Ent_AddComponent< CTransform >( soundEnt, "transform" );
 	auto sound               = Ent_AddComponent< CSound >( soundEnt, "sound" );
-
-	auto playerTransform     = Ent_GetComponent< CTransform >( gLocalPlayer, "transform" );
 
 	transform->aPos          = playerTransform->aPos;
 	transform->aAng          = playerTransform->aAng;
@@ -821,7 +831,6 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 
 	sound->aEffects.Edit() |= AudioEffect_Loop | AudioEffect_World;
 }
-
 
 
 #if CH_CLIENT

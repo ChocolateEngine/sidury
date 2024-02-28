@@ -21,8 +21,6 @@ EntitySystemData& EntSysData()
 }
 
 
-extern Entity gLocalPlayer;
-
 CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
 
 

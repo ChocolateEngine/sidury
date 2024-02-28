@@ -44,7 +44,7 @@ struct Quat
 }
 
 
-enum EPlayerMoveType : byte
+enum Net_EPlayerMoveType : byte
 {
     Walk = 0,
     NoClip,
@@ -72,7 +72,7 @@ table NetMsg_UserCmd
 {
     angles       :Vec3;
     buttons      :int;
-    move_type    :EPlayerMoveType;
+    move_type    :Net_EPlayerMoveType;
     flashlight   :bool;  // temp
 }
 

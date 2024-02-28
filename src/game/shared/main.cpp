@@ -41,7 +41,10 @@ float            gFrameTime   = 0.f;
 // real time is unmodified time since engine launched, and game time is time affected by host_timescale and pausing
 double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
+#if CH_CLIENT
 Entity           gLocalPlayer = CH_ENT_INVALID;
+#endif
+
 ViewportCamera_t gView{};
 
 extern bool      gRunning;

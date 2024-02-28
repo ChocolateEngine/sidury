@@ -14,7 +14,7 @@ struct Transform;
 struct TransformSmall;
 struct CCamera;
 struct CPlayerMoveData;
-enum class PlayerMoveType;
+enum EPlayerMoveType : s8;
 
 
 EXT_CVAR_FLAG( CVARF_CL_EXEC );
@@ -92,10 +92,10 @@ enum ECommandSource
 // Keep in sync with NetMsgUserCmd in sidury.capnp
 struct UserCmd_t
 {
-	glm::vec3      aAng;
-	int            aButtons;
-	PlayerMoveType aMoveType;
-	bool           aFlashlight;  // Temp, toggles the flashlight on/off
+	glm::vec3       aAng;
+	int             aButtons;
+	EPlayerMoveType aMoveType;
+	bool            aFlashlight;  // Temp, toggles the flashlight on/off
 };
 
 

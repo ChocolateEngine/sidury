@@ -1005,6 +1005,7 @@ void RenderSystemOld::CreateSelectionTexture()
 
 	// Create Framebuffer
 	CreateFramebuffer_t frameBufCreate{};
+	frameBufCreate.apName             = "Selection Framebuffer";
 	frameBufCreate.aRenderPass        = gGraphicsData.aRenderPassSelect;
 	frameBufCreate.aSize              = viewport->aSize;
 	frameBufCreate.aPass.aAttachDepth = aSelectionDepth;

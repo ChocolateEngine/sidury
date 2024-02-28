@@ -67,6 +67,9 @@ class ServerSystem : public IServerSystem
 
 	void Update( float sDT ) override
 	{
+		if ( !SV_IsHosting() )
+			return;
+
 		gFrameTime = sDT;
 
 		if ( Game_IsPaused() )
@@ -75,9 +78,6 @@ class ServerSystem : public IServerSystem
 		}
 
 		gCurTime += gFrameTime;
-
-		if ( !SV_IsHosting() )
-			return;
 
 		SV_Update( sDT );
 	}

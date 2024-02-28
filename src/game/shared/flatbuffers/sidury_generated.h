@@ -48,6 +48,12 @@ struct NetMsg_ConVarBuilder;
 struct NetMsg_Paused;
 struct NetMsg_PausedBuilder;
 
+struct NetMsg_GameRule;
+struct NetMsg_GameRuleBuilder;
+
+struct NetMsg_GameRuleList;
+struct NetMsg_GameRuleListBuilder;
+
 struct MsgSrc_Client;
 struct MsgSrc_ClientBuilder;
 
@@ -132,24 +138,24 @@ inline const char *EnumNameESiduryComponentProtocolVer(ESiduryComponentProtocolV
   return EnumNamesESiduryComponentProtocolVer()[index];
 }
 
-enum EPlayerMoveType : int8_t {
-  EPlayerMoveType_Walk = 0,
-  EPlayerMoveType_NoClip = 1,
-  EPlayerMoveType_Fly = 2,
-  EPlayerMoveType_MIN = EPlayerMoveType_Walk,
-  EPlayerMoveType_MAX = EPlayerMoveType_Fly
+enum Net_EPlayerMoveType : int8_t {
+  Net_EPlayerMoveType_Walk = 0,
+  Net_EPlayerMoveType_NoClip = 1,
+  Net_EPlayerMoveType_Fly = 2,
+  Net_EPlayerMoveType_MIN = Net_EPlayerMoveType_Walk,
+  Net_EPlayerMoveType_MAX = Net_EPlayerMoveType_Fly
 };
 
-inline const EPlayerMoveType (&EnumValuesEPlayerMoveType())[3] {
-  static const EPlayerMoveType values[] = {
-    EPlayerMoveType_Walk,
-    EPlayerMoveType_NoClip,
-    EPlayerMoveType_Fly
+inline const Net_EPlayerMoveType (&EnumValuesNet_EPlayerMoveType())[3] {
+  static const Net_EPlayerMoveType values[] = {
+    Net_EPlayerMoveType_Walk,
+    Net_EPlayerMoveType_NoClip,
+    Net_EPlayerMoveType_Fly
   };
   return values;
 }
 
-inline const char * const *EnumNamesEPlayerMoveType() {
+inline const char * const *EnumNamesNet_EPlayerMoveType() {
   static const char * const names[4] = {
     "Walk",
     "NoClip",
@@ -159,10 +165,10 @@ inline const char * const *EnumNamesEPlayerMoveType() {
   return names;
 }
 
-inline const char *EnumNameEPlayerMoveType(EPlayerMoveType e) {
-  if (::flatbuffers::IsOutRange(e, EPlayerMoveType_Walk, EPlayerMoveType_Fly)) return "";
+inline const char *EnumNameNet_EPlayerMoveType(Net_EPlayerMoveType e) {
+  if (::flatbuffers::IsOutRange(e, Net_EPlayerMoveType_Walk, Net_EPlayerMoveType_Fly)) return "";
   const size_t index = static_cast<size_t>(e);
-  return EnumNamesEPlayerMoveType()[index];
+  return EnumNamesNet_EPlayerMoveType()[index];
 }
 
 enum EMsgSrc_Client : uint8_t {
@@ -221,11 +227,12 @@ enum EMsgSrc_Server : uint8_t {
   EMsgSrc_Server_ComponentList = 7,
   EMsgSrc_Server_EntityList = 8,
   EMsgSrc_Server_Paused = 9,
+  EMsgSrc_Server_GameRules = 10,
   EMsgSrc_Server_MIN = EMsgSrc_Server_Invalid,
-  EMsgSrc_Server_MAX = EMsgSrc_Server_Paused
+  EMsgSrc_Server_MAX = EMsgSrc_Server_GameRules
 };
 
-inline const EMsgSrc_Server (&EnumValuesEMsgSrc_Server())[10] {
+inline const EMsgSrc_Server (&EnumValuesEMsgSrc_Server())[11] {
   static const EMsgSrc_Server values[] = {
     EMsgSrc_Server_Invalid,
     EMsgSrc_Server_Disconnect,
@@ -236,13 +243,14 @@ inline const EMsgSrc_Server (&EnumValuesEMsgSrc_Server())[10] {
     EMsgSrc_Server_ComponentRegistryInfo,
     EMsgSrc_Server_ComponentList,
     EMsgSrc_Server_EntityList,
-    EMsgSrc_Server_Paused
+    EMsgSrc_Server_Paused,
+    EMsgSrc_Server_GameRules
   };
   return values;
 }
 
 inline const char * const *EnumNamesEMsgSrc_Server() {
-  static const char * const names[11] = {
+  static const char * const names[12] = {
     "Invalid",
     "Disconnect",
     "ConVar",
@@ -253,13 +261,14 @@ inline const char * const *EnumNamesEMsgSrc_Server() {
     "ComponentList",
     "EntityList",
     "Paused",
+    "GameRules",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameEMsgSrc_Server(EMsgSrc_Server e) {
-  if (::flatbuffers::IsOutRange(e, EMsgSrc_Server_Invalid, EMsgSrc_Server_Paused)) return "";
+  if (::flatbuffers::IsOutRange(e, EMsgSrc_Server_Invalid, EMsgSrc_Server_GameRules)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesEMsgSrc_Server()[index];
 }
@@ -436,8 +445,8 @@ struct NetMsg_UserCmd FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int32_t buttons() const {
     return GetField<int32_t>(VT_BUTTONS, 0);
   }
-  EPlayerMoveType move_type() const {
-    return static_cast<EPlayerMoveType>(GetField<int8_t>(VT_MOVE_TYPE, 0));
+  Net_EPlayerMoveType move_type() const {
+    return static_cast<Net_EPlayerMoveType>(GetField<int8_t>(VT_MOVE_TYPE, 0));
   }
   bool flashlight() const {
     return GetField<uint8_t>(VT_FLASHLIGHT, 0) != 0;
@@ -462,7 +471,7 @@ struct NetMsg_UserCmdBuilder {
   void add_buttons(int32_t buttons) {
     fbb_.AddElement<int32_t>(NetMsg_UserCmd::VT_BUTTONS, buttons, 0);
   }
-  void add_move_type(EPlayerMoveType move_type) {
+  void add_move_type(Net_EPlayerMoveType move_type) {
     fbb_.AddElement<int8_t>(NetMsg_UserCmd::VT_MOVE_TYPE, static_cast<int8_t>(move_type), 0);
   }
   void add_flashlight(bool flashlight) {
@@ -483,7 +492,7 @@ inline ::flatbuffers::Offset<NetMsg_UserCmd> CreateNetMsg_UserCmd(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const Vec3 *angles = nullptr,
     int32_t buttons = 0,
-    EPlayerMoveType move_type = EPlayerMoveType_Walk,
+    Net_EPlayerMoveType move_type = Net_EPlayerMoveType_Walk,
     bool flashlight = false) {
   NetMsg_UserCmdBuilder builder_(_fbb);
   builder_.add_buttons(buttons);
@@ -943,6 +952,87 @@ inline ::flatbuffers::Offset<NetMsg_Paused> CreateNetMsg_Paused(
   NetMsg_PausedBuilder builder_(_fbb);
   builder_.add_paused(paused);
   return builder_.Finish();
+}
+
+struct NetMsg_GameRule FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef NetMsg_GameRuleBuilder Builder;
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           verifier.EndTable();
+  }
+};
+
+struct NetMsg_GameRuleBuilder {
+  typedef NetMsg_GameRule Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  explicit NetMsg_GameRuleBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<NetMsg_GameRule> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<NetMsg_GameRule>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<NetMsg_GameRule> CreateNetMsg_GameRule(
+    ::flatbuffers::FlatBufferBuilder &_fbb) {
+  NetMsg_GameRuleBuilder builder_(_fbb);
+  return builder_.Finish();
+}
+
+struct NetMsg_GameRuleList FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef NetMsg_GameRuleListBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_RULES = 4
+  };
+  const ::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_GameRule>> *rules() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_GameRule>> *>(VT_RULES);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RULES) &&
+           verifier.VerifyVector(rules()) &&
+           verifier.VerifyVectorOfTables(rules()) &&
+           verifier.EndTable();
+  }
+};
+
+struct NetMsg_GameRuleListBuilder {
+  typedef NetMsg_GameRuleList Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_rules(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_GameRule>>> rules) {
+    fbb_.AddOffset(NetMsg_GameRuleList::VT_RULES, rules);
+  }
+  explicit NetMsg_GameRuleListBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<NetMsg_GameRuleList> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<NetMsg_GameRuleList>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<NetMsg_GameRuleList> CreateNetMsg_GameRuleList(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NetMsg_GameRule>>> rules = 0) {
+  NetMsg_GameRuleListBuilder builder_(_fbb);
+  builder_.add_rules(rules);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<NetMsg_GameRuleList> CreateNetMsg_GameRuleListDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const std::vector<::flatbuffers::Offset<NetMsg_GameRule>> *rules = nullptr) {
+  auto rules__ = rules ? _fbb.CreateVector<::flatbuffers::Offset<NetMsg_GameRule>>(*rules) : 0;
+  return CreateNetMsg_GameRuleList(
+      _fbb,
+      rules__);
 }
 
 struct MsgSrc_Client FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

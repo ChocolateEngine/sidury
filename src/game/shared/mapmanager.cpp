@@ -23,8 +23,6 @@ LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
 
 SiduryMap*    gpMap = nullptr;
 
-extern Entity gLocalPlayer;
-
 
 enum ESMF_CommandVersion : u16
 {

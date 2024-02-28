@@ -1013,25 +1013,25 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create Core Data Buffer
 
-	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aCoreDataStaging, sizeof( Buffer_Core_t ), "Core Staging Buffer", "Core Buffer" ) )
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aCoreDataStaging, sizeof( Buffer_Core_t ), "Core Staging", "Core" ) )
 		return false;
 	
 	// ------------------------------------------------------
 	// Create Viewport Data Buffer
 
-	if ( !Graphics_CreateStagingUniformBuffer( gGraphicsData.aViewportStaging, sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS, "Viewport Staging Buffer", "Viewport Buffer" ) )
+	if ( !Graphics_CreateStagingUniformBuffer( gGraphicsData.aViewportStaging, sizeof( Shader_Viewport_t ) * CH_R_MAX_VIEWPORTS, "Viewport Staging", "Viewport" ) )
 		return false;
 
 	// ------------------------------------------------------
 	// Create Model Matrix Data Buffer
 
-	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aModelMatrixStaging, sizeof( glm::mat4 ) * CH_R_MAX_RENDERABLES, "Model Matrix Staging Buffer", "Model Matrix Buffer" ) )
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aModelMatrixStaging, sizeof( glm::mat4 ) * CH_R_MAX_RENDERABLES, "Model Matrix Staging", "Model Matrix" ) )
 		return false;
 	
 	// ------------------------------------------------------
 	// Create Renderable Data Buffer
 
-	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aRenderableStaging, sizeof( Shader_Renderable_t ) * CH_R_MAX_RENDERABLES, "Renderable Staging Buffer", "Renderable Buffer" ) )
+	if ( !Graphics_CreateStagingBuffer( gGraphicsData.aRenderableStaging, sizeof( Shader_Renderable_t ) * CH_R_MAX_RENDERABLES, "Renderable Staging", "Renderable" ) )
 		return false;
 
 	// ------------------------------------------------------
@@ -2210,7 +2210,6 @@ void Graphics::CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVe
 
 	char* bufferName = nullptr;
 
-#ifdef _DEBUG
 	if ( spDebugName )
 	{
 		size_t len = strlen( spDebugName );
@@ -2218,7 +2217,6 @@ void Graphics::CreateVertexBuffers( ModelBuffers_t* spBuffer, VertexData_t* spVe
 
 		snprintf( bufferName, len + 5, "VB | %s", spDebugName );
 	}
-#endif
 
 	// transfer source needed if using blend shapes or has a skeleton
 	spBuffer->aVertex = CreateModelBuffer(
@@ -2265,7 +2263,6 @@ void Graphics::CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVert
 		return;
 	}
 
-#ifdef _DEBUG
 	if ( spDebugName )
 	{
 		size_t len = strlen( spDebugName );
@@ -2273,7 +2270,6 @@ void Graphics::CreateIndexBuffer( ModelBuffers_t* spBuffer, VertexData_t* spVert
 
 		snprintf( bufferName, len + 7, "IB | %s", spDebugName );
 	}
-#endif
 
 	spBuffer->aIndex = CreateModelBuffer(
 	  bufferName ? bufferName : "IB",
@@ -2302,14 +2298,13 @@ void Graphics_CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVer
 	}
 
 	char* debugName = nullptr;
-#ifdef _DEBUG
+
 	if ( spDebugName )
 	{
 		size_t nameLen = strlen( spDebugName );
 		debugName      = new char[ nameLen ];  // MEMORY LEAK - need string memory pool
 		snprintf( debugName, nameLen, "%s", spDebugName );
 	}
-#endif
 
 	Graphics_CreateVertexBuffers( spBuffers, spVertexData, debugName );
 
@@ -2319,83 +2314,61 @@ void Graphics_CreateModelBuffers( ModelBuffers_t* spBuffers, VertexData_t* spVer
 #endif
 
 
+void DumpRenderableInfo( ChHandle_t renderHandle )
+{
+	Renderable_t* renderable = nullptr;
+	if ( !gGraphicsData.aRenderables.Get( renderHandle, &renderable ) )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Invalid Handle Found for Renderable: %zd\n", renderHandle );
+		return;
+	}
+
+	Log_MsgF(
+	  gLC_ClientGraphics, "\n------------------------------------------------------------\n"
+						  "Renderable %zd\n", renderHandle );
+
+	// TODO: give models debug names
+	std::string_view modelPath = gGraphics.GetModelPath( renderable->aModel );
+
+	Log_MsgF( gLC_ClientGraphics, "    Name: \"%s\"\n", renderable->apDebugName );
+
+	if ( modelPath.size() )
+		Log_MsgF( gLC_ClientGraphics, "    Model: %zd - \"%s\"\n", renderable->aModel, modelPath.data() );
+	else
+		Log_MsgF( gLC_ClientGraphics, "    Model: %zd\n", renderable->aModel );
+
+	Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer: %zd\n", renderable->aVertexBuffer );
+
+	Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer Shader Handle: %d\n", renderable->aVertexIndex );
+	Log_MsgF( gLC_ClientGraphics, "    Index Buffer Shader Handle: %d\n\n", renderable->aIndexHandle );
+
+	Log_MsgF( gLC_ClientGraphics, "    Test Visibility: %s\n", renderable->aTestVis ? "True" : "False" );
+	Log_MsgF( gLC_ClientGraphics, "    Cast Shadow:     %s\n", renderable->aCastShadow ? "True" : "False" );
+	Log_MsgF( gLC_ClientGraphics, "    Visible:         %s\n", renderable->aVisible ? "True" : "False" );
+
+	Log_MsgF( gLC_ClientGraphics, "\n    Material Count %d\n", renderable->aMaterialCount );
+
+	for ( u32 matI = 0; matI < renderable->aMaterialCount; matI++ )
+	{
+		ChHandle_t material = renderable->apMaterials[ matI ];
+		Log_MsgF( gLC_ClientGraphics, "        %d - %s\n", matI, gGraphics.Mat_GetName( material ) );
+	}
+}
+
+
 CONCMD( r_dump_renderables )
 {
 	for ( u32 i = 0; i < gGraphicsData.aRenderables.size(); i++ )
 	{
 		ChHandle_t renderHandle = gGraphicsData.aRenderables.GetHandleByIndex( i );
-
-		Renderable_t* renderable   = nullptr;
-		if ( !gGraphicsData.aRenderables.Get( renderHandle, &renderable ) )
-		{
-			Log_ErrorF( gLC_ClientGraphics, "Invalid Handle Found for Renderable: %zd\n", renderHandle );
-			continue;
-		}
-
-		Log_MsgF(
-		  gLC_ClientGraphics, "\n------------------------------------------------------------\n"
-							  "Renderable %zd\n",
-		  renderHandle );
-
-#ifdef _DEBUG
-		Log_MsgF( gLC_ClientGraphics, "    Name \"%s\"\n", renderable->apDebugName );
-#endif
-
-#if 0
-		// used in actual drawing
-	ChHandle_t                  aModel;
-	glm::mat4                   aModelMatrix;
-
-	// TODO: store the materials for each mesh here so you can override them for this renderable
-	// all material handles are 0 by default, which means no custom materials are being used
-	// also will start with 1 material by default for async loading, and then will expand upon model loading finish
-	// or
-	u32                         aMaterialCount;
-	ChHandle_t*                 apMaterials = nullptr;
-
-	// used for blend shapes and skeleton data, i don't like this here because very few models will have blend shapes/skeletons
-	ChVector< float >           aBlendShapeWeights;
-	ChVector< BoneTransform_t > aBoneTransforms;
-
-	// -------------------------------------------------
-	// Internal Rendering Parts
-
-	// used for calculating render lists
-	ModelBBox_t                 aAABB;
-
-	// technically we could have this here for skinning results if needed
-	// I don't like this here as only very few models will use skinning
-	ChHandle_t                  aVertexBuffer;
-	ChHandle_t                  aBlendShapeWeightsBuffer;
-	ChHandle_t                  aBoneTransformBuffer;
-
-	u32                         aVertexIndex            = UINT32_MAX;
-	u32                         aIndexHandle            = UINT32_MAX;
-	// u32               aBlendShapeWeightsMagic = UINT32_MAX;
-	u32                         aBlendShapeWeightsIndex = UINT32_MAX;
-	u32                         aBoneTransformHandle    = UINT32_MAX;
-
-	// -------------------------------------------------
-	// User Defined Bools
-
-	// I don't like these bools that have to be checked every frame
-	bool                        aTestVis;
-	bool                        aCastShadow;
-	bool                        aVisible;
-	bool                        aBlendShapesDirty;  // AAAAAAA
-	bool                        aBonesDirty;        // AAAAAAA
-#endif
-
-		Log_MsgF( gLC_ClientGraphics, "    Model %zd\n", renderable->aModel );
-		Log_MsgF( gLC_ClientGraphics, "    Material Count %d\n", renderable->aMaterialCount );
-		Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer %zd\n\n", renderable->aVertexBuffer );
-
-		Log_MsgF( gLC_ClientGraphics, "    Vertex Buffer Shader Handle %d\n", renderable->aVertexIndex );
-		Log_MsgF( gLC_ClientGraphics, "    Index Buffer Shader Handle %d\n", renderable->aIndexHandle );
+		DumpRenderableInfo( renderHandle );
 	}
 
-
-	// Dump Vertex Buffer Index for each renderable
-
-	gGraphicsData.aVertexBuffers;
+	Log_MsgF( gLC_ClientGraphics, "\nRenderable Count %d\n", gGraphicsData.aRenderables.size() );
 }
+
+
+// CONCMD( r_dump_renderable_at_cursor )
+// {
+// 	// TODO: will need to enable selection
+// }

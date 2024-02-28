@@ -26,13 +26,13 @@ enum PlayerFlags_
 typedef unsigned char PlayerFlags;
 
 
-enum class PlayerMoveType
+enum EPlayerMoveType : s8
 {
-	Walk,
-	NoClip,
-	Fly,
-	// Water,
-	Count
+	EPlayerMoveType_Walk,
+	EPlayerMoveType_NoClip,
+	EPlayerMoveType_Fly,
+	// EPlayerMoveType_Water,
+	EPlayerMoveType_Count
 };
 
 
@@ -43,43 +43,46 @@ enum class PlayerMoveType
 struct CPlayerMoveData
 {
 	// General
-	ComponentNetVar< PlayerMoveType > aMoveType         = PlayerMoveType::Walk;
+	ComponentNetVar< EPlayerMoveType > aMoveType         = EPlayerMoveType_Walk;
 
-	ComponentNetVar< PlayerFlags >    aPlayerFlags      = PlyNone;
-	ComponentNetVar< PlayerFlags >    aPrevPlayerFlags  = PlyNone;
+	ComponentNetVar< PlayerFlags >     aPlayerFlags      = PlyNone;
+	ComponentNetVar< PlayerFlags >     aPrevPlayerFlags  = PlyNone;
 
-	ComponentNetVar< float >          aMaxSpeed         = 0.f;
+	ComponentNetVar< float >           aMaxSpeed         = 0.f;
 
 	// View Bobbing
-	ComponentNetVar< float >          aWalkTime         = 0.f;
-	ComponentNetVar< float >          aBobOffsetAmount  = 0.f;
-	ComponentNetVar< float >          aPrevViewTilt     = 0.f;
+	ComponentNetVar< float >           aWalkTime         = 0.f;
+	ComponentNetVar< float >           aBobOffsetAmount  = 0.f;
+	ComponentNetVar< float >           aPrevViewTilt     = 0.f;
 
 	// Smooth Land
-	ComponentNetVar< float >          aLandPower        = 0.f;
-	ComponentNetVar< float >          aLandTime         = 0.f;
-	
+	ComponentNetVar< float >           aLandPower        = 0.f;
+	ComponentNetVar< float >           aLandTime         = 0.f;
+
 	// Smooth Duck
-	ComponentNetVar< float >          aPrevViewHeight   = 0.f;
-	ComponentNetVar< float >          aTargetViewHeight = 0.f;
-	ComponentNetVar< float >          aOutViewHeight    = 0.f;
-	ComponentNetVar< float >          aDuckDuration     = 0.f;
-	ComponentNetVar< float >          aDuckTime         = 0.f;
+	ComponentNetVar< float >           aPrevViewHeight   = 0.f;
+	ComponentNetVar< float >           aTargetViewHeight = 0.f;
+	ComponentNetVar< float >           aOutViewHeight    = 0.f;
+	ComponentNetVar< float >           aDuckDuration     = 0.f;
+	ComponentNetVar< float >           aDuckTime         = 0.f;
 
 	// Sound Effects
-	ComponentNetVar< double >         aLastStepTime     = 0.f;
+	ComponentNetVar< double >          aLastStepTime     = 0.f;
 
-	std::vector< Handle >             aStepSounds;
-	std::vector< Handle >             aImpactSounds;
+	// HACK FOR IMPACT SOUND ON CLIENT - CHANGE THIS LATER
+	ComponentNetVar< glm::vec3 >       aPrevVel{};
+
+	std::vector< Handle >              aStepSounds;
+	std::vector< Handle >              aImpactSounds;
 
 	// Physics
 
-	IPhysicsShape*                    apPhysShape = nullptr;
-	IPhysicsObject*                   apPhysObj   = nullptr;
+	IPhysicsShape*                     apPhysShape = nullptr;
+	IPhysicsObject*                    apPhysObj   = nullptr;
 
-	IPhysicsObject*                   apGroundObj = nullptr;
-	glm::vec3                         aGroundPosition{};
-	glm::vec3                         aGroundNormal{};
+	IPhysicsObject*                    apGroundObj = nullptr;
+	glm::vec3                          aGroundPosition{};
+	glm::vec3                          aGroundNormal{};
 	// glm::vec3               aGroundVelocity{};
 	// Handle                  aGroundMaterial;
 };
@@ -187,7 +190,7 @@ class PlayerMovement // : public ComponentSystem
 	void             AddFriction();
 	void             Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
-	void             SetMoveType( CPlayerMoveData& move, PlayerMoveType type );
+	void             SetMoveType( CPlayerMoveData& move, EPlayerMoveType type );
 	void             SetCollisionEnabled( bool enable );
 	void             SetGravity( const glm::vec3& gravity );
 	void             EnableGravity( bool enabled );
