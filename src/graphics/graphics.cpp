@@ -1886,10 +1886,7 @@ void Graphics::SetRenderableDebugName( ChHandle_t sRenderable, std::string_view 
 {
 	if ( Renderable_t* renderable = gGraphics.GetRenderableData( sRenderable ) )
 	{
-		if ( renderable->apDebugName )
-		{
-			FreeRenderableDebugName( renderable );
-		}
+		FreeRenderableDebugName( renderable );
 
 		if ( sName.empty() )
 			return;
