@@ -533,105 +533,10 @@ extern "C"
 		// ---------------------------------------------------------------------------------------------
 		// Main Loop
 
-#if 1
 		if ( gDedicatedServer )
 			MainLoopDedicated();
 		else
 			MainLoop();
-#else
-		auto startTime = std::chrono::high_resolution_clock::now();
-
-		while ( gRunning )
-		{
-			PROF_SCOPE_NAMED( "Main Loop" );
-
-			auto  currentTime = std::chrono::high_resolution_clock::now();
-			float time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-
-			// don't let the time go too crazy, usually happens when in a breakpoint
-			time              = glm::min( time, host_max_frametime.GetFloat() );
-
-			if ( host_fps_max.GetFloat() > 0.f )
-			{
-				float maxFps       = glm::clamp( host_fps_max.GetFloat(), 10.f, 5000.f );
-
-				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
-				float minFrameTime = 1.0f / maxFps;
-				if ( ( minFrameTime - time ) > ( 2.0f / 1000.f ) )
-					sys_sleep( 1 );
-
-				// framerate is above max
-				if ( time < minFrameTime )
-					continue;
-			}
-
-			// ftl::TaskCounter taskCounter( &gTaskScheduler );
-
-			Map_UpdateTimer( time );
-
-			input->Update( time );
-
-			// may change from input update running the quit command
-			if ( !gRunning )
-				break;
-
-			gCurrentModule = ECurrentModule_Client;
-
-			if ( RunningClient() )
-				client->PreUpdate( time );
-
-			float frameTimeScaled = time * host_timescale;
-			gCurrentModule        = ECurrentModule_Server;
-
-			// Update Game Logic
-			if ( server )
-				server->Update( frameTimeScaled );
-
-			gCurrentModule = ECurrentModule_Client;
-
-			if ( RunningClient() )
-				client->Update( frameTimeScaled );
-			
-			gCurrentModule = ECurrentModule_None;
-
-			// Do this here for dedicated server
-			if ( gDedicatedServer )
-			{
-				UpdateViewport();
-
-				{
-					PROF_SCOPE_NAMED( "Imgui New Frame" );
-					ImGui::NewFrame();
-					ImGui_ImplSDL2_NewFrame();
-				}
-
-				renderOld->NewFrame();
-				gui->Update( time );
-
-				if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) )
-				{
-					renderOld->Present();
-				}
-				else
-				{
-					PROF_SCOPE_NAMED( "Imgui End Frame" );
-					ImGui::EndFrame();
-				}
-			}
-
-			Con_Update();
-			Resource_Update();
-
-			// Wait and help to execute unfinished tasks
-			// gTaskScheduler.WaitForCounter( &taskCounter );
-
-			startTime = currentTime;
-
-#ifdef TRACY_ENABLE
-			FrameMark;
-#endif
-		}
-#endif
 
 		// ---------------------------------------------------------------------------------------------
 		// Shutdown
