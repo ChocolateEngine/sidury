@@ -897,7 +897,8 @@ void Shader_UpdateMaterialVars()
 		// ?????
 		if ( !data )
 		{
-			Log_Error( gLC_ClientGraphics, "Shader does not have material data?\n" );
+			std::string_view shaderName = gGraphics.GetShaderName( shader );
+			Log_ErrorF( gLC_ClientGraphics, "Shader does not have material data: %s\n", shaderName.empty() ? "UNNAMED" : shaderName.data() );
 			continue;
 		}
 
