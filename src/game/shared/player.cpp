@@ -574,24 +574,16 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 	auto UpdateTransform = [ & ]()
 	{
 		// weird stuff to get the angle of the light correct
-		// flashlight->aAng.Edit().x = camTransform->aAng.Get().z;
-		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
-		// flashlight->aAng.Edit().z = -camTransform->aAng.Get().x + 90.f;
 
-		//flashlight->aAng.Edit().x = -camTransform->aAng.Get().x + 90.f;
-		flashlight->aAng.Edit().y = camTransform->aAng.Get().y;
+		glm::vec3 ang{};
+		ang.x                   = -camTransform->aAng.Get().x + 90.f;
+		ang.z                   = -camTransform->aAng.Get().y;
 
-		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
-		// flashlight->aAng.Edit().z = 0.f;
+		// HACK HACK
+		glm::mat4 flashlightMat = Util_ToMatrix( nullptr, &ang );
+		flashlight->aRot.Edit() = Util_GetMatrixRotation( flashlightMat );
 
-		// flashlight->aAng.Edit().x = camTransform->aAng.Get().y + 90.f;
-		// flashlight->aAng.Edit().y = -camTransform->aAng.Get().x + 90.f;
-		// flashlight->aAng.Edit().z = 0.f;
-		
-		//flashlight->aAng.Edit().y = -camTransform->aAng.Get().y;
-		//flashlight->aAng.Edit().z = -camTransform->aAng.Get().z;
-
-		flashlight->aPos          = transform->aPos.Get() + camTransform->aPos.Get();
+		flashlight->aPos        = transform->aPos.Get() + camTransform->aPos.Get();
 
 		glm::vec3 offset( r_flashlight_offset_x.GetFloat(), r_flashlight_offset_y.GetFloat(), r_flashlight_offset_z.GetFloat() );
 

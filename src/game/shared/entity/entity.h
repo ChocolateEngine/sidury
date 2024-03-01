@@ -1279,7 +1279,7 @@ struct CLight
 	ComponentNetVar< ELightType > aType = ELightType_Directional;
 	ComponentNetVar< glm::vec4 >  aColor{};
 	ComponentNetVar< glm::vec3 >  aPos{};
-	ComponentNetVar< glm::vec3 >  aAng{};
+	ComponentNetVar< glm::quat >  aRot{};
 	ComponentNetVar< float >      aInnerFov     = 45.f;
 	ComponentNetVar< float >      aOuterFov     = 45.f;
 	ComponentNetVar< float >      aRadius       = 0.f;

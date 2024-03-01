@@ -54,7 +54,7 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 	else
 	{
 		spLight->apLight->aPos = spLight->aPos;
-		spLight->apLight->aRot = AngToQuat( glm::radians( spLight->aAng.Get() ) );
+		spLight->apLight->aRot = spLight->aRot;
 	}
 
 	spLight->apLight->aType     = spLight->aType;

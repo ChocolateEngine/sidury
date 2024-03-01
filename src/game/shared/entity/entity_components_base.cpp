@@ -71,7 +71,7 @@ CH_STRUCT_REGISTER_COMPONENT( CLight, light, EEntComponentNetType_Both, ECompReg
 	// it should be attached to it's own entity that can be parented
 	// and that entity needs to contain the transform (or transform small) component
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aPos, pos, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Vec3, glm::vec3, aAng, ang, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Quat, glm::quat, aRot, rot, ECompRegFlag_None );
 
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aInnerFov, innerFov, ECompRegFlag_None );
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Float, float, aOuterFov, outerFov, ECompRegFlag_None );
