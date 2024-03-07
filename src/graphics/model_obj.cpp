@@ -48,13 +48,15 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 	std::string baseDir  = GetBaseDir( srPath );
 	std::string baseDir2 = GetBaseDir( srBasePath );
 
+	u32         matCount = glm::max( 1U, obj->material_count );
+
 	MeshBuilder meshBuilder( gGraphics );
   #ifdef _DEBUG
 	meshBuilder.Start( spModel, srBasePath.c_str() );
   #else
 	meshBuilder.Start( spModel );
   #endif
-	meshBuilder.SetSurfaceCount( obj->material_count );
+	meshBuilder.SetSurfaceCount( matCount );
 	
 	for ( unsigned int i = 0; i < obj->material_count; i++ )
 	{
@@ -104,6 +106,13 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 		meshBuilder.SetMaterial( material );
 	}
 
+	if ( obj->material_count == 0 )
+	{
+		Handle material = gGraphics.CreateMaterial( srPath, gGraphics.GetShader( gDefaultShader ) );
+		meshBuilder.SetCurrentSurface( 0 );
+		meshBuilder.SetMaterial( material );
+	}
+
 	// u64 vertexOffset = 0;
 	// u64 indexOffset  = 0;
 	// 
@@ -121,8 +130,13 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 		for ( u32 faceIndex = 0; faceIndex < group.face_count; faceIndex++ )
 		// for ( u32 faceIndex = 0; faceIndex < obj->face_count; faceIndex++ )
 		{
-			u32& faceVertCount = obj->face_vertices[group.face_offset + faceIndex];
-			u32& faceMat = obj->face_materials[group.face_offset + faceIndex];
+			u32& faceVertCount = obj->face_vertices[ group.face_offset + faceIndex ];
+			u32  faceMat       = 0;
+
+			if ( obj->material_count > 0 )
+			{
+				faceMat = obj->face_materials[ group.face_offset + faceIndex ];
+			}
 
 			meshBuilder.SetCurrentSurface( faceMat );
 			meshBuilder.AllocateVertices( faceVertCount == 3 ? 3 : 6 );
@@ -135,8 +149,8 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 
 				if ( faceVertIndex >= 3 )
 				{
-					auto ind0 = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 3 ];
-					auto ind1 = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 1 ];
+					auto ind0                   = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 3 ];
+					auto ind1                   = meshBuilder.apSurf->aIndices[ meshBuilder.apSurf->aIndices.size() - 1 ];
 
 					meshBuilder.apSurf->aVertex = meshBuilder.apSurf->aVertices[ ind0 ];
 					meshBuilder.NextVertex();
@@ -159,9 +173,12 @@ void LoadObj_Fast( const std::string &srBasePath, const std::string &srPath, Mod
 				  obj->normals[ normal_index + 1 ],
 				  obj->normals[ normal_index + 2 ] );
 
-				meshBuilder.SetTexCoord(
-				  obj->texcoords[ texcoord_index ],
-				  1.0f - obj->texcoords[ texcoord_index + 1 ] );
+				if ( obj->material_count > 0 )
+				{
+					meshBuilder.SetTexCoord(
+					  obj->texcoords[ texcoord_index ],
+					  1.0f - obj->texcoords[ texcoord_index + 1 ] );
+				}
 
 				meshBuilder.NextVertex();
 			}
