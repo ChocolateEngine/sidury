@@ -11,7 +11,7 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LogChannel gLC_Entity = Log_RegisterChannel( "Entity - " CH_MODULE_NAME, LogColor::Purple );
+LogChannel gLC_Entity = Log_RegisterChannel( "Entity - " CH_MODULE_NAME, LogColor::Cyan );
 
 
 EntitySystemData& EntSysData()
