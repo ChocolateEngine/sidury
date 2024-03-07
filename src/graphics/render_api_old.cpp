@@ -1134,50 +1134,7 @@ bool RenderSystemOld::GetSelectionResult( u8& red, u8& green, u8& blue )
 
 	Log_DevF( 1, "Picked Color of (%d, %d, %d)\n", red, green, blue );
 
-
-
-	// TEMP
-	// Write To File
-
-	FILE* selectPPM = fopen( "SELECTION_TEXTURE.ppm", "wb" );
-
-	fprintf( selectPPM, "P6\n%d %d\n255\n", readTexture.size.x, readTexture.size.y );
-
-	size_t writeIndex      = 0;
-	for ( size_t y = 0; y < readTexture.size.y; ++y )
-	{
-		for ( size_t x = 0; x < readTexture.size.x; ++x )
-		{
-			// u32 pixel = gpMissingTexture[ y + x * gMissingTextureHeight ];
-
-			// u8 r = ( pixel >> 16 ) & 0xFF;
-			// u8 g = ( pixel >> 8 ) & 0xFF;
-			// u8 b = pixel & 0xFF;
-
-			// u8 r = gpMissingTexture[ ( y + x * gMissingTextureHeight ) ];
-			// u8 g = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 1 ];
-			// u8 b = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 2 ];
-			// u8 a = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 3 ];
-
-			u8 r = readTexture.pData[ writeIndex++ ];
-			//u8 g = readTexture.pData[ writeIndex++ ];
-			// u8 b = readTexture.pData[ writeIndex++ ];
-			// u8 a = readTexture.pData[ writeIndex++ ];
-
-			fwrite( &r, 1, 1, selectPPM );
-			fwrite( &r, 1, 1, selectPPM );
-			fwrite( &r, 1, 1, selectPPM );
-
-			// fwrite( &g, 1, 1, selectPPM );
-			//fwrite( &b, 1, 1, selectPPM );
-		}
-	}
-
-	fclose( selectPPM );
-
-
 	render->FreeReadTexture( &readTexture );
-
 
 	return true;
 }
