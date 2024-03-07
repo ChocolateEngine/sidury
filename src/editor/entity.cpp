@@ -125,6 +125,12 @@ void Entity_Delete( ChHandle_t sHandle )
 		ent->apName = nullptr;
 	}
 
+	// Check if this entity has a light on it
+	if ( ent->apLight )
+	{
+		graphics->DestroyLight( ent->apLight );
+	}
+
 	// Check if we have a renderable on this entity
 	if ( ent->aRenderable != CH_INVALID_HANDLE )
 	{
