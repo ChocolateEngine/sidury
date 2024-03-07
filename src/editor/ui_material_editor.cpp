@@ -10,14 +10,31 @@
 #include <unordered_set>
 
 
+CONVAR( matedit_texture_size, 64, CVARF_ARCHIVE, "Size of textures drawn in the image preview" );
+
+
+struct TextureParameterData
+{
+	char*       path[ 512 ];
+	ImTextureID imTexture;
+};
+
+
 struct MaterialEditorData
 {
-	ChHandle_t  mat                  = CH_INVALID_HANDLE;
+	ChHandle_t                                      mat           = CH_INVALID_HANDLE;
 
-	bool        drawNewDialog        = false;
-	std::string newMatName           = "";
-	
-	std::string newVarName           = "";
+	bool                                            drawNewDialog = false;
+	std::string                                     newMatName    = "";
+
+	std::string                                     newVarName    = "";
+
+	std::unordered_map< ChHandle_t, ImTextureID >   imguiTextures;
+
+	std::unordered_map< u32, TextureParameterData > textureData;
+
+	FilePickerData_t                                textureBrowser;
+	u32                                             textureBrowserVar = UINT32_MAX;
 };
 
 
@@ -76,6 +93,11 @@ void MaterialEditor_DrawViewLoadedDialog()
 }
 
 
+void MaterialEditor_DrawTextureVar()
+{
+}
+
+
 void MaterialEditor_Draw()
 {
 	if ( !ImGui::BeginChild( "Material Editor" ) )
@@ -109,6 +131,12 @@ void MaterialEditor_Draw()
 		if ( ImGui::Button( "Save As" ) )
 		{
 		}
+
+		ImGui::SameLine();
+
+		if ( ImGui::Button( "Pick Material Under Cursor" ) )
+		{
+		}
 	}
 
 	if ( gMatEditor.drawNewDialog )
@@ -127,14 +155,14 @@ void MaterialEditor_Draw()
 
 	ImGui::Separator();
 
-	const char* matPath    = graphics->Mat_GetName( gMatEditor.mat );
-	ChHandle_t  shader     = graphics->Mat_GetShader( gMatEditor.mat );
-	const char* shaderName = graphics->GetShaderName( shader );
+	const char* matPath       = graphics->Mat_GetName( gMatEditor.mat );
+	ChHandle_t  oldShader     = graphics->Mat_GetShader( gMatEditor.mat );
+	const char* oldShaderName = graphics->GetShaderName( oldShader );
 
 	ImGui::Text( matPath );
 
 	// Draw Shader Dropdown
-	if ( ImGui::BeginCombo( "Shader", shaderName ? shaderName : "" ) )
+	if ( ImGui::BeginCombo( "Shader", oldShaderName ? oldShaderName : "" ) )
 	{
 		u32 shaderCount = graphics->GetGraphicsShaderCount();
 
@@ -152,92 +180,138 @@ void MaterialEditor_Draw()
 		ImGui::EndCombo();
 	}
 
+	ChHandle_t  shader     = graphics->Mat_GetShader( gMatEditor.mat );
+	const char* shaderName = graphics->GetShaderName( shader );
+
 	ImGui::Separator();
 
-	gMatEditor.newVarName.reserve( 128 );
-	ImGui::InputText( "New Var Name", gMatEditor.newVarName.data(), 128, ImGuiInputTextFlags_CallbackAlways, StringTextInput, &gMatEditor.newVarName );
+	// Get Shader Variable Data
+	u32 shaderVarCount = graphics->GetShaderVarCount( shader );
 
-	// Add Material Var - Remove when we have shaders registering var types
-	if ( ImGui::BeginCombo( "Add Var", "Texture" ) )
+	if ( !shaderVarCount )
 	{
-		if ( ImGui::Selectable( "Texture" ) && gMatEditor.newVarName.size() )
-		{
-			// TODO: open a texture browser
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, CH_INVALID_HANDLE );
-			gMatEditor.newVarName.clear();
-		}
-
-		if ( ImGui::Selectable( "Float" ) && gMatEditor.newVarName.size() )
-		{
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, 0.f );
-			gMatEditor.newVarName.clear();
-		}
-
-		if ( ImGui::Selectable( "Int" ) && gMatEditor.newVarName.size() )
-		{
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, 0 );
-			gMatEditor.newVarName.clear();
-		}
-
-		if ( ImGui::Selectable( "Vec2" ) && gMatEditor.newVarName.size() )
-		{
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, glm::vec2() );
-			gMatEditor.newVarName.clear();
-		}
-
-		if ( ImGui::Selectable( "Vec3" ) && gMatEditor.newVarName.size() )
-		{
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, glm::vec3() );
-			gMatEditor.newVarName.clear();
-		}
-
-		if ( ImGui::Selectable( "Vec4" ) && gMatEditor.newVarName.size() )
-		{
-			graphics->Mat_SetVar( gMatEditor.mat, gMatEditor.newVarName, glm::vec4() );
-			gMatEditor.newVarName.clear();
-		}
-
-		ImGui::EndCombo();
+		ImGui::Text( "Shader has no material properties" );
+		ImGui::EndChild();
+		return;
 	}
 
-	// Draw Material Vars
-	if ( ImGui::BeginTable( matPath, 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable ) )
+	size_t                 varCount   = graphics->Mat_GetVarCount( gMatEditor.mat );
+	ShaderMaterialVarDesc* shaderVars = graphics->GetShaderVars( shader );
+
+	if ( !shaderVars )
 	{
-		// Draw Shader
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex( 0 );
+		ImGui::Text( "FAILED TO GET SHADER VARS!!!!" );
+		ImGui::EndChild();
+		return;
+	}
 
-		ImGui::Text( "shader" );
+	// Shader Booleans
+	ImGui::Text( "Booleans" );
 
-		ImGui::TableSetColumnIndex( 1 );
+	for ( u32 varI = 0; varI < shaderVarCount; varI++ )
+	{
+		if ( shaderVars[ varI ].type != EMatVar_Bool )
+			continue;
 
-		ImGui::Text( shaderName ? shaderName : "INVALID" );
+		bool value = graphics->Mat_GetBool( gMatEditor.mat, shaderVars[ varI ].name );
+		bool out   = value;
 
-		size_t varCount = graphics->Mat_GetVarCount( gMatEditor.mat );
-
-		for ( u32 varI = 0; varI < varCount; varI++ )
+		if ( ImGui::BeginChild( shaderVars[ varI ].name, {}, ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY ) )
 		{
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex( 0 );
-
-			// TODO: probably expose MaterialVar directly? this re-accessing the data a lot
-			const char* varName    = graphics->Mat_GetVarName( gMatEditor.mat, varI );
-			EMatVar     matVarType = graphics->Mat_GetVarType( gMatEditor.mat, varI );
-
-			ImGui::Text( varName ? varName : "ERROR NAME" );
-
-			ImGui::TableSetColumnIndex( 1 );
-
-			switch ( matVarType )
+			if ( ImGui::Checkbox( shaderVars[ varI ].name, &out ) )
 			{
-				default:
-				case EMatVar_Invalid:
-					break;
+				graphics->Mat_SetVar( gMatEditor.mat, shaderVars[ varI ].name, out );
+			}
 
-				case EMatVar_Texture:
+			if ( !shaderVars[ varI ].desc )
+				continue;
+
+			ImGui::Text( shaderVars[ varI ].desc );
+		}
+
+		ImGui::EndChild();
+	}
+
+	ImGui::Spacing();
+
+	u32 imId = 1;
+
+	// maybe make a section for textures only?
+
+	ImGui::Text( "Textures" );
+	
+	for ( u32 varI = 0; varI < shaderVarCount; varI++ )
+	{
+		ShaderMaterialVarDesc& shaderVar = shaderVars[ varI ];
+
+		if ( shaderVar.type != EMatVar_Texture )
+			continue;
+
+		if ( ImGui::BeginChild( shaderVar.name, {}, ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY ) )
+		{
+			ChHandle_t        texHandle   = graphics->Mat_GetTexture( gMatEditor.mat, shaderVar.name );
+			EFilePickerReturn filePickRet = EFilePickerReturn_None;
+
+			float             size        = std::clamp( matedit_texture_size.GetFloat(), 2.f, 8192.f );
+
+			ImVec2            texSize     = { size, size };
+
+			auto              texIt       = gMatEditor.imguiTextures.find( texHandle );
+			ImTextureID       imTex       = 0;
+
+			if ( texIt == gMatEditor.imguiTextures.end() )
+			{
+				imTex                                 = render->AddTextureToImGui( texHandle );
+				gMatEditor.imguiTextures[ texHandle ] = imTex;
+			}
+			else
+			{
+				imTex = texIt->second;
+			}
+
+			// if ( ImGui::BeginChild( shaderVar.name, {}, ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY ) )
+			{
+				if ( ImGui::BeginChild( imId++, {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY ) )
 				{
-					ChHandle_t    texHandle = graphics->Mat_GetTexture( gMatEditor.mat, varI );
-					TextureInfo_t texInfo   = render->GetTextureInfo( texHandle );
+					ImGui::Image( imTex, texSize );
+				}
+
+				ImGui::EndChild();
+
+				ImGui::SameLine();
+
+				// ImGui::SetNextWindowSizeConstraints( { 50, 50 }, { 100000, 100000 } );
+
+				if ( ImGui::BeginChild( imId++, {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY ) )
+				{
+					ImGui::Text( shaderVar.name );
+
+					if ( shaderVar.desc )
+					{
+						ImGui::SameLine();
+						ImGui::Text( "- %s", shaderVar.desc );
+					}
+
+					if ( ImGui::Button( "Select" ) || ( gMatEditor.textureBrowser.open && gMatEditor.textureBrowserVar == varI ) )
+					{
+						gMatEditor.textureBrowserVar        = varI;
+						gMatEditor.textureBrowser.open      = true;
+						gMatEditor.textureBrowser.filterExt = { ".ktx" };
+						filePickRet                         = FilePicker_Draw( gMatEditor.textureBrowser, shaderVar.name );
+					}
+
+					ImGui::SameLine();
+
+					bool resetTexture = false;
+					if ( ImGui::Button( "Reset" ) )
+					{
+						resetTexture = true;
+					}
+
+					// TODO: show texture import options?
+					// Mainly an option to have texture filtering on or off
+
+					TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 
 					ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
 
@@ -249,62 +323,188 @@ void MaterialEditor_Draw()
 						ImGui::EndTooltip();
 					}
 
-					break;
+					if ( filePickRet == EFilePickerReturn_SelectedItems )
+					{
+						if ( texHandle )
+							render->FreeTexture( texHandle );
+
+						TextureCreateData_t createInfo{};
+						createInfo.aUsage     = EImageUsage_Sampled;
+
+						ChHandle_t newTexture = CH_INVALID_HANDLE;
+						render->LoadTexture( newTexture, gMatEditor.textureBrowser.selectedItems[ 0 ], createInfo );
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, newTexture );
+
+						texHandle                    = newTexture;
+
+						gMatEditor.textureBrowserVar = UINT32_MAX;
+					}
+
+					if ( resetTexture )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, shaderVar.defaultTextureHandle );
+					}
 				}
+
+				ImGui::EndChild();
+			}
+		}
+
+		ImGui::EndChild();
+	}
+
+	ImGui::Text( "Variables" );
+
+	// Shader Variables
+	for ( u32 varI = 0; varI < shaderVarCount; varI++ )
+	{
+		ShaderMaterialVarDesc& shaderVar = shaderVars[ varI ];
+
+		if ( shaderVar.type == EMatVar_Invalid || shaderVar.type == EMatVar_Bool  || shaderVar.type == EMatVar_Texture )
+			continue;
+
+		if ( ImGui::BeginChild( shaderVar.name, {}, ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY ) )
+		{
+			ImGui::Text( shaderVar.name );
+
+			if ( shaderVar.desc )
+			{
+				ImGui::SameLine();
+				ImGui::Text( "- %s", shaderVar.desc );
+			}
+
+			switch ( shaderVar.type )
+			{
+				default:
+				case EMatVar_Invalid:
+				case EMatVar_Bool:
+				case EMatVar_Texture:
+					continue;
 
 				case EMatVar_Float:
 				{
-					float value = graphics->Mat_GetFloat( gMatEditor.mat, varI );
-					ImGui::Text( "%.6f", value );
+					float value = graphics->Mat_GetFloat( gMatEditor.mat, shaderVar.name );
+
+					if ( ImGui::DragFloat( shaderVar.name, &value, 0.05f ) )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, value );
+					}
+
 					break;
 				}
 
 				case EMatVar_Int:
 				{
-					int value = graphics->Mat_GetInt( gMatEditor.mat, varI );
-					ImGui::Text( "%d", value );
-					break;
-				}
+					int value = graphics->Mat_GetInt( gMatEditor.mat, shaderVar.name );
 
-				case EMatVar_Bool:
-				{
-					bool value = graphics->Mat_GetBool( gMatEditor.mat, varI );
-					ImGui::Text( value ? "True" : "False" );
+					if ( ImGui::DragInt( shaderVar.name, &value ) )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, value );
+					}
+
 					break;
 				}
 
 				case EMatVar_Vec2:
 				{
-					glm::vec2 value = graphics->Mat_GetVec2( gMatEditor.mat, varI );
-					ImGui::Text( "X: %.6f, Y: %.6f", value.x, value.y );
+					glm::vec2 value = graphics->Mat_GetVec2( gMatEditor.mat, shaderVar.name );
+
+					if ( ImGui::DragScalarN( shaderVar.name, ImGuiDataType_Float, &value.x, 2, 0.25f, nullptr, nullptr, nullptr, 1.f ) )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, value );
+					}
+
 					break;
 				}
 
 				case EMatVar_Vec3:
 				{
-					glm::vec3 value = graphics->Mat_GetVec3( gMatEditor.mat, varI );
-					ImGui::Text( "X: %.6f, Y: %.6f, Z: %.6f", value.x, value.y, value.z );
+					glm::vec3 value = graphics->Mat_GetVec3( gMatEditor.mat, shaderVar.name );
+
+					if ( ImGui::DragScalarN( shaderVar.name, ImGuiDataType_Float, &value.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f ) )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, value );
+					}
+
 					break;
 				}
 
 				case EMatVar_Vec4:
 				{
-					glm::vec4 value = graphics->Mat_GetVec4( gMatEditor.mat, varI );
-					ImGui::Text( "X: %.6f, Y: %.6f, Z: %.6f, W: %.6f", value.x, value.y, value.z, value.w );
+					glm::vec4 value = graphics->Mat_GetVec4( gMatEditor.mat, shaderVar.name );
+
+					if ( ImGui::DragScalarN( shaderVar.name, ImGuiDataType_Float, &value.x, 4, 0.25f, nullptr, nullptr, nullptr, 1.f ) )
+					{
+						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, value );
+					}
+
 					break;
 				}
 			}
 		}
+
+		ImGui::EndChild();
 	}
 
-	ImGui::EndTable();
 	ImGui::EndChild();
 }
 
 
 void MaterialEditor_SetMaterial( ChHandle_t sMat )
 {
+	gMatEditor.textureBrowser.filterExt.push_back( ".ktx" );
+	gMatEditor.textureBrowser.open = false;
+	gMatEditor.textureBrowserVar   = UINT32_MAX;
+
+	// Clear ImGui Textures
+	if ( gMatEditor.mat )
+	{
+		size_t varCount = graphics->Mat_GetVarCount( gMatEditor.mat );
+
+		for ( u32 varI = 0; varI < varCount; varI++ )
+		{
+			EMatVar matVarType = graphics->Mat_GetVarType( gMatEditor.mat, varI );
+
+			if ( matVarType == EMatVar_Texture )
+			{
+				ChHandle_t texHandle = graphics->Mat_GetTexture( gMatEditor.mat, varI );
+				render->FreeTextureFromImGui( texHandle );
+			}
+		}
+	}
+
+	gMatEditor.imguiTextures.clear();
+
 	gMatEditor.mat = sMat;
+	
+	if ( gMatEditor.mat == CH_INVALID_HANDLE )
+	{
+		return;
+	}
+
+	// size_t varCount = graphics->Mat_GetVarCount( gMatEditor.mat );
+	// 
+	// for ( u32 varI = 0; varI < varCount; varI++ )
+	// {
+	// 	EMatVar matVarType = graphics->Mat_GetVarType( gMatEditor.mat, varI );
+	// 
+	// 	if ( matVarType == EMatVar_Texture )
+	// 	{
+	// 		ChHandle_t texHandle = graphics->Mat_GetTexture( gMatEditor.mat, varI );
+	// 		ImTextureID imTex = render->AddTextureToImGui( texHandle );
+	// 
+	// 		if ( imTex )
+	// 		{
+	// 			gMatEditor.imguiTextures[ texHandle ] = imTex;
+	// 		}
+	// 		else
+	// 		{
+	// 			Log_ErrorF( "Failed to add imgui texture!\n" );
+	// 			MaterialEditor_SetMaterial( CH_INVALID_HANDLE );
+	// 			return;
+	// 		}
+	// 	}
+	// }
 }
 
 
