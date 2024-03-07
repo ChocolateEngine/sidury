@@ -31,6 +31,7 @@ extern IRenderSystemOld* renderOld;
 
 extern float             gFrameTime;
 extern double            gCurTime;
+extern u32               gMainViewportHandle;
 
 
 enum EGizmoMode
@@ -89,7 +90,8 @@ struct EditorView_t
 	// projection matrix * view matrix
 	glm::mat4        aProjViewMat;
 
-	u32              aViewportIndex;
+	// TODO: use this in the future
+	// u32              aViewportIndex;
 
 	// TODO: remove this from here, right now this is the same between ALL contexts
 	glm::uvec2       aResolution;

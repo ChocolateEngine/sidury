@@ -35,9 +35,9 @@ static void Shader_ShadowMap_GetGraphicsPipelineCreate( GraphicsPipelineCreate_t
 
 
 // blech
-void Shader_ShadowMap_SetViewInfo( int sViewInfo )
+void Shader_ShadowMap_SetViewInfo( u32 sViewInfo )
 {
-	gShadowViewInfoIndex = sViewInfo;
+	gShadowViewInfoIndex = Graphics_GetShaderSlot( gGraphicsData.aViewportSlots, sViewInfo );
 }
 
 

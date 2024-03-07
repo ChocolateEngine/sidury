@@ -123,7 +123,7 @@ static bool gCheckSelectionResult = false;
 bool EditorView_IsMouseInView()
 {
 	// TEMP
-	ViewportShader_t* viewport = graphics->GetViewportData( 0 );
+	ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportHandle );
 
 	glm::ivec2 mousePos = input->GetMousePos();
 
@@ -243,10 +243,6 @@ void EditorView_UpdateInputs()
 	const float upSpeed      = view_move_up * moveScale;
 	// apMove->aMaxSpeed        = max_speed * moveScale;
 
-	static glm::vec3  rayPos{};
-	static glm::vec3  rayDir{};
-	static glm::mat4  tempView = context->aView.aProjViewMat;
-
 	if ( Input_KeyPressed( EBinding_Viewport_MoveForward ) )
 		gEditorData.aMove[ W_FORWARD ] = forwardSpeed;
 
@@ -345,7 +341,8 @@ void EditorView_UpdateView( EditorContext_t* spContext )
 		// wtf broken??
 		// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
 
-		ViewportShader_t* viewport = graphics->GetViewportData( spContext->aView.aViewportIndex );
+		// ViewportShader_t* viewport = graphics->GetViewportData( spContext->aView.aViewportIndex );
+		ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportHandle );
 
 		if ( viewport )
 			viewport->aViewPos = spContext->aView.aPos;

@@ -171,6 +171,34 @@ ChHandle_t Graphics::GetComputeShaderByIndex( u32 sIndex )
 }
 
 
+u32 Graphics::GetShaderVarCount( ChHandle_t shader )
+{
+	ShaderData_t* data = Shader_GetData( shader );
+
+	if ( data == nullptr )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Get Shader Data for Shader Material Var Count\n" );
+		return 0;
+	}
+
+	return data->aMaterialVarCount;
+}
+
+
+ShaderMaterialVarDesc* Graphics::GetShaderVars( ChHandle_t shader )
+{
+	ShaderData_t* data = Shader_GetData( shader );
+
+	if ( data == nullptr )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Get Shader Data for Shader Material Vars\n" );
+		return nullptr;
+	}
+
+	return data->apMaterialVars;
+}
+
+
 bool Shader_CreatePipelineLayout( std::string_view sName, Handle& srLayout, FShader_GetPipelineLayoutCreate fCreate )
 {
 	if ( fCreate == nullptr )
@@ -408,7 +436,7 @@ bool Graphics_ShaderInit( bool sRecreate )
 {
 	for ( ShaderCreate_t* shaderCreate : Shader_GetCreateList() )
 	{
-		Handle renderPass = gGraphicsData.aRenderPassGraphics;
+		ChHandle_t renderPass = gGraphicsData.aRenderPassGraphics;
 
 		if ( shaderCreate->aRenderPass == ERenderPass_Shadow )
 			renderPass = gGraphicsData.aRenderPassShadow;

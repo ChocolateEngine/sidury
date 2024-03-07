@@ -3,6 +3,8 @@
 #include <unordered_set>
 #include "igraphics.h"
 
+#include <map>
+
 
 LOG_CHANNEL2( ClientGraphics )
 
@@ -32,8 +34,10 @@ constexpr u32 CH_BINDING_VERTEX_BUFFERS           = 5;
 constexpr u32 CH_BINDING_INDEX_BUFFERS            = 6;
 
 
+// Contains a built list of renderable surfaces to draw this frame, grouped by shader
 struct ViewRenderList_t
 {
+	u32                                                         aHandle;
 	// TODO: needs improvement and further sorting
 	// [ Shader ] = vector of surfaces to draw
 	std::unordered_map< ChHandle_t, ChVector< SurfaceDraw_t > > aRenderLists;
@@ -177,22 +181,18 @@ struct ModelAABBUpdate_t
 };
 
 
-struct GraphicsViewData_t
-{
-	// std::vector< ChHandle_t >       aBuffers;
-	std::vector< ViewportShader_t > aViewports;  // Get rid of thus and only use the one in core data for the gpu
-	std::vector< Frustum_t >        aFrustums;
-	//std::stack< ViewportShader_t >  aStack;
-	//bool                            aUpdate = false;
-};
-
-
+// This is for allocating data list indexes for shaders, like a list of viewports
+// With this, we can figure out what index to write data to for the shader
+// This is used when using one big buffer for a list
+// like one buffer for a list of viewports or lights
 struct ShaderArrayAllocator_t
 {
-	u32  aAllocated = 0;
-	u32  aUsed      = 0;
-	u32* apFree     = nullptr;
-	bool aDirty     = false;
+	const char* apName     = nullptr;
+	u32         aAllocated = 0;        // Total amount of handles allocated
+	u32         aUsed      = 0;        // How many handles are in use
+	u32*        apFree     = nullptr;  // List of empty handles
+	u32*        apUsed     = nullptr;  // List of handles in use, Graphics_GetShaderSlot() returns the index of the handle in this list
+	bool        aDirty     = false;
 };
 
 
@@ -263,7 +263,7 @@ struct GraphicsData_t
 	ResourceList< Renderable_t >                  aRenderables;
 	std::unordered_map< ChHandle_t, ModelBBox_t > aRenderAABBUpdate;
 
-	std::vector< ViewRenderList_t >               aViewRenderLists;
+	std::unordered_map< u32, ViewRenderList_t >   aViewRenderLists;
 
 	// Renderables that need skinning applied to them
 	//ChVector< ChHandle_t >                        aSkinningRenderList;
@@ -301,8 +301,9 @@ struct GraphicsData_t
 
 	// --------------------------------------------------------------------------------------
 	// Viewports
-
-	GraphicsViewData_t                            aViewData;
+	
+	// Viewport Handle - Viewport Data 
+	std::unordered_map < u32, ViewportShader_t >  aViewports;
 
 	// --------------------------------------------------------------------------------------
 	// Assets
@@ -353,13 +354,15 @@ extern GraphicsData_t gGraphicsData;
 
 bool                  Graphics_CreateVariableUniformLayout( ShaderDescriptor_t& srBuffer, const char* spLayoutName, const char* spSetName, int sCount );
 
-void                  Graphics_DrawShaderRenderables( ChHandle_t cmd, size_t sIndex, ChHandle_t shader, size_t sViewIndex, ChVector< SurfaceDraw_t >& srRenderList );
+void                  Graphics_DrawShaderRenderables( ChHandle_t cmd, size_t sIndex, ChHandle_t shader, ChVector< SurfaceDraw_t >& srRenderList );
 
-u32                   Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName );
-void                  Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName, u32 sIndex );
+u32                   Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator );
+void                  Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, u32 sIndex );
+u32                   Graphics_GetShaderSlot( ShaderArrayAllocator_t& srAllocator, u32 sHandle );
 
 u32                   Graphics_AllocateCoreSlot( EShaderCoreArray sSlot );
 void                  Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex );
+u32                   Graphics_GetCoreSlot( EShaderCoreArray sSlot, u32 sIndex );
 
 // return a magic number
 u32                   Graphics_AddShaderBuffer( ShaderBufferList_t& srBufferList, ChHandle_t sBuffer );
@@ -591,6 +594,9 @@ class Graphics : public IGraphics
 
 	virtual u32                GetComputeShaderCount()                                                                                                      override;
 	virtual ChHandle_t         GetComputeShaderByIndex( u32 sIndex )                                                                                        override;
+	
+	virtual u32                    GetShaderVarCount( ChHandle_t shader )                                                                                   override;
+	virtual ShaderMaterialVarDesc* GetShaderVars( ChHandle_t shader )                                                                                       override;
 
 	// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 	// virtual bool               Shader_IsMaterialTransparent( Handle sMat ) override;

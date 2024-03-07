@@ -131,19 +131,18 @@ void Graphics_UpdateDebugDraw()
 
 	if ( r_debug_aabb || r_debug_normals )
 	{
-		ViewRenderList_t& viewList   = gGraphicsData.aViewRenderLists[ 0 ];
-
-		glm::mat4         lastMatrix = glm::mat4( 0.f );
-		glm::mat4         invMatrix  = glm::mat4( 1.f );
-
-		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
+		for ( auto& [ viewHandle, viewRenderList ] : gGraphicsData.aViewRenderLists )
 		{
-			for ( SurfaceDraw_t& surfaceDraw : modelList )
+			glm::mat4 lastMatrix = glm::mat4( 0.f );
+			glm::mat4 invMatrix  = glm::mat4( 1.f );
+
+			for ( auto& [ shader, modelList ] : viewRenderList.aRenderLists )
 			{
-				// hack to not draw this AABB multiple times, need to change this render list system
-				if ( surfaceDraw.aSurface == 0 )
+				for ( SurfaceDraw_t& surfaceDraw : modelList )
 				{
-					// Graphics_DrawModelAABB( renderable->apDraw );
+					// hack to not draw this AABB multiple times, need to change this render list system
+					if ( surfaceDraw.aSurface != 0 )
+						continue;
 
 					Renderable_t* renderable = gGraphics.GetRenderableData( surfaceDraw.aRenderable );
 
@@ -158,7 +157,6 @@ void Graphics_UpdateDebugDraw()
 
 					if ( r_debug_normals )
 					{
-						// slight hack
 						if ( lastMatrix != renderable->aModelMatrix )
 						{
 							lastMatrix = renderable->aModelMatrix;

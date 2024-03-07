@@ -7,15 +7,11 @@
 
 // TODO: use handles for lights instead of storing pointers to them
 
-// static std::unordered_map< Light_t*, Handle >      gLightBuffers;
-static std::unordered_map< Light_t*, u32 >  gLightSlots;
-std::unordered_map< Light_t*, ShadowMap_t > gLightShadows;
-
 std::vector< Light_t* >                     gLights;
 static std::vector< Light_t* >              gDirtyLights;
 static std::vector< Light_t* >              gDestroyLights;
 
-extern void                                 Shader_ShadowMap_SetViewInfo( int sViewInfo );
+extern void                                 Shader_ShadowMap_SetViewInfo( u32 sViewInfo );
 
 // --------------------------------------------------------------------------------------
 
@@ -89,18 +85,18 @@ void Graphics_AddShadowMap( Light_t* spLight )
 		return;
 	}
 
-	ShadowMap_t& shadowMap     = gLightShadows[ spLight ];
-	shadowMap.aSize            = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
-	shadowMap.aViewInfoIndex   = viewportIndex;
+	ShadowMap_t* shadowMap    = new ShadowMap_t;
+	shadowMap->aSize          = { r_shadowmap_size.GetFloat(), r_shadowmap_size.GetFloat() };
+	shadowMap->aViewportHandle = viewportIndex;
 
-	viewport->aShaderOverride  = gGraphics.GetShader( "__shadow_map" );
-	viewport->aSize            = shadowMap.aSize;
-	viewport->aActive          = false;
+	viewport->aShaderOverride = gGraphics.GetShader( "__shadow_map" );
+	viewport->aSize           = shadowMap->aSize;
+	viewport->aActive         = false;
 
 	// Create Textures
 	TextureCreateInfo_t texCreate{};
 	texCreate.apName    = "Shadow Map";
-	texCreate.aSize     = shadowMap.aSize;
+	texCreate.aSize     = shadowMap->aSize;
 	texCreate.aFormat   = render->GetSwapFormatDepth();
 	texCreate.aViewType = EImageView_2D;
 
@@ -112,46 +108,50 @@ void Graphics_AddShadowMap( Light_t* spLight )
 
 	createData.aDepthCompare   = true;
 
-	shadowMap.aTexture         = gGraphics.CreateTexture( texCreate, createData );
+	shadowMap->aTexture        = gGraphics.CreateTexture( texCreate, createData );
 
 	// Create Framebuffer
 	CreateFramebuffer_t frameBufCreate{};
 	frameBufCreate.apName             = "Shadow Map Framebuffer";
 	frameBufCreate.aRenderPass        = gGraphicsData.aRenderPassShadow;  // ImGui will be drawn onto the graphics RenderPass
-	frameBufCreate.aSize              = shadowMap.aSize;
+	frameBufCreate.aSize              = shadowMap->aSize;
 
 	// Create Color
-	frameBufCreate.aPass.aAttachDepth = shadowMap.aTexture;
-	shadowMap.aFramebuffer            = render->CreateFramebuffer( frameBufCreate );
+	frameBufCreate.aPass.aAttachDepth = shadowMap->aTexture;
+	shadowMap->aFramebuffer           = render->CreateFramebuffer( frameBufCreate );
 
-	if ( shadowMap.aFramebuffer == InvalidHandle )
+	if ( shadowMap->aFramebuffer == InvalidHandle )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to create shadow map!\n" );
+		delete shadowMap;
+		return;
 	}
+
+	spLight->apShadowMap = shadowMap;
 }
 
 
 void Graphics_DestroyShadowMap( Light_t* spLight )
 {
-	auto it = gLightShadows.find( spLight );
-	if ( it == gLightShadows.end() )
-	{
-		Log_Error( gLC_ClientGraphics, "Light Shadow Map not found for deletion!\n" );
+	if ( !spLight )
 		return;
-	}
 
-	if ( it->second.aFramebuffer )
-		render->DestroyFramebuffer( it->second.aFramebuffer );
+	if ( !spLight->apShadowMap )
+		return;
 
-	if ( it->second.aTexture )
-		gGraphics.FreeTexture( it->second.aTexture );
+	if ( spLight->apShadowMap->aFramebuffer )
+		render->DestroyFramebuffer( spLight->apShadowMap->aFramebuffer );
 
-	if ( it->second.aViewInfoIndex != UINT32_MAX )
+	if ( spLight->apShadowMap->aTexture )
+		gGraphics.FreeTexture( spLight->apShadowMap->aTexture );
+
+	if ( spLight->apShadowMap->aViewportHandle != UINT32_MAX )
 	{
-		gGraphics.FreeViewport( it->second.aViewInfoIndex );
+		gGraphics.FreeViewport( spLight->apShadowMap->aViewportHandle );
 	}
 
-	gLightShadows.erase( spLight );
+	delete spLight->apShadowMap;
+	spLight->apShadowMap = nullptr;
 }
 
 
@@ -220,32 +220,22 @@ u32 Graphics_AllocateLightSlot( Light_t* spLight )
 
 void Graphics_FreeLightSlot( Light_t* spLight )
 {
-	auto it = gLightSlots.find( spLight );
-	if ( it == gLightSlots.end() )
-	{
-		Log_Error( gLC_ClientGraphics, "Light not found for deletion!\n" );
-		return;
-	}
-
-	u32 lightSlot = it->second;
-	gLightSlots.erase( spLight );
-
 	switch ( spLight->aType )
 	{
 		case ELightType_Directional:
-			Graphics_FreeCoreSlot( EShaderCoreArray_LightWorld, lightSlot );
+			Graphics_FreeCoreSlot( EShaderCoreArray_LightWorld, spLight->aShaderIndex );
 			break;
 
 		case ELightType_Point:
-			Graphics_FreeCoreSlot( EShaderCoreArray_LightPoint, lightSlot );
+			Graphics_FreeCoreSlot( EShaderCoreArray_LightPoint, spLight->aShaderIndex );
 			break;
 
 		case ELightType_Cone:
-			Graphics_FreeCoreSlot( EShaderCoreArray_LightCone, lightSlot );
+			Graphics_FreeCoreSlot( EShaderCoreArray_LightCone, spLight->aShaderIndex );
 			break;
 
 		// case ELightType_Capsule:
-		// 	Graphics_FreeCoreSlot( EShaderCoreArray_LightCapsule, lightSlot );
+		// 	Graphics_FreeCoreSlot( EShaderCoreArray_LightCapsule, spLight->aShaderIndex );
 		// 	break;
 	}
 
@@ -379,28 +369,16 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 {
 	PROF_SCOPE();
 
-	u32  lightSlot = CH_SHADER_CORE_SLOT_INVALID;
+	if ( spLight == nullptr )
+		return;
 
-	auto it        = gLightSlots.find( spLight );
-
-	if ( it == gLightSlots.end() )
+	if ( spLight->aShaderIndex == CH_SHADER_CORE_SLOT_INVALID )
 	{
-		lightSlot = Graphics_AllocateLightSlot( spLight );
-
-		if ( lightSlot == CH_SHADER_CORE_SLOT_INVALID )
-		{
-			Log_Warn( gLC_ClientGraphics, "Failed to Allocate Slot for Light!\n" );
-			return;
-		}
-
-		gLightSlots[ spLight ] = lightSlot;
-	}
-	else
-	{
-		lightSlot = it->second;
+		gGraphics.DestroyLight( spLight );
+		Log_ErrorF( gLC_ClientGraphics, "Light has no Shader Slot Index!\n" );
+		return;
 	}
 
-	gGraphicsData.aCoreDataStaging.aDirty = true;
 
 #if 1
 	switch ( spLight->aType )
@@ -412,7 +390,8 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		}
 		case ELightType_Directional:
 		{
-			UBO_LightDirectional_t& light = gGraphicsData.aCoreData.aLightWorld[ lightSlot ];
+			u32                     index = Graphics_GetCoreSlot( EShaderCoreArray_LightWorld, spLight->aShaderIndex );
+			UBO_LightDirectional_t& light = gGraphicsData.aCoreData.aLightWorld[ index ];
 			light.aColor.x                = spLight->aColor.x;
 			light.aColor.y                = spLight->aColor.y;
 			light.aColor.z                = spLight->aColor.z;
@@ -482,7 +461,8 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		}
 		case ELightType_Point:
 		{
-			UBO_LightPoint_t& light = gGraphicsData.aCoreData.aLightPoint[ lightSlot ];
+			u32               index = Graphics_GetCoreSlot( EShaderCoreArray_LightPoint, spLight->aShaderIndex );
+			UBO_LightPoint_t& light = gGraphicsData.aCoreData.aLightPoint[ index ];
 			light.aColor.x          = spLight->aColor.x;
 			light.aColor.y          = spLight->aColor.y;
 			light.aColor.z          = spLight->aColor.z;
@@ -495,7 +475,8 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 		}
 		case ELightType_Cone:
 		{
-			UBO_LightCone_t& light = gGraphicsData.aCoreData.aLightCone[ lightSlot ];
+			u32              index = Graphics_GetCoreSlot( EShaderCoreArray_LightCone, spLight->aShaderIndex );
+			UBO_LightCone_t& light = gGraphicsData.aCoreData.aLightCone[ index ];
 			light.aColor.x         = spLight->aColor.x;
 			light.aColor.y         = spLight->aColor.y;
 			light.aColor.z         = spLight->aColor.z;
@@ -514,51 +495,55 @@ void Graphics_UpdateLightBuffer( Light_t* spLight )
 
 #if 1
 			// update shadow map view info
-			ShadowMap_t&     shadowMap = gLightShadows[ spLight ];
+			// if ( spLight->apShadowMap )
+			if ( spLight->apShadowMap )
+			{
+				ShadowMap_t*     shadowMap = spLight->apShadowMap;
 
-			ViewportCamera_t view{};
-			view.aFarZ  = r_shadowmap_farz;
-			view.aNearZ = r_shadowmap_nearz;
-			// view.aFOV   = spLight->aOuterFov;
-			view.aFOV   = r_shadowmap_fov_hack;
+				ViewportCamera_t view{};
+				view.aFarZ    = r_shadowmap_farz;
+				view.aNearZ   = r_shadowmap_nearz;
+				// view.aFOV   = spLight->aOuterFov;
+				view.aFOV     = r_shadowmap_fov_hack;
 
-			glm::quat rot = spLight->aRot;
-			rot.w         = -rot.w;
+				glm::quat rot = spLight->aRot;
+				rot.w         = -rot.w;
 
-			// rot = Util_RotateQuaternion( rot, { 1, 0, 0 }, 180 );
-			// rot = Util_RotateQuaternion( rot, { 0, 1, 0 }, 180 );
+				// rot = Util_RotateQuaternion( rot, { 1, 0, 0 }, 180 );
+				// rot = Util_RotateQuaternion( rot, { 0, 1, 0 }, 180 );
 
-			Util_ToViewMatrixY( view.aViewMat, spLight->aPos, rot );
-			view.ComputeProjection( shadowMap.aSize.x, shadowMap.aSize.y );
+				Util_ToViewMatrixY( view.aViewMat, spLight->aPos, rot );
+				view.ComputeProjection( shadowMap->aSize.x, shadowMap->aSize.y );
 
-			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
-			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
-			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
-			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
-			gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
-			// gGraphicsData.aViewportData[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
+				gGraphicsData.aViewportData[ shadowMap->aViewportHandle ].aProjection        = view.aProjMat;
+				gGraphicsData.aViewportData[ shadowMap->aViewportHandle ].aView              = view.aViewMat;
+				gGraphicsData.aViewportData[ shadowMap->aViewportHandle ].aProjView          = view.aProjViewMat;
+				gGraphicsData.aViewportData[ shadowMap->aViewportHandle ].aNearZ             = view.aNearZ;
+				gGraphicsData.aViewportData[ shadowMap->aViewportHandle ].aFarZ              = view.aFarZ;
+				// gGraphicsData.aViewportData[ shadowMap->aViewInfoIndex ].aSize       = shadowMap->aSize;
 
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aProjection = view.aProjMat;
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aView       = view.aViewMat;
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aProjView   = view.aProjViewMat;
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aNearZ      = view.aNearZ;
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aFarZ       = view.aFarZ;
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aSize       = shadowMap.aSize;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aProjection = view.aProjMat;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aView       = view.aViewMat;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aProjView   = view.aProjViewMat;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aNearZ      = view.aNearZ;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aFarZ       = view.aFarZ;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aSize       = shadowMap->aSize;
 
-			gGraphicsData.aViewportStaging.aDirty                                      = true;
-			// Handle shadowBuffer                               = gViewportBuffers[ shadowMap.aViewInfoIndex ];
-			// render->BufferWrite( shadowBuffer, sizeof( Shader_Viewport_t ), &gViewport[ shadowMap.aViewInfoIndex ] );
+				gGraphicsData.aViewportStaging.aDirty                                       = true;
+				// Handle shadowBuffer                               = gViewportBuffers[ shadowMap->aViewInfoIndex ];
+				// render->BufferWrite( shadowBuffer, sizeof( Shader_Viewport_t ), &gViewport[ shadowMap->aViewInfoIndex ] );
 
-			// get shadow map view info
+				// get shadow map view info
 
-			// TODO: MAYBE MOVE aProjView OUT OF THIS LIGHT BUFFER, AND ON THE GPU,
-			// USE THE ProjViewMat FROM THE ACTUAL VIEW IN THE VIEWPORT BUFFER
-			// see for more info: https://vkguide.dev/docs/chapter-4/descriptors_code_more/
-			// is there also a performance cost to doing this though? since we have to read memory elsewhere not in the cache?
-			light.aProjView                                                            = view.aProjViewMat;
-			light.aShadow                                                              = render->GetTextureIndex( shadowMap.aTexture );
+				// TODO: MAYBE MOVE aProjView OUT OF THIS LIGHT BUFFER, AND ON THE GPU,
+				// USE THE ProjViewMat FROM THE ACTUAL VIEW IN THE VIEWPORT BUFFER
+				// see for more info: https://vkguide.dev/docs/chapter-4/descriptors_code_more/
+				// is there also a performance cost to doing this though? since we have to read memory elsewhere not in the cache?
+				light.aProjView                                                             = view.aProjViewMat;
+				light.aShadow                                                               = render->GetTextureIndex( shadowMap->aTexture );
 
-			gGraphicsData.aViewData.aViewports[ shadowMap.aViewInfoIndex ].aActive     = spLight->aShadow && spLight->aEnabled;
+				gGraphicsData.aViewports[ shadowMap->aViewportHandle ].aActive     = spLight->aShadow && spLight->aEnabled;
+			}
 	#endif
 
 			break;
@@ -601,7 +586,16 @@ Light_t* Graphics::CreateLight( ELightType sType )
 		return nullptr;
 	}
 
-	light->aType                          = sType;
+	light->aType        = sType;
+	light->aShaderIndex = Graphics_AllocateLightSlot( light );
+
+	if ( light->aShaderIndex == CH_SHADER_CORE_SLOT_INVALID )
+	{
+		Log_Warn( gLC_ClientGraphics, "Failed to Allocate Slot for Light!\n" );
+		delete light;
+		return nullptr;
+	}
+
 	gGraphicsData.aCoreDataStaging.aDirty = true;
 
 	gLights.push_back( light );
@@ -616,6 +610,14 @@ Light_t* Graphics::CreateLight( ELightType sType )
 void Graphics::UpdateLight( Light_t* spLight )
 {
 	gDirtyLights.push_back( spLight );
+}
+
+
+void Lighting_UpdateShaderIndexes()
+{
+	for ( Light_t* light : gLights )
+	{
+	}
 }
 
 
@@ -655,29 +657,27 @@ bool Graphics_IsUsingShadowMaps()
 {
 	PROF_SCOPE();
 
-	bool usingShadow = false;
-	for ( const auto& [ light, shadowMap ] : gLightShadows )
+	for ( Light_t* light : gLights )
 	{
-		if ( !light->aEnabled || !light->aShadow )
+		if ( !light->aEnabled || !light->aShadow || !light->apShadowMap )
 			continue;
 
-		usingShadow = true;
-		break;
+		return true;
 	}
 
-	return usingShadow;
+	return false;
 }
 
 
-void Graphics_RenderShadowMap( Handle cmd, size_t sIndex, Light_t* spLight, const ShadowMap_t& srShadowMap )
+void Graphics_RenderShadowMap( Handle cmd, size_t sIndex, Light_t* spLight, ShadowMap_t* shadowMap )
 {
 	PROF_SCOPE();
 
 	Rect2D_t rect{};
 	rect.aOffset.x = 0;
 	rect.aOffset.y = 0;
-	rect.aExtent.x = srShadowMap.aSize.x;
-	rect.aExtent.y = srShadowMap.aSize.y;
+	rect.aExtent.x = shadowMap->aSize.x;
+	rect.aExtent.y = shadowMap->aSize.y;
 
 	render->CmdSetScissor( cmd, 0, &rect, 1 );
 
@@ -686,27 +686,28 @@ void Graphics_RenderShadowMap( Handle cmd, size_t sIndex, Light_t* spLight, cons
 	viewPort.y        = 0.f;
 	viewPort.minDepth = 0.f;
 	viewPort.maxDepth = 1.f;
-	viewPort.width    = srShadowMap.aSize.x;
-	viewPort.height   = srShadowMap.aSize.y;
+	viewPort.width    = shadowMap->aSize.x;
+	viewPort.height   = shadowMap->aSize.y;
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
 	render->CmdSetDepthBias( cmd, r_shadowmap_constant, r_shadowmap_clamp, r_shadowmap_slope );
 
 	// HACK: need to setup a view push and pop system?
-	Shader_ShadowMap_SetViewInfo( srShadowMap.aViewInfoIndex );
+	Shader_ShadowMap_SetViewInfo( shadowMap->aViewportHandle );
 
-	if ( gGraphicsData.aViewRenderLists.size() <= srShadowMap.aViewInfoIndex )
+	auto it = gGraphicsData.aViewRenderLists.find( shadowMap->aViewportHandle );
+	if ( it == gGraphicsData.aViewRenderLists.end() )
 	{
 		Log_Error( gLC_ClientGraphics, "Invalid Viewport Index for Shadow Map Rendering\n" );
 		return;
 	}
 
-	ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ srShadowMap.aViewInfoIndex ];
+	ViewRenderList_t& viewList = it->second;
 
 	for ( auto& [ shader, renderList ] : viewList.aRenderLists )
 	{
-		Graphics_DrawShaderRenderables( cmd, sIndex, shader, srShadowMap.aViewInfoIndex, renderList );
+		Graphics_DrawShaderRenderables( cmd, sIndex, shader, renderList );
 	}
 }
 
@@ -720,19 +721,19 @@ void Graphics_DrawShadowMaps( Handle sCmd, size_t sIndex )
 	renderPassBegin.aClear[ 0 ].aColor   = { 0.f, 0.f, 0.f, 1.f };
 	renderPassBegin.aClear[ 0 ].aIsDepth = true;
 
-	for ( const auto& [ light, shadowMap ] : gLightShadows )
+	for ( Light_t* light : gLights )
 	{
-		if ( !light->aEnabled || !light->aShadow )
+		if ( !light->aEnabled || !light->aShadow || !light->apShadowMap )
 			continue;
 
 		renderPassBegin.aRenderPass  = gGraphicsData.aRenderPassShadow;
-		renderPassBegin.aFrameBuffer = shadowMap.aFramebuffer;
+		renderPassBegin.aFrameBuffer = light->apShadowMap->aFramebuffer;
 
 		if ( renderPassBegin.aFrameBuffer == InvalidHandle )
 			continue;
 
 		render->BeginRenderPass( sCmd, renderPassBegin );
-		Graphics_RenderShadowMap( sCmd, sIndex, light, shadowMap );
+		Graphics_RenderShadowMap( sCmd, sIndex, light, light->apShadowMap );
 		render->EndRenderPass( sCmd );
 	}
 }

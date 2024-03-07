@@ -545,18 +545,30 @@ struct RenderPassData_t
 };
 
 
+struct ShadowMap_t
+{
+	ChHandle_t aTexture     = CH_INVALID_HANDLE;
+	ChHandle_t aFramebuffer = CH_INVALID_HANDLE;
+	glm::ivec2 aSize{};
+	u32        aViewportHandle = UINT32_MAX;
+};
+
+
 struct Light_t
 {
-	ELightType aType = ELightType_Directional;
-	glm::vec4  aColor{ 1.f, 1.f, 1.f, 1.f };
-	glm::vec3  aPos{};
-	glm::quat  aRot{};
-	float      aInnerFov = 45.f;
-	float      aOuterFov = 45.f;
-	float      aRadius   = 0.f;
-	float      aLength   = 0.f;
-	bool       aShadow   = true;
-	bool       aEnabled  = true;
+	ELightType   aType = ELightType_Directional;
+	glm::vec4    aColor{ 1.f, 1.f, 1.f, 1.f };
+	glm::vec3    aPos{};
+	glm::quat    aRot{};
+	float        aInnerFov    = 45.f;
+	float        aOuterFov    = 45.f;
+	float        aRadius      = 0.f;
+	float        aLength      = 0.f;
+	bool         aShadow      = true;
+	bool         aEnabled     = true;
+
+	u32          aShaderIndex = UINT32_MAX;
+	ShadowMap_t* apShadowMap  = nullptr;  // only used for cone lights currently
 };
 
 
@@ -611,22 +623,12 @@ struct ViewportShader_t
 
 	glm::uvec2 aSize{};
 	bool       aActive         = true;
-	bool       aAllocated      = false;
 
 	// HACK: if this is set, it overrides the shader used for all renderables in this view
 	ChHandle_t aShaderOverride = CH_INVALID_HANDLE;
 
-	// HACK: not used in shader
 	glm::vec2  aOffset;
-};
-
-
-struct ShadowMap_t
-{
-	ChHandle_t aTexture     = CH_INVALID_HANDLE;
-	ChHandle_t aFramebuffer = CH_INVALID_HANDLE;
-	glm::ivec2 aSize{};
-	u32        aViewInfoIndex = UINT32_MAX;
+	Frustum_t  aFrustum;
 };
 
 
@@ -1101,6 +1103,9 @@ class IGraphics : public ISystem
 	virtual u32               GetComputeShaderCount()                                                                                                                                         = 0;
 	virtual ChHandle_t        GetComputeShaderByIndex( u32 sIndex )                                                                                                                           = 0;
 
+	virtual u32                GetShaderVarCount( ChHandle_t shader )                                                                                                                          = 0;
+	virtual ShaderMaterialVarDesc* GetShaderVars( ChHandle_t shader )                                                                                                                          = 0;
+
 	// Used to know if this material needs to be ordered and drawn after all opaque ones are drawn
 	// virtual bool               Shader_IsMaterialTransparent( Handle sMat ) = 0;
 
@@ -1259,7 +1264,7 @@ class IRenderSystem : public ISystem
 
 
 #define IGRAPHICS_NAME "Graphics"
-#define IGRAPHICS_VER  6
+#define IGRAPHICS_VER  7
 
 #define IRENDERSYSTEMOLD_NAME "IRenderSystemOld"
 #define IRENDERSYSTEMOLD_VER  1

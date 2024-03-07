@@ -37,27 +37,24 @@ CONVAR( r_random_blend_shapes, 1 );
 CONVAR( r_reset_blend_shapes, 0 );
 
 
-bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex )
+bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, ViewportShader_t& srViewport )
 {
 	PROF_SCOPE();
 
 	if ( !spModelDraw )
 		return false;
 
-	if ( gGraphicsData.aViewData.aViewports.size() <= sViewportIndex || !r_vis || !spModelDraw->aTestVis )
-		return true;
-
 	if ( !spModelDraw->aVisible )
 		return false;
 
-	ViewportShader_t& viewInfo = gGraphicsData.aViewData.aViewports[ sViewportIndex ];
-
-	if ( !viewInfo.aActive || !viewInfo.aAllocated )
+	if ( !srViewport.aActive )
 		return false;
 
-	Frustum_t& frustum = gGraphicsData.aViewData.aFrustums[ sViewportIndex ];
+	// If visibility testing is disabled, or the object doesn't want vis testing, then it is always visible
+	if ( !r_vis || !spModelDraw->aTestVis )
+		return true;
 
-	return frustum.IsBoxVisible( spModelDraw->aAABB.aMin, spModelDraw->aAABB.aMax );
+	return srViewport.aFrustum.IsBoxVisible( spModelDraw->aAABB.aMin, spModelDraw->aAABB.aMax );
 }
 
 
@@ -148,7 +145,7 @@ bool Graphics_BindModel( ChHandle_t cmd, VertexFormat sVertexFormat, Model* spMo
 }
 
 
-void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, size_t sViewIndex, ChVector< SurfaceDraw_t >& srRenderList )
+void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, ChVector< SurfaceDraw_t >& srRenderList )
 {
 	PROF_SCOPE();
 
@@ -250,13 +247,11 @@ void Graphics_DrawShaderRenderables( Handle cmd, size_t sIndex, Handle shader, s
 
 
 // Do Rendering with shader system and user land meshes
-void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRenderList_t& srViewList )
+void Graphics_RenderView( Handle cmd, size_t sIndex, ViewportShader_t& srViewport, ViewRenderList_t& srViewList )
 {
 	PROF_SCOPE();
 
-	ViewportShader_t* viewportData = gGraphics.GetViewportData( sViewIndex );
-
-	if ( viewportData->aSize.x == 0 || viewportData->aSize.y == 0 )
+	if ( srViewport.aSize.x == 0 || srViewport.aSize.y == 0 )
 	{
 		Log_ErrorF( "Cannot Render View with width and/or height of 0!\n" );
 		return;
@@ -284,14 +279,14 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 	// viewPort.x        = 0.f;
 	// viewPort.y        = height;
 
-	viewPort.x        = viewportData->aOffset.x;
-	viewPort.y        = viewportData->aSize.y + viewportData->aOffset.y;
+	viewPort.x        = srViewport.aOffset.x;
+	viewPort.y        = srViewport.aSize.y + srViewport.aOffset.y;
 
 	// viewPort.width    = width;
 	// viewPort.height   = height * -1.f;
 
-	viewPort.width    = viewportData->aSize.x;
-	viewPort.height   = viewportData->aSize.y * -1.f;
+	viewPort.width    = srViewport.aSize.x;
+	viewPort.height   = srViewport.aSize.y * -1.f;
 
 	auto findGizmo    = srViewList.aRenderLists.find( gizmo );
 
@@ -302,7 +297,7 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 
 		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-		Graphics_DrawShaderRenderables( cmd, sIndex, gizmo, sViewIndex, srViewList.aRenderLists[ gizmo ] );
+		Graphics_DrawShaderRenderables( cmd, sIndex, gizmo, srViewList.aRenderLists[ gizmo ] );
 	}
 
 	viewPort.minDepth = 0.f;
@@ -327,7 +322,7 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 		if ( shader == gizmo )
 			continue;
 
-		Graphics_DrawShaderRenderables( cmd, sIndex, shader, sViewIndex, renderList );
+		Graphics_DrawShaderRenderables( cmd, sIndex, shader, renderList );
 	}
 
 	// Draw Skybox - and set depth for skybox
@@ -338,7 +333,7 @@ void Graphics_RenderView( Handle cmd, size_t sIndex, size_t sViewIndex, ViewRend
 
 		render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-		Graphics_DrawShaderRenderables( cmd, sIndex, skybox, sViewIndex, srViewList.aRenderLists[ skybox ] );
+		Graphics_DrawShaderRenderables( cmd, sIndex, skybox, srViewList.aRenderLists[ skybox ] );
 	}
 }
 
@@ -350,19 +345,29 @@ void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass )
 	// render->CmdBindDescriptorSets( sCmd, sIndex, EPipelineBindPoint_Graphics, PIPELINE_LAYOUT, SETS, SET_COUNT );
 
 	// TODO: add in some dependency thing here, when you add camera's in the game, you'll need to render those first before the final viewports (VR maybe)
-	for ( size_t i = 0; i < gGraphicsData.aViewRenderLists.size(); i++ )
+	for ( auto& [ viewHandle, viewRenderList ] : gGraphicsData.aViewRenderLists )
 	{
+		auto it = gGraphicsData.aViewports.find( viewHandle );
+
+		if ( it == gGraphicsData.aViewports.end() )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "Failed to get viewport data for rendering\n" );
+			continue;
+		}
+
+		ViewportShader_t& viewport = it->second;
+
 		// blech
-		if ( !gGraphicsData.aViewData.aViewports[ i ].aAllocated || !gGraphicsData.aViewData.aViewports[ i ].aActive )
+		if ( !viewport.aActive )
 			continue;
 
 		// HACK HACK !!!!
-		// don't render views with shader overrides here, the only override is the shadow map shader
+		// don't render views with shader overrides here, the only override is the shadow map shader and selection
 		// and that is rendered in a separate render pass
-		if ( gGraphicsData.aViewData.aViewports[ i ].aShaderOverride )
+		if ( viewport.aShaderOverride )
 			continue;
 
-		Graphics_RenderView( sCmd, sIndex, i, gGraphicsData.aViewRenderLists[ i ] );
+		Graphics_RenderView( sCmd, sIndex, viewport, viewRenderList );
 	}
 }
 
@@ -407,61 +412,74 @@ void Graphics_UpdateRenderPassBuffers( ERenderPass sRenderPass )
 
 u32 Graphics::CreateViewport( ViewportShader_t** spViewport )
 {
-	u32 index = Graphics_AllocateShaderSlot( gGraphicsData.aViewportSlots, "Viewports" );
+	u32 handle = Graphics_AllocateShaderSlot( gGraphicsData.aViewportSlots );
 
-	if ( index == UINT32_MAX )
+	if ( handle == UINT32_MAX )
 	{
 		Log_Error( gLC_ClientGraphics, "Failed to allocate viewport\n" );
-		return index;
+		return handle;
 	}
 
-	if ( index + 1 > gGraphicsData.aViewData.aViewports.size() )
-		gGraphicsData.aViewData.aViewports.resize( index + 1 );
+	ViewportShader_t& viewport = gGraphicsData.aViewports[ handle ];
 
 	if ( spViewport )
 	{
-		( *spViewport )             = &gGraphicsData.aViewData.aViewports[ index ];
-		( *spViewport )->aAllocated = true;
+		( *spViewport )             = &viewport;
 		( *spViewport )->aActive    = true;
 	}
-	else
-	{
-		gGraphicsData.aViewData.aViewports[ index ].aAllocated = true;
-	}
 
-	return index;
+	return handle;
 }
 
 
-void Graphics::FreeViewport( u32 sViewportIndex )
+void Graphics::FreeViewport( u32 sViewportHandle )
 {
-	Graphics_FreeShaderSlot( gGraphicsData.aViewportSlots, "Viewports", sViewportIndex );
+	// TODO: QUEUE THIS !!!!
+	Graphics_FreeShaderSlot( gGraphicsData.aViewportSlots, sViewportHandle );
 
-	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
+	// Remove the Viewport Data
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Invalid Viewport Index to Free, only %zd allocated, tried to free slot %zd\n",
-		            gGraphicsData.aViewData.aViewports.size(), sViewportIndex );
+		auto it = gGraphicsData.aViewports.find( sViewportHandle );
 
-		return;
+		if ( it == gGraphicsData.aViewports.end() )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "Failed to Free Viewport\n" );
+			return;
+		}
+
+		gGraphicsData.aViewports.erase( it );
 	}
 
-	memset( &gGraphicsData.aViewData.aViewports[ sViewportIndex ], 0, sizeof( ViewportShader_t ) );
+	// Remove the View Render List
+	{
+		auto it = gGraphicsData.aViewRenderLists.find( sViewportHandle );
+
+		if ( it == gGraphicsData.aViewRenderLists.end() )
+		{
+			Log_ErrorF( gLC_ClientGraphics, "Failed to Free Viewport Render List\n" );
+			return;
+		}
+
+		gGraphicsData.aViewRenderLists.erase( it );
+	}
 }
 
 
-ViewportShader_t* Graphics::GetViewportData( u32 sViewportIndex )
+// FUICK THIS WONT WORK !!!!
+// DATA WILL BE LOST WHEN SWITCHING INDEX AAAAAAAAAAAAAAAAAAAAAAA
+
+
+ViewportShader_t* Graphics::GetViewportData( u32 viewportHandle )
 {
-	if ( sViewportIndex >= gGraphicsData.aViewData.aViewports.size() )
+	auto it = gGraphicsData.aViewports.find( viewportHandle );
+
+	if ( it == gGraphicsData.aViewports.end() )
 	{
-		Log_ErrorF( "Invalid Viewport Index: %zd, only allocated %zd\n", sViewportIndex, gGraphicsData.aViewData.aViewports.size() );
+		Log_ErrorF( gLC_ClientGraphics, "Failed to Find Viewport Data\n" );
 		return nullptr;
 	}
 
-	ViewportShader_t* viewport = &gGraphicsData.aViewData.aViewports[ sViewportIndex ];
-
-	if ( !viewport->aAllocated )
-		return nullptr;
-
+	ViewportShader_t* viewport = &it->second;
 	return viewport;
 }
 

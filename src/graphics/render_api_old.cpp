@@ -5,7 +5,7 @@
 
 RenderSystemOld gRenderOld;
 
-extern bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, int sViewportIndex );
+extern bool Graphics_ViewFrustumTest( Renderable_t* spModelDraw, ViewportShader_t& srViewport );
 extern void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass );
 
 
@@ -53,13 +53,15 @@ void Graphics_DrawSelectionTextureRenderables( Handle cmd, size_t sIndex )
 
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-	if ( gGraphicsData.aViewRenderLists.size() <= gRenderOld.aSelectionViewport )
+	auto it = gGraphicsData.aViewRenderLists.find( gRenderOld.aSelectionViewport );
+
+	if ( it == gGraphicsData.aViewRenderLists.end() )
 	{
 		Log_Error( gLC_ClientGraphics, "Invalid Viewport Index for Selection Rendering\n" );
 		return;
 	}
 
-	ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ gRenderOld.aSelectionViewport ];
+	ViewRenderList_t& viewList = it->second;
 
 	// HACK - EVIL
 	// always draw stuff with the gizmo shader on top of everything
@@ -104,14 +106,14 @@ void Graphics_DrawSelectionTextureRenderables( Handle cmd, size_t sIndex )
 	viewPort.maxDepth = 1.f;
 	render->CmdSetViewport( cmd, 0, &viewPort, 1 );
 
-	Graphics_DrawShaderRenderables( cmd, sIndex, select, gRenderOld.aSelectionViewport, otherRenderables );
+	Graphics_DrawShaderRenderables( cmd, sIndex, select, otherRenderables );
 
 	// for ( auto& [ shader, renderList ] : viewList.aRenderLists )
 	// {
 	// 	if ( shader == gizmo )
 	// 		continue;
 	// 
-	// 	Graphics_DrawShaderRenderables( cmd, sIndex, shader, gRenderOld.aSelectionViewport, renderList );
+	// 	Graphics_DrawShaderRenderables( cmd, sIndex, shader, renderList );
 	// }
 }
 
@@ -221,14 +223,12 @@ void Graphics_PrepareDrawData()
 	Graphics_PrepareLights();
 
 	// update view frustums (CHANGE THIS, SHOULD NOT UPDATE EVERY SINGLE ONE PER FRAME  !!!!)
-	if ( !r_vis_lock.GetBool() || gGraphicsData.aViewData.aFrustums.size() != gGraphicsData.aViewData.aViewports.size() )
+	if ( !r_vis_lock.GetBool() )
 	{
-		gGraphicsData.aViewData.aFrustums.resize( gGraphicsData.aViewData.aViewports.size() );
-
-		for ( size_t i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		for ( auto& [ handle, viewport ] : gGraphicsData.aViewports )
 		{
-			gGraphics.CreateFrustum( gGraphicsData.aViewData.aFrustums[ i ], gGraphicsData.aViewData.aViewports[ i ].aProjView );
-			gGraphics.DrawFrustum( gGraphicsData.aViewData.aFrustums[ i ] );
+			gGraphics.CreateFrustum( viewport.aFrustum, viewport.aProjView );
+			gGraphics.DrawFrustum( viewport.aFrustum );
 		}
 	}
 
@@ -260,11 +260,11 @@ void Graphics_PrepareDrawData()
 	if ( !visLocked )
 	{
 		// Reset Render Lists
-		for ( ViewRenderList_t& viewList : gGraphicsData.aViewRenderLists )
-			for ( auto& [ handle, vec ] : viewList.aRenderLists )
+		for ( auto& [ viewHandle, viewList ] : gGraphicsData.aViewRenderLists )
+		{
+			for ( auto& [ shader, vec ] : viewList.aRenderLists )
 				vec.clear();
-
-		gGraphicsData.aViewRenderLists.resize( gGraphicsData.aViewData.aViewports.size() );
+		}
 	}
 
 #if 1
@@ -339,22 +339,23 @@ void Graphics_PrepareDrawData()
 		}
 
 		// check if we need this in any views
-		bool isVisible = false;
-		for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
+		bool   isVisible = false;
+		// size_t viewIndex = 0;
+		for ( auto& [ viewHandle, viewport ] : gGraphicsData.aViewports )
 		{
 			PROF_SCOPE_NAMED( "Viewport Testing" );
 
 			// HACK: kind of of hack with the shader override check
 			// If we don't want to cast a shadow and are in a shadowmap view, don't add to the view's render list
-			if ( !renderable->aCastShadow && gGraphicsData.aViewData.aViewports[ viewIndex ].aShaderOverride )
+			if ( !renderable->aCastShadow && viewport.aShaderOverride )
 				continue;
 
 			// Is this model visible in this view?
-			if ( !Graphics_ViewFrustumTest( renderable, viewIndex ) )
+			if ( !Graphics_ViewFrustumTest( renderable, viewport ) )
 				continue;
 
 			isVisible                  = true;
-			ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewIndex ];
+			ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewHandle ];
 
 			// Add each surface to the shader draw list
 			for ( uint32_t surf = 0; surf < model->aMeshes.size(); surf++ )
@@ -369,8 +370,7 @@ void Graphics_PrepareDrawData()
 					continue;
 				}
 
-				// Handle shader = InvalidHandle;
-				Handle shader = gGraphicsData.aViewData.aViewports[ viewIndex ].aShaderOverride;
+				Handle shader = viewport.aShaderOverride;
 
 				if ( !shader )
 					shader = gGraphics.Mat_GetShader( mat );
@@ -380,7 +380,7 @@ void Graphics_PrepareDrawData()
 					continue;
 
 				// add a SurfaceDraw_t to this render list
-				SurfaceDraw_t& surfDraw = gGraphicsData.aViewRenderLists[ viewIndex ].aRenderLists[ shader ].emplace_back();
+				SurfaceDraw_t& surfDraw = viewList.aRenderLists[ shader ].emplace_back();
 				surfDraw.aRenderable    = gGraphicsData.aRenderables.aHandles[ i ];
 				surfDraw.aSurface       = surf;
 				surfDraw.aShaderSlot    = surfDrawIndex++;
@@ -455,11 +455,12 @@ void Graphics_PrepareDrawData()
 	// TODO: can this be merged into the above for loop for viewports and renderables?
 
 #if 01
-	for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
+	// for ( size_t viewIndex = 0; viewIndex < gGraphicsData.aViewData.aViewports.size(); viewIndex++ )
+	for ( auto& [ viewHandle, viewport ] : gGraphicsData.aViewports )
 	{
 		PROF_SCOPE_NAMED( "Update Shader Draw Data" );
 
-		ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewIndex ];
+		ViewRenderList_t& viewList = gGraphicsData.aViewRenderLists[ viewHandle ];
 
 		for ( auto& [ shader, modelList ] : viewList.aRenderLists )
 		{
@@ -477,6 +478,8 @@ void Graphics_PrepareDrawData()
 				}
 
 				ChHandle_t mat = gGraphics.Model_GetMaterial( renderable->aModel, surfaceDraw.aSurface );
+
+				u32        viewIndex = Graphics_GetShaderSlot( gGraphicsData.aViewportSlots, viewHandle );
 
 				Shader_SetupRenderableDrawData( shader, mat, renderable->aIndex, viewIndex, renderable, shaderData, surfaceDraw );
 				// Shader_SetupRenderableDrawData( renderableIndex, viewIndex, renderable, shaderData, renderable );
@@ -509,11 +512,10 @@ void Graphics_PrepareDrawData()
 
 	// Update Viewport SSBO
 	{
-		// this looks stupid
-		for ( u32 i = 0; i < gGraphicsData.aViewData.aViewports.size(); i++ )
+		for ( auto& [ viewHandle, viewport ] : gGraphicsData.aViewports )
 		{
-			ViewportShader_t&  viewport       = gGraphicsData.aViewData.aViewports[ i ];
-			Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ i ];
+			u32                viewIndex      = Graphics_GetShaderSlot( gGraphicsData.aViewportSlots, viewHandle );
+			Shader_Viewport_t& viewportBuffer = gGraphicsData.aViewportData[ viewIndex ];
 
 			viewportBuffer.aProjView          = viewport.aProjView;
 			viewportBuffer.aProjection        = viewport.aProjection;
@@ -958,14 +960,14 @@ void RenderSystemOld::CreateSelectionTexture()
 		return;
 	}
 
+	viewport->aShaderOverride     = gGraphics.GetShader( CH_SHADER_NAME_SELECT );
 	ViewportShader_t* refViewport = gGraphics.GetViewportData( aSelectionViewportRef );
 
 	if ( refViewport->aSize.x == 0 || refViewport->aSize.y == 0 )
 		return;
 
-	viewport->aShaderOverride = gGraphics.GetShader( CH_SHADER_NAME_SELECT );
-	viewport->aSize           = refViewport->aSize;
-	viewport->aActive         = true;
+	viewport->aSize   = refViewport->aSize;
+	viewport->aActive = true;
 
 	// Create Color Texture
 	{
@@ -1087,7 +1089,7 @@ void RenderSystemOld::EnableSelection( bool enabled, u32 viewport )
 		Graphics_DestroySelectRenderPass();
 		FreeSelectionTexture();
 
-		if ( aSelectionViewport < CH_R_MAX_VIEWPORTS )
+		if ( aSelectionViewport != UINT32_MAX )
 			gGraphics.FreeViewport( aSelectionViewport );
 
 		aSelectionViewport = CH_R_MAX_VIEWPORTS;
@@ -1118,7 +1120,7 @@ void RenderSystemOld::SetSelectionRenderablesAndCursorPos( const ChVector< Selec
 // Returns the color the cursor landed on
 bool RenderSystemOld::GetSelectionResult( u8& red, u8& green, u8& blue )
 {
-	if ( !aSelectionEnabled )
+	if ( !aSelectionEnabled || aSelectionTexture == CH_INVALID_HANDLE )
 		return false;
 
 	ReadTexture  readTexture = render->ReadTextureFromDevice( aSelectionTexture );
@@ -1130,9 +1132,52 @@ bool RenderSystemOld::GetSelectionResult( u8& red, u8& green, u8& blue )
 	green                    = ( pixel >> 8 ) & 0xFF;
 	blue                     = pixel & 0xFF;
 
+	Log_DevF( 1, "Picked Color of (%d, %d, %d)\n", red, green, blue );
+
+
+
+	// TEMP
+	// Write To File
+
+	FILE* selectPPM = fopen( "SELECTION_TEXTURE.ppm", "wb" );
+
+	fprintf( selectPPM, "P6\n%d %d\n255\n", readTexture.size.x, readTexture.size.y );
+
+	size_t writeIndex      = 0;
+	for ( size_t y = 0; y < readTexture.size.y; ++y )
+	{
+		for ( size_t x = 0; x < readTexture.size.x; ++x )
+		{
+			// u32 pixel = gpMissingTexture[ y + x * gMissingTextureHeight ];
+
+			// u8 r = ( pixel >> 16 ) & 0xFF;
+			// u8 g = ( pixel >> 8 ) & 0xFF;
+			// u8 b = pixel & 0xFF;
+
+			// u8 r = gpMissingTexture[ ( y + x * gMissingTextureHeight ) ];
+			// u8 g = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 1 ];
+			// u8 b = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 2 ];
+			// u8 a = gpMissingTexture[ ( y + x * gMissingTextureHeight ) + 3 ];
+
+			u8 r = readTexture.pData[ writeIndex++ ];
+			//u8 g = readTexture.pData[ writeIndex++ ];
+			// u8 b = readTexture.pData[ writeIndex++ ];
+			// u8 a = readTexture.pData[ writeIndex++ ];
+
+			fwrite( &r, 1, 1, selectPPM );
+			fwrite( &r, 1, 1, selectPPM );
+			fwrite( &r, 1, 1, selectPPM );
+
+			// fwrite( &g, 1, 1, selectPPM );
+			//fwrite( &b, 1, 1, selectPPM );
+		}
+	}
+
+	fclose( selectPPM );
+
+
 	render->FreeReadTexture( &readTexture );
 
-	Log_DevF( 1, "Picked Color of (%d, %d, %d)\n", red, green, blue );
 
 	return true;
 }

@@ -43,12 +43,13 @@ extern ConVar    r_nearz, r_farz, r_fov;
 extern ConVar    host_timescale;
 
 // blech
-static u32       gMainViewportIndex = UINT32_MAX;
+u32              gMainViewportHandle = UINT32_MAX;
 
 CONVAR( phys_friction, 10 );
 CONVAR( dbg_global_axis, 1 );
 CONVAR( dbg_global_axis_size, 15 );
 CONVAR( r_render, 1 );
+CONVAR( ui_show_imgui_demo, 0 );
 
 extern ConVar                   editor_gizmo_scale_enabled;
 extern ConVar                   editor_gizmo_scale;
@@ -393,7 +394,8 @@ void UpdateLoop( float frameTime, bool sResize )
 		ImGui_ImplSDL2_NewFrame();
 	}
 
-	ImGui::ShowDemoWindow();
+	if ( ui_show_imgui_demo )
+		ImGui::ShowDemoWindow();
 
 	renderOld->NewFrame();
 
@@ -456,7 +458,7 @@ bool Game_Init()
 	}
 
 	// Create the Main Viewport - TODO: use this more across the game code
-	gMainViewportIndex = graphics->CreateViewport();
+	gMainViewportHandle = graphics->CreateViewport();
 
 	Game_UpdateProjection();
 #ifdef _WIN32
@@ -474,7 +476,7 @@ bool Game_Init()
 	Skybox_Init();
 	EntEditor_Init();
 
-	renderOld->EnableSelection( true, gMainViewportIndex );
+	renderOld->EnableSelection( true, gMainViewportHandle );
 
 	// TODO, mess with ImGui WantSaveIniSettings
 
@@ -776,31 +778,41 @@ void Game_UpdateProjection()
 		viewport->aSize       = { width, height };
 	}
 #else
-	// only 1 viewport can be seen right now
-	EditorContext_t* context = Editor_GetContext();
-	if ( !context )
-		return;
-
-	ViewportShader_t* viewport   = graphics->GetViewportData( 0 );
-
-	context->aView.aResolution.x = newWidth;
-	context->aView.aResolution.y = newHeight;
-	context->aView.aOffset.x     = offsetX;
-	context->aView.aOffset.y     = offsetY;
-	context->aView.aProjMat      = projMat;
-	context->aView.aProjViewMat  = projMat * context->aView.aViewMat;
+	ViewportShader_t* viewport  = graphics->GetViewportData( gMainViewportHandle );
 
 	if ( !viewport )
 		return;
 
-	viewport->aProjView   = context->aView.aProjViewMat;
-	viewport->aProjection = context->aView.aProjMat;
-	viewport->aView       = context->aView.aViewMat;
+	// only 1 viewport can be seen right now
+	EditorContext_t* context = Editor_GetContext();
 
 	viewport->aNearZ      = r_nearz;
 	viewport->aFarZ       = r_farz;
 	viewport->aSize       = { newWidth, newHeight };
 	viewport->aOffset     = { offsetX, offsetY };
+	viewport->aProjection = projMat;
+
+	if ( context )
+	{
+		viewport->aView = context->aView.aViewMat;
+	}
+	else
+	{
+		viewport->aView = glm::mat4( 1.f );
+	}
+
+	viewport->aProjView = projMat * viewport->aView;
+
+	// Update Context View Data
+	if ( context )
+	{
+		context->aView.aResolution.x = newWidth;
+		context->aView.aResolution.y = newHeight;
+		context->aView.aOffset.x     = offsetX;
+		context->aView.aOffset.y     = offsetY;
+		context->aView.aProjMat      = projMat;
+		context->aView.aProjViewMat  = viewport->aProjView;
+	}
 #endif
 
 	graphics->SetViewportUpdate( true );

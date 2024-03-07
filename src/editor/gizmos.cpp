@@ -426,7 +426,8 @@ void Gizmo_UpdateInputs( EditorContext_t* context, bool mouseInView )
 		return;
 	}
 
-	Ray ray = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aPos, context->aView.aViewportIndex );
+	// Ray ray = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aPos, context->aView.aViewportIndex );
+	Ray ray = Util_GetRayFromScreenSpace( input->GetMousePos(), context->aView.aPos, gMainViewportHandle );
 
 	if ( gEditorData.gizmo.selectedAxis != EGizmoAxis_None )
 	{

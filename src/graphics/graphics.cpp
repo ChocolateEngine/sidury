@@ -925,18 +925,33 @@ bool Graphics_CreateStorageBuffers( std::vector< Handle >& srBuffers, const char
 }
 
 
-static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u32 sCount )
+static void Graphics_AllocateShaderArray( ShaderArrayAllocator_t& srAllocator, u32 sCount, const char* spName )
 {
+	srAllocator.apName     = spName;
 	srAllocator.aAllocated = sCount;
 	srAllocator.aUsed      = 0;
+
+	srAllocator.apUsed     = ch_calloc_count< u32 >( sCount );
 	srAllocator.apFree     = ch_calloc_count< u32 >( sCount );
 
-	// Fill the free list with indexes
-	// for ( u32 index = srAllocator.aAllocated - 1, slot = 0; index > 0; --index, ++slot )
-	// 	srAllocator.apFree[ slot ] = index;
+	// Fill the free list with handles, and the used list with invalid handles
+	for ( u32 index = 0; index < sCount; index++ )
+	{
+		srAllocator.apFree[ index ] = ( rand() % 0xFFFFFFFE ) + 1;  // Each slot gets a magic number
+		srAllocator.apUsed[ index ] = UINT32_MAX;
+	}
+}
 
-	for ( u32 index = 0; index < srAllocator.aAllocated; index++ )
-		srAllocator.apFree[ index ] = index;
+
+static void Graphics_FreeShaderArray( ShaderArrayAllocator_t& srAllocator )
+{
+	if ( srAllocator.apFree )
+		free( srAllocator.apFree );
+
+	if ( srAllocator.apUsed )
+		free( srAllocator.apUsed );
+
+	memset( &srAllocator, 0, sizeof( ShaderArrayAllocator_t ) );
 }
 
 
@@ -994,12 +1009,12 @@ bool Graphics_CreateDescriptorSets( ShaderRequirmentsList_t& srRequire )
 	// ------------------------------------------------------
 	// Create Core Data Array Slots
 
-	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightWorld ], CH_R_MAX_LIGHT_TYPE );
-	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightPoint ], CH_R_MAX_LIGHT_TYPE );
-	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCone ], CH_R_MAX_LIGHT_TYPE );
-	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCapsule ], CH_R_MAX_LIGHT_TYPE );
+	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightWorld ], CH_R_MAX_LIGHT_TYPE, "LightWorld" );
+	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightPoint ], CH_R_MAX_LIGHT_TYPE, "LightPoint" );
+	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCone ], CH_R_MAX_LIGHT_TYPE, "LightCone" );
+	Graphics_AllocateShaderArray( gGraphicsData.aCoreDataSlots[ EShaderCoreArray_LightCapsule ], CH_R_MAX_LIGHT_TYPE, "LightCapsule" );
 
-	Graphics_AllocateShaderArray( gGraphicsData.aViewportSlots, CH_R_MAX_VIEWPORTS );
+	Graphics_AllocateShaderArray( gGraphicsData.aViewportSlots, CH_R_MAX_VIEWPORTS, "Viewports" );
 
 	gGraphicsData.aRenderableData  = ch_calloc_count< Shader_Renderable_t >( CH_R_MAX_RENDERABLES );
 	gGraphicsData.aModelMatrixData = ch_calloc_count< glm::mat4 >( CH_R_MAX_RENDERABLES );
@@ -1162,35 +1177,7 @@ u32 Graphics_AllocateCoreSlot( EShaderCoreArray sSlot )
 		return CH_SHADER_CORE_SLOT_INVALID;
 	}
 
-#if 1
-	return Graphics_AllocateShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], gShaderCoreArrayStr[ sSlot ] );
-#else
-	ShaderArrayAllocator_t& allocator = gGraphicsData.aCoreDataSlots[ sSlot ];
-
-	if ( allocator.aUsed == allocator.aAllocated )
-	{
-		Log_ErrorF( gLC_ClientGraphics, "Out of slots for allocating core shader data for %s type, max of %zd\n",
-			gShaderCoreArrayStr[ sSlot ], allocator.aAllocated );
-
-		return CH_SHADER_CORE_SLOT_INVALID;
-	}
-
-	CH_ASSERT( allocator.apFree );
-
-	// Get the base of this free list
-	u32 index = allocator.apFree[ 0 ];
-	allocator.aUsed++;
-
-	CH_ASSERT( index != CH_SHADER_CORE_SLOT_INVALID );
-
-	// shift everything down by one
-	memcpy( &allocator.apFree[ 0 ], &allocator.apFree[ 1 ], sizeof( u32 ) * ( allocator.aAllocated - 1 ) );
-
-	// mark the very end of the list as invalid
-	allocator.apFree[ allocator.aAllocated - 1 ] = CH_SHADER_CORE_SLOT_INVALID;
-
-	return index;
-#endif
+	return Graphics_AllocateShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ] );
 }
 
 
@@ -1202,40 +1189,22 @@ void Graphics_FreeCoreSlot( EShaderCoreArray sSlot, u32 sIndex )
 		return;
 	}
 
-#if 1
-	Graphics_FreeShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], gShaderCoreArrayStr[ sSlot ], sIndex );
-#else
-	ShaderArrayAllocator_t& allocator = gGraphicsData.aCoreDataSlots[ sSlot ];
-
-	if ( allocator.aUsed == 0 )
-	{
-		Log_ErrorF( gLC_ClientGraphics, "No slots in use in core shader data for %s type, can't free this slot\n", gShaderCoreArrayStr[ sSlot ] );
-		return;
-	}
-
-	if ( allocator.aAllocated >= sIndex )
-	{
-		Log_ErrorF( gLC_ClientGraphics, "Core shader data slot index is greater than amount allocated for %s type, max of %zd, tried to free index %zd\n",
-		            gShaderCoreArrayStr[ sSlot ], allocator.aAllocated );
-		return;
-	}
-
-	CH_ASSERT( allocator.apFree );
-	CH_ASSERT( allocator.apFree[ allocator.aAllocated - allocator.aUsed ] == CH_SHADER_CORE_SLOT_INVALID );
-
-	// write this free index
-	allocator.apFree[ allocator.aAllocated - allocator.aUsed ] == sIndex;
-	allocator.aUsed--;
-#endif
+	Graphics_FreeShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], sIndex );
 }
 
 
-u32 Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName )
+u32 Graphics_GetCoreSlot( EShaderCoreArray sSlot, u32 sIndex )
+{
+	return Graphics_GetShaderSlot( gGraphicsData.aCoreDataSlots[ sSlot ], sIndex );
+}
+
+
+u32 Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator )
 {
 	if ( srAllocator.aUsed == srAllocator.aAllocated )
 	{
 		Log_ErrorF( gLC_ClientGraphics, "Out of slots for allocating shader data \"%s\", max of %zd\n",
-		            spDebugName ? spDebugName : "UNKNOWN", srAllocator.aAllocated );
+		            srAllocator.apName ? srAllocator.apName : "UNKNOWN", srAllocator.aAllocated );
 
 		return UINT32_MAX;
 	}
@@ -1243,48 +1212,88 @@ u32 Graphics_AllocateShaderSlot( ShaderArrayAllocator_t& srAllocator, const char
 	CH_ASSERT( srAllocator.apFree );
 
 	// Get the base of this free list
-	u32 index = srAllocator.apFree[ 0 ];
-	srAllocator.aUsed++;
+	u32 handle = srAllocator.apFree[ 0 ];
 
-	CH_ASSERT( index != UINT32_MAX );
+	if ( handle == UINT32_MAX )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Out of slots in shader array \"%s\"\n", srAllocator.apName );
+		return UINT32_MAX;
+	}
+
+	// Copy this to the used list
+	srAllocator.apUsed[ srAllocator.aUsed++ ] = handle;
 
 	// shift everything down by one
 	memcpy( &srAllocator.apFree[ 0 ], &srAllocator.apFree[ 1 ], sizeof( u32 ) * ( srAllocator.aAllocated - 1 ) );
 
 	// mark the very end of the list as invalid
-	srAllocator.apFree[ srAllocator.aAllocated - 1 ] = UINT32_MAX;
+	srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] = UINT32_MAX;
 
 	// mark this as dirty
-	srAllocator.aDirty                               = true;
+	srAllocator.aDirty                                               = true;
 
-	return index;
+	return handle;
 }
 
 
-void Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, const char* spDebugName, u32 sIndex )
+void Graphics_FreeShaderSlot( ShaderArrayAllocator_t& srAllocator, u32 sHandle )
 {
 	if ( srAllocator.aUsed == 0 )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "No slots in use in core shader data for %s type, can't free this slot\n", spDebugName ? spDebugName : "UNKNOWN" );
-		return;
-	}
-
-	if ( srAllocator.aAllocated >= sIndex )
-	{
-		Log_ErrorF( gLC_ClientGraphics, "Core shader data slot index is greater than amount allocated for %s type, max of %zd, tried to free index %zd\n",
-		            spDebugName ? spDebugName : "UNKNOWN", srAllocator.aAllocated );
+		Log_ErrorF( gLC_ClientGraphics, "No slots in use in shader data for %s type, can't free this slot\n", srAllocator.apName ? srAllocator.apName : "UNKNOWN" );
 		return;
 	}
 
 	CH_ASSERT( srAllocator.apFree );
 	CH_ASSERT( srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] == UINT32_MAX );
 
-	// write this free index
-	srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] = sIndex;
+	// Find the index of this handle in the used list
+	u32 index = 0;
+	for ( ; index < srAllocator.aUsed; index++ )
+	{
+		if ( srAllocator.apUsed[ index ] == sHandle )
+			break;
+	}
+
+	if ( index == srAllocator.aAllocated )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "Failed to find handle in shader slot \"%s\"\n", srAllocator.apName );
+		return;
+	}
+
+	// shift everything down by one if there's anything after
+	// don't shift anything if this is the last handle
+	if ( index + 1 < srAllocator.aAllocated )
+	{
+		memcpy( &srAllocator.apUsed[ index ], &srAllocator.apUsed[ index + 1 ], sizeof( u32 ) * ( srAllocator.aAllocated - 1 ) );
+	}
+
+	// write this free handle
+	srAllocator.apFree[ srAllocator.aAllocated - srAllocator.aUsed ] = sHandle;
+	srAllocator.apUsed[ srAllocator.aUsed ]                          = 0;
 	srAllocator.aUsed--;
 
 	// mark this as dirty
 	srAllocator.aDirty = true;
+}
+
+
+u32 Graphics_GetShaderSlot( ShaderArrayAllocator_t& srAllocator, u32 sHandle )
+{
+	if ( srAllocator.aUsed == 0 )
+	{
+		Log_ErrorF( gLC_ClientGraphics, "No slots in use in shader data for %s type, can't free this slot\n", srAllocator.apName ? srAllocator.apName : "UNKNOWN" );
+		return UINT32_MAX;
+	}
+
+	for ( u32 index = 0; index < srAllocator.aUsed; index++ )
+	{
+		if ( srAllocator.apUsed[ index ] == sHandle )
+			return index;
+	}
+
+	Log_ErrorF( gLC_ClientGraphics, "Failed to find handle in shader slot \"%s\"\n", srAllocator.apName );
+	return UINT32_MAX;
 }
 
 
@@ -1366,11 +1375,11 @@ void Graphics_OnResetCallback( ERenderResetFlags sFlags )
 	// only exception if we are in msaa now or not, blech
 	render->GetBackBufferTextures( &gGraphicsData.aBackBufferTex[ 0 ], &gGraphicsData.aBackBufferTex[ 1 ], &gGraphicsData.aBackBufferTex[ 2 ] );
 
-	int width, height;
-	render->GetSurfaceSize( width, height );
-
-	if ( gGraphicsData.aViewData.aViewports.size() )
-		gGraphicsData.aViewData.aViewports[ 0 ].aSize = { width, height };
+	// int width, height;
+	// render->GetSurfaceSize( width, height );
+	// 
+	// if ( gGraphicsData.aViewData.aViewports.size() )
+	// 	gGraphicsData.aViewData.aViewports[ 0 ].aSize = { width, height };
 
 	if ( sFlags & ERenderResetFlags_MSAA )
 	{
@@ -1480,16 +1489,10 @@ void Graphics::Shutdown()
 
 	for ( u32 i = 0; i < EShaderCoreArray_Count; i++ )
 	{
-		if ( gGraphicsData.aCoreDataSlots[ i ].apFree )
-			free( gGraphicsData.aCoreDataSlots[ i ].apFree );
-
-		gGraphicsData.aCoreDataSlots[ i ].apFree     = nullptr;
-		gGraphicsData.aCoreDataSlots[ i ].aAllocated = 0;
-		gGraphicsData.aCoreDataSlots[ i ].aUsed      = 0;
+		Graphics_FreeShaderArray( gGraphicsData.aCoreDataSlots[ i ] );
 	}
 
-	if ( gGraphicsData.aViewportSlots.apFree )
-		free( gGraphicsData.aViewportSlots.apFree );
+	Graphics_FreeShaderArray( gGraphicsData.aViewportSlots );
 
 	if ( gGraphicsData.aModelMatrixData )
 		free( gGraphicsData.aModelMatrixData );

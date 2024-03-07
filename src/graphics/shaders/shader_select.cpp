@@ -78,7 +78,7 @@ static void Shader_Select_PushConstants( Handle cmd, Handle sLayout, SurfaceDraw
 	}
 
 	ShaderSelect_Push push;
-	push.aViewport           = gRenderOld.aSelectionViewport;
+	push.aViewport           = Graphics_GetShaderSlot( gGraphicsData.aViewportSlots, gRenderOld.aSelectionViewport );
 	push.aRenderable         = CH_GET_HANDLE_INDEX( srSurfaceDraw.aRenderable );
 	push.aColor.x            = color[ 0 ] / 255.f;
 	push.aColor.y            = color[ 1 ] / 255.f;
