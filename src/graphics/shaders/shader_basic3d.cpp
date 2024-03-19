@@ -73,6 +73,9 @@ static ShaderMaterialVarDesc gBasic3D_MaterialVars[] = {
 
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, alphaTest, "Alpha Testing", false ),
 	CH_SHADER_MATERIAL_VAR( Basic3D_Material, useNormalMap, "Use Normal Map", true ),
+
+	// bullet list option
+	// CH_SHADER_MATERIAL_VAR_COMBO();
 };
 
 

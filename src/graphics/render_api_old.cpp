@@ -12,6 +12,8 @@ extern void Graphics_Render( Handle sCmd, size_t sIndex, ERenderPass sRenderPass
 extern ConVar r_vis_lock;
 extern ConVar r_reset_blend_shapes;
 
+CONVAR( r_wireframe, 0 );
+
 
 void RenderSystemOld::NewFrame()
 {
@@ -182,6 +184,11 @@ void Graphics_PrepareDrawData()
 	// fun
 	static Handle        shadow_map       = gGraphics.GetShader( "__shadow_map" );
 	static ShaderData_t* shadowShaderData = Shader_GetData( shadow_map );
+	static ChHandle_t    debugShader      = gGraphics.GetShader( "wireframe" );
+
+	// shaders to exclude from wireframe
+	static ChHandle_t    shaderSkybox     = gGraphics.GetShader( "skybox" );
+	static ChHandle_t    shaderGizmo      = gGraphics.GetShader( "gizmo" );
 
 	render->PreRenderPass();
 
@@ -370,10 +377,13 @@ void Graphics_PrepareDrawData()
 					continue;
 				}
 
-				Handle shader = viewport.aShaderOverride;
+				Handle shader = gGraphics.Mat_GetShader( mat );
 
-				if ( !shader )
-					shader = gGraphics.Mat_GetShader( mat );
+				if ( viewport.aShaderOverride )
+					shader = viewport.aShaderOverride;
+
+				else if ( r_wireframe && shader != shaderSkybox && shader != shaderGizmo )
+					shader = debugShader;
 
 				ShaderData_t* shaderData = Shader_GetData( shader );
 				if ( !shaderData )
