@@ -662,8 +662,24 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 				createData.aUsage  = EImageUsage_Sampled;
 				createData.aFilter = EImageFilter_Linear;
 
+				std::string texturePath = cur.apString;
+
+				if ( FileSys_IsRelative( cur.apString ) )
+				{
+					if ( !texturePath.ends_with( ".ktx" ) )
+						texturePath += ".ktx";
+
+					std::string basePath = texturePath;
+
+					if ( !FileSys_IsFile( texturePath ) )
+						texturePath = "models/" + basePath;
+
+					if ( !FileSys_IsFile( texturePath ) )
+						texturePath = "materials/" + basePath;
+				}
+
 				Handle texture     = InvalidHandle;
-				gGraphics.Mat_SetVar( handle, cur.apName, gGraphics.LoadTexture( texture, cur.apString, createData ) );
+				gGraphics.Mat_SetVar( handle, cur.apName, render->LoadTexture( texture, texturePath, createData ) );
 				break;
 			}
 
