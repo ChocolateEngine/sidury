@@ -189,6 +189,8 @@ void Graphics_PrepareDrawData()
 	// shaders to exclude from wireframe
 	static ChHandle_t    shaderSkybox     = gGraphics.GetShader( "skybox" );
 	static ChHandle_t    shaderGizmo      = gGraphics.GetShader( "gizmo" );
+	static ChHandle_t    shaderDebug      = gGraphics.GetShader( "debug" );
+	static ChHandle_t    shaderDebugLine  = gGraphics.GetShader( "debug_line" );
 
 	render->PreRenderPass();
 
@@ -382,7 +384,8 @@ void Graphics_PrepareDrawData()
 				if ( viewport.aShaderOverride )
 					shader = viewport.aShaderOverride;
 
-				else if ( r_wireframe && shader != shaderSkybox && shader != shaderGizmo )
+				// lol this looks great
+				else if ( r_wireframe && shader != shaderSkybox && shader != shaderGizmo && shader != shaderDebug && shader != shaderDebugLine )
 					shader = debugShader;
 
 				ShaderData_t* shaderData = Shader_GetData( shader );
