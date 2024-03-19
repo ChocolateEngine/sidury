@@ -77,8 +77,10 @@ struct CPlayerMoveData
 
 	// Physics
 
-	IPhysicsShape*                     apPhysShape = nullptr;
-	IPhysicsObject*                    apPhysObj   = nullptr;
+	IPhysVirtualCharacter*             apCharacter  = nullptr;
+
+	// IPhysicsShape*                     apPhysShape = nullptr;
+	// IPhysicsObject*                    apPhysObj   = nullptr;
 
 	IPhysicsObject*                    apGroundObj = nullptr;
 	glm::vec3                          aGroundPosition{};
@@ -127,7 +129,7 @@ struct CPlayerSpawn
 // This is really just the old Player class just jammed into one "system"
 class PlayerMovement // : public ComponentSystem
 {
-  public:
+   public:
 	void             EnsureUserCmd( Entity player );
 
 	void             SetPlayer( Entity player );
@@ -136,6 +138,9 @@ class PlayerMovement // : public ComponentSystem
 	void             OnPlayerRespawn( Entity player );
 
 	void             MovePlayer( Entity player, UserCmd_t* spUserCmd );
+
+	void             UpdatePhysicsShape();
+	void             SetPhysicsShape( bool ducked = false );
 
 	void             UpdateInputs();
 	void             UpdatePosition( Entity player );
@@ -151,75 +156,77 @@ class PlayerMovement // : public ComponentSystem
 	void             DetermineMoveType();
 
 #if CH_CLIENT
-	void             DisplayPlayerStats( Entity player ) const;
+	void   DisplayPlayerStats( Entity player ) const;
 
 	// std::string             GetStepSound(  );
-	Handle           GetStepSound();
+	Handle GetStepSound();
 
-	void             PlayStepSound();
-	void             StopStepSound( bool force = false );  // Temp Hack for sound system
+	void   PlayStepSound();
+	void   StopStepSound( bool force = false );  // Temp Hack for sound system
 
 	// Sound for colliding onto stuff or landing on the ground
-	void             PlayImpactSound();
-	void             StopImpactSound();  // Temp Hack for sound system
+	void   PlayImpactSound();
+	void   StopImpactSound();  // Temp Hack for sound system
 #endif
 
-	bool             CalcOnGround( bool sSetFlag = true );
-	bool             IsOnGround();
-	bool             WasOnGround();
+	bool                   CalcOnGround( bool sSetFlag = true );
+	bool                   IsOnGround();
+	bool                   WasOnGround();
 
-	float            GetMoveSpeed( glm::vec3& wishDir, glm::vec3& wishVel );
-	float            GetMaxSpeed();
-	float            GetMaxSpeedBase();
-	float            GetMaxSprintSpeed();
-	float            GetMaxDuckSpeed();
+	float                  GetMoveSpeed( glm::vec3& wishDir, glm::vec3& wishVel );
+	float                  GetMaxSpeed();
+	float                  GetMaxSpeedBase();
+	float                  GetMaxSprintSpeed();
+	float                  GetMaxDuckSpeed();
 
-	void             BaseFlyMove();
-	void             NoClipMove();
-	void             FlyMove();
-	void             WalkMove();
+	void                   BaseFlyMove();
+	void                   NoClipMove();
+	void                   FlyMove();
+	void                   WalkMove();
 
-	void             WalkMovePostPhys();  // um
+	void                   WalkMovePostPhys();  // um
 
-	void             DoSmoothDuck();
-	void             DoSmoothLand( bool wasOnGround );
-	void             DoViewBob();
-	void             DoViewTilt();
+	void                   DoSmoothDuck();
+	void                   DoSmoothLand( bool wasOnGround );
+	void                   DoViewBob();
+	void                   DoViewTilt();
 
 	// TODO: remove these first 2 when physics finally works to a decent degree
-	void             AddFriction();
-	void             Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
+	void                   AddFriction();
+	void                   Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir = false );
 
-	void             SetMoveType( CPlayerMoveData& move, EPlayerMoveType type );
-	void             SetCollisionEnabled( bool enable );
-	void             SetGravity( const glm::vec3& gravity );
-	void             EnableGravity( bool enabled );
+	void                   SetMoveType( CPlayerMoveData& move, EPlayerMoveType type );
+	void                   SetCollisionEnabled( bool enable );
+	void                   SetGravity( const glm::vec3& gravity );
+	void                   EnableGravity( bool enabled );
 
-	inline bool      IsInSprint() { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
-	inline bool      IsInDuck() { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
+	inline bool            IsInSprint() { return apMove ? apMove->aPlayerFlags & PlyInSprint : false; }
+	inline bool            IsInDuck() { return apMove ? apMove->aPlayerFlags & PlyInDuck : false; }
 
-	inline bool      WasInSprint() { return apMove ? apMove->aPrevPlayerFlags & PlyInSprint : false; }
-	inline bool      WasInDuck() { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
+	inline bool            WasInSprint() { return apMove ? apMove->aPrevPlayerFlags & PlyInSprint : false; }
+	inline bool            WasInDuck() { return apMove ? apMove->aPrevPlayerFlags & PlyInDuck : false; }
 
 	// store it for use in functions, save on GetComponent calls
-	Entity           aPlayer        = CH_ENT_INVALID;
-	UserCmd_t*       apUserCmd      = nullptr;
+	Entity                 aPlayer        = CH_ENT_INVALID;
+	UserCmd_t*             apUserCmd      = nullptr;
 
-	CPlayerMoveData* apMove         = nullptr;
-	CRigidBody*      apRigidBody    = nullptr;
-	CTransform*      apTransform    = nullptr;
-	CDirection*      apDir          = nullptr;
+	CPlayerMoveData*       apMove         = nullptr;
+	CRigidBody*            apRigidBody    = nullptr;
+	CTransform*            apTransform    = nullptr;
+	CDirection*            apDir          = nullptr;
 
-	CTransform*      apCamTransform = nullptr;
-	CDirection*      apCamDir       = nullptr;
-	CCamera*         apCamera       = nullptr;
+	CTransform*            apCamTransform = nullptr;
+	CDirection*            apCamDir       = nullptr;
+	CCamera*               apCamera       = nullptr;
+
+	IPhysVirtualCharacter* apCharacter    = nullptr;
 
 	// CPhysShape*      apPhysShape = nullptr;
 	// CPhysObject*     apPhysObj   = nullptr;
 
-	IPhysicsShape*   apPhysShape    = nullptr;
-	IPhysicsObject*  apPhysObj      = nullptr;
-	CPhysObject*     apPhysObjComp  = nullptr;
+	// IPhysicsShape*   apPhysShape    = nullptr;
+	// IPhysicsObject*  apPhysObj      = nullptr;
+	// CPhysObject*     apPhysObjComp  = nullptr;
 
 	// PhysCharacter* apPhys = nullptr;
 	//PhysicsObject* apPhysObj = nullptr;

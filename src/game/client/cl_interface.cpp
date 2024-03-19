@@ -15,7 +15,7 @@
 CONVAR( r_render, 1 );
 
 // blech
-static u32 gMainViewportIndex = UINT32_MAX;
+u32 gMainViewportIndex = UINT32_MAX;
 
 extern EClientState gClientState;
 

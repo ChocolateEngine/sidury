@@ -71,7 +71,7 @@ endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 target_precompile_headers( SiduryClient PRIVATE "${CH_PUBLIC}/core/core.h" )
 
 source_group(
-	TREE ${CMAKE_CURRENT_LIST_DIR}/../
+	TREE ${CMAKE_CURRENT_LIST_DIR}/../../
 	PREFIX "Source Files"
 	FILES ${SRC_FILES}
 )

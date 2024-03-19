@@ -41,6 +41,11 @@ set(
 	# networking
 	${SIDURY_SHARED_DIR}/network/net_main.cpp
 	${SIDURY_SHARED_DIR}/network/net_main.h
+
+	# ../../shared/map_parser.cpp
+	# ../../shared/map_parser.h
+	# ../../shared/skybox.cpp
+	# ../../shared/skybox.h
 	
 	# tools
 	# ${SIDURY_SHARED_DIR}/tools/light_editor.cpp

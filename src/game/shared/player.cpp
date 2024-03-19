@@ -36,6 +36,8 @@ PlayerManager players;
 
 #if CH_SERVER
 static PlayerSpawnManager playerSpawn;
+#else
+extern u32 gMainViewportIndex;
 #endif
 
 constexpr float DEFAULT_SPEED = 250.f;
@@ -56,7 +58,6 @@ CONVAR( sv_friction, 8, CVARF_DEF_SERVER_REPLICATED );  // 4.f
 CONVAR( sv_friction_enable, 1, CVARF_DEF_SERVER_REPLICATED );
 
 CONVAR( phys_friction_player, 0.01, CVARF_DEF_SERVER_REPLICATED );
-CONVAR( phys_player_offset, 40, CVARF_DEF_SERVER_REPLICATED );
 
 // lerp the friction maybe?
 //CONVAR( sv_new_movement, 1 );
@@ -69,10 +70,10 @@ CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
 CONVAR( sv_view_height, 67, CVARF_DEF_SERVER_REPLICATED );  // 67
-CONVAR( sv_view_height_duck, 36, CVARF_DEF_SERVER_REPLICATED );  // 36
+CONVAR( sv_view_height_duck, 35, CVARF_DEF_SERVER_REPLICATED );  // 35
 CONVAR( sv_view_height_lerp, 15, CVARF_DEF_SERVER_REPLICATED );  // 0.015
 
-CONVAR( player_model_scale, 40 );
+CONVAR( player_model_scale, 1 );
 
 CONVAR( cl_thirdperson, 0 );
 CONVAR( cl_playermodel_enable, 1 );
@@ -120,7 +121,15 @@ CONVAR( r_flashlight_offset_z, -4.f );
 
 extern ConVar   m_yaw, m_pitch;
 
-constexpr float PLAYER_MASS = 200.f;
+constexpr float       PLAYER_MASS            = 200.f;
+
+
+static IPhysicsShape* gPlayerShapeStanding   = nullptr;
+static IPhysicsShape* gPlayerShapeCrouch     = nullptr;
+
+constexpr u32         gPlayerPhysHeight      = 72;
+constexpr u32         gPlayerPhysHeightDuck  = 40;
+constexpr u32         gPlayerPhysHeightDuck2 = 32;  // why ?????
 
 
 #if CH_SERVER
@@ -351,16 +360,12 @@ bool PlayerManager::SetCurrentPlayer( Entity player )
 	apMove->apDir          = Ent_GetComponent< CDirection >( player, "direction" );
 	apMove->apRigidBody    = GetRigidBody( player );
 	apMove->apTransform    = GetTransform( player );
-	apMove->apPhysShape    = GetComp_PhysShapePtr( player );
-	apMove->apPhysObjComp  = GetComp_PhysObject( player );
-	apMove->apPhysObj      = apMove->apPhysObjComp->apObj;
+	apMove->apCharacter    = apMove->apCharacter;
 
 	CH_ASSERT( apMove->apDir );
 	CH_ASSERT( apMove->apRigidBody );
 	CH_ASSERT( apMove->apTransform );
-	CH_ASSERT( apMove->apPhysShape );
-	CH_ASSERT( apMove->apPhysObjComp );
-	CH_ASSERT( apMove->apPhysObj );
+	CH_ASSERT( apMove->apCharacter );
 
 	CH_ASSERT( apMove->apCamTransform );
 	CH_ASSERT( apMove->apCamDir );
@@ -389,7 +394,8 @@ void PlayerManager::Create( Entity player )
 #if CH_SERVER
 
 	// Add Components to entity
-	Ent_AddComponent( player, "playerMoveData" );
+	auto playerMove = Ent_AddComponent< CPlayerMoveData >( player, "playerMoveData" );
+
 	Ent_AddComponent( player, "rigidBody" );
 	Ent_AddComponent( player, "direction" );
 
@@ -444,27 +450,56 @@ void PlayerManager::Create( Entity player )
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
-	auto compPhysShape        = Ent_AddComponent< CPhysShape >( player, "physShape" );
-	compPhysShape->aShapeType = PhysShapeType::Cylinder;
-	compPhysShape->aBounds    = glm::vec3( 72, 16, 1 );
+	PhysicsShapeInfo charShapeInfo( PhysShapeType::Cylinder );
+	charShapeInfo.aBounds                  = { 72, 16, 1 };
 
-	Phys_CreatePhysShapeComponent( compPhysShape );
+	gPlayerShapeStanding  = GetPhysEnv()->CreateShape( charShapeInfo );
 
-	IPhysicsShape* physShape = compPhysShape->apShape;
+	PhysicsShapeInfo duckShapeInfo( PhysShapeType::Cylinder );
+	duckShapeInfo.aBounds = { 40, 16, 1 };
 
-	CH_ASSERT( physShape );
+	gPlayerShapeCrouch    = GetPhysEnv()->CreateShape( duckShapeInfo );
 
-	PhysicsObjectInfo physInfo;
-	physInfo.aMotionType = PhysMotionType::Dynamic;
-	physInfo.aPos        = transform->aPos;
-	physInfo.aAng        = transform->aAng;
+	PhysVirtualCharacterSettings charSettings{};
+	charSettings.shape                     = gPlayerShapeStanding;
+	charSettings.up                        = vec_up;
+	charSettings.mass                      = PLAYER_MASS;
+	charSettings.maxSlopeAngle             = 35;
+	//charSettings.predictiveContactDistance = 20.f;
+	//charSettings.characterPadding    = 0.2f;
+	//charSettings.collisionTolerance  = 0.2f;
 
-	physInfo.aCustomMass = true;
-	physInfo.aMass       = PLAYER_MASS;
+	// charSettings.maxCollisionIterations    = 25;
+	// charSettings.maxConstraintIterations   = 50;
 
-	CPhysObject* physObj = Phys_CreateObject( player, physShape, physInfo );
+	IPhysVirtualCharacter* character = GetPhysEnv()->CreateVirtualCharacter( charSettings );
 
-	CH_ASSERT( physObj );
+	playerMove->apCharacter          = character;
+
+	character->SetRotation( AngToQuat( glm::radians( glm::vec3( 90.f, 0.f, 0.f ) ) ) );
+	character->SetShapeOffset( { 0, gPlayerPhysHeight / 2.f, 0 } );
+
+	// auto compPhysShape        = Ent_AddComponent< CPhysShape >( player, "physShape" );
+	// compPhysShape->aShapeType = PhysShapeType::Cylinder;
+	// compPhysShape->aBounds    = glm::vec3( 72, 16, 1 );
+	// 
+	// Phys_CreatePhysShapeComponent( compPhysShape );
+	// 
+	// IPhysicsShape* physShape = compPhysShape->apShape;
+	// 
+	// CH_ASSERT( physShape );
+	// 
+	// PhysicsObjectInfo physInfo;
+	// physInfo.aMotionType = PhysMotionType::Dynamic;
+	// physInfo.aPos        = transform->aPos;
+	// physInfo.aAng        = transform->aAng;
+	// 
+	// physInfo.aCustomMass = true;
+	// physInfo.aMass       = PLAYER_MASS;
+	// 
+	// CPhysObject* physObj = Phys_CreateObject( player, physShape, physInfo );
+	// 
+	// CH_ASSERT( physObj );
 #endif
 }
 
@@ -490,8 +525,9 @@ void PlayerManager::Respawn( Entity player )
 	auto         rigidBody  = GetRigidBody( player );
 	auto         transform  = GetTransform( player );
 	auto         zoom       = GetPlayerZoom( player );
-	auto         physObjComp    = GetComp_PhysObject( player );
+	auto         playerMove = GetPlayerMoveData( player );
 
+	CH_ASSERT( playerMove );
 	CH_ASSERT( playerInfo );
 	CH_ASSERT( playerInfo->aCamera );
 
@@ -501,11 +537,6 @@ void PlayerManager::Respawn( Entity player )
 	CH_ASSERT( transform );
 	CH_ASSERT( camTransform );
 	CH_ASSERT( zoom );
-	CH_ASSERT( physObjComp );
-
-	IPhysicsObject* physObj = physObjComp->apObj;
-
-	CH_ASSERT( physObj );
 
 #if CH_SERVER
 	Transform playerSpawnSpot = playerSpawn.SelectSpawnTransform();
@@ -521,10 +552,11 @@ void PlayerManager::Respawn( Entity player )
 	zoom->aOrigFov                = r_fov.GetFloat();
 	zoom->aNewFov                 = r_fov.GetFloat();
 
-	physObjComp->aTransformMode   = EPhysTransformMode_None;
+	// physObjComp->aTransformMode   = EPhysTransformMode_None;
 
-	physObj->SetLinearVelocity( { 0, 0, 0 } );
+	playerMove->apCharacter->SetLinearVelocity( { 0, 0, 0 } );
 
+#if 0
 	physObj->SetAllowSleeping( false );
 	physObj->SetMotionQuality( PhysMotionQuality::LinearCast );
 	physObj->SetLinearVelocity( { 0, 0, 0 } );
@@ -541,6 +573,7 @@ void PlayerManager::Respawn( Entity player )
 	// rotate 90 degrees
 	// physObj->SetAng( { 90, transform->aAng.Get().y, 0 } );
 	physObj->SetAng( { 90, 0, 0 } );
+#endif
 
 	apMove->OnPlayerRespawn( player );
 }
@@ -786,30 +819,26 @@ void PlayerManager::UpdateLocalPlayer()
 			float     scaleBase = player_model_scale.GetFloat();
 
 			// This is to squish the model when the player crouches
+			// TODO: HANDLE WHEN THE PLAYER IS IN THE AIR !!!! NETWORK THAT DATA !!!!
 			float     scaleMult = playerMove->aOutViewHeight / sv_view_height;
 			
 			glm::vec3 scale( scaleBase, scaleBase, scaleBase );
-			scale.y *= scaleMult;
+			scale.z *= scaleMult;
 
 			// HACK HACK
 			glm::vec3 ang{};
 
 			if ( cl_playermodel_cam_ang )
 			{
-				ang = camTransform->aAng;
-				//ang[ YAW ] *= -1;
-				ang[ YAW ] += 180;
-				ang[ YAW ] *= -1;
-				ang[ ROLL ]  = ang[ PITCH ] + 90;
-				ang[ PITCH ] = 0;
+				ang[ ROLL ]  = -camTransform->aAng.Get()[ YAW ];
+				ang[ YAW ]   = 0.f;
+				ang[ PITCH ] = camTransform->aAng.Get()[ PITCH ] * -1.f;
 			}
 			else
 			{
-				ang = transform->aAng;
-				 ang[ ROLL ] += 90;
-				//ang[ YAW ] *= -1;
-				ang[ YAW ] += 180;
-				ang[ YAW ] *= -1;
+				ang[ ROLL ]  = -transform->aAng.Get()[ YAW ];
+				ang[ YAW ]   = 0.f;
+				ang[ PITCH ] = transform->aAng.Get()[ PITCH ] * -1.f;
 			}
 
 			// Util_ToMatrix( renderData->aModelMatrix, transform->aPos, ang, scale );
@@ -820,11 +849,11 @@ void PlayerManager::UpdateLocalPlayer()
 
 			renderData->aModelMatrix = glm::translate( transform->aPos.Get() );
 
-			renderData->aModelMatrix *= glm::eulerAngleYZX(
-			  glm::radians( ang.x ),
+			renderData->aModelMatrix *= glm::eulerAngleZYX(
+			  glm::radians( ang.z ),
 			  glm::radians( ang.y ),
-			  glm::radians( ang.z ) );
-
+			  glm::radians( ang.x ) );
+			
 			renderData->aModelMatrix = glm::scale( renderData->aModelMatrix, scale );
 
 			graphics->UpdateRenderableAABB( renderComp->aRenderable );
@@ -1021,6 +1050,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 
 	CTransform* camTransform = GetTransform( info->aCamera );
 	CTransform* transform    = GetTransform( player );
+	auto        playerMove   = GetPlayerMoveData( player );
 
 	auto        dir          = GetComp_Direction( player );
 
@@ -1074,7 +1104,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 #if CH_CLIENT
 		if ( info->aIsLocalPlayer )
 		{
-			ViewportShader_t* viewport = graphics->GetViewportData( 0 );
+			ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportIndex );
 
 			if ( viewport )
 				viewport->aViewPos = thirdPerson.aPos;
@@ -1098,7 +1128,7 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 			// wtf broken??
 			// audio->SetListenerTransform( transformView.aPos, transformView.aAng );
 			
-			ViewportShader_t* viewport = graphics->GetViewportData( 0 );
+			ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportIndex );
 
 			if ( viewport )
 				viewport->aViewPos = transformView.aPos;
@@ -1114,6 +1144,16 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	// temp
 	//graphics->DrawAxis( transformView.aPos, transformView.aAng, { 40.f, 40.f, 40.f } );
 	//graphics->DrawAxis( transform->aPos, transform->aAng, { 40.f, 40.f, 40.f } );
+	// graphics->DrawAxis( transform->aPos, {}, { 40.f, 40.f, 40.f } );
+
+#if CH_SERVER
+	glm::mat4 physTransform = playerMove->apCharacter->GetCenterOfMassTransform();
+
+	glm::vec3 physPos       = Util_GetMatrixPosition( physTransform );
+
+	graphics->DrawAxis( physPos, {}, { 40.f, 40.f, 40.f } );
+#endif
+
 
 #if CH_CLIENT
 	if ( info->aIsLocalPlayer )
@@ -1189,8 +1229,11 @@ void PlayerMovement::SetPlayer( Entity player )
 	apRigidBody    = GetRigidBody( player );
 	apTransform    = GetTransform( player );
 	apDir          = Ent_GetComponent< CDirection >( player, "direction" );
-	apPhysObjComp  = GetComp_PhysObject( player );
-	apPhysObj      = apPhysObjComp->apObj;
+
+#if CH_SERVER
+	apCharacter = apMove->apCharacter;
+	CH_ASSERT( apCharacter );
+#endif
 
 	CH_ASSERT( apCamTransform );
 	CH_ASSERT( apCamDir );
@@ -1200,8 +1243,6 @@ void PlayerMovement::SetPlayer( Entity player )
 	CH_ASSERT( apRigidBody );
 	CH_ASSERT( apTransform );
 	CH_ASSERT( apDir );
-	CH_ASSERT( apPhysObjComp );
-	CH_ASSERT( apPhysObj );
 }
 
 
@@ -1237,16 +1278,13 @@ void PlayerMovement::OnPlayerRespawn( Entity player )
 
 	auto move      = GetPlayerMoveData( player );
 	auto transform = GetTransform( player );
-	auto physObj   = GetComp_PhysObjectPtr( player );
 
 	CH_ASSERT( move );
 	CH_ASSERT( transform );
-	CH_ASSERT( physObj );
 
 	//auto& physObj = Entity_GetComponent< PhysicsObject* >( player );
-	transform->aPos.Edit().z += phys_player_offset;
 
-	physObj->SetPos( transform->aPos );
+	move->apCharacter->SetPosition( transform->aPos );
 
 	// Init Smooth Duck
 	move->aTargetViewHeight = GetViewHeight();
@@ -1260,22 +1298,37 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 	SetPlayer( player );
 
-	apUserCmd   = spUserCmd;
+	apUserCmd         = spUserCmd;
 
-	apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
+	// apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
 
 	// update velocity
-	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
+	apRigidBody->aVel = apCharacter->GetLinearVelocity();
 
 	//apPhysObj->SetSleepingThresholds( 0, 0 );
 	//apPhysObj->SetAngularFactor( 0 );
 	//apPhysObj->SetAngularVelocity( {0, 0, 0} );
-	apPhysObj->SetFriction( phys_friction_player );
+	// apCharacter->SetFriction( phys_friction_player );
 
 	UpdateInputs();
 
 	// Needed before smooth duck
 	CalcOnGround();
+
+	// TODO: what if we automatically duck when we jump
+
+	if ( apMove->aMoveType == EPlayerMoveType_Walk )
+	{
+		// If we are now ducking
+		if ( apMove->aPlayerFlags & PlyInDuck && !( apMove->aPrevPlayerFlags & PlyInDuck ) )
+		{
+			SetPhysicsShape( true );
+		}
+		else if ( !( apMove->aPlayerFlags & PlyInDuck ) && ( apMove->aPrevPlayerFlags & PlyInDuck ) )
+		{
+			SetPhysicsShape( false );
+		}
+	}
 
 	// should be in WalkMove only, but i need this here when toggling noclip mid-duck
 	DoSmoothDuck();
@@ -1291,6 +1344,52 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 	// HACK FOR IMPACT SOUND ON CLIENT
 	apMove->aPrevVel = apRigidBody->aVel;
+}
+
+
+void PlayerMovement::UpdatePhysicsShape()
+{
+}
+
+
+void PlayerMovement::SetPhysicsShape( bool ducked )
+{
+	if ( ducked )
+	{
+		switch ( apMove->apCharacter->GetGroundState() )
+		{
+			// case EPhysGroundState_NotSupported:
+			case EPhysGroundState_InAir:
+				// offset player position so our view height stays the same
+				glm::vec3 pos = apMove->apCharacter->GetPosition();
+				pos.z += gPlayerPhysHeightDuck2;
+
+				apMove->apCharacter->SetPosition( pos );
+				apTransform->aPos = pos;
+				break;
+		}
+
+		apMove->apCharacter->SetShapeOffset( { 0, gPlayerPhysHeightDuck / 2.f, 0 } );
+		GetPhysEnv()->SetVirtualCharacterShape( apMove->apCharacter, gPlayerShapeCrouch, FLT_MAX );
+	}
+	else 
+	{
+		switch ( apMove->apCharacter->GetGroundState() )
+		{
+			// case EPhysGroundState_NotSupported:
+			case EPhysGroundState_InAir:
+				// offset player position so our view height stays the same
+				glm::vec3 pos = apMove->apCharacter->GetPosition();
+				pos.z -= gPlayerPhysHeightDuck2;
+
+				apMove->apCharacter->SetPosition( pos );
+				apTransform->aPos = pos;
+				break;
+		}
+
+		apMove->apCharacter->SetShapeOffset( { 0, gPlayerPhysHeight / 2.f, 0 } );
+		GetPhysEnv()->SetVirtualCharacterShape( apMove->apCharacter, gPlayerShapeStanding, FLT_MAX );
+	}
 }
 
 
@@ -1351,6 +1450,8 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, EPlayerMoveType type )
 
 		case EPlayerMoveType_Walk:
 		{
+			// update physics shape
+			SetPhysicsShape( apMove->aPlayerFlags & PlyInDuck );
 			EnableGravity( true );
 			SetCollisionEnabled( true );
 			break;
@@ -1361,15 +1462,15 @@ void PlayerMovement::SetMoveType( CPlayerMoveData& move, EPlayerMoveType type )
 
 void PlayerMovement::SetCollisionEnabled( bool enable )
 {
-	apPhysObjComp->aEnableCollision = enable;
-	apPhysObj->SetCollisionEnabled( enable );
+	//apPhysObjComp->aEnableCollision = enable;
+	apCharacter->EnableCollision( enable );
 }
 
 
 void PlayerMovement::EnableGravity( bool enabled )
 {
-	apPhysObjComp->aGravity = enabled;
-	apPhysObj->SetGravityEnabled( enabled );
+	//apPhysObjComp->aGravity = enabled;
+	//apCharacter->SetGravityEnabled( enabled );
 }
 
 // ============================================================
@@ -1530,27 +1631,25 @@ void PlayerMovement::UpdatePosition( Entity player )
 	apMove        = GetPlayerMoveData( player );
 	apTransform   = GetTransform( player );
 	apRigidBody   = GetRigidBody( player );
-	apPhysObjComp = GetComp_PhysObject( player );
-	apPhysObj     = apPhysObjComp->apObj;
+	apCharacter   = apMove->apCharacter;
 
 	CH_ASSERT( apMove );
 	CH_ASSERT( apTransform );
 	CH_ASSERT( apRigidBody );
-	CH_ASSERT( apPhysObjComp );
-	CH_ASSERT( apPhysObj );
+	CH_ASSERT( apCharacter );
 
 	//auto& physObj = Entity_GetComponent< PhysicsObject* >( player );
 
 	//if ( aMoveType == MoveType::Fly )
 		//aTransform = apPhysObj->GetWorldTransform();
 	//transform.aPos = physObj->GetWorldTransform().aPos;
-	apTransform->aPos = apPhysObj->GetPos();
-	apTransform->aPos.Edit().z -= phys_player_offset;
+	apTransform->aPos = apCharacter->GetPosition();
+	// apTransform->aPos.Edit().z -= phys_player_offset;
 
 	if ( apMove->aMoveType != EPlayerMoveType_NoClip )
 	{
-		PlayerCollisionCheck playerCollide( GetPhysEnv()->GetGravity(), apRigidBody->aVel, apMove );
-		apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
+		// PlayerCollisionCheck playerCollide( GetPhysEnv()->GetGravity(), apRigidBody->aVel, apMove );
+		// apPhysObj->CheckCollision( phys_player_max_sep_dist, &playerCollide );
 	}
 
 	// um
@@ -1590,8 +1689,34 @@ void PlayerMovement::DoSmoothDuck()
 		return;
 	}
 
+	if ( apMove->aMoveType != EPlayerMoveType_Walk )
+	{
+		apMove->aDuckTime += gFrameTime;
+
+		if ( apMove->aDuckDuration >= apMove->aDuckTime )
+		{
+			float time             = ( apMove->aDuckTime / apMove->aDuckDuration );
+			float timeCurve        = Math_EaseOutQuart( time );
+
+			apMove->aOutViewHeight = std::lerp( apMove->aPrevViewHeight, apMove->aTargetViewHeight, timeCurve );
+		}
+
+		return;
+	}
+	
+	EPhysGroundState groundState = apMove->apCharacter->GetGroundState();
+
+	// no smooth duck in air, imagine your only moving your legs in the air, not your view
+	if ( groundState == EPhysGroundState_InAir || groundState == EPhysGroundState_NotSupported )
+	{
+		apMove->aOutViewHeight            = GetViewHeight();
+		camTransform->aPos.Edit()[ W_UP ] = apMove->aOutViewHeight;
+		return;
+	}
+
 #if CH_SERVER
-	if ( IsOnGround() && apMove->aMoveType == EPlayerMoveType_Walk )
+	// if ( IsOnGround() && apMove->aMoveType == EPlayerMoveType_Walk )
+	if ( apMove->aMoveType == EPlayerMoveType_Walk )
 	{
 		if ( apMove->aTargetViewHeight != GetViewHeight() )
 		{
@@ -1608,7 +1733,7 @@ void PlayerMovement::DoSmoothDuck()
 			apMove->aDuckDuration *= cl_duck_time;
 		}
 	}
-	else if ( WasOnGround() )
+	else // if ( WasOnGround() )
 	{
 		apMove->aPrevViewHeight = apMove->aOutViewHeight;
 		apMove->aDuckDuration = Lerp_GetDuration( sv_view_height, sv_view_height_duck, apMove->aPrevViewHeight, cl_duck_time );
@@ -1638,6 +1763,20 @@ bool PlayerMovement::CalcOnGround( bool sSetFlag )
 {
 	PROF_SCOPE();
 
+	EPhysGroundState groundState = apMove->apCharacter->GetGroundState();
+	bool             onGround    = groundState == EPhysGroundState_OnGround;
+
+	if ( sSetFlag )
+	{
+		if ( onGround )
+			apMove->aPlayerFlags.Edit() |= PlyOnGround;
+		else
+			apMove->aPlayerFlags.Edit() &= ~PlyOnGround;
+	}
+
+	return onGround;
+
+#if 0
 	if ( apMove->aMoveType != EPlayerMoveType_Walk )
 		return false;
 
@@ -1662,6 +1801,7 @@ bool PlayerMovement::CalcOnGround( bool sSetFlag )
 	}
 
 	return onGround;
+#endif
 }
 
 
@@ -1858,14 +1998,14 @@ void PlayerMovement::BaseFlyMove()
 void PlayerMovement::NoClipMove()
 {
 	BaseFlyMove();
-	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
+	apCharacter->SetLinearVelocity( apRigidBody->aVel );
 }
 
 
 void PlayerMovement::FlyMove()
 {
 	BaseFlyMove();
-	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
+	apCharacter->SetLinearVelocity( apRigidBody->aVel );
 }
 
 
@@ -1932,10 +2072,6 @@ void PlayerMovement::WalkMove()
 		Accelerate( wishspeed, wishvel, true );
 	}
 
-	// uhhh
-	apPhysObj->SetLinearVelocity( apRigidBody->aVel );
-	apRigidBody->aVel = apPhysObj->GetLinearVelocity();
-
 	// -------------------------------------------------
 	// Try checking for stairs
 
@@ -1962,12 +2098,61 @@ void PlayerMovement::WalkMove()
 	}
 #endif
 
-	// CalcOnGround();
 	DoSmoothLand( wasOnGround );
-	// DoViewBob();
-	// DoViewTilt();
 
-	wasOnGround = IsOnGround();
+	// Manually apply gravity
+	EPhysGroundState groundState = apCharacter->GetGroundState();
+
+	if ( groundState != EPhysGroundState_OnGround )
+	{
+		glm::vec3 gravity = GetPhysEnv()->GetGravity();
+		apRigidBody->aVel += gravity * gFrameTime;
+	}
+	else
+	{
+		glm::vec3 newVel = apRigidBody->aVel;
+
+		// Handle Jumping
+		if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
+		{
+			newVel.z = jump_force;
+		}
+		else
+		{
+			// have slight velocity downward (TODO: make this just gravity clamped from 0 to 1)
+			// this allows the velocity arrows to show in jolt phys debug view
+			newVel.z = -1.f;
+		}
+
+		apRigidBody->aVel.Set( newVel );
+	}
+
+	// uhhh
+	apCharacter->SetLinearVelocity( apRigidBody->aVel );
+	apRigidBody->aVel = apCharacter->GetLinearVelocity();
+
+
+#if CH_SERVER
+	// YEAH !!!!!
+	switch ( groundState )
+	{
+		case EPhysGroundState_OnGround:
+			Log_Msg( "GroundState: OnGround\n" );
+			break;
+
+		case EPhysGroundState_OnSteepGround:
+			Log_Msg( "GroundState: OnSteepGround\n" );
+			break;
+
+		case EPhysGroundState_NotSupported:
+			Log_Msg( "GroundState: NotSupported\n" );
+			break;
+
+		case EPhysGroundState_InAir:
+			Log_Msg( "GroundState: InAir\n" );
+			break;
+	}
+#endif
 }
 
 
