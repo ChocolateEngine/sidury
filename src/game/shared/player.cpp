@@ -2132,7 +2132,7 @@ void PlayerMovement::WalkMove()
 	apRigidBody->aVel = apCharacter->GetLinearVelocity();
 
 
-#if CH_SERVER
+#if 0 // CH_SERVER
 	// YEAH !!!!!
 	switch ( groundState )
 	{
