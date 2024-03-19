@@ -89,6 +89,9 @@ static T* GetBufferData( cgltf_accessor* accessor )
 {
 	if ( !accessor )
 		return nullptr;
+
+	if ( !accessor->buffer_view )
+		return nullptr;
 	
 	unsigned char* buffer = (unsigned char*)accessor->buffer_view->buffer->data + accessor->buffer_view->offset;
 	void* data = buffer + accessor->offset;
@@ -99,6 +102,9 @@ static T* GetBufferData( cgltf_accessor* accessor )
 static void* GetBufferDataNoOffset( cgltf_accessor* accessor )
 {
 	if ( !accessor )
+		return nullptr;
+
+	if ( !accessor->buffer_view )
 		return nullptr;
 	
 	unsigned char* buffer = (unsigned char*)accessor->buffer_view->buffer->data;
@@ -167,6 +173,10 @@ static void LoadBlendShapes( MeshBuildData_t& meshBuilder, MeshBuildMaterial_t& 
 
 			auto vertices = GetBufferData< glm::vec3 >( vertexBuffer );
 
+			// ?????
+			if ( vertices == nullptr )
+				continue;
+
 			// for ( u32 j = 0; j < srIndexList.size(); j++ )
 			// 	blendShape.apPos[ j ] = *( vertices + srIndexList[ j ] );
 
@@ -181,6 +191,10 @@ static void LoadBlendShapes( MeshBuildData_t& meshBuilder, MeshBuildMaterial_t& 
 		{
 			auto normals = GetBufferData< glm::vec3 >( normalBuffer );
 
+			// ?????
+			if ( normals == nullptr )
+				continue;
+
 			for ( int j = 0; j < srIndexList.size(); j++ )
 				blendShape.apData[ j ].aNorm = *( normals + srIndexList[ j ] );
 		}
@@ -189,6 +203,10 @@ static void LoadBlendShapes( MeshBuildData_t& meshBuilder, MeshBuildMaterial_t& 
 		if ( texBuffer )
 		{
 			auto texCoords = GetBufferData< glm::vec2 >( texBuffer );
+
+			// ?????
+			if ( texCoords == nullptr )
+				continue;
 
 			for ( int j = 0; j < srIndexList.size(); j++ )
 				blendShape.apData[ j ].aUV = *( texCoords + srIndexList[ j ] );
