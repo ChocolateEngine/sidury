@@ -219,6 +219,18 @@ bool MapManager_LoadLegacyV1Map( const std::string& path, EditorContext_t* spCon
 		return false;
 	}
 
+	if ( spContext->aMap.aMapInfo->worldLight )
+	{
+		ChHandle_t worldLightHandle    = Entity_Create();
+		Entity_t*  worldLightEnt       = Entity_GetData( worldLightHandle );
+
+		worldLightEnt->aTransform.aAng = spContext->aMap.aMapInfo->worldLightAng;
+
+		worldLightEnt->apLight         = graphics->CreateLight( ELightType_World );
+		worldLightEnt->apLight->aRot   = AngToQuat( glm::radians( spContext->aMap.aMapInfo->worldLightAng ) );
+		worldLightEnt->apLight->aColor = spContext->aMap.aMapInfo->worldLightColor;
+	}
+
 	return true;
 }
 
@@ -568,14 +580,17 @@ void MapManager_WriteMap( const std::string& srPath )
 // here so we don't need calculate sizes all the time for string comparing
 struct MapInfoKeys
 {
-	std::string version   = "version";
-	std::string mapName   = "mapName";
-	std::string modelPath = "modelPath";
-	std::string ang       = "ang";
-	std::string physAng   = "physAng";
-	std::string skybox    = "skybox";
-	std::string spawnPos  = "spawnPos";
-	std::string spawnAng  = "spawnAng";
+	std::string version         = "version";
+	std::string mapName         = "mapName";
+	std::string modelPath       = "modelPath";
+	std::string ang             = "ang";
+	std::string physAng         = "physAng";
+	std::string skybox          = "skybox";
+	std::string spawnPos        = "spawnPos";
+	std::string spawnAng        = "spawnAng";
+	std::string worldLight      = "worldLight";
+	std::string worldLightAng   = "worldLightAng";
+	std::string worldLightColor = "worldLightColor";
 }
 gMapInfoKeys;
 
@@ -611,11 +626,12 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 	// parsing time
 	kvRoot.Solidify();
 
-	KeyValue *kvShader = kvRoot.children;
+	KeyValue* kvShader  = kvRoot.children;
 
-	MapInfo *mapInfo = new MapInfo;
+	MapInfo*  mapInfo   = new MapInfo;
+	mapInfo->worldLight = false;
 
-	KeyValue *kv = kvShader->children;
+	KeyValue* kv        = kvShader->children;
 	for ( int i = 0; i < kvShader->childCount; i++ )
 	{
 		if ( kv->hasChildren )
@@ -664,11 +680,28 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 		else if ( gMapInfoKeys.physAng == kv->key.string )
 			mapInfo->ang = KV_GetVec3( kv->value.string );
 
+		// Spawn Info
 		else if ( gMapInfoKeys.spawnPos == kv->key.string )
 			mapInfo->spawnPos = KV_GetVec3( kv->value.string );
 
 		else if ( gMapInfoKeys.spawnAng == kv->key.string )
 			mapInfo->spawnAng = KV_GetVec3( kv->value.string );
+
+		// World Light Info
+		else if ( gMapInfoKeys.worldLight == kv->key.string )
+		{
+			if ( strcmp( kv->value.string, "1" ) == 0 )
+				mapInfo->worldLight = true;
+
+			else if ( strcmp( kv->value.string, "true" ) == 0 )
+				mapInfo->worldLight = true;
+		}
+
+		else if ( gMapInfoKeys.worldLightAng == kv->key.string )
+			mapInfo->worldLightAng = KV_GetVec3( kv->value.string );
+
+		else if ( gMapInfoKeys.worldLightColor == kv->key.string )
+			mapInfo->worldLightColor = KV_GetVec4( kv->value.string );
 
 		kv = kv->next;
 	}

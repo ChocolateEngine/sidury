@@ -99,11 +99,14 @@ enum ERenderPass
 using ELightType = int;
 enum : ELightType
 {
-	ELightType_Directional,  // World
+	ELightType_World,
 	ELightType_Point,
 	ELightType_Cone,
 	// ELightType_Capsule,
 	ELightType_Count,
+
+	// temp
+	ELightType_Directional = ELightType_World,
 };
 
 

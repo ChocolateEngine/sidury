@@ -49,8 +49,11 @@ struct MapInfo
 	glm::vec3    spawnPos;
 	glm::vec3    spawnAng;
 
-	// TODO: make a component
 	std::string  skybox;
+
+	bool         worldLight;
+	glm::vec3    worldLightAng;
+	glm::vec4    worldLightColor;
 };
 
 
