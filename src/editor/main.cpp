@@ -159,7 +159,7 @@ void Main_DrawGraphicsSettings()
 		ImGui::EndCombo();
 	}
 
-	if ( ImGui::Checkbox( "MSAA Textures - Very Expensive", &msaa_textures ) )
+	if ( ImGui::Checkbox( "MSAA Textures/Sample Shading - Very Expensive", &msaa_textures ) )
 	{
 		if ( msaa_textures )
 			Con_QueueCommandSilent( "r_msaa_textures 1" );
