@@ -583,7 +583,7 @@ bool Graphics_ParseMaterial( const std::string& srPath, Handle& handle )
 
 	if ( err != EJsonError_None )
 	{
-		Log_ErrorF( gLC_ClientGraphics, "Error Parsing Material: %d\n", err );
+		Log_ErrorF( gLC_ClientGraphics, "Error Parsing Material: %s\n", Json_ErrorToStr( err ) );
 		return false;
 	}
 
