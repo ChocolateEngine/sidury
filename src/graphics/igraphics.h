@@ -101,11 +101,12 @@ enum : ELightType
 {
 	ELightType_World,
 	ELightType_Point,
-	ELightType_Cone,
+	ELightType_Spot,
 	// ELightType_Capsule,
 	ELightType_Count,
 
-	// temp
+	// legacy names
+	ELightType_Cone        = ELightType_Spot,
 	ELightType_Directional = ELightType_World,
 };
 
