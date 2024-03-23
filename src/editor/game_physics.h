@@ -28,8 +28,8 @@ void                      Phys_GetModelInd( Handle sModel, PhysDataConcave_t& sr
 void                      Phys_Init();
 void                      Phys_Shutdown();
 
-void                      Phys_CreateEnv( bool sClient );
-void                      Phys_DestroyEnv( bool sClient );
+void                      Phys_CreateEnv();
+void                      Phys_DestroyEnv();
 
 // Simulate This Physics Environment
 void                      Phys_Simulate( IPhysicsEnvironment* spPhysEnv, float sFrameTime );

@@ -2,6 +2,7 @@
 
 #include "types/transform.h"
 #include "igraphics.h"
+#include "physics/iphysics.h"
 
 
 #include <unordered_set>
@@ -32,8 +33,10 @@ struct Entity_t
 
 	// Physics
 	char*              apPhysicsModel;
+	IPhysicsObject*    apPhysicsObject;
 
 	// Lighting
+	bool               aLightEnabled;
 	Light_t*           apLight;
 	ChHandle_t         aLightRenderable;
 
@@ -59,7 +62,9 @@ ChHandle_t                                          Entity_Create();
 void                                                Entity_Delete( ChHandle_t sHandle );
 
 Entity_t*                                           Entity_GetData( ChHandle_t sHandle );
-const ChVector< ChHandle_t >&                       Entity_GetHandleList();
+const std::vector< ChHandle_t >&                    Entity_GetHandleList();
+
+void                                                Entity_SetName( ChHandle_t sHandle, const char* name );
 
 void                                                Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible );
 

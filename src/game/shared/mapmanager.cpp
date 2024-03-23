@@ -10,6 +10,8 @@
 #include "mapmanager.h"
 #include "skybox.h"
 
+#include "map_system.h"
+
 #if CH_SERVER
 	#include "../server/sv_main.h"
 #endif
@@ -150,262 +152,217 @@ bool MapManager_LoadLegacyV1Map( const std::string &path )
 }
 
 
-#if 0
-bool MapManager_ReadMapHeader( const std::vector< char >& srMapData )
+
+static bool MapManager_LoadScene( chmap::Scene& scene )
 {
-	if ( srMapData.size() < sizeof( SiduryMapHeader_t ) )
+	std::unordered_map< u32, ChHandle_t > entityHandles;
+
+	for ( chmap::Entity& mapEntity : scene.entites )
 	{
-		Log_ErrorF( gLC_Map, "Map Data is Less than the size of the map header (%zd < %zd)\n", srMapData.size(), sizeof( SiduryMapHeader_t ) );
-		return false;
-	}
+		Entity ent = Entity_CreateEntity();
 
-	SiduryMapHeader_t* header = (SiduryMapHeader_t*)srMapData.data();
-
-	if ( header->aVersion != CH_MAP_VERSION )
-	{
-		Log_ErrorF( gLC_Map, "Expected Map Version %zd, got %zd", CH_MAP_VERSION, header->aVersion );
-		return false;
-	}
-
-	if ( header->aSignature != CH_MAP_SIGNATURE )
-	{
-		Log_ErrorF( gLC_Map, "Expected Map Signature %zd, got %zd", CH_MAP_SIGNATURE, header->aSignature );
-		return false;
-	}
-
-	return true;
-}
-
-
-ESMF_CommandVersion Map_GetCommandVersion( ESMF_Command sCommand )
-{
-	switch ( sCommand )
-	{
-		default:
-		case ESMF_Command_Invalid:
-			return ESMF_CommandVersion_Invalid;
-
-		case ESMF_Command_EntityList:
-			return ESMF_CommandVersion_EntityList;
-
-		case ESMF_Command_ComponentList:
-			return ESMF_CommandVersion_ComponentList;
-	}
-}
-
-
-template< typename T >
-inline const T* Map_GetCommandData( const SMF_Command* spCommand, fb::Verifier& srVerifier )
-{
-	auto msg = fb::GetRoot< T >( spCommand->data()->data() );
-
-	if ( !msg->Verify( srVerifier ) )
-	{
-		// Log_WarnF( gLC_Map, "Command Data is not Valid: %s\n", SV_MsgToString( sMsgType ) );
-		Log_WarnF( gLC_Map, "Command Data is not Valid\n" );
-		return nullptr;
-	}
-
-	ESMF_CommandVersion version = Map_GetCommandVersion( spCommand->command() );
-	if ( spCommand->version() != version )
-	{
-		Log_WarnF( gLC_Map, "Older command version (got %zd, expected %zd), skipping: \"%s\"\n",
-		           spCommand->version(), version, EnumNameESMF_Command( spCommand->command() ) );
-
-		return nullptr;
-	}
-
-	return msg;
-}
-
-
-void MapManager_ReadCommand( const SMF_Command* spCommand )
-{
-	fb::Verifier cmdVerify( spCommand->data()->data(), spCommand->data()->size() );
-
-	switch ( spCommand->command() )
-	{
-		case ESMF_Command_Skybox:
+		if ( ent == CH_ENT_INVALID )
 		{
-#if CH_CLIENT
-			if ( auto msg = Map_GetCommandData< SMF_Skybox >( spCommand, cmdVerify ) )
+			return false;
+		}
+
+		// Entity_SetName( ent, mapEntity.name );
+		entityHandles[ mapEntity.id ] = ent;
+
+		auto transform                = Ent_AddComponent< CTransform >( ent, "transform" );
+
+		transform->aPos               = mapEntity.pos;
+		transform->aAng               = mapEntity.ang;
+		transform->aScale             = mapEntity.scale;
+
+		// Check Built in components (TODO: IMPROVE THIS)
+		for ( chmap::Component& comp : mapEntity.components )
+		{
+			// Load a renderable
+			if ( strcmp( comp.name, "renderable" ) == 0 )
 			{
-				Skybox_SetMaterial( msg->material()->c_str() );
+				auto it = comp.values.find( "path" );
+				if ( it == comp.values.end() )
+				{
+					Log_Error( gLC_Map, "Failed to find renderable model path in component\n" );
+					continue;
+				}
+
+				if ( it->second.type != chmap::EComponentType_String )
+					continue;
+
+				auto renderable   = Ent_AddComponent< CRenderable >( ent, "renderable" );
+				renderable->aPath = it->second.apString;
+
+				// Load other renderable data
+				// for ( const auto& [ name, compValue ] : comp.values )
+				// {
+				// }
 			}
-#endif
-			break;
-		}
-		case ESMF_Command_EntityList:
-		{
-			// we don't read entities or components from the map if we are not hosting
-			// the server will send this data to us
-#if CH_SERVER
-			if ( auto msg = Map_GetCommandData< NetMsg_EntityUpdates >( spCommand, cmdVerify ) )
-				Entity_ReadEntityUpdates( msg );
-#endif
-			break;
-		}
-		case ESMF_Command_ComponentList:
-		{
-#if CH_SERVER
-			// IDEA: for reading multiple maps to stream in, maybe have an option to insert our own entity translation table?
-			// This would be so the translation table doesn't conflict with the previous map
-			if ( auto msg = Map_GetCommandData< NetMsg_ComponentUpdates >( spCommand, cmdVerify ) )
-				Entity_ReadComponentUpdates( msg );
-#endif
-			break;
-		}
-		default:
-		{
-			Log_ErrorF( gLC_Map, "Invalid Map Command Type: %zd\n", spCommand->command() );
-			return;
+			else if ( strcmp( comp.name, "light" ) == 0 )
+			{
+				auto it = comp.values.find( "type" );
+				if ( it == comp.values.end() )
+				{
+					Log_Error( gLC_Map, "Failed to find light type in component\n" );
+					continue;
+				}
+
+				if ( it->second.type != chmap::EComponentType_String )
+					continue;
+
+				auto light = Ent_AddComponent< CLight >( ent, "light" );
+
+				if ( strcmp( it->second.apString, "world" ) == 0 )
+				{
+					light->aType = ELightType_World;
+				}
+				else if ( strcmp( it->second.apString, "point" ) == 0 )
+				{
+					light->aType = ELightType_Point;
+				}
+				else if ( strcmp( it->second.apString, "spot" ) == 0 )
+				{
+					light->aType = ELightType_Spot;
+				}
+				// else if ( strcmp( it->second.apString, "capsule" ) == 0 )
+				// {
+				// 	light->aType = ELightType_Capsule;
+				// }
+				else
+				{
+					Log_ErrorF( gLC_Map, "Unknown Light Type: %s\n", it->second.apString );
+					continue;
+				}
+
+				// Read the rest of the light data
+				for ( const auto& [ name, compValue ] : comp.values )
+				{
+					if ( name == "color" )
+					{
+						if ( compValue.type != chmap::EComponentType_Vec4 )
+							continue;
+
+						light->aColor = compValue.aVec4;
+					}
+					else if ( name == "radius" )
+					{
+						if ( compValue.type == chmap::EComponentType_Int )
+							light->aRadius = compValue.aInteger;
+
+						else if ( compValue.type == chmap::EComponentType_Double )
+							light->aRadius = compValue.aDouble;
+					}
+				}
+			}
+			else if ( strcmp( comp.name, "phys_object" ) == 0 )
+			{
+				auto it = comp.values.find( "path" );
+				if ( it == comp.values.end() )
+				{
+					Log_Error( gLC_Map, "Failed to find physics object path in component\n" );
+					continue;
+				}
+
+				auto itType = comp.values.find( "type" );
+				if ( itType == comp.values.end() )
+				{
+					Log_Error( gLC_Map, "Failed to find physics object type in component\n" );
+					continue;
+				}
+
+				// why did you keep it split up like this?
+				auto physShape   = Ent_AddComponent< CPhysShape >( ent, "physShape" );
+				auto physObject  = Ent_AddComponent< CPhysObject >( ent, "physObject" );
+
+				physShape->aPath = it->second.apString;
+
+				if ( strcmp( itType->second.apString, "convex" ) == 0 )
+				{
+					physObject->aStartActive   = true;
+					physObject->aMass          = 10.f;
+					physObject->aTransformMode = EPhysTransformMode_Update;
+					physShape->aShapeType      = PhysShapeType::Convex;
+				}
+				else if ( strcmp( itType->second.apString, "static_compound" ) == 0 )
+				{
+					physObject->aStartActive   = true;
+					physObject->aMass          = 10.f;
+					physObject->aCustomMass    = true;
+					physObject->aTransformMode = EPhysTransformMode_Update;
+					physObject->aMotionType    = PhysMotionType::Dynamic;
+					physObject->aAllowSleeping = false;
+					physShape->aShapeType      = PhysShapeType::StaticCompound;
+				}
+				else if ( strcmp( itType->second.apString, "mesh" ) == 0 )
+					physShape->aShapeType = PhysShapeType::Mesh;
+				else
+					physShape->aShapeType = PhysShapeType::Convex;
+
+			}
+			else
+			{
+				// TODO: Try to search for this component
+
+			}
 		}
 	}
-}
 
-
-void MapManager_BuildCommand( fb::FlatBufferBuilder& srBuilder, std::vector< fb::Offset< SMF_Command > >& srCommandsBuilt, ESMF_Command sCommand )
-{
-	fb::FlatBufferBuilder messageBuilder;
-	bool                  wroteData = false;
-
-	switch ( sCommand )
+	// Check entity parents
+	for ( chmap::Entity& mapEntity : scene.entites )
 	{
-		case ESMF_Command_Skybox:
-		{
-#if CH_CLIENT
-			const char*       skyboxName       = Skybox_GetMaterialName();
+		if ( mapEntity.parent == UINT32_MAX )
+			continue;
 
-			auto              skyboxNameOffset = messageBuilder.CreateString( skyboxName ? skyboxName : "" );
-			SMF_SkyboxBuilder skyboxBuilder( messageBuilder );
-			skyboxBuilder.add_material( skyboxNameOffset );
-			messageBuilder.Finish( skyboxBuilder.Finish() );
+		auto itID     = entityHandles.find( mapEntity.id );
+		auto itParent = entityHandles.find( mapEntity.parent );
 
-			wroteData = true;
-#endif
-			break;
-		}
-		case ESMF_Command_EntityList:
+		if ( itID == entityHandles.end() || itParent == entityHandles.end() )
 		{
-			Entity_WriteEntityUpdates( messageBuilder );
-			wroteData = true;
-			break;
+			Log_ErrorF( "Failed to parent entity %d", mapEntity.id );
+			continue;
 		}
-		case ESMF_Command_ComponentList:
-		{
-			Entity_WriteComponentUpdates( messageBuilder, true );
-			wroteData = true;
-			break;
-		}
-		default:
-		{
-			Log_ErrorF( gLC_Map, "Invalid Map Command Type: %zd\n", sCommand );
-			return;
-		}
+
+		Entity_ParentEntity( itID->second, itParent->second );
 	}
-
-	flatbuffers::Offset< flatbuffers::Vector< u8 > > dataVector{};
-
-	if ( wroteData )
-		dataVector = srBuilder.CreateVector( messageBuilder.GetBufferPointer(), messageBuilder.GetSize() );
-
-	SMF_CommandBuilder command( srBuilder );
-	command.add_command( sCommand );
-	command.add_version( Map_GetCommandVersion( sCommand ) );
-
-	if ( wroteData )
-		command.add_data( dataVector );
-
-	fb::Offset< SMF_Command > offset = command.Finish();
-	srBuilder.Finish( offset );
-	srCommandsBuilt.push_back( offset );
 }
-#endif
 
 
-bool MapManager_LoadMap( const std::string &path )
+bool MapManager_LoadMap( const std::string& path )
 {
-	if ( gpMap )
-		MapManager_CloseMap();
-
 	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
 
 	if ( absPath.empty() )
 	{
-		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"\n", path.c_str() );
 		return false;
 	}
 
-	Log_DevF( gLC_Map, 1, "Loading Map: %s\n", path.c_str() );
+	chmap::Map* map = chmap::Load( absPath );
 
-	std::string mapInfoPath = FileSys_FindFile( absPath + "/mapInfo.smf" );
-	if ( FileSys_FindFile( absPath + "/mapInfo.smf" ).size() )
+	if ( map == nullptr )
 	{
-		// It's a Legacy Map
-		return MapManager_LoadLegacyV1Map( absPath );
-	}
-
-	// ======================================================
-	// Reading the new Map Format
-
-#if 0
-	std::string mapDataPath = FileSys_FindFile( absPath + "/mapData.smf" );
-
-	if ( mapDataPath.empty() )
-	{
-		Log_WarnF( gLC_Map, "Map does not contain a mapData.smf file: \"%s\"", path.c_str() );
+		Log_ErrorF( gLC_Map, "Failed to Load Map: \"%s\"\n", path.c_str() );
 		return false;
 	}
 
-	std::vector< char > mapData = FileSys_ReadFile( mapDataPath );
-
-	if ( mapData.empty() )
+	// Only load the primary scene for now
+	// Each scene gets it's own editor context
+	// TODO: make an editor project system
+	if ( !MapManager_LoadScene( map->scenes[ map->primaryScene ] ) )
 	{
-		Log_ErrorF( gLC_Map, "Map data file is empty: \"%s\"", path.c_str() );
+		Log_ErrorF( gLC_Map, "Failed to Load Primary Scene: \"%s\" - Scene \"%s\"\n", path.c_str(), map->scenes[ map->primaryScene ].name );
 		return false;
 	}
 
-	if ( !MapManager_ReadMapHeader( mapData ) )
+	if ( map->skybox )
 	{
-		Log_ErrorF( gLC_Map, "Failed to read map header: \"%s\"", path.c_str() );
-		return false;
+		Entity skyboxEnt      = Entity_CreateEntity();
+		auto   skybox         = Ent_AddComponent< CSkybox >( skyboxEnt, "skybox" );
+		skybox->aMaterialPath = map->skybox;
 	}
-
-	// Start parsing commands
-	char*        serializedData = mapData.data() + sizeof( SiduryMapHeader_t );
-	size_t       serializedSize = mapData.size() - sizeof( SiduryMapHeader_t );
-
-	fb::Verifier cmdVerify( (u8*)serializedData, serializedSize );
-	auto         mapDataRoot = fb::GetRoot< SMF_Data >( (u8*)serializedData );
-
-	if ( mapDataRoot->Verify( cmdVerify ) )
-	{
-		for ( size_t i = 0; i < mapDataRoot->commands()->size(); i++ )
-		{
-			const SMF_Command* command = mapDataRoot->commands()->Get( i );
-
-			if ( !command )
-				continue;
-
-			MapManager_ReadCommand( command );
-		}
-	}
-	else
-	{
-		Log_ErrorF( gLC_Map, "Invalid Map Data: \"%s\"", path.c_str() );
-		return false;
-	}
-
-	// After all entities are parsed, copy them into the SiduryMap structure
-	gpMap               = new SiduryMap;
-	gpMap->aMapPath     = path;
-	gpMap->aMapEntities.reserve( EntSysData().aEntityFlags.size() );
-
-	for ( auto& [ entity, flags ] : EntSysData().aEntityFlags )
-		gpMap->aMapEntities.push_back( entity );
 
 	return true;
-#endif
 }
 
 

@@ -72,30 +72,17 @@ struct SiduryMap
 
 	ChVector< ChHandle_t > aMapEntities;
 
+	std::string            aSkybox;
+
 	// Kept for Legacy Sidury Maps
-	MapInfo*               aMapInfo    = nullptr;
-};
-
-
-// Map Component Tag
-struct CMap
-{
-	// Vector of maps this entity is part of
-	std::vector< MapHandle_t > aMaps;
-};
-
-
-struct CMapRoot
-{
-	MapHandle_t aHandle;
+	// MapInfo*               aMapInfo    = nullptr;
 };
 
 
 bool                              MapManager_FindMap( const std::string& srPath );
 bool                              MapManager_LoadMap( const std::string& srPath );
 // SiduryMap*       MapManager_CreateMap();
-void                              MapManager_WriteMap( const std::string& srPath );
-void                              MapManager_CloseMap();
+void                              MapManager_WriteMap( SiduryMap& map, const std::string& srPath );
 
 void                              MapManager_Update();
 void                              MapManager_RebuildMapList();

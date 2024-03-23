@@ -22,7 +22,8 @@ IPhysicsEnvironment*     GetPhysEnv()
 	return physenv;
 }
 
-CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ) | CVARF( CL_EXEC ), "Physics Engine Gravity" )
+// CONVAR_CMD_EX( phys_gravity, -20.2984, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
+CONVAR_CMD_EX( phys_gravity, -CH_GRAVITY_SPEED, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
 {
 	// if ( Game_GetCommandSource() != ECommandSource_Console )
 	// 	return;
@@ -165,34 +166,43 @@ bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
 		case PhysShapeType::Convex:
 		case PhysShapeType::Mesh:
 		{
-			if ( compPhysShape->aModel == InvalidHandle )
-			{
-				compPhysShape->aModel = graphics->LoadModel( compPhysShape->aPath.Get() );
-			}
-
-			if ( compPhysShape->aModel == InvalidHandle )
-			{
-				Log_ErrorF( "Failed to load physics model: \"%s\"\n", compPhysShape->aPath.Get().c_str() );
-				return false;
-			}
+			//if ( compPhysShape->aModel == InvalidHandle )
+			//{
+			//	compPhysShape->aModel = graphics->LoadModel( compPhysShape->aPath.Get() );
+			//}
+			//
+			//if ( compPhysShape->aModel == InvalidHandle )
+			//{
+			//	Log_ErrorF( "Failed to load physics model: \"%s\"\n", compPhysShape->aPath.Get().c_str() );
+			//	return false;
+			//}
 
 			break;
 		}
 	}
+
+	IPhysicsShape* shape = nullptr;
 
 	switch ( compPhysShape->aShapeType )
 	{
 		default:
 			break;
 
-		// Uses the path for this
 		case PhysShapeType::Convex:
-			Phys_GetModelVerts( compPhysShape->aModel, shapeInfo.aConvexData );
+		case PhysShapeType::Mesh:
+		case PhysShapeType::StaticCompound:
+		case PhysShapeType::MutableCompound:
+			shape = GetPhysEnv()->LoadShape( compPhysShape->aPath, compPhysShape->aShapeType );
 			break;
 
-		case PhysShapeType::Mesh:
-			Phys_GetModelInd( compPhysShape->aModel, shapeInfo.aConcaveData );
-			break;
+		// Uses the path for this
+		// case PhysShapeType::Convex:
+		// 	Phys_GetModelVerts( compPhysShape->aModel, shapeInfo.aConvexData );
+		// 	break;
+		// 
+		// case PhysShapeType::Mesh:
+		// 	Phys_GetModelInd( compPhysShape->aModel, shapeInfo.aConcaveData );
+		// 	break;
 
 		case PhysShapeType::Sphere:
 		case PhysShapeType::Box:
@@ -200,10 +210,10 @@ bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
 		case PhysShapeType::TaperedCapsule:
 		case PhysShapeType::Cylinder:
 			shapeInfo.aBounds = compPhysShape->aBounds;
+			shape = GetPhysEnv()->CreateShape( shapeInfo );
 			break;
 	}
 
-	IPhysicsShape* shape = GetPhysEnv()->CreateShape( shapeInfo );
 
 	if ( !shape )
 	{

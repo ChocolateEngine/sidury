@@ -40,7 +40,7 @@ static PlayerSpawnManager playerSpawn;
 extern u32 gMainViewportIndex;
 #endif
 
-constexpr float DEFAULT_SPEED = 250.f;
+constexpr float DEFAULT_SPEED = 6.34325f;
 
 CONVAR( sv_sprint_mult, 2.4, CVARF_DEF_SERVER_REPLICATED );
 CONVAR( sv_duck_mult, 0.5, CVARF_DEF_SERVER_REPLICATED );
@@ -50,9 +50,9 @@ ConVar side_speed( "sv_side_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED )
 ConVar max_speed( "sv_max_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );    // 320.f
 
 ConVar accel_speed( "sv_accel_speed", 10, CVARF_DEF_SERVER_REPLICATED );
-ConVar accel_speed_air( "sv_accel_speed_air", 30, CVARF_DEF_SERVER_REPLICATED );
-ConVar jump_force( "sv_jump_force", 250, CVARF_DEF_SERVER_REPLICATED );
-ConVar stop_speed( "sv_stop_speed", 25, CVARF_DEF_SERVER_REPLICATED );
+ConVar accel_speed_air( "sv_accel_speed_air", 1, CVARF_DEF_SERVER_REPLICATED );
+ConVar jump_force( "sv_jump_force", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );
+ConVar stop_speed( "sv_stop_speed", 2, CVARF_DEF_SERVER_REPLICATED );
 
 CONVAR( sv_friction, 8, CVARF_DEF_SERVER_REPLICATED );  // 4.f
 CONVAR( sv_friction_enable, 1, CVARF_DEF_SERVER_REPLICATED );
@@ -63,17 +63,18 @@ CONVAR( phys_friction_player, 0.01, CVARF_DEF_SERVER_REPLICATED );
 //CONVAR( sv_new_movement, 1 );
 //CONVAR( sv_friction_new, 8 );  // 4.f
 
-CONVAR( sv_gravity, 800, CVARF_DEF_SERVER_REPLICATED );
+// CONVAR( sv_gravity, 800, CVARF_DEF_SERVER_REPLICATED );
+CONVAR( phys_gravity_player, -( CH_GRAVITY_SPEED * 2.f ), CVARF_DEF_SERVER_REPLICATED );
 
-CONVAR( cl_stepspeed, 200 );
+CONVAR( cl_stepspeed, 8 );
 CONVAR( cl_steptime, 0.25 );
 CONVAR( cl_stepduration, 0.22 );
 
-CONVAR( sv_view_height, 67, CVARF_DEF_SERVER_REPLICATED );  // 67
-CONVAR( sv_view_height_duck, 35, CVARF_DEF_SERVER_REPLICATED );  // 35
+CONVAR( sv_view_height, 1.7, CVARF_DEF_SERVER_REPLICATED );  // 67
+CONVAR( sv_view_height_duck, 0.888, CVARF_DEF_SERVER_REPLICATED );  // 35
 CONVAR( sv_view_height_lerp, 15, CVARF_DEF_SERVER_REPLICATED );  // 0.015
 
-CONVAR( player_model_scale, 1 );
+CONVAR( player_model_scale, 0.025373 );
 
 CONVAR( cl_thirdperson, 0 );
 CONVAR( cl_playermodel_enable, 1 );
@@ -82,14 +83,14 @@ CONVAR( cl_playermodel_shadow, 0 );
 CONVAR( cl_playermodel_cam_ang, 1 );
 CONVAR( cl_cam_x, 0 );
 CONVAR( cl_cam_y, 0 );
-CONVAR( cl_cam_z, -150 );
+CONVAR( cl_cam_z, -3 );
 CONVAR( cl_show_player_stats, 0 );
 
 CONVAR( phys_dbg_player, 0 );
 
 CONVAR( r_fov, 106.f, CVARF_ARCHIVE );
-CONVAR( r_nearz, 1.f );
-CONVAR( r_farz, 10000.f );
+CONVAR( r_nearz, 0.01f );
+CONVAR( r_farz, 1000.f );
 
 CONVAR( cl_zoom_fov, 40 );
 CONVAR( cl_zoom_duration, 0.4 );
@@ -97,14 +98,14 @@ CONVAR( cl_zoom_duration, 0.4 );
 CONVAR( cl_duck_time, 0.4 );
 
 CONVAR( sv_land_smoothing, 1 );
-CONVAR( sv_land_max_speed, 1000 );
+CONVAR( sv_land_max_speed, 30 );
 CONVAR( sv_land_vel_scale, 1 );      // 0.01
-CONVAR( sv_land_power_scale, 100 );  // 0.01
+CONVAR( sv_land_power_scale, 2 );  // 0.01
 CONVAR( sv_land_time_scale, 2 );
 
 CONVAR( cl_bob_enabled, 1 );
-CONVAR( cl_bob_magnitude, 2 );
-CONVAR( cl_bob_freq, 4.5 );
+CONVAR( cl_bob_magnitude, 0.5 );
+CONVAR( cl_bob_freq, 45 );
 CONVAR( cl_bob_speed_scale, 0.013 );
 CONVAR( cl_bob_exit_lerp, 0.1 );
 CONVAR( cl_bob_exit_threshold, 0.1 );
@@ -115,21 +116,26 @@ CONVAR( cl_bob_debug, 0 );
 
 CONVAR( r_flashlight_brightness, 10.f );
 CONVAR( r_flashlight_lock, 0.f );
-CONVAR( r_flashlight_offset_x, -4.f );
-CONVAR( r_flashlight_offset_y, -4.f );
-CONVAR( r_flashlight_offset_z, -4.f );
+CONVAR( r_flashlight_offset_x, -0.1f );
+CONVAR( r_flashlight_offset_y, -0.1f );
+CONVAR( r_flashlight_offset_z, -0.1f );
 
 extern ConVar   m_yaw, m_pitch;
 
-constexpr float       PLAYER_MASS            = 200.f;
+// 2.069860757751118
+constexpr float         PLAYER_MASS            = 10.503715f;
 
 
 static IPhysicsShape* gPlayerShapeStanding   = nullptr;
 static IPhysicsShape* gPlayerShapeCrouch     = nullptr;
 
-constexpr u32         gPlayerPhysHeight      = 72;
-constexpr u32         gPlayerPhysHeightDuck  = 40;
-constexpr u32         gPlayerPhysHeightDuck2 = 32;  // why ?????
+// constexpr u32         gPlayerPhysHeight      = 72;
+// constexpr u32         gPlayerPhysHeightDuck  = 40;
+// constexpr u32         gPlayerPhysHeightDuck2 = 32;  // why ?????
+
+constexpr float         gPlayerPhysHeight      = 1.826f;
+constexpr float         gPlayerPhysHeightDuck  = 1.0149f;
+constexpr float         gPlayerPhysHeightDuck2 = 0.8119f;  // why ?????
 
 
 #if CH_SERVER
@@ -451,12 +457,12 @@ void PlayerManager::Create( Entity player )
 	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
 
 	PhysicsShapeInfo charShapeInfo( PhysShapeType::Cylinder );
-	charShapeInfo.aBounds                  = { 72, 16, 1 };
+	charShapeInfo.aBounds                  = { gPlayerPhysHeight, 0.377, 1 };
 
 	gPlayerShapeStanding  = GetPhysEnv()->CreateShape( charShapeInfo );
 
 	PhysicsShapeInfo duckShapeInfo( PhysShapeType::Cylinder );
-	duckShapeInfo.aBounds = { 40, 16, 1 };
+	duckShapeInfo.aBounds = { gPlayerPhysHeightDuck, 0.377, 1 };
 
 	gPlayerShapeCrouch    = GetPhysEnv()->CreateShape( duckShapeInfo );
 
@@ -1300,7 +1306,7 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 	apUserCmd         = spUserCmd;
 
-	// apPhysObj->SetAllowDebugDraw( phys_dbg_player.GetBool() );
+	apCharacter->SetAllowDebugDraw( phys_dbg_player.GetBool() );
 
 	// update velocity
 	apRigidBody->aVel = apCharacter->GetLinearVelocity();
@@ -2105,7 +2111,8 @@ void PlayerMovement::WalkMove()
 
 	if ( groundState != EPhysGroundState_OnGround )
 	{
-		glm::vec3 gravity = GetPhysEnv()->GetGravity();
+		// glm::vec3 gravity = GetPhysEnv()->GetGravity();
+		glm::vec3 gravity( 0.f, 0.f, phys_gravity_player.GetFloat() );
 		apRigidBody->aVel += gravity * gFrameTime;
 	}
 	else
@@ -2121,7 +2128,7 @@ void PlayerMovement::WalkMove()
 		{
 			// have slight velocity downward (TODO: make this just gravity clamped from 0 to 1)
 			// this allows the velocity arrows to show in jolt phys debug view
-			newVel.z = -1.f;
+			newVel.z = -0.01f;
 		}
 
 		apRigidBody->aVel.Set( newVel );
@@ -2306,7 +2313,7 @@ CONVAR( cl_tilt_threshold, 200 );
 CONVAR( cl_tilt_type, 1 );
 CONVAR( cl_tilt_lerp, 5 );
 CONVAR( cl_tilt_lerp_new, 10 );
-CONVAR( cl_tilt_speed_scale, 0.043 );
+CONVAR( cl_tilt_speed_scale, 1.7 );
 CONVAR( cl_tilt_scale, 0.2 );
 CONVAR( cl_tilt_threshold_new, 12 );
 

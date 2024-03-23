@@ -46,9 +46,13 @@ void Entity_Update()
 		// Update Light Position and Angle
 		if ( ent->apLight )
 		{
-			ent->apLight->aEnabled = !ent->aHidden;
-			ent->apLight->aPos     = Util_GetMatrixPosition( worldMatrix );
-			ent->apLight->aRot     = Util_GetMatrixRotation( worldMatrix );
+			if ( ent->aHidden )
+				ent->apLight->aEnabled = false;
+			else
+				ent->apLight->aEnabled = ent->aLightEnabled;
+
+			ent->apLight->aPos = Util_GetMatrixPosition( worldMatrix );
+			ent->apLight->aRot = Util_GetMatrixRotation( worldMatrix );
 
 			// blech
 			graphics->UpdateLight( ent->apLight );
@@ -100,6 +104,8 @@ ChHandle_t Entity_Create()
 	ent->aSelectColor[ 0 ] = RandomU8( 0, 255 );
 	ent->aSelectColor[ 1 ] = RandomU8( 0, 255 );
 	ent->aSelectColor[ 2 ] = RandomU8( 0, 255 );
+
+	ent->aLightEnabled     = true;
 
 	Log_DevF( 1, "Created Entity With Selection Color of (%d, %d, %d)\n", ent->aSelectColor[ 0 ], ent->aSelectColor[ 1 ], ent->aSelectColor[ 2 ] );
 
@@ -195,9 +201,32 @@ Entity_t* Entity_GetData( ChHandle_t sHandle )
 }
 
 
-const ChVector< ChHandle_t >& Entity_GetHandleList()
+const std::vector< ChHandle_t > &Entity_GetHandleList()
 {
 	return gEntityList.aHandles;
+}
+
+
+void Entity_SetName( ChHandle_t sHandle, const char* name )
+{
+	Entity_t* ent = nullptr;
+
+	if ( !gEntityList.Get( sHandle, &ent ) )
+	{
+		Log_ErrorF( "Invalid Entity: %d", sHandle );
+		return;
+	}
+
+	if ( name == nullptr )
+		return;
+
+	if ( ent->apName )
+		free( ent->apName );
+
+	size_t nameLen = strlen( name );
+	ent->apName    = ch_malloc_count< char >( nameLen + 1 );
+	memcpy( ent->apName, name, nameLen );
+	ent->apName[ nameLen ] = '\0';
 }
 
 

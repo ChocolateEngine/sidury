@@ -72,6 +72,9 @@ ResourceList< EditorContext_t > gEditorContexts;
 // }
 
 
+IPhysicsObject*                 reallyCoolObject = nullptr;
+
+
 void Game_Shutdown()
 {
 	Log_Msg( "TODO: Save all open maps\n" );
@@ -404,12 +407,22 @@ void UpdateLoop( float frameTime, bool sResize )
 	else
 		renderOld->Reset();
 
+	Phys_Simulate( GetPhysEnv(), frameTime );
+
 	gui->Update( frameTime );
 
 	if ( !sResize )
 		Entity_Update();
 
 	EntEditor_Update( frameTime );
+
+	if ( reallyCoolObject )
+	{
+		glm::vec3 pos = reallyCoolObject->GetPos();
+		glm::vec3 ang = reallyCoolObject->GetAng();
+
+		graphics->DrawAxis( pos, ang, { 1, 1, 1 } );
+	}
 
 	if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
 	{
@@ -432,7 +445,7 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	Con_Update();
 
-	Resource_Update();
+	// Resource_Update();
 }
 
 
@@ -896,10 +909,7 @@ void Editor_SetContext( ChHandle_t sContext )
 	}
 
 	// Set Skybox Material
-	if ( context->aMap.aMapInfo )
-		Skybox_SetMaterial( context->aMap.aMapInfo->skybox );
-	else
-		Skybox_SetMaterial( "" );
+	Skybox_SetMaterial( context->aMap.aSkybox );
 
 	// TODO: once multiple windows for the 3d view are supported, we will change focus of them here
 }
@@ -931,3 +941,49 @@ Ray Util_GetRayFromScreenSpace( glm::ivec2 mousePos, glm::vec3 origin, u32 viewp
 	return ray;
 }
 
+
+// ------------------------------------------------------------------------
+// TESTING
+
+
+void CreatePhysObjectTest( const std::string& path )
+{
+	EditorContext_t* ctx = Editor_GetContext();
+	
+	if ( !ctx )
+		return;
+
+	IPhysicsShape* shape = GetPhysEnv()->LoadShape( path, PhysShapeType::StaticCompound );
+
+	if ( !shape )
+		return;
+
+	PhysicsObjectInfo settings{};
+	settings.aMotionType   = PhysMotionType::Kinematic;
+	settings.aPos          = ctx->aView.aPos;
+	settings.aAng          = ctx->aView.aAng;
+	settings.aStartActive  = true;
+	settings.aCustomMass   = true;
+	settings.aMass         = 10.f;
+
+	IPhysicsObject* object = GetPhysEnv()->CreateObject( shape, settings );
+
+	reallyCoolObject       = object;
+	return;
+}
+
+
+CONCMD( create_phys_object )
+{
+	if ( args.empty() )
+		return;
+
+	std::string path = args[ 0 ];
+	CreatePhysObjectTest( path );
+}
+
+
+CONCMD( create_phys_object_chair )
+{
+	CreatePhysObjectTest( "riverhouse/controlroom_chair001a_physics.obj" );
+}

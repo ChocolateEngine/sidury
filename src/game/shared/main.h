@@ -58,6 +58,7 @@ extern double           gCurTime;
 
 
 constexpr int           CH_MAX_USERNAME_LEN = 256;
+constexpr float         CH_GRAVITY_SPEED    = 9.80665f;
 
 
 enum class GameState

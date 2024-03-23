@@ -9,9 +9,7 @@
 
 extern IRender*          render;
 
-// IPhysicsEnvironment*     physenv    = nullptr;
-IPhysicsEnvironment*     cl_physenv    = nullptr;
-IPhysicsEnvironment*     sv_physenv    = nullptr;
+IPhysicsEnvironment*     physenv    = nullptr;
 
 Ch_IPhysics*             ch_physics = nullptr;
 
@@ -19,11 +17,11 @@ static Phys_DebugFuncs_t gPhysDebugFuncs;
 
 IPhysicsEnvironment*     GetPhysEnv()
 {
-	CH_ASSERT( sv_physenv );
-	return sv_physenv;
+	CH_ASSERT( physenv );
+	return physenv;
 }
 
-CONVAR_CMD_EX( phys_gravity, -800, CVARF( SERVER ) | CVARF( REPLICATED ) | CVARF( CL_EXEC ), "Physics Engine Gravity" )
+CONVAR_CMD_EX( phys_gravity, -1, 0, "Physics Engine Gravity" )
 {
 	// if ( Game_GetCommandSource() != ECommandSource_Console )
 	// 	return;
@@ -472,6 +470,8 @@ void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
 
 void Phys_Init()
 {
+	Phys_CreateEnv();
+
 	Phys_DebugInit();
 	
 	gPhysDebugFuncs.apDrawLine          = Phys_DrawLine;
@@ -496,47 +496,26 @@ void Phys_Shutdown()
 	}
 
 	gPhysRenderables.clear();
-
-	Phys_DestroyEnv( true );
-	Phys_DestroyEnv( false );
+	Phys_DestroyEnv( );
 }
 
 
-void Phys_CreateEnv( bool sClient )
+void Phys_CreateEnv()
 {
-	Phys_DestroyEnv( sClient );
+	Phys_DestroyEnv();
 
-	if ( sClient )
-	{
-		cl_physenv = ch_physics->CreatePhysEnv();
-		cl_physenv->Init();
-		cl_physenv->SetGravityZ( phys_gravity );
-	}
-	else
-	{
-		sv_physenv = ch_physics->CreatePhysEnv();
-		sv_physenv->Init();
-		sv_physenv->SetGravityZ( phys_gravity );
-	}
+	physenv = ch_physics->CreatePhysEnv();
+	physenv->Init();
+	physenv->SetGravityZ( phys_gravity );
 }
 
 
-void Phys_DestroyEnv( bool sClient )
+void Phys_DestroyEnv()
 {
-	if ( sClient )
-	{
-		if ( cl_physenv )
-			ch_physics->DestroyPhysEnv( cl_physenv );
+	if ( physenv )
+		ch_physics->DestroyPhysEnv( physenv );
 
-		cl_physenv = nullptr;
-	}
-	else
-	{
-		if ( sv_physenv )
-			ch_physics->DestroyPhysEnv( sv_physenv );
-
-		sv_physenv = nullptr;
-	}
+	physenv = nullptr;
 }
 
 

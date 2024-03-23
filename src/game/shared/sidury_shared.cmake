@@ -42,8 +42,8 @@ set(
 	${SIDURY_SHARED_DIR}/network/net_main.cpp
 	${SIDURY_SHARED_DIR}/network/net_main.h
 
-	# ../../shared/map_parser.cpp
-	# ../../shared/map_parser.h
+	../../shared/map_system.cpp
+	../../shared/map_system.h
 	# ../../shared/skybox.cpp
 	# ../../shared/skybox.h
 	
@@ -87,6 +87,7 @@ include_directories(
 	"${CH_THIRDPARTY}/flatbuffers/include"
 	"${SIDURY_SHARED_DIR}"
 	"../../"
+    "../../shared/"
 	"../../graphics"
 )
 

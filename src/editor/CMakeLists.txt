@@ -29,6 +29,7 @@ set(
 include_directories(
 	"${CH_THIRDPARTY}/flatbuffers/include"
 	"../graphics"
+	"../shared"
 
 	# Import Formats
 	"${CH_THIRDPARTY}/mozjpeg"

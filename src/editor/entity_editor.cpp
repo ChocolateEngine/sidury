@@ -162,7 +162,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 void Editor_DrawTextureList()
 {
 	// Draws all currently loaded textures
-	ChVector< ChHandle_t > textures   = render->GetTextureList();
+	std::vector< ChHandle_t > textures   = render->GetTextureList();
 	ImVec2                 windowSize = ImGui::GetWindowSize();
 
 	glm::vec2              imageDisplaySize = { 96, 96 };
@@ -336,7 +336,7 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 
 	bool updateLight = false;
 
-	updateLight |= ImGui::Checkbox( "Enabled", &spEntity->apLight->aEnabled );
+	updateLight |= ImGui::Checkbox( "Enabled", &spEntity->aLightEnabled );
 	updateLight |= ImGui::ColorEdit4( "Color", &spEntity->apLight->aColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
 
 	if ( spEntity->apLight->aType == ELightType_Directional )
@@ -404,13 +404,13 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 
 	ImGui::Text( matPath );
 
-	ImGui::SameLine();
-
-	if ( ImGui::Button( "Edit" ) )
-	{
-		// Focus Material Editor and Show this material
-		MaterialEditor_SetMaterial( mat );
-	}
+	// ImGui::SameLine();
+	// 
+	// if ( ImGui::Button( "Edit" ) )
+	// {
+	// 	// Focus Material Editor and Show this material
+	// 	MaterialEditor_SetMaterial( mat );
+	// }
 	// 
 	// ImGui::Separator();
 
@@ -419,6 +419,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 
 	// ImGui::BeginChild( "ConVar List Child", ImVec2( 0, -ImGui::GetFrameHeightWithSpacing() ), true );
 
+#if 0
 	if ( ImGui::BeginTable( matPath, 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable ) )
 	{
 		// Draw Shader
@@ -524,6 +525,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 	}
 
 	ImGui::EndTable();
+#endif
 
 	//size_t varCount = graphics->Mat_GetVarCount( mat );
 	//
@@ -796,9 +798,9 @@ void EntEditor_DrawEntityData()
 	// -------------------------------------------------------------------------------------
 	// Entity Transform
 
-	ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
+	ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.0025f, nullptr, nullptr, nullptr, 1.f );
 	ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.01f, nullptr, nullptr, nullptr, 1.f );
+	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.001f, nullptr, nullptr, nullptr, 1.f );
 
 	ImGui::Separator();
 

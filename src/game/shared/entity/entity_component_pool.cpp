@@ -151,8 +151,8 @@ void* EntityComponentPool::Create( Entity entity )
 		Log_ErrorF( gLC_Entity, "what - component \"%s\"\n", apName );
 	}
 
-	aMapComponentToEntity[ newID ]  = entity;
 	aMapEntityToComponent[ entity ] = newID;
+	aMapComponentToEntity[ newID ]  = entity;
 
 	void* data                      = aFuncNew();
 	aComponentFlags[ newID ]        = EEntityFlag_Created;

@@ -60,7 +60,7 @@ struct CPhysObject
 	ComponentNetVar< float >              aMaxAngularVelocity = 0.25f * M_PI * 60.0f;  // Maximum angular velocity that this body can reach (rad/s)
 
 	ComponentNetVar< PhysMotionType >     aMotionType         = PhysMotionType::Static;
-	ComponentNetVar< PhysMotionQuality >  aMotionQuality      = PhysMotionQuality::Discrete;
+	ComponentNetVar< PhysMotionQuality >  aMotionQuality      = PhysMotionQuality::LinearCast;
 
 	ComponentNetVar< bool >               aIsSensor           = false;
 
