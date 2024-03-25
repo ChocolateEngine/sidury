@@ -3,7 +3,7 @@
 #include "iaudio.h"
 #include "physics/iphysics.h"
 #include "render/irender.h"
-#include "graphics/igraphics.h"
+#include "igraphics.h"
 #include "steam/ch_isteam.h"
 
 #include "../client/cl_interface.h"
@@ -113,7 +113,7 @@ static AppModule_t gAppModulesClient[] =
 	{ (ISystem**)&audio,     "ch_aduio",     IADUIO_NAME, IADUIO_VER },
 	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
     { (ISystem**)&graphics,  "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
-    { (ISystem**)&renderOld, "ch_graphics", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+    { (ISystem**)&renderOld, "ch_graphics",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui",       IGUI_NAME, IGUI_HASH },
 };
 

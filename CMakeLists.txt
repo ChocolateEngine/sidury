@@ -37,8 +37,6 @@ if( EDITOR )
 	add_subdirectory( src/editor )
 endif( EDITOR )
 
-add_subdirectory( src/graphics )
-
 if( STEAM )
 	add_subdirectory( src/steam )
 endif( STEAM )

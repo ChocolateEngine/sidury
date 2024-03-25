@@ -10,7 +10,7 @@
 #include "iaudio.h"
 #include "physics/iphysics.h"
 #include "render/irender.h"
-#include "graphics/igraphics.h"
+#include "igraphics.h"
 #include "steam/ch_isteam.h"
 
 struct ViewportCamera_t;
