@@ -25,7 +25,7 @@ include_directories(
 )
 
 # ??????
-add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
+add_library( SiduryClient SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} ../shared/sidury_shared.cmake )
 
 target_link_libraries(
 	SiduryClient

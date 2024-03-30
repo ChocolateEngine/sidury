@@ -19,7 +19,7 @@ add_compile_definitions(
 )
 
 # ??????
-add_library( SiduryServer SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} )
+add_library( SiduryServer SHARED ${SRC_FILES} ${PUBLIC_FILES} ${THIRDPARTY_FILES} ../shared/sidury_shared.cmake )
 
 include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}"

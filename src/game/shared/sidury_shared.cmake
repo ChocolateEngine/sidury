@@ -88,7 +88,6 @@ include_directories(
 	"${SIDURY_SHARED_DIR}"
 	"../../"
     "../../shared/"
-	"../../graphics"
 )
 
 set( FLATBUFFERS_DIR_DEBUG "${CH_THIRDPARTY}/flatbuffers/build/Debug" )

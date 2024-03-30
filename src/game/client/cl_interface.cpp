@@ -15,7 +15,10 @@
 CONVAR( r_render, 1 );
 
 // blech
-u32 gMainViewportIndex = UINT32_MAX;
+u32                 gMainViewportIndex = UINT32_MAX;
+
+SDL_Window*         gpWindow           = nullptr;
+ChHandle_t          gGraphicsWindow    = CH_INVALID_HANDLE;
 
 extern EClientState gClientState;
 
@@ -33,6 +36,11 @@ void Game_HandleSystemEvents()
 			// TODO: remove this and use pause concmd, can't at the moment as binds are only parsed when game is active, hmm
 			case SDL_KEYDOWN:
 			{
+				SDL_Window* window = SDL_GetWindowFromID( e.key.windowID );
+
+				if ( window != gpWindow )
+					continue;
+
 				if ( e.key.keysym.sym == SDLK_BACKQUOTE || e.key.keysym.sym == SDLK_ESCAPE )
 					gui->ShowConsole();
 
@@ -41,6 +49,11 @@ void Game_HandleSystemEvents()
 
 			case SDL_WINDOWEVENT:
 			{
+				SDL_Window* window = SDL_GetWindowFromID( e.window.windowID );
+
+				if ( window != gpWindow )
+					continue;
+
 				switch ( e.window.event )
 				{
 					case SDL_WINDOWEVENT_DISPLAY_CHANGED:
@@ -60,7 +73,7 @@ void Game_HandleSystemEvents()
 					{
 						// Log_Msg( "SDL_WINDOWEVENT_SIZE_CHANGED\n" );
 						Game_UpdateProjection();
-						renderOld->Reset();
+						renderOld->Reset( gGraphicsWindow );
 						break;
 					}
 					case SDL_WINDOWEVENT_EXPOSED:
@@ -95,7 +108,7 @@ void Game_UpdateProjection()
 	PROF_SCOPE();
 
 	int width = 0, height = 0;
-	render->GetSurfaceSize( width, height );
+	render->GetSurfaceSize( gGraphicsWindow, width, height );
 	gView.ComputeProjection( width, height );
 
 	ViewportShader_t* viewport = graphics->GetViewportData( gMainViewportIndex );
@@ -197,9 +210,9 @@ public:
 
 		gui->Update( sDT );
 
-		if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) && r_render )
+		if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) && r_render )
 		{
-			renderOld->Present();
+			renderOld->Present( gGraphicsWindow );
 		}
 		else
 		{
@@ -230,6 +243,12 @@ public:
 
 	void PostUpdate( float frameTime ) override
 	{
+	}
+
+	void SetWindowInfo( SDL_Window* window, ChHandle_t graphicsWindow ) override
+	{
+		gpWindow        = window;
+		gGraphicsWindow = graphicsWindow;
 	}
 
 	bool Connected() override

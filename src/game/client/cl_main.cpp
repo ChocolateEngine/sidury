@@ -56,6 +56,7 @@ UserCmd_t                         gClientUserCmd{};
 std::vector< CL_Client_t >        gClClients;
 
 extern EntitySystem*              entities;
+extern SDL_Window*                gpWindow;
 
 std::vector< std::string >        gMapList;
 static bool                       gRebuildMapList  = true;
@@ -135,8 +136,8 @@ CONCMD( connect )
 static void CenterMouseOnScreen()
 {
 	int w, h;
-	SDL_GetWindowSize( render->GetWindow(), &w, &h );
-	SDL_WarpMouseInWindow( render->GetWindow(), w / 2, h / 2 );
+	SDL_GetWindowSize( gpWindow, &w, &h );
+	SDL_WarpMouseInWindow( gpWindow, w / 2, h / 2 );
 }
 
 

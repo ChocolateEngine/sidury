@@ -1,3 +1,6 @@
+#include "core/app_info.h"
+#include "core/build_number.h"
+
 #include "iinput.h"
 #include "igui.h"
 #include "iaudio.h"
@@ -13,20 +16,30 @@
 #include "imgui/imgui_impl_sdl2.h"
 
 
+#if CH_USE_MIMALLOC
+	#include "mimalloc-new-delete.h"
+#endif
+
+
 CONVAR( host_max_frametime, 0.1 );
 CONVAR( host_fps_max, 300 );
 CONVAR( host_timescale, 1 );
 
 
-static bool    gArgNoSteam      = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
-static bool    gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debuger to attach", "-debugger" );
-static bool    gDedicatedServer = Args_Register( "Host a Dedicated Server", "-server" );
+int                        gWidth             = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
+int                        gHeight            = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
+static bool                gMaxWindow         = Args_Register( "Maximize the main window", "-max" );
+static bool                gArgNoSteam        = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
+static bool                gWaitForDebugger   = Args_Register( "Upon Program Startup, Wait for the Debugger to attach", "-debugger" );
+static bool                gDedicatedServer   = Args_Register( "Host a Dedicated Server", "-server" );
 // static bool    gDedicatedServer = false;
-static bool    gRunning         = true;
+static bool                gRunning           = true;
 
+SDL_Window*                gpWindow           = nullptr;
+void*                      gpSysWindow        = nullptr;
+ChHandle_t                 gGraphicsWindow    = CH_INVALID_HANDLE;
 
 u32                        gDedicatedViewport = UINT32_MAX;
-
 
 IGuiSystem*                gui              = nullptr;
 IRender*                   render           = nullptr;
@@ -109,21 +122,21 @@ CONCMD( mimalloc_print )
 static AppModule_t gAppModulesClient[] = 
 {
 	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,    "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
+	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
 	{ (ISystem**)&audio,     "ch_aduio",     IADUIO_NAME, IADUIO_VER },
 	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
-    { (ISystem**)&graphics,  "ch_graphics",  IGRAPHICS_NAME, IGRAPHICS_VER },
-    { (ISystem**)&renderOld, "ch_graphics",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+    { (ISystem**)&graphics,  "ch_render",  IGRAPHICS_NAME, IGRAPHICS_VER },
+    { (ISystem**)&renderOld, "ch_render",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui",       IGUI_NAME, IGUI_HASH },
 };
 
 
 static AppModule_t gAppModulesServer[] = {
 	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,    "ch_render_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
+	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },  // TODO: rename to ch_render_vk
 	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_HASH },
-	{ (ISystem**)&graphics,  "ch_graphics", IGRAPHICS_NAME, IGRAPHICS_VER },
-	{ (ISystem**)&renderOld, "ch_graphics", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&graphics,  "ch_render", IGRAPHICS_NAME, IGRAPHICS_VER },
+	{ (ISystem**)&renderOld, "ch_render", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui", IGUI_NAME, IGUI_HASH },
 };
 
@@ -237,7 +250,7 @@ CONCMD_DROP( map, map_dropdown )
 void UpdateViewport()
 {
 	int width = 0, height = 0;
-	render->GetSurfaceSize( width, height );
+	render->GetSurfaceSize( gGraphicsWindow, width, height );
 
 	ViewportShader_t* viewport = graphics->GetViewportData( gDedicatedViewport );
 
@@ -274,13 +287,22 @@ bool LoadGameSystems()
 			Mod_Shutdown();
 			return false;
 		}
+
+		// This needs to be done before we can start up the client
+		client->SetWindowInfo( gpWindow, gGraphicsWindow );
+
+		if ( !Mod_InitSystem( clientModule ) )
+		{
+			Mod_Shutdown();
+			return false;
+		}
 	}
 
 	AppModule_t serverModule{ (ISystem**)&server, "ch_server", ISERVER_NAME, ISERVER_VER };
 
 	// Mark all convars from server dll with CVARF_SERVER
 	Con_SetConVarRegisterFlags( CVARF( SERVER ) );
-	EModLoadError modLoadRet = Mod_LoadSystem( serverModule );
+	EModLoadError modLoadRet = Mod_LoadAndInitSystem( serverModule );
 
 	if ( modLoadRet != EModLoadError_Success )
 	{
@@ -289,6 +311,96 @@ bool LoadGameSystems()
 	}
 
 	return true;
+}
+
+
+bool CreateMainWindow()
+{
+	// Create Main Window
+	std::string windowName;
+
+	windowName = ( Core_GetAppInfo().apWindowTitle ) ? Core_GetAppInfo().apWindowTitle : "Chocolate Engine";
+	windowName += vstring( " - Build %zd - Compiled On - %s %s", Core_GetBuildNumber(), Core_GetBuildDate(), Core_GetBuildTime() );
+
+#ifdef _WIN32
+	gpSysWindow = Sys_CreateWindow( windowName.c_str(), gWidth, gHeight, gMaxWindow );
+
+	if ( !gpSysWindow )
+	{
+		Log_Error( "Failed to create game window\n" );
+		return false;
+	}
+
+	gpWindow = SDL_CreateWindowFrom( gpSysWindow );
+#else
+	int flags = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+
+	if ( gMaxWindow )
+		flags |= SDL_WINDOW_MAXIMIZED;
+
+	gpWindow = SDL_CreateWindow( windowName.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+	                             gWidth, gHeight, flags );
+#endif
+
+	if ( !gpWindow )
+	{
+		Log_Error( "Failed to create SDL2 Window\n" );
+		return false;
+	}
+
+	render->SetMainSurface( gpWindow, gpSysWindow );
+
+	input->AddWindow( gpWindow, ImGui::GetCurrentContext() );
+
+	return true;
+}
+
+
+void CloseMainWindow()
+{
+	if ( gDedicatedViewport != UINT32_MAX )
+		graphics->FreeViewport( gDedicatedViewport );
+
+	render->DestroyWindow( gGraphicsWindow );
+
+	render->ShutdownImGui();
+	ImGui_ImplSDL2_Shutdown();
+
+	ImGui::DestroyContext( ImGui::GetCurrentContext() );
+
+	Con_RunCommand( "quit" );
+}
+
+
+bool HandleEvents()
+{
+	std::vector< SDL_Event >* events = input->GetEvents();
+
+	for ( SDL_Event& event : *events )
+	{
+		if ( event.type == SDL_QUIT )
+		{
+			CloseMainWindow();
+			return true;
+		}
+
+		else if ( event.type == SDL_WINDOWEVENT )
+		{
+			if ( event.window.event == SDL_WINDOWEVENT_CLOSE )
+			{
+				SDL_Window* sdlWindow = SDL_GetWindowFromID( event.window.windowID );
+
+				// Is this the main window?
+				if ( sdlWindow == gpWindow )
+				{
+					CloseMainWindow();
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 
@@ -336,13 +448,12 @@ void MainLoop()
 
 		// ftl::TaskCounter taskCounter( &gTaskScheduler );
 
-		Map_UpdateTimer( time );
-
 		input->Update( time );
 
-		// may change from input update running the quit command
-		if ( !gRunning )
-			break;
+		if ( HandleEvents() )
+			return;
+
+		Map_UpdateTimer( time );
 
 		gCurrentModule = ECurrentModule_Client;
 
@@ -392,13 +503,12 @@ void MainLoopDedicated()
 
 		// ftl::TaskCounter taskCounter( &gTaskScheduler );
 
-		Map_UpdateTimer( time );
-
 		input->Update( time );
 
-		// may change from input update running the quit command
-		if ( !gRunning )
-			break;
+		if ( HandleEvents() )
+			return;
+
+		Map_UpdateTimer( time );
 
 		float frameTimeScaled = time * host_timescale;
 		gCurrentModule        = ECurrentModule_Server;
@@ -419,9 +529,9 @@ void MainLoopDedicated()
 		renderOld->NewFrame();
 		gui->Update( time );
 
-		if ( !( SDL_GetWindowFlags( render->GetWindow() ) & SDL_WINDOW_MINIMIZED ) )
+		if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 		{
-			renderOld->Present();
+			renderOld->Present( gGraphicsWindow );
 		}
 		else
 		{
@@ -497,12 +607,28 @@ extern "C"
 			Mod_LoadSystem( steamModule );
 		}
 
-		if ( !LoadGameSystems() )
+		if ( !CreateMainWindow() )
 		{
 			return;
 		}
 
 		if ( !Mod_InitSystems() )
+		{
+			return;
+		}
+
+		// Create the Graphics API Window
+		gGraphicsWindow = render->CreateWindow( gpWindow, gpSysWindow );
+
+		if ( gGraphicsWindow == CH_INVALID_HANDLE )
+		{
+			Log_Fatal( "Failed to Create GraphicsAPI Window\n" );
+			return;
+		}
+
+		gui->StyleImGui();
+
+		if ( !LoadGameSystems() )
 		{
 			return;
 		}
@@ -522,6 +648,10 @@ extern "C"
 		{
 			gDedicatedViewport = graphics->CreateViewport();
 		}
+
+		// always only one window
+		// TODO: if we launch the in the toolkit process, move this
+		input->SetCurrentWindow( gpWindow );
 
 		// IDEA: put autoexec built it again, and just store all convars in a list
 		// Then, when each convar is registered, we check what we read from config.cfg and autoexec.cfg
