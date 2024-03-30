@@ -265,6 +265,136 @@ void Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible )
 }
 
 
+struct EntityVisibleData_t
+{
+};
+
+
+inline void Entity_SetEntitiesVisibleBase( Entity_t** entity_list, u32 count, bool visible )
+{
+	for ( u32 i = 0; i < count; i++ )
+	{
+		Entity_t* ent = entity_list[ i ];
+
+		// TODO: put this entity in a different list
+		// like entities_visible
+		ent->aHidden = !visible;
+
+		if ( ent->apLight )
+		{
+			ent->apLight->aEnabled != visible;
+			graphics->UpdateLight( ent->apLight );
+		}
+
+		// no renderable to hide
+		if ( ent->aRenderable == CH_INVALID_HANDLE )
+			continue;
+
+		// maybe make an array to store renderable handles, and then do a for loop after to mark all of them hidden quickly?
+		// though you would need to allocate and free memory for this, hmmm
+		Renderable_t* renderable = graphics->GetRenderableData( ent->aRenderable );
+
+		if ( !renderable )
+		{
+			Log_ErrorF( gLC_Entity, "Entity Missing Renderable!\n" );
+			ent->aRenderable = CH_INVALID_HANDLE;
+			continue;
+		}
+
+		renderable->aVisible = visible;
+	}
+}
+
+
+void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible )
+{
+	Entity_t**                       entity_list = ch_malloc_count< Entity_t* >( sCount );
+	u32                              new_count   = 0;
+	std::unordered_set< ChHandle_t > child_entities; 
+
+	for ( u32 i = 0; i < sCount; i++ )
+	{
+		if ( !gEntityList.Get( sEntities[ i ], &entity_list[ new_count ] ) )
+		{
+			Log_ErrorF( "Invalid Entity: %d", sEntities[ i ] );
+			continue;
+		}
+
+		Entity_GetChildrenRecurse( sEntities[ i ], child_entities );
+		new_count++;
+	}
+
+	if ( new_count == 0 )
+	{
+		free( entity_list );
+		return;
+	}
+
+	if ( child_entities.size() )
+	{
+		Entity_t** entity_list_new = ch_realloc_count< Entity_t* >( entity_list, sCount + child_entities.size() );
+		
+		if ( entity_list_new == nullptr )
+		{
+			Log_ErrorF( "Failed to allocate memory for entities\n" );
+			free( entity_list );
+			return;
+		}
+
+		entity_list = entity_list_new;
+
+		for ( const ChHandle_t& ent_handle : child_entities )
+		{
+			if ( !gEntityList.Get( ent_handle, &entity_list[ new_count ] ) )
+			{
+				Log_ErrorF( "Invalid Entity: %d", ent_handle );
+				continue;
+			}
+
+			new_count++;
+		}
+
+		if ( new_count == 0 )
+		{
+			free( entity_list );
+			return;
+		}
+	}
+
+	Entity_SetEntitiesVisibleBase( entity_list, new_count, sVisible );
+
+	free( entity_list );
+}
+
+
+void Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool sVisible )
+{
+	Entity_t** entity_list = ch_stack_alloc< Entity_t* >( sCount );
+	u32        new_count   = 0;
+
+	for ( u32 i = 0; i < sCount; i++ )
+	{
+		if ( !gEntityList.Get( sEntities[ i ], &entity_list[ new_count ] ) )
+		{
+			Log_ErrorF( "Invalid Entity: %d", sEntities[ i ] );
+			continue;
+		}
+
+		new_count++;
+	}
+
+	if ( new_count == 0 )
+	{
+		CH_STACK_FREE( entity_list );
+		return;
+	}
+
+	Entity_SetEntitiesVisibleBase( entity_list, new_count, sVisible );
+
+	CH_STACK_FREE( entity_list );
+}
+
+
 // Get the highest level parent for this entity, returns self if not parented
 ChHandle_t Entity_GetRootParent( ChHandle_t sSelf )
 {

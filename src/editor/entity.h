@@ -67,6 +67,8 @@ const std::vector< ChHandle_t >&                    Entity_GetHandleList();
 void                                                Entity_SetName( ChHandle_t sHandle, const char* name );
 
 void                                                Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible );
+void                                                Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible );
+void                                                Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool sVisible );
 
 // Get the highest level parent for this entity, returns self if not parented
 ChHandle_t                                          Entity_GetRootParent( ChHandle_t sSelf );

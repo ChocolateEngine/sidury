@@ -896,17 +896,11 @@ void Editor_SetContext( ChHandle_t sContext )
 	// Hide Entities of Last Context (TODO: change this if you implement some quick hide or vis group system like hammer has)
 	if ( gEditorContexts.Get( lastContextIdx, &lastContext ) )
 	{
-		for ( ChHandle_t ent : lastContext->aMap.aMapEntities )
-		{
-			Entity_SetEntityVisible( ent, false );
-		}
+		Entity_SetEntitiesVisibleNoChild( lastContext->aMap.aMapEntities.apData, lastContext->aMap.aMapEntities.aSize, false );
 	}
 
 	// Show Entities in New Context
-	for ( ChHandle_t ent : context->aMap.aMapEntities )
-	{
-		Entity_SetEntityVisible( ent, true );
-	}
+	Entity_SetEntitiesVisibleNoChild( context->aMap.aMapEntities.apData, context->aMap.aMapEntities.aSize, true );
 
 	// Set Skybox Material
 	Skybox_SetMaterial( context->aMap.aSkybox );
