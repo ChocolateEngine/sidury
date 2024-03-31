@@ -208,6 +208,19 @@ bool AssetBrowser_Init()
 }
 
 
+void AssetBrowser_Close()
+{
+	for ( u32 i = 0; i < EAssetType_Count; i++ )
+	{
+		if ( gAssetBrowserData.icons[ i ] == CH_INVALID_HANDLE )
+			continue;
+
+		render->FreeTextureFromImGui( gAssetBrowserData.icons[ i ] );
+		render->FreeTexture( gAssetBrowserData.icons[ i ] );
+	}
+}
+
+
 void AssetBrowser_Draw()
 {
 	// set position
@@ -399,23 +412,31 @@ void AssetBrowser_Draw()
 			if ( ImGui::BeginChild( assetIndex + 1, { assetBoxX, imageDisplaySize.y + ( textSize.y ) + 18.f }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
 			{
 				ImGui::Image( gAssetBrowserData.iconsImGui[ asset.type ], { imageDisplaySize.x, imageDisplaySize.y } );
-
-				if ( ImGui::IsItemHovered() )
-				{
-					if ( ImGui::BeginTooltip() )
-					{
-						ImGui::Text( asset.path.data() );
-						// TextureInfo_t info = render->GetTextureInfo( CH_INVALID_HANDLE );
-						// Editor_DrawTextureInfo( info );
-					}
-				
-					ImGui::EndTooltip();
-				}
-
 				ImGui::TextWrapped( asset.fileName.data() );
 			}
 
 			ImGui::EndChild();
+
+			if ( ImGui::IsItemHovered() )
+			{
+				if ( ImGui::BeginTooltip() )
+				{
+					ImGui::Text( asset.path.data() );
+					// TextureInfo_t info = render->GetTextureInfo( CH_INVALID_HANDLE );
+					// Editor_DrawTextureInfo( info );
+				}
+
+				ImGui::EndTooltip();
+			}
+
+			if ( ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
+			{
+				// TODO: improve this
+				if ( asset.type == EAssetType_Material )
+				{
+					Tool_OpenAsset( toolMatEditor, toolMatEditorOpen, asset.path );
+				}
+			}
 
 			ImGui::PopStyleVar();
 			ImGui::PopStyleVar();

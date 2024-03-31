@@ -132,15 +132,6 @@ void Game_UpdateProjection()
 }
 
 
-#define CH_GET_INTERFACE( var, type, name, ver )                      \
-	var = Mod_GetInterfaceCast< type >( name, ver );                  \
-	if ( var == nullptr )                                             \
-	{                                                                 \
-		Log_Error( "Failed to load " name "\n" ); \
-		return false;                                                 \
-	}
-
-
 class ClientSystem : public IClientSystem
 {
 public:

@@ -58,6 +58,9 @@ extern Ch_IPhysics*      ch_physics;
 extern IGraphics*        graphics;
 extern IRenderSystemOld* renderOld;
 
+extern ITool*            toolMapEditor;
+extern ITool*            toolMatEditor;
+
 
 static AppModule_t gAppModules[] = 
 {
@@ -68,6 +71,10 @@ static AppModule_t gAppModules[] =
     { (ISystem**)&graphics,   "ch_render",          IGRAPHICS_NAME, IGRAPHICS_VER },
     { (ISystem**)&renderOld,  "ch_render",          IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,        "ch_gui",             IGUI_NAME, IGUI_HASH },
+
+	// Tools
+    // { (ISystem**)&toolMapEditor, "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+    { (ISystem**)&toolMatEditor, "modules/ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
 };
 
 

@@ -13,6 +13,9 @@ option( EDITOR "Build the editor" ON )
 # add_subdirectory( ../chocolate ${CMAKE_CURRENT_LIST_DIR} )
 add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../chocolate ${CMAKE_CURRENT_LIST_DIR}/../chocolate )
 
+message( "" )
+message( "Game Projects" )
+
 # grab the globals and put them here
 get_property( CH_ROOT GLOBAL PROPERTY CH_ROOT )
 get_property( CH_PUBLIC GLOBAL PROPERTY CH_PUBLIC )
@@ -34,7 +37,7 @@ else()
 endif( GAME_OLD )
 
 if( EDITOR )
-	add_subdirectory( src/editor )
+	add_subdirectory( src/toolkit )
 endif( EDITOR )
 
 if( STEAM )

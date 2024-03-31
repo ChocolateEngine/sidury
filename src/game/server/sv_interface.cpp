@@ -6,15 +6,6 @@
 #include "main.h"
 
 
-#define CH_GET_INTERFACE( var, type, name, ver )     \
-	var = Mod_GetInterfaceCast< type >( name, ver ); \
-	if ( var == nullptr )                            \
-	{                                                \
-		Log_Error( "Failed to load " name "\n" );    \
-		return false;                                \
-	}
-
-
 class ServerSystem : public IServerSystem
 {
    public:

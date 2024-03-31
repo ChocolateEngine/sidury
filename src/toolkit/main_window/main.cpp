@@ -31,42 +31,37 @@ void*             gpSysWindow     = nullptr;
 ChHandle_t        gGraphicsWindow = CH_INVALID_HANDLE;
 
 
-struct AppWindow
-{
-	SDL_Window*   window         = nullptr;
-	void*         sysWindow      = nullptr;
-	ChHandle_t    graphicsWindow = CH_INVALID_HANDLE;
-	ImGuiContext* context        = nullptr;
-
-	ChHandle_t    viewport       = CH_INVALID_HANDLE;
-};
-
-
 std::vector< AppWindow > gWindows;
 
 
-IGuiSystem*       gui             = nullptr;
-IRender*          render          = nullptr;
-IInputSystem*     input           = nullptr;
-IAudioSystem*     audio           = nullptr;
-IGraphics*        graphics        = nullptr;
-IRenderSystemOld* renderOld       = nullptr;
-Ch_IPhysics*      ch_physics      = nullptr;
+IGuiSystem*              gui           = nullptr;
+IRender*                 render        = nullptr;
+IInputSystem*            input         = nullptr;
+IAudioSystem*            audio         = nullptr;
+IGraphics*               graphics      = nullptr;
+IRenderSystemOld*        renderOld     = nullptr;
+Ch_IPhysics*             ch_physics    = nullptr;
 
-static bool       gPaused         = false;
-float             gFrameTime      = 0.f;
+ITool*                   toolMapEditor = nullptr;
+ITool*                   toolMatEditor = nullptr;
+
+bool                     toolMapEditorOpen = false;
+bool                     toolMatEditorOpen = false;
+
+static bool              gPaused       = false;
+float                    gFrameTime    = 0.f;
 
 // TODO: make gRealTime and gGameTime
 // real time is unmodified time since engine launched, and game time is time affected by host_timescale and pausing
-double            gCurTime        = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
+double                   gCurTime      = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
-extern bool       gRunning;
-extern ConVar     host_timescale;
+extern bool              gRunning;
+extern ConVar            host_timescale;
 
-u32               gMainViewportHandle   = UINT32_MAX;
+u32                      gMainViewportHandle   = UINT32_MAX;
 
-int               gMainMenuBarHeight    = 0.f;
-static bool       gShowQuitConfirmation = false;
+int                      gMainMenuBarHeight    = 0.f;
+static bool              gShowQuitConfirmation = false;
 
 
 CONVAR( r_nearz, 0.01 );
@@ -200,6 +195,74 @@ void Main_DrawSettingsMenu()
 }
 
 
+AppWindow* App_GetToolWindow( ITool* tool )
+{
+	for ( u32 i = 0; i < gWindows.size(); i++ )
+	{
+		if ( gWindows[ i ].tool == tool )
+			return &gWindows[ i ];
+	}
+
+	Log_ErrorF( "Failed to find window for tool!\n" );
+	return nullptr;
+}
+
+
+void App_LaunchTool( bool& isOpen, ITool* tool )
+{
+	if ( !tool )
+	{
+		Log_ErrorF( "Tool not Loaded!\n" );
+		return;
+	}
+
+	if ( isOpen )
+	{
+		AppWindow* window = App_GetToolWindow( tool );
+
+		if ( !window )
+		{
+			// Launch this tool instead
+			isOpen = false;
+		}
+		else
+		{
+			Window_Focus( window );
+		}
+
+	}
+
+	if ( !isOpen )
+	{
+		// Launch Tool
+		const char* windowName = tool->GetName();
+		AppWindow*  window     = Window_Create( windowName );
+
+		if ( !window )
+		{
+			Log_ErrorF( "Failed to open tool window: \"%s\"\n", windowName );
+			return;
+		}
+
+		window->tool = tool;
+
+		ToolLaunchData launchData{};
+		launchData.toolkit        = nullptr;
+		launchData.mainViewport   = window->viewport;
+		launchData.window         = window->window;
+		launchData.graphicsWindow = window->graphicsWindow;
+
+		if ( !tool->Launch( launchData ) )
+		{
+			Log_ErrorF( "Failed to launch tool: \"%s\"\n", windowName );
+			Window_OnClose( *window );
+		}
+
+		isOpen = true;
+	}
+}
+
+
 void Main_DrawMenuBar()
 {
 	if ( gShowQuitConfirmation )
@@ -217,12 +280,14 @@ void Main_DrawMenuBar()
 
 			ImGui::Separator();
 
-			if ( ImGui::MenuItem( "Map Editor" ) )
+			if ( ImGui::MenuItem( "Map Editor", "", toolMapEditorOpen ) )
 			{
+				App_LaunchTool( toolMapEditorOpen, toolMapEditor );
 			}
 
-			if ( ImGui::MenuItem( "Material Editor" ) )
+			if ( ImGui::MenuItem( "Material Editor", "", toolMatEditorOpen ) )
 			{
+				App_LaunchTool( toolMatEditorOpen, toolMatEditor );
 			}
 
 			ImGui::Separator();
@@ -252,148 +317,8 @@ void Main_DrawMenuBar()
 #define CH_LIVE_WINDOW_RESIZE 1
 
 
-void Window_Create()
-{
-	AppWindow& testWindow = gWindows.emplace_back();
-
-	std::string windowName = vstring( "test window %d", gWindows.size() );
-
-#ifdef _WIN32
-	testWindow.sysWindow = Sys_CreateWindow( windowName.c_str(), 800, 600, false );
-
-	if ( !testWindow.sysWindow )
-	{
-		Log_Error( "Failed to create test window\n" );
-		return;
-	}
-
-	testWindow.window = SDL_CreateWindowFrom( testWindow.sysWindow );
-#else
-	int flags = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
-
-	testWindow.window = SDL_CreateWindow( windowName.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-	                             800, 600, flags );
-#endif
-
-	if ( !testWindow.window )
-	{
-		Log_Error( "Failed to create SDL2 Window\n" );
-		return;
-	}
-
-	auto origContext          = ImGui::GetCurrentContext();
-	testWindow.context        = ImGui::CreateContext();
-	ImGui::SetCurrentContext( testWindow.context );
-
-	testWindow.graphicsWindow = render->CreateWindow( testWindow.window, testWindow.sysWindow );
-
-	if ( testWindow.graphicsWindow == CH_INVALID_HANDLE )
-	{
-		Log_Fatal( "Failed to Create GraphicsAPI Window\n" );
-		ImGui::SetCurrentContext( origContext );
-		return;
-	}
-
-	gui->StyleImGui();
-	input->AddWindow( testWindow.window, testWindow.context );
-
-	// Create the Main Viewport - TODO: use this more across the game code
-	testWindow.viewport = graphics->CreateViewport();
-
-	int width = 0, height = 0;
-	render->GetSurfaceSize( testWindow.graphicsWindow, width, height );
-
-	auto& io                   = ImGui::GetIO();
-	io.DisplaySize.x           = width;
-	io.DisplaySize.y           = height;
-
-	ViewportShader_t* viewport = graphics->GetViewportData( testWindow.viewport );
-
-	if ( !viewport )
-	{
-		ImGui::SetCurrentContext( origContext );
-		return;
-	}
-
-	viewport->aNearZ      = r_nearz;
-	viewport->aFarZ       = r_farz;
-	viewport->aSize       = { width, height };
-	viewport->aOffset     = { 0, 0 };
-	viewport->aProjection = glm::mat4( 1.f );
-	viewport->aView       = glm::mat4( 1.f );
-	viewport->aProjView   = glm::mat4( 1.f );
-
-	graphics->SetViewportUpdate( true );
-	ImGui::SetCurrentContext( origContext );
-}
-
-
-void Window_OnClose( AppWindow& window )
-{
-	graphics->FreeViewport( window.viewport );
-	render->DestroyWindow( window.graphicsWindow );
-
-	ImGuiContext* origContext = ImGui::GetCurrentContext();
-
-	ImGui::SetCurrentContext( window.context );
-
-	render->ShutdownImGui();
-	ImGui_ImplSDL2_Shutdown();
-
-	ImGui::DestroyContext( window.context );
-	ImGui::SetCurrentContext( origContext );
-}
-
-
-void Window_Render( AppWindow& window, float frameTime, bool sResize )
-{
-	auto origContext = ImGui::GetCurrentContext();
-
-	input->SetCurrentWindow( window.window );
-	ImGui::SetCurrentContext( window.context );
-
-	if ( sResize )
-	{
-		renderOld->Reset( window.graphicsWindow );
-
-		int width = 0, height = 0;
-		render->GetSurfaceSize( window.graphicsWindow, width, height );
-
-		auto& io                   = ImGui::GetIO();
-		io.DisplaySize.x           = width;
-		io.DisplaySize.y           = height;
-
-		ViewportShader_t* viewport = graphics->GetViewportData( window.viewport );
-
-		if ( !viewport )
-			return;
-
-		viewport->aNearZ      = r_nearz;
-		viewport->aFarZ       = r_farz;
-		viewport->aSize       = { width, height };
-		viewport->aOffset     = { 0, 0 };
-		viewport->aProjection = glm::mat4( 1.f );
-		viewport->aView       = glm::mat4( 1.f );
-		viewport->aProjView   = glm::mat4( 1.f );
-
-		graphics->SetViewportUpdate( true );
-	}
-
-	{
-		PROF_SCOPE_NAMED( "Imgui New Frame" );
-		ImGui::NewFrame();
-		ImGui_ImplSDL2_NewFrame();
-	}
-
-	ImGui::Text( "cool" );
-
-	renderOld->Present( window.graphicsWindow );
-	ImGui::SetCurrentContext( origContext );
-	input->SetCurrentWindow( gpWindow );
-}
-
-
 extern bool AssetBrowser_Init();
+extern void AssetBrowser_Close();
 extern void AssetBrowser_Draw();
 
 
@@ -408,6 +333,8 @@ void App_CloseMainWindow()
 	}
 
 	gWindows.clear();
+
+	AssetBrowser_Close();
 
 	// lazy way to tell engine to quit
 	Con_RunCommand( "quit" );
@@ -444,6 +371,7 @@ bool App_HandleEvents()
 					if ( gWindows[ i ].window != sdlWindow )
 						continue;
 
+					gWindows[ i ].tool->Close();
 					Window_OnClose( gWindows[ i ] );
 					vec_remove_index( gWindows, i );
 					break;
@@ -473,6 +401,15 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( sResize )
 		renderOld->Reset( gGraphicsWindow );
+
+	// Run Tools
+	if ( !sResize )
+	{
+		for ( u32 i = 0; i < gWindows.size(); i++ )
+		{
+			gWindows[ i ].tool->Update( frameTime );
+		}
+	}
 
 	input->SetCurrentWindow( gpWindow );
 
@@ -518,10 +455,6 @@ void UpdateLoop( float frameTime, bool sResize )
 				if ( ImGui::BeginTabItem( "Resource Usage" ) )
 				{
 					ImGui::Text( "TODO" );
-
-					if ( ImGui::Button( "TEST WINDOW" ) )
-						Window_Create();
-
 					ImGui::EndTabItem();
 				}
 
@@ -556,9 +489,9 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( !sResize )
 	{
-		for ( auto& testWindow : gWindows )
+		for ( auto& toolWindow : gWindows )
 		{
-			Window_Render( testWindow, frameTime, sResize );
+			Window_Render( toolWindow, frameTime, sResize );
 		}
 	}
 
@@ -729,5 +662,38 @@ void UpdateProjection()
 	viewport->aProjView   = glm::mat4( 1.f );
 
 	graphics->SetViewportUpdate( true );
+}
+
+
+void Tool_Focus( ITool* tool )
+{
+	AppWindow* window = App_GetToolWindow( tool );
+
+	if ( !window )
+	{
+		Log_ErrorF( "Tool not open!\n" );
+		return;
+	}
+
+	Window_Focus( window );
+}
+
+
+void Tool_OpenAsset( ITool* tool, bool& toolIsOpen, const std::string& path )
+{
+	AppWindow* window = App_GetToolWindow( tool );
+	bool       toolWasOpen = toolIsOpen;
+
+	if ( !window )
+	{
+		Log_ErrorF( "Tool not open - Launching!\n" );
+		App_LaunchTool( toolIsOpen, tool );
+	}
+
+	if ( toolIsOpen && tool->OpenAsset( path ) && toolWasOpen )
+	{
+		AppWindow* window = App_GetToolWindow( tool );
+		Window_Focus( window );
+	}
 }
 
