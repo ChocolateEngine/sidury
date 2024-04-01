@@ -434,7 +434,7 @@ void AssetBrowser_Draw()
 				// TODO: improve this
 				if ( asset.type == EAssetType_Material )
 				{
-					Tool_OpenAsset( toolMatEditor, toolMatEditorOpen, asset.path );
+					toolkit.OpenAsset( CH_TOOL_MAT_EDITOR_NAME, asset.path.data() );
 				}
 			}
 

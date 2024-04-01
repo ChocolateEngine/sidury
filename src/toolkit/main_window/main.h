@@ -27,47 +27,64 @@ struct AppWindow
 	void*         sysWindow      = nullptr;
 	ChHandle_t    graphicsWindow = CH_INVALID_HANDLE;
 	ImGuiContext* context        = nullptr;
-
 	ChHandle_t    viewport       = CH_INVALID_HANDLE;
-
-	ITool*        tool           = nullptr;
 };
 
 
-extern IGuiSystem*              gui;
-extern IRender*                 render;
-extern IInputSystem*            input;
-extern IAudioSystem*            audio;
-extern IGraphics*               graphics;
-extern IRenderSystemOld*        renderOld;
-
-extern ITool*                   toolMapEditor;
-extern ITool*                   toolMatEditor;
-
-extern bool                     toolMapEditorOpen;
-extern bool                     toolMatEditorOpen;
-
-extern u32                      gMainViewportHandle;
-extern SDL_Window*              gpWindow;
-extern ChHandle_t               gGraphicsWindow;
-extern std::vector< AppWindow > gWindows;
-
-extern ConVar                   r_nearz;
-extern ConVar                   r_farz;
-extern ConVar                   r_fov;
+struct LoadedTool
+{
+	const char* interface          = nullptr;
+	ITool*      tool               = nullptr;
+	AppWindow*  window             = nullptr;
+	bool        running            = false;
+	bool        renderInMainWindow = false;  // if false, this tool has it's own window, if true, it's stored in a tab in the main window
+};
 
 
-bool                            App_CreateMainWindow();
-bool                            App_Init();
+class Toolkit : public IToolkit
+{
+   public:
+	// Open an Asset in a Tool
+	// - spToolInterface is the name of the module interface
+	// - spPath is the path to the asset to open
+	void OpenAsset( const char* spToolInterface, const char* spPath ) override;
+};
 
-void                            UpdateLoop( float frameTime, bool sResize = false );
-void                            UpdateProjection();
 
-AppWindow*                      Window_Create( const char* windowName );
-void                            Window_OnClose( AppWindow& window );
-void                            Window_Focus( AppWindow* window );
-void                            Window_Render( AppWindow& window, float frameTime, bool sResize );
+extern IGuiSystem*               gui;
+extern IRender*                  render;
+extern IInputSystem*             input;
+extern IAudioSystem*             audio;
+extern IGraphics*                graphics;
+extern IRenderSystemOld*         renderOld;
 
-void                            Tool_Focus( ITool* tool );
-void                            Tool_OpenAsset( ITool* tool, bool& toolIsOpen, const std::string& path );
+extern Toolkit                   toolkit;
 
+extern u32                       gMainViewportHandle;
+extern SDL_Window*               gpWindow;
+extern ChHandle_t                gGraphicsWindow;
+extern std::vector< LoadedTool > gTools;
+
+extern ConVar                    r_nearz;
+extern ConVar                    r_farz;
+extern ConVar                    r_fov;
+
+void                             Util_DrawTextureInfo( TextureInfo_t& info );
+
+LoadedTool*                      App_GetTool( const char* tool );
+bool                             App_CreateMainWindow();
+bool                             App_Init();
+
+void                             UpdateLoop( float frameTime, bool sResize = false );
+void                             UpdateProjection();
+
+AppWindow*                       Window_Create( const char* windowName );
+void                             Window_OnClose( AppWindow& window );
+void                             Window_Focus( AppWindow* window );
+void                             Window_Render( LoadedTool& tool, float frameTime, bool sResize );
+
+bool                             AssetBrowser_Init();
+void                             AssetBrowser_Close();
+void                             AssetBrowser_Draw();
+
+void                             ResourceUsage_Draw();

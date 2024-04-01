@@ -58,9 +58,6 @@ extern Ch_IPhysics*      ch_physics;
 extern IGraphics*        graphics;
 extern IRenderSystemOld* renderOld;
 
-extern ITool*            toolMapEditor;
-extern ITool*            toolMatEditor;
-
 
 static AppModule_t gAppModules[] = 
 {
@@ -71,10 +68,20 @@ static AppModule_t gAppModules[] =
     { (ISystem**)&graphics,   "ch_render",          IGRAPHICS_NAME, IGRAPHICS_VER },
     { (ISystem**)&renderOld,  "ch_render",          IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,        "ch_gui",             IGUI_NAME, IGUI_HASH },
+};
 
-	// Tools
-    // { (ISystem**)&toolMapEditor, "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
-    { (ISystem**)&toolMatEditor, "modules/ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
+
+struct ToolLoadDesc
+{
+	const char* name;
+	const char* interface;
+	int         version;
+};
+
+
+static ToolLoadDesc gToolModules[] = {
+	// { "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+	{ "modules/ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
 };
 
 
@@ -125,6 +132,30 @@ extern "C"
 		{
 			Log_Error( "Failed to Load Systems\n" );
 			return;
+		}
+
+		// Add Tools
+		gTools.reserve( ARR_SIZE( gToolModules ) );
+		for ( u32 i = 0; i < ARR_SIZE( gToolModules ); i++ )
+		{
+			ISystem*    toolSystem = nullptr;
+
+			AppModule_t toolAppModule;
+			toolAppModule.apInterfaceName = gToolModules[ i ].interface;
+			toolAppModule.apInterfaceVer  = gToolModules[ i ].version;
+			toolAppModule.apModuleName    = gToolModules[ i ].name;
+			toolAppModule.apSystem        = (ISystem**)&toolSystem;
+			toolAppModule.aRequired       = false;
+
+			if ( !Mod_AddSystems( &toolAppModule, 1 ) )
+			{
+				Log_ErrorF( "Failed to Load Tool: %s\n", gToolModules[ i ].name );
+				continue;
+			}
+
+			LoadedTool& tool = gTools.emplace_back();
+			tool.interface   = gToolModules[ i ].interface;
+			tool.tool        = (ITool*)toolSystem;
 		}
 
 		if ( !App_CreateMainWindow() )

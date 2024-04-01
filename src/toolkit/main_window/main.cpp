@@ -21,52 +21,70 @@
 #include <algorithm>
 
 
-int               gWidth          = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
-int               gHeight         = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
-static bool       gMaxWindow      = Args_Register( "Maximize the main window", "-max" );
+int                       gWidth          = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
+int                       gHeight         = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
+static bool               gMaxWindow      = Args_Register( "Maximize the main window", "-max" );
+static bool               gSingleWindow   = Args_Register( "Single Window Mode, all tools will be rendered in tabs on the main window", "-single-window" );
 
 
-SDL_Window*       gpWindow        = nullptr;
-void*             gpSysWindow     = nullptr;
-ChHandle_t        gGraphicsWindow = CH_INVALID_HANDLE;
+SDL_Window*               gpWindow        = nullptr;
+void*                     gpSysWindow     = nullptr;
+ChHandle_t                gGraphicsWindow = CH_INVALID_HANDLE;
+
+Toolkit                   toolkit;
+
+// std::vector< AppWindow >  gWindows;
+std::vector< LoadedTool > gTools;
 
 
-std::vector< AppWindow > gWindows;
+IGuiSystem*               gui               = nullptr;
+IRender*                  render            = nullptr;
+IInputSystem*             input             = nullptr;
+IAudioSystem*             audio             = nullptr;
+IGraphics*                graphics          = nullptr;
+IRenderSystemOld*         renderOld         = nullptr;
+Ch_IPhysics*              ch_physics        = nullptr;
+
+//ITool*                    toolMapEditor     = nullptr;
+//ITool*                    toolMatEditor     = nullptr;
 
 
-IGuiSystem*              gui           = nullptr;
-IRender*                 render        = nullptr;
-IInputSystem*            input         = nullptr;
-IAudioSystem*            audio         = nullptr;
-IGraphics*               graphics      = nullptr;
-IRenderSystemOld*        renderOld     = nullptr;
-Ch_IPhysics*             ch_physics    = nullptr;
+//bool                      toolMapEditorOpen = false;
+//bool                      toolMatEditorOpen = false;
 
-ITool*                   toolMapEditor = nullptr;
-ITool*                   toolMatEditor = nullptr;
-
-bool                     toolMapEditorOpen = false;
-bool                     toolMatEditorOpen = false;
-
-static bool              gPaused       = false;
-float                    gFrameTime    = 0.f;
+static bool               gPaused           = false;
+float                     gFrameTime        = 0.f;
 
 // TODO: make gRealTime and gGameTime
 // real time is unmodified time since engine launched, and game time is time affected by host_timescale and pausing
-double                   gCurTime      = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
+double                    gCurTime          = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
-extern bool              gRunning;
-extern ConVar            host_timescale;
+extern bool               gRunning;
+extern ConVar             host_timescale;
 
-u32                      gMainViewportHandle   = UINT32_MAX;
+u32                       gMainViewportHandle   = UINT32_MAX;
 
-int                      gMainMenuBarHeight    = 0.f;
-static bool              gShowQuitConfirmation = false;
+int                       gMainMenuBarHeight    = 0.f;
+static bool               gShowQuitConfirmation = false;
 
 
 CONVAR( r_nearz, 0.01 );
 CONVAR( r_farz, 10000 );
 CONVAR( r_fov, 106 );
+
+
+void Util_DrawTextureInfo( TextureInfo_t& info )
+{
+	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+
+	if ( info.aPath.size() )
+		ImGui::Text( info.aPath.data() );
+
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+	ImGui::Text( "Format: TODO" );
+	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+	ImGui::Text( "Ref Count: %d", info.aRefCount );
+}
 
 
 void DrawQuitConfirmation();
@@ -195,71 +213,95 @@ void Main_DrawSettingsMenu()
 }
 
 
-AppWindow* App_GetToolWindow( ITool* tool )
+LoadedTool* App_GetTool( const char* tool )
 {
-	for ( u32 i = 0; i < gWindows.size(); i++ )
+	if ( tool == nullptr )
+		return nullptr;
+
+	for ( u32 i = 0; i < gTools.size(); i++ )
 	{
-		if ( gWindows[ i ].tool == tool )
-			return &gWindows[ i ];
+		if ( strcmp( gTools[ i ].interface, tool ) == 0 )
+			return &gTools[ i ];
 	}
+
+	Log_ErrorF( "Failed to find tool \"%s\"\n", tool );
+	return nullptr;
+}
+
+
+AppWindow* App_GetToolWindow( const char* toolInterface )
+{
+	LoadedTool* tool = App_GetTool( toolInterface );
+
+	if ( tool && tool->window )
+		return tool->window;
 
 	Log_ErrorF( "Failed to find window for tool!\n" );
 	return nullptr;
 }
 
 
-void App_LaunchTool( bool& isOpen, ITool* tool )
+void App_LaunchTool( const char* toolInterface )
 {
-	if ( !tool )
+	if ( !toolInterface )
 	{
 		Log_ErrorF( "Tool not Loaded!\n" );
 		return;
 	}
 
-	if ( isOpen )
+	LoadedTool* tool = App_GetTool( toolInterface );
+
+	if ( tool->running )
 	{
-		AppWindow* window = App_GetToolWindow( tool );
-
-		if ( !window )
-		{
-			// Launch this tool instead
-			isOpen = false;
-		}
+		if ( tool->window )
+			Window_Focus( tool->window );
 		else
-		{
-			Window_Focus( window );
-		}
+			Log_ErrorF( "TODO: FOCUS TOOL TAB!\n" );
 
+		return;
 	}
 
-	if ( !isOpen )
+	// Launch this tool instead
+	const char* windowName = tool->tool->GetName();
+	AppWindow*  window     = nullptr;
+
+	if ( !gSingleWindow )
 	{
-		// Launch Tool
-		const char* windowName = tool->GetName();
-		AppWindow*  window     = Window_Create( windowName );
+		window = Window_Create( windowName );
 
 		if ( !window )
 		{
 			Log_ErrorF( "Failed to open tool window: \"%s\"\n", windowName );
 			return;
 		}
+	}
 
-		window->tool = tool;
+	ToolLaunchData launchData{};
+	launchData.toolkit = &toolkit;
 
-		ToolLaunchData launchData{};
-		launchData.toolkit        = nullptr;
+	if ( gSingleWindow )
+	{
+		launchData.mainViewport   = gMainViewportHandle;
+		launchData.window         = gpWindow;
+		launchData.graphicsWindow = gGraphicsWindow;
+	}
+	else
+	{
 		launchData.mainViewport   = window->viewport;
 		launchData.window         = window->window;
 		launchData.graphicsWindow = window->graphicsWindow;
-
-		if ( !tool->Launch( launchData ) )
-		{
-			Log_ErrorF( "Failed to launch tool: \"%s\"\n", windowName );
-			Window_OnClose( *window );
-		}
-
-		isOpen = true;
 	}
+
+	if ( !tool->tool->Launch( launchData ) )
+	{
+		Log_ErrorF( "Failed to launch tool: \"%s\"\n", windowName );
+
+		if ( window )
+			Window_OnClose( *window );
+	}
+
+	tool->window  = window;
+	tool->running = true;
 }
 
 
@@ -280,14 +322,10 @@ void Main_DrawMenuBar()
 
 			ImGui::Separator();
 
-			if ( ImGui::MenuItem( "Map Editor", "", toolMapEditorOpen ) )
+			for ( auto& tool : gTools )
 			{
-				App_LaunchTool( toolMapEditorOpen, toolMapEditor );
-			}
-
-			if ( ImGui::MenuItem( "Material Editor", "", toolMatEditorOpen ) )
-			{
-				App_LaunchTool( toolMatEditorOpen, toolMatEditor );
+				if ( ImGui::MenuItem( tool.tool->GetName(), nullptr, tool.running ) )
+					App_LaunchTool( tool.interface );
 			}
 
 			ImGui::Separator();
@@ -305,6 +343,8 @@ void Main_DrawMenuBar()
 			ImGui::EndMenu();
 		}
 
+		ImGui::Separator();
+
 		ImGui::EndMainMenuBar();
 	}
 
@@ -317,22 +357,25 @@ void Main_DrawMenuBar()
 #define CH_LIVE_WINDOW_RESIZE 1
 
 
-extern bool AssetBrowser_Init();
-extern void AssetBrowser_Close();
-extern void AssetBrowser_Draw();
-
-
 // return true if we should stop the UpdateLoop
 void App_CloseMainWindow()
 {
-	// Close ALL Windows
-	for ( u32 i = 0; i < gWindows.size(); i++ )
+	// Close ALL Windows and Tools
+	for ( u32 i = 0; i < gTools.size(); i++ )
 	{
-		input->RemoveWindow( gWindows[ i ].window );
-		Window_OnClose( gWindows[ i ] );
+		if ( gTools[ i ].running )
+		{
+			gTools[ i ].tool->Close();
+		}
+
+		if ( gTools[ i ].window )
+		{
+			input->RemoveWindow( gTools[ i ].window->window );
+			Window_OnClose( *gTools[ i ].window );
+		}
 	}
 
-	gWindows.clear();
+	gTools.clear();
 
 	AssetBrowser_Close();
 
@@ -366,14 +409,18 @@ bool App_HandleEvents()
 					return true;
 				}
 
-				for ( u32 i = 0; i < gWindows.size(); i++ )
+				for ( u32 i = 0; i < gTools.size(); i++ )
 				{
-					if ( gWindows[ i ].window != sdlWindow )
+					if ( !gTools[ i ].window )
 						continue;
 
-					gWindows[ i ].tool->Close();
-					Window_OnClose( gWindows[ i ] );
-					vec_remove_index( gWindows, i );
+					if ( gTools[ i ].window->window != sdlWindow )
+						continue;
+
+					gTools[ i ].tool->Close();
+					Window_OnClose( *gTools[ i ].window );
+					gTools[ i ].window  = nullptr;
+					gTools[ i ].running = false;
 					break;
 				}
 			}
@@ -381,6 +428,111 @@ bool App_HandleEvents()
 	}
 
 	return false;
+}
+
+
+void RenderMainWindow( float frameTime, bool sResize )
+{
+	PROF_SCOPE();
+
+	Main_DrawMenuBar();
+
+	// hack
+	static bool showConsole     = false;
+	static bool wasConsoleShown = false;
+
+	// set position
+	int         width, height;
+	render->GetSurfaceSize( gGraphicsWindow, width, height );
+
+	// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height) - gMainMenuBarHeight ) }, { (float)width, (float)( (height) - gMainMenuBarHeight ) } );
+	//if ( showConsole )
+	//	ImGui::SetNextWindowSizeConstraints( { (float)width, 64 }, { (float)width, 64 } );
+	//else
+
+	static bool inToolTab = false;
+
+	// value... fresh from my ass
+	// float       titleBarHeight = 16.f;
+	// float       titleBarHeight = 10.f;
+	// float       titleBarHeight = 28.f;
+	float       titleBarHeight = 31.f;
+
+	if ( inToolTab )
+	{
+		// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( gMainMenuBarHeight + titleBarHeight ) }, { (float)width, (float)( gMainMenuBarHeight + titleBarHeight ) } );
+		ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( titleBarHeight ) }, { (float)width, (float)( titleBarHeight ) } );
+	}
+	else
+	{
+		ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height)-gMainMenuBarHeight ) }, { (float)width, (float)( (height)-gMainMenuBarHeight ) } );
+	}
+
+	if ( ImGui::Begin( "##Asset Browser", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse ) )
+	{
+		if ( ImGui::BeginTabBar( "Toolkit Tabs" ) )
+		{
+			inToolTab = false;
+
+			if ( ImGui::BeginTabItem( "Asset List" ) )
+			{
+				AssetBrowser_Draw();
+				ImGui::EndTabItem();
+			}
+
+			if ( ImGui::BeginTabItem( "Console" ) )
+			{
+				showConsole = true;
+				gui->DrawConsole( wasConsoleShown, true );
+				ImGui::EndTabItem();
+			}
+			else
+			{
+				showConsole = false;
+			}
+
+			if ( ImGui::BeginTabItem( "Resource Usage" ) )
+			{
+				ResourceUsage_Draw();
+				ImGui::EndTabItem();
+			}
+
+			if ( ImGui::BeginTabItem( "Settings" ) )
+			{
+				Main_DrawSettingsMenu();
+				ImGui::EndTabItem();
+			}
+
+			// Draw the tabs for the main tools
+			for ( auto& tool : gTools )
+			{
+				if ( !tool.running )
+					continue;
+
+				if ( tool.window )
+					continue;
+
+				if ( ImGui::BeginTabItem( tool.tool->GetName() ) )
+				{
+					inToolTab = true;
+					tool.tool->Render( frameTime, { 0, titleBarHeight } );
+					ImGui::EndTabItem();
+				}
+			}
+
+			ImGui::EndTabBar();
+		}
+
+		if ( wasConsoleShown != showConsole )
+			wasConsoleShown = showConsole;
+
+		ImGui::End();
+	}
+
+	if ( sResize )
+		UpdateProjection();
+
+	renderOld->Present( gGraphicsWindow );
 }
 
 
@@ -405,9 +557,10 @@ void UpdateLoop( float frameTime, bool sResize )
 	// Run Tools
 	if ( !sResize )
 	{
-		for ( u32 i = 0; i < gWindows.size(); i++ )
+		for ( u32 i = 0; i < gTools.size(); i++ )
 		{
-			gWindows[ i ].tool->Update( frameTime );
+			if ( gTools[ i ].running )
+				gTools[ i ].tool->Update( frameTime );
 		}
 	}
 
@@ -415,71 +568,7 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 	{
-		Main_DrawMenuBar();
-
-		// hack
-		static bool showConsole     = false;
-		static bool wasConsoleShown = false;
-
-		// set position
-		int         width, height;
-		render->GetSurfaceSize( gGraphicsWindow, width, height );
-
-		// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height) - gMainMenuBarHeight ) }, { (float)width, (float)( (height) - gMainMenuBarHeight ) } );
-		//if ( showConsole )
-		//	ImGui::SetNextWindowSizeConstraints( { (float)width, 64 }, { (float)width, 64 } );
-		//else
-			ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height)-gMainMenuBarHeight ) }, { (float)width, (float)( (height)-gMainMenuBarHeight ) } );
-
-		if ( ImGui::Begin( "##Asset Browser", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize ) )
-		{
-			if ( ImGui::BeginTabBar( "Toolkit Tabs" ) )
-			{
-				if ( ImGui::BeginTabItem( "Asset List" ) )
-				{
-					AssetBrowser_Draw();
-					ImGui::EndTabItem();
-				}
-
-				if ( ImGui::BeginTabItem( "Console" ) )
-				{
-					showConsole = true;
-					gui->DrawConsole( wasConsoleShown, true );
-					ImGui::EndTabItem();
-				}
-				else
-				{
-					showConsole = false;
-				}
-
-				if ( ImGui::BeginTabItem( "Resource Usage" ) )
-				{
-					ImGui::Text( "TODO" );
-					ImGui::EndTabItem();
-				}
-
-				if ( ImGui::BeginTabItem( "Settings" ) )
-				{
-					Main_DrawSettingsMenu();
-					ImGui::EndTabItem();
-				}
-
-				ImGui::EndTabBar();
-			}
-
-			if ( wasConsoleShown != showConsole )
-				wasConsoleShown = showConsole;
-
-			ImGui::End();
-		}
-
-		// if ( showConsole )
-		// 	gui->Update( 0.f );
-
-		if ( sResize )
-			UpdateProjection();
-
-		renderOld->Present( gGraphicsWindow );
+		RenderMainWindow( frameTime, sResize );
 	}
 	else
 	{
@@ -489,9 +578,14 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( !sResize )
 	{
-		for ( auto& toolWindow : gWindows )
+		// Draw other windows
+		for ( auto& tool: gTools )
 		{
-			Window_Render( toolWindow, frameTime, sResize );
+			if ( !tool.running )
+				continue;
+
+			if ( tool.window )
+				Window_Render( tool, frameTime, sResize );
 		}
 	}
 
@@ -511,12 +605,15 @@ void WindowResizeCallback( void* hwnd )
 		return;
 	}
 
-	for ( AppWindow& window : gWindows )
+	for ( LoadedTool& tool: gTools )
 	{
-		if ( window.sysWindow != hwnd )
+		if ( !tool.window )
 			continue;
 
-		Window_Render( window, 0.f, true );
+		if ( tool.window->sysWindow != hwnd )
+			continue;
+
+		Window_Render( tool, 0.f, true );
 		break;
 	}
 #endif
@@ -665,35 +762,32 @@ void UpdateProjection()
 }
 
 
-void Tool_Focus( ITool* tool )
+void Toolkit::OpenAsset( const char* spToolInterface, const char* spPath )
 {
-	AppWindow* window = App_GetToolWindow( tool );
+	LoadedTool* tool = App_GetTool( spToolInterface );
 
-	if ( !window )
+	if ( tool == nullptr )
 	{
-		Log_ErrorF( "Tool not open!\n" );
+		Log_ErrorF( "Failed to find tool \"%s\" to open asset with: \"%s\"\n", spToolInterface, spPath );
 		return;
 	}
 
-	Window_Focus( window );
-}
+	if ( !tool->running )
+		App_LaunchTool( spToolInterface );
 
-
-void Tool_OpenAsset( ITool* tool, bool& toolIsOpen, const std::string& path )
-{
-	AppWindow* window = App_GetToolWindow( tool );
-	bool       toolWasOpen = toolIsOpen;
-
-	if ( !window )
+	if ( !tool->running )
 	{
-		Log_ErrorF( "Tool not open - Launching!\n" );
-		App_LaunchTool( toolIsOpen, tool );
+		Log_ErrorF( "Failed to launch tool \"%s\" to open asset with: \"%s\"\n", spToolInterface, spPath );
+		return;
 	}
 
-	if ( toolIsOpen && tool->OpenAsset( path ) && toolWasOpen )
+	if ( !tool->tool->OpenAsset( spPath ) )
 	{
-		AppWindow* window = App_GetToolWindow( tool );
-		Window_Focus( window );
+		Log_ErrorF( "Failed to open asset in tool \"%s\": \"%s\"\n", spToolInterface, spPath );
+		return;
 	}
+
+	if ( tool->window )
+		Window_Focus( tool->window );
 }
 

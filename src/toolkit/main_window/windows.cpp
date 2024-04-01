@@ -11,18 +11,18 @@ void Window_Focus( AppWindow* window )
 
 AppWindow* Window_Create( const char* windowName )
 {
-	AppWindow& appWindow = gWindows.emplace_back();
+	AppWindow* appWindow = new AppWindow;
 
 #ifdef _WIN32
-	appWindow.sysWindow = Sys_CreateWindow( windowName, 800, 600, false );
+	appWindow->sysWindow = Sys_CreateWindow( windowName, 800, 600, false );
 
-	if ( !appWindow.sysWindow )
+	if ( !appWindow->sysWindow )
 	{
 		Log_Error( "Failed to create tool window\n" );
 		return nullptr;
 	}
 
-	appWindow.window = SDL_CreateWindowFrom( appWindow.sysWindow );
+	appWindow->window = SDL_CreateWindowFrom( appWindow->sysWindow );
 #else
 	int flags         = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
@@ -30,45 +30,45 @@ AppWindow* Window_Create( const char* windowName )
 	                                      800, 600, flags );
 #endif
 
-	if ( !appWindow.window )
+	if ( !appWindow->window )
 	{
 		Log_Error( "Failed to create SDL2 Window\n" );
 		return nullptr;
 	}
 
-	auto origContext  = ImGui::GetCurrentContext();
-	appWindow.context = ImGui::CreateContext();
-	ImGui::SetCurrentContext( appWindow.context );
+	auto origContext   = ImGui::GetCurrentContext();
+	appWindow->context = ImGui::CreateContext();
+	ImGui::SetCurrentContext( appWindow->context );
 
-	appWindow.graphicsWindow = render->CreateWindow( appWindow.window, appWindow.sysWindow );
+	appWindow->graphicsWindow = render->CreateWindow( appWindow->window, appWindow->sysWindow );
 
-	if ( appWindow.graphicsWindow == CH_INVALID_HANDLE )
+	if ( appWindow->graphicsWindow == CH_INVALID_HANDLE )
 	{
 		Log_Fatal( "Failed to Create GraphicsAPI Window\n" );
 		ImGui::SetCurrentContext( origContext );
-		Window_OnClose( appWindow );
+		Window_OnClose( *appWindow );
 		return nullptr;
 	}
 
 	gui->StyleImGui();
-	input->AddWindow( appWindow.window, appWindow.context );
+	input->AddWindow( appWindow->window, appWindow->context );
 
 	// Create the Main Viewport - TODO: use this more across the game code
-	appWindow.viewport = graphics->CreateViewport();
+	appWindow->viewport = graphics->CreateViewport();
 
 	int width = 0, height = 0;
-	render->GetSurfaceSize( appWindow.graphicsWindow, width, height );
+	render->GetSurfaceSize( appWindow->graphicsWindow, width, height );
 
 	auto& io                   = ImGui::GetIO();
 	io.DisplaySize.x           = width;
 	io.DisplaySize.y           = height;
 
-	ViewportShader_t* viewport = graphics->GetViewportData( appWindow.viewport );
+	ViewportShader_t* viewport = graphics->GetViewportData( appWindow->viewport );
 
 	if ( !viewport )
 	{
 		ImGui::SetCurrentContext( origContext );
-		Window_OnClose( appWindow );
+		Window_OnClose( *appWindow );
 		return nullptr;
 	}
 
@@ -83,7 +83,7 @@ AppWindow* Window_Create( const char* windowName )
 	graphics->SetViewportUpdate( true );
 	ImGui::SetCurrentContext( origContext );
 
-	return &appWindow;
+	return appWindow;
 }
 
 
@@ -106,25 +106,27 @@ void Window_OnClose( AppWindow& window )
 
 // TODO: this window will be used for Open and Save dialogs, not attached to any tools
 // maybe change this to Window_RenderStart and Window_RenderEnd so we don't have to check if it's a tool every frame?
-void Window_Render( AppWindow& window, float frameTime, bool sResize )
+void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 {
 	auto origContext = ImGui::GetCurrentContext();
 
-	input->SetCurrentWindow( window.window );
-	ImGui::SetCurrentContext( window.context );
+	AppWindow* window      = tool.window;
+
+	input->SetCurrentWindow( window->window );
+	ImGui::SetCurrentContext( window->context );
 
 	if ( sResize )
 	{
-		renderOld->Reset( window.graphicsWindow );
+		renderOld->Reset( window->graphicsWindow );
 
 		int width = 0, height = 0;
-		render->GetSurfaceSize( window.graphicsWindow, width, height );
+		render->GetSurfaceSize( window->graphicsWindow, width, height );
 
 		auto& io                   = ImGui::GetIO();
 		io.DisplaySize.x           = width;
 		io.DisplaySize.y           = height;
 
-		ViewportShader_t* viewport = graphics->GetViewportData( window.viewport );
+		ViewportShader_t* viewport = graphics->GetViewportData( window->viewport );
 
 		if ( !viewport )
 			return;
@@ -146,9 +148,9 @@ void Window_Render( AppWindow& window, float frameTime, bool sResize )
 		ImGui_ImplSDL2_NewFrame();
 	}
 
-	window.tool->Render( frameTime );
+	tool.tool->Render( frameTime, {} );
 
-	renderOld->Present( window.graphicsWindow );
+	renderOld->Present( window->graphicsWindow );
 	ImGui::SetCurrentContext( origContext );
 	input->SetCurrentWindow( gpWindow );
 }
