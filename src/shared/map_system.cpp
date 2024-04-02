@@ -18,17 +18,13 @@ static bool CheckJsonType( JsonObject_t& object, EJsonType type )
 
 static void CopyString( char*& out, char* string, size_t stringLen )
 {
-	out = ch_malloc_count< char >( stringLen + 1 );
-	memcpy( out, string, stringLen );
-	out[ stringLen ] = '\0';
+	out = Util_AllocString( string, stringLen );
 }
 
 
 static void CopyString( char*& out, const char* string, size_t stringLen )
 {
-	out = ch_malloc_count< char >( stringLen + 1 );
-	memcpy( out, string, stringLen );
-	out[ stringLen ] = '\0';
+	out = Util_AllocString( string, stringLen );
 }
 
 
@@ -249,9 +245,6 @@ static bool LoadScene( Map* map, const std::string& scenePath )
 
 	Scene       scene;
 	CopyString( scene.name, sceneName.data(), sceneName.size() );
-	// map->name = ch_malloc_count< char >( sceneName.size() + 1 );
-	// memcpy( map->name, sceneName.data(), sceneName.size() );
-	// map->name[ sceneName.size() ] = '\0';
 
 	for ( size_t i = 0; i < root.aObjects.size(); i++ )
 	{
