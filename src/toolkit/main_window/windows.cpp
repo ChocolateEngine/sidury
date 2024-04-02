@@ -89,14 +89,11 @@ AppWindow* Window_Create( const char* windowName )
 
 void Window_OnClose( AppWindow& window )
 {
-	graphics->FreeViewport( window.viewport );
-	render->DestroyWindow( window.graphicsWindow );
-
 	ImGuiContext* origContext = ImGui::GetCurrentContext();
-
 	ImGui::SetCurrentContext( window.context );
 
-	render->ShutdownImGui();
+	graphics->FreeViewport( window.viewport );
+	render->DestroyWindow( window.graphicsWindow );
 	ImGui_ImplSDL2_Shutdown();
 
 	ImGui::DestroyContext( window.context );
