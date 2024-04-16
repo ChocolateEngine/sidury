@@ -399,7 +399,16 @@ void PlayerManager::Create( Entity player )
 
 #if CH_SERVER
 
-	// Add Components to entity
+	SV_Client_t* client = SV_GetClientFromEntity( player );
+
+	CH_ASSERT( client );
+
+	if ( !client )
+		return;
+
+	// ------------------------------------------------------------------------------
+	// Setup Player Entity Components
+
 	auto playerMove = Ent_AddComponent< CPlayerMoveData >( player, "playerMoveData" );
 
 	Ent_AddComponent( player, "rigidBody" );
@@ -422,13 +431,6 @@ void PlayerManager::Create( Entity player )
 
 	health->aHealth = 100;
 
-	SV_Client_t* client = SV_GetClientFromEntity( player );
-
-	CH_ASSERT( client );
-
-	if ( !client )
-		return;
-
 	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
 
 	// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
@@ -449,12 +451,18 @@ void PlayerManager::Create( Entity player )
 	zoom->aOrigFov             = r_fov.GetFloat();
 	zoom->aNewFov              = r_fov.GetFloat();
 
+	// ------------------------------------------------------------------------------
+	// Setup Flashlight
+
 	flashlight->aEnabled       = false;
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
 	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
 	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
+
+	// ------------------------------------------------------------------------------
+	// Setup Physics Shapes
 
 	PhysicsShapeInfo charShapeInfo( PhysShapeType::Cylinder );
 	charShapeInfo.aBounds                  = { gPlayerPhysHeight, 0.377, 1 };
@@ -465,6 +473,9 @@ void PlayerManager::Create( Entity player )
 	duckShapeInfo.aBounds = { gPlayerPhysHeightDuck, 0.377, 1 };
 
 	gPlayerShapeCrouch    = GetPhysEnv()->CreateShape( duckShapeInfo );
+
+	// ------------------------------------------------------------------------------
+	// Setup Virtual Character Physics Object
 
 	PhysVirtualCharacterSettings charSettings{};
 	charSettings.shape                     = gPlayerShapeStanding;
