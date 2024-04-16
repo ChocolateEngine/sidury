@@ -5,7 +5,7 @@
 
 void Window_Focus( AppWindow* window )
 {
-	SDL_RaiseWindow( window->window );
+	input->SetWindowFocused( window->window );
 }
 
 
@@ -54,7 +54,7 @@ AppWindow* Window_Create( const char* windowName )
 	input->AddWindow( appWindow->window, appWindow->context );
 
 	// Create the Main Viewport - TODO: use this more across the game code
-	appWindow->viewport = graphics->CreateViewport();
+	//appWindow->viewport = graphics->CreateViewport();
 
 	int width = 0, height = 0;
 	render->GetSurfaceSize( appWindow->graphicsWindow, width, height );
@@ -63,25 +63,28 @@ AppWindow* Window_Create( const char* windowName )
 	io.DisplaySize.x           = width;
 	io.DisplaySize.y           = height;
 
-	ViewportShader_t* viewport = graphics->GetViewportData( appWindow->viewport );
+	//ViewportShader_t* viewport = graphics->GetViewportData( appWindow->viewport );
+	//
+	//if ( !viewport )
+	//{
+	//	ImGui::SetCurrentContext( origContext );
+	//	Window_OnClose( *appWindow );
+	//	return nullptr;
+	//}
+	//
+	//viewport->aNearZ      = r_nearz;
+	//viewport->aFarZ       = r_farz;
+	//viewport->aSize       = { width, height };
+	//viewport->aOffset     = { 0, 0 };
+	//viewport->aProjection = glm::mat4( 1.f );
+	//viewport->aView       = glm::mat4( 1.f );
+	//viewport->aProjView   = glm::mat4( 1.f );
+	//
+	//graphics->SetViewportUpdate( true );
 
-	if ( !viewport )
-	{
-		ImGui::SetCurrentContext( origContext );
-		Window_OnClose( *appWindow );
-		return nullptr;
-	}
-
-	viewport->aNearZ      = r_nearz;
-	viewport->aFarZ       = r_farz;
-	viewport->aSize       = { width, height };
-	viewport->aOffset     = { 0, 0 };
-	viewport->aProjection = glm::mat4( 1.f );
-	viewport->aView       = glm::mat4( 1.f );
-	viewport->aProjView   = glm::mat4( 1.f );
-
-	graphics->SetViewportUpdate( true );
 	ImGui::SetCurrentContext( origContext );
+
+	Window_Focus( appWindow );
 
 	return appWindow;
 }
@@ -92,7 +95,7 @@ void Window_OnClose( AppWindow& window )
 	ImGuiContext* origContext = ImGui::GetCurrentContext();
 	ImGui::SetCurrentContext( window.context );
 
-	graphics->FreeViewport( window.viewport );
+	//graphics->FreeViewport( window.viewport );
 	render->DestroyWindow( window.graphicsWindow );
 	ImGui_ImplSDL2_Shutdown();
 
@@ -123,20 +126,20 @@ void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 		io.DisplaySize.x           = width;
 		io.DisplaySize.y           = height;
 
-		ViewportShader_t* viewport = graphics->GetViewportData( window->viewport );
-
-		if ( !viewport )
-			return;
-
-		viewport->aNearZ      = r_nearz;
-		viewport->aFarZ       = r_farz;
-		viewport->aSize       = { width, height };
-		viewport->aOffset     = { 0, 0 };
-		viewport->aProjection = glm::mat4( 1.f );
-		viewport->aView       = glm::mat4( 1.f );
-		viewport->aProjView   = glm::mat4( 1.f );
-
-		graphics->SetViewportUpdate( true );
+		// ViewportShader_t* viewport = graphics->GetViewportData( window->viewport );
+		// 
+		// if ( !viewport )
+		// 	return;
+		// 
+		// viewport->aNearZ      = r_nearz;
+		// viewport->aFarZ       = r_farz;
+		// viewport->aSize       = { width, height };
+		// viewport->aOffset     = { 0, 0 };
+		// viewport->aProjection = glm::mat4( 1.f );
+		// viewport->aView       = glm::mat4( 1.f );
+		// viewport->aProjView   = glm::mat4( 1.f );
+		// 
+		// graphics->SetViewportUpdate( true );
 	}
 
 	{
@@ -145,9 +148,9 @@ void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 		ImGui_ImplSDL2_NewFrame();
 	}
 
-	tool.tool->Render( frameTime, {} );
+	tool.tool->Render( frameTime, sResize, {} );
+	tool.tool->Present();
 
-	renderOld->Present( window->graphicsWindow );
 	ImGui::SetCurrentContext( origContext );
 	input->SetCurrentWindow( gpWindow );
 }

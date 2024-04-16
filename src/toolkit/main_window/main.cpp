@@ -281,13 +281,11 @@ void App_LaunchTool( const char* toolInterface )
 
 	if ( gSingleWindow )
 	{
-		launchData.mainViewport   = gMainViewportHandle;
 		launchData.window         = gpWindow;
 		launchData.graphicsWindow = gGraphicsWindow;
 	}
 	else
 	{
-		launchData.mainViewport   = window->viewport;
 		launchData.window         = window->window;
 		launchData.graphicsWindow = window->graphicsWindow;
 	}
@@ -515,7 +513,7 @@ void RenderMainWindow( float frameTime, bool sResize )
 				if ( ImGui::BeginTabItem( tool.tool->GetName() ) )
 				{
 					inToolTab = true;
-					tool.tool->Render( frameTime, { 0, titleBarHeight } );
+					tool.tool->Render( frameTime, sResize, { 0, titleBarHeight } );
 					ImGui::EndTabItem();
 				}
 			}
@@ -532,7 +530,7 @@ void RenderMainWindow( float frameTime, bool sResize )
 	if ( sResize )
 		UpdateProjection();
 
-	renderOld->Present( gGraphicsWindow );
+	renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
 }
 
 
@@ -750,13 +748,17 @@ void UpdateProjection()
 	if ( !viewport )
 		return;
 
-	viewport->aNearZ      = r_nearz;
-	viewport->aFarZ       = r_farz;
-	viewport->aSize       = { width, height };
-	viewport->aOffset     = { 0, 0 };
-	viewport->aProjection = glm::mat4( 1.f );
-	viewport->aView       = glm::mat4( 1.f );
-	viewport->aProjView   = glm::mat4( 1.f );
+	// HACK HACK HACK
+	// if ( !gSingleWindow )
+	{
+		viewport->aNearZ      = r_nearz;
+		viewport->aFarZ       = r_farz;
+		viewport->aSize       = { width, height };
+		viewport->aOffset     = { 0, 0 };
+		viewport->aProjection = glm::mat4( 1.f );
+		viewport->aView       = glm::mat4( 1.f );
+		viewport->aProjView   = glm::mat4( 1.f );
+	}
 
 	graphics->SetViewportUpdate( true );
 }

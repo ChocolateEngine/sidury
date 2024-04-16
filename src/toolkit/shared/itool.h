@@ -20,7 +20,6 @@ struct ToolLaunchData
 	IToolkit*   toolkit;
 	SDL_Window* window;
 	ChHandle_t  graphicsWindow;
-	u32         mainViewport;
 };
 
 
@@ -53,20 +52,24 @@ class ITool : public ISystem
 	// Buttons
 	// virtual ChHandle_t  GetIcon() = 0;
 
-	virtual const char* GetName() = 0;
+	virtual const char* GetName()                                                 = 0;
 
-	virtual bool        Launch( const ToolLaunchData& launchData ) = 0;
-	virtual void        Close()  = 0;
+	virtual bool        Launch( const ToolLaunchData& launchData )                = 0;
+	virtual void        Close()                                                   = 0;
 
 	// General Update
-	virtual void        Update( float frameTime )  = 0;
+	virtual void        Update( float frameTime )                                 = 0;
 
 	// Rendering Code + ImGui
+	// resize is true when in a window resize
 	// sOffset is used when rendering in the main window as a tab
-	virtual void        Render( float frameTime, glm::uvec2 sOffset )  = 0;
+	virtual void        Render( float frameTime, bool resize, glm::uvec2 offset ) = 0;
+
+	// Have the tool present the viewports to the screen, only when in it's own window
+	virtual void        Present()                                                 = 0;
 
 	// Tell this tool to try to open an asset for editing
-	virtual bool        OpenAsset( const std::string& path )       = 0;
+	virtual bool        OpenAsset( const std::string& path )                      = 0;
 };
 
 

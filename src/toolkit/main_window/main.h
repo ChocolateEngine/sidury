@@ -27,7 +27,6 @@ struct AppWindow
 	void*         sysWindow      = nullptr;
 	ChHandle_t    graphicsWindow = CH_INVALID_HANDLE;
 	ImGuiContext* context        = nullptr;
-	ChHandle_t    viewport       = CH_INVALID_HANDLE;
 };
 
 
