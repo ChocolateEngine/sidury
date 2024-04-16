@@ -362,8 +362,6 @@ void CloseMainWindow()
 		graphics->FreeViewport( gDedicatedViewport );
 
 	render->DestroyWindow( gGraphicsWindow );
-
-	render->ShutdownImGui();
 	ImGui_ImplSDL2_Shutdown();
 
 	ImGui::DestroyContext( ImGui::GetCurrentContext() );
@@ -531,7 +529,7 @@ void MainLoopDedicated()
 
 		if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 		{
-			renderOld->Present( gGraphicsWindow );
+			renderOld->Present( gGraphicsWindow, &gDedicatedViewport, 1 );
 		}
 		else
 		{
@@ -556,7 +554,7 @@ void MainLoopDedicated()
 
 extern "C"
 {
-	void DLL_EXPORT game_init()
+	int DLL_EXPORT app_init()
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
@@ -589,7 +587,7 @@ extern "C"
 			if ( !Mod_AddSystems( gAppModulesServer, ARR_SIZE( gAppModulesServer ) ) )
 			{
 				Log_Error( "Failed to Load Systems\n" );
-				return;
+				return 1;
 			}
 		}
 		else
@@ -597,7 +595,7 @@ extern "C"
 			if ( !Mod_AddSystems( gAppModulesClient, ARR_SIZE( gAppModulesClient ) ) )
 			{
 				Log_Error( "Failed to Load Systems\n" );
-				return;
+				return 1;
 			}
 		}
 
@@ -609,12 +607,12 @@ extern "C"
 
 		if ( !CreateMainWindow() )
 		{
-			return;
+			return 1;
 		}
 
 		if ( !Mod_InitSystems() )
 		{
-			return;
+			return 1;
 		}
 
 		// Create the Graphics API Window
@@ -623,14 +621,14 @@ extern "C"
 		if ( gGraphicsWindow == CH_INVALID_HANDLE )
 		{
 			Log_Fatal( "Failed to Create GraphicsAPI Window\n" );
-			return;
+			return 1;
 		}
 
 		gui->StyleImGui();
 
 		if ( !LoadGameSystems() )
 		{
-			return;
+			return 1;
 		}
 
 		// Reset ConVar Flags
@@ -678,6 +676,7 @@ extern "C"
 			client->Shutdown();
 
 		Resource_Shutdown();
+		return 0;
 	}
 }
 

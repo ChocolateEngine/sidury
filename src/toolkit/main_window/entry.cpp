@@ -80,7 +80,7 @@ struct ToolLoadDesc
 
 
 static ToolLoadDesc gToolModules[] = {
-	// { "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+	{ "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
 	{ "modules/ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
 };
 
@@ -93,7 +93,7 @@ static void ShowInvalidGameOptionWindow( const char* spMessage )
 
 extern "C"
 {
-	void DLL_EXPORT game_init()
+	int DLL_EXPORT app_init()
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
@@ -103,14 +103,14 @@ extern "C"
 		if ( gArgGamePath == nullptr || gArgGamePath == "" )
 		{
 			ShowInvalidGameOptionWindow( "No Game Specified" );
-			return;
+			return 1;
 		}
 
 		// Load the game's app info
 		if ( !Core_AddAppInfo( FileSys_GetExePath() + PATH_SEP_STR + gArgGamePath ) )
 		{
 			ShowInvalidGameOptionWindow( "Failed to Load App Info" );
-			return;
+			return 1;
 		}
 
 		IMGUI_CHECKVERSION();
@@ -131,7 +131,7 @@ extern "C"
 		if ( !Mod_AddSystems( gAppModules, ARR_SIZE( gAppModules ) ) )
 		{
 			Log_Error( "Failed to Load Systems\n" );
-			return;
+			return 1;
 		}
 
 		// Add Tools
@@ -161,19 +161,19 @@ extern "C"
 		if ( !App_CreateMainWindow() )
 		{
 			Log_Error( "Failed to Create Main Window\n" );
-			return;
+			return 1;
 		}
 
 		if ( !Mod_InitSystems() )
 		{
 			Log_Error( "Failed to Init Systems\n" );
-			return;
+			return 1;
 		}
 
 		if ( !App_Init() )
 		{
 			Log_Error( "Failed to Start Editor!\n" );
-			return;
+			return 1;
 		}
 
 		Con_QueueCommandSilent( "exec autoexec", false );
@@ -232,6 +232,8 @@ extern "C"
 			FrameMark;
 #endif
 		}
+
+		return 0;
 	}
 }
 

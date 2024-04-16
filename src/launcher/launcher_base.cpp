@@ -159,9 +159,9 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 {
 	set_search_directory();
 
-	void ( *game_init )() = 0;
-	void ( *core_init )( int argc, char *argv[], const char* gamePath ) = 0;
-	void ( *core_exit )() = 0;
+	int  ( *app_init )()                                                = 0;
+	void ( *core_init )( int argc, char* argv[], const char* gamePath ) = 0;
+	void ( *core_exit )( bool writeArchive )                            = 0;
 
 	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
 	//	return -1;
@@ -209,16 +209,17 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 	// if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
 	// 	return -1;
 
-	*(void**)( &game_init ) = sys_load_func( client, "game_init" );
-	if ( !game_init )
+	*(void**)( &app_init ) = sys_load_func( client, "app_init" );
+	if ( !app_init )
 	{
 		fprintf( stderr, "Error: %s\n", sys_get_error() );
 		unload_objects();
 		return -1;
 	}
 
-	game_init();
-	core_exit();
+	int appRet = app_init();
+	core_exit( appRet == 0 );
+
 	unload_objects();
 
 	return 0;
