@@ -203,7 +203,36 @@ public:
 
 		if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) && r_render )
 		{
-			renderOld->Present( gGraphicsWindow );
+			// update render lists
+			// for now, we only have one primary render list, no cameras or anything yet
+			static ChVector< ChHandle_t > renderList;
+			renderList.clear();
+			renderList.resize( graphics->GetRenderableCount() );
+
+			for ( u32 i = 0; i < graphics->GetRenderableCount(); i++ )
+			{
+				renderList[ i ] = graphics->GetRenderableByIndex( i );
+			}
+
+			// TODO: Make this less stupid with allocating memory each frame
+			u32* viewportList = ch_malloc< u32 >( graphics->GetViewportCount() );
+			viewportList[ 0 ] = gMainViewportIndex;
+
+			// Add Shadowmaps to this list
+			for ( u32 i = 1, j = 0; i < graphics->GetLightCount(); i++ )
+			{
+				Light_t* light = graphics->GetLightByIndex( i );
+				if ( !light->apShadowMap )
+					continue;
+
+				viewportList[ j++ ] = light->apShadowMap->aViewportHandle;
+			}
+
+			graphics->SetViewportRenderList( gMainViewportIndex, renderList.data(), renderList.size() );
+
+			renderOld->Present( gGraphicsWindow, viewportList, graphics->GetViewportCount() );
+
+			free( viewportList );
 		}
 		else
 		{
