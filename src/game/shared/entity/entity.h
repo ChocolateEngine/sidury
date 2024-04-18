@@ -177,7 +177,7 @@ enum EEntityFlag_ : EEntityFlag
 
 	// Ignore data from the server on the client, useful for first person camera entity
 	// Or just change how EEntComponentNetType works, maybe what we pass is the default value, but you can override it?
-	EEntityFlag_IgnoreOnClient = ( 1 << 5 ),
+	EEntityFlag_IgnoreOnClient = ( 1 << 5 ), 
 };
 
 
@@ -668,9 +668,6 @@ struct EntityEventListener_t
 struct EntitySystemData
 {
 	bool                                                         aActive   = false;
-
-	// TEMP DEBUG
-	bool                                                         aIsClient = false;
 
 	// Queue of unused entity IDs
 	// TODO: CHANGE BACK TO QUEUE

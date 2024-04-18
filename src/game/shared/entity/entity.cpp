@@ -343,11 +343,6 @@ bool Entity_Init()
 	PROF_SCOPE();
 
 	EntSysData().aActive = true;
-
-#if CH_CLIENT
-	EntSysData().aIsClient = true;
-#endif
-
 	EntSysData().aEntityPool.clear();
 	EntSysData().aComponentPools.clear();
 	EntSysData().aEntityIDConvert.clear();
