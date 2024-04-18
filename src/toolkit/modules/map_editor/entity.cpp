@@ -89,16 +89,13 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	char* newName = static_cast< char* >( realloc( ent->apName, NAME_LEN ) );
-	if ( newName == nullptr )
+	ent->apName = Util_AllocStringF( "Entity %zd", entHandle );
+	if ( ent->apName == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
 		Entity_Delete( entHandle );
 		return CH_INVALID_HANDLE;
 	}
-
-	ent->apName = newName;
-	strcpy( ent->apName, vstring( "Entity %zd", entHandle ).c_str() );
 
 	// Pick a random color for it
 	ent->aSelectColor[ 0 ] = RandomU8( 0, 255 );
@@ -127,7 +124,7 @@ void Entity_Delete( ChHandle_t sHandle )
 
 	if ( ent->apName )
 	{
-		free( ent->apName );
+		Util_FreeString( ent->apName );
 		ent->apName = nullptr;
 	}
 
@@ -220,13 +217,7 @@ void Entity_SetName( ChHandle_t sHandle, const char* name )
 	if ( name == nullptr )
 		return;
 
-	if ( ent->apName )
-		free( ent->apName );
-
-	size_t nameLen = strlen( name );
-	ent->apName    = ch_malloc_count< char >( nameLen + 1 );
-	memcpy( ent->apName, name, nameLen );
-	ent->apName[ nameLen ] = '\0';
+	ent->apName = Util_ReallocString( ent->apName, name );
 }
 
 
