@@ -868,7 +868,7 @@ bool MapEditor::Launch( const ToolLaunchData& launchData )
 
 	Game_UpdateProjection();
 
-	renderOld->EnableSelection( true, gMainViewport );
+	// renderOld->EnableSelection( true, gMainViewport );
 
 	return MapEditor_Init();
 }
@@ -885,7 +885,7 @@ void MapEditor::Close()
 	Skybox_Destroy();
 	Phys_Shutdown();
 
-	renderOld->EnableSelection( false, gMainViewport );
+	// renderOld->EnableSelection( false, gMainViewport );
 	graphics->FreeViewport( gMainViewport );
 
 	gToolData.graphicsWindow = 0;
