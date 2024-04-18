@@ -54,6 +54,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 	PROF_SCOPE();
 
 	std::string                commandName;
+	std::string                fullCommand;
 	std::vector< std::string > args;
 
 	for ( size_t i = 0; i < sCommand.size(); i++ )
@@ -61,7 +62,7 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 		commandName.clear();
 		args.clear();
 
-		Con_ParseCommandLineEx( sCommand, commandName, args, i );
+		Con_ParseCommandLineEx( sCommand, commandName, args, fullCommand, i );
 		str_lower( commandName );
 
 		ConVarBase* cvarBase = Con_GetConVarBase( commandName );

@@ -441,8 +441,9 @@ void Input_BindKey( EButton key, const std::string& cmd )
 
 	// Add the first convar here to the input list
 	std::string name;
+	std::string fullCommand;
 	std::vector< std::string > args;
-	Con_ParseCommandLine( cmd, name, args );
+	Con_ParseCommandLine( cmd, name, args, fullCommand );
 
 	ConVar* cvar = Con_GetConVar( name );
 
