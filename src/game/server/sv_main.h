@@ -136,7 +136,7 @@ void                SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srD
 void                SV_ConnectClientFinish( SV_Client_t& srClient );
 
 // void                SV_SendConVar( std::string_view sName, const std::vector< std::string >& srArgs );
-void                SV_SendConVar( ConVarBase* spConVar );
+void                SV_SendConVar( std::string_view sConVar );
 bool                SV_BuildConVarMsg( flatbuffers::FlatBufferBuilder& srMessage, bool sFullUpdate = false );
 
 // --------------------------------------------------------------------

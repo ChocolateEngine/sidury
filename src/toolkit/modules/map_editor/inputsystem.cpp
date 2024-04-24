@@ -8,9 +8,9 @@ extern IInputSystem* input;
 LOG_REGISTER_CHANNEL2( EditorInput, LogColor::Default );
 
 
-CONVAR( m_pitch, 0.022, CVARF_ARCHIVE );
-CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
-CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
+CONVAR_FLOAT( m_pitch, 0.022, CVARF_ARCHIVE, "Mouse Pitch" );
+CONVAR_FLOAT( m_yaw, 0.022, CVARF_ARCHIVE, "Mouse Yaw" );
+CONVAR_FLOAT( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 
 static glm::vec2                                    gMouseDelta{};
@@ -117,9 +117,6 @@ EBinding Input_StrToBinding( std::string_view sBindingName )
 //		Log_MsgF( "Binding: \"%s\" - %s\n", input->GetKeyName( sScancode ), Input_BindingToStr( it->second ) );
 //	}
 //}
-
-
-CONVAR( in_show_scancodes, 0 );
 
 
 CONCMD( bind_reset_all )
@@ -317,8 +314,9 @@ static void bind_dropdown_keys(
 
 
 static void bind_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	bind_dropdown_keys( args, results );
 	

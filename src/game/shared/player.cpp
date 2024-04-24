@@ -42,85 +42,87 @@ extern u32 gMainViewportIndex;
 
 constexpr float DEFAULT_SPEED = 6.34325f;
 
-CONVAR( sv_sprint_mult, 2.4, CVARF_DEF_SERVER_REPLICATED );
-CONVAR( sv_duck_mult, 0.5, CVARF_DEF_SERVER_REPLICATED );
+CONVAR_FLOAT( sv_sprint_mult, 2.4, CVARF_DEF_SERVER_REPLICATED, "Player Sprint Speed Multiplier" );
+CONVAR_FLOAT( sv_duck_mult, 0.5, CVARF_DEF_SERVER_REPLICATED, "Player Duck Speed Multiplier" );
 
-ConVar forward_speed( "sv_forward_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );
-ConVar side_speed( "sv_side_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );  // 350.f
-ConVar max_speed( "sv_max_speed", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );    // 320.f
+CONVAR_FLOAT( sv_forward_speed, DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED, "Player Forward Speed" );
+CONVAR_FLOAT( sv_side_speed, DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED, "Player Side Speed" );  // 350.f
+CONVAR_FLOAT( sv_max_speed, DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED, "Player Max Speed" );    // 320.f
 
-ConVar accel_speed( "sv_accel_speed", 10, CVARF_DEF_SERVER_REPLICATED );
-ConVar accel_speed_air( "sv_accel_speed_air", 1, CVARF_DEF_SERVER_REPLICATED );
-ConVar jump_force( "sv_jump_force", DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED );
-ConVar stop_speed( "sv_stop_speed", 2, CVARF_DEF_SERVER_REPLICATED );
+CONVAR_FLOAT( sv_accel_speed, 10, CVARF_DEF_SERVER_REPLICATED, "Player Acceleration" );
+CONVAR_FLOAT( sv_accel_speed_air, 1, CVARF_DEF_SERVER_REPLICATED, "Player Acceleration When in the Air" );
+CONVAR_FLOAT( sv_jump_force, DEFAULT_SPEED, CVARF_DEF_SERVER_REPLICATED, "Player Jump Power" );
+CONVAR_FLOAT( sv_stop_speed, 2, CVARF_DEF_SERVER_REPLICATED, "Player Stop Speed" );
 
-CONVAR( sv_friction, 8, CVARF_DEF_SERVER_REPLICATED );  // 4.f
-CONVAR( sv_friction_enable, 1, CVARF_DEF_SERVER_REPLICATED );
+CONVAR_FLOAT( sv_friction, 8, CVARF_DEF_SERVER_REPLICATED, "Player Ground Friction" );  // 4.f
+CONVAR_BOOL( sv_friction_enable, 1, CVARF_DEF_SERVER_REPLICATED );
 
-CONVAR( phys_friction_player, 0.01, CVARF_DEF_SERVER_REPLICATED );
+CONVAR_FLOAT( phys_friction_player, 0.01, CVARF_DEF_SERVER_REPLICATED );
 
 // lerp the friction maybe?
-//CONVAR( sv_new_movement, 1 );
-//CONVAR( sv_friction_new, 8 );  // 4.f
+//CONVAR_FLOAT( sv_new_movement, 1 );
+//CONVAR_FLOAT( sv_friction_new, 8 );  // 4.f
 
-// CONVAR( sv_gravity, 800, CVARF_DEF_SERVER_REPLICATED );
-CONVAR( phys_gravity_player, -( CH_GRAVITY_SPEED * 2.f ), CVARF_DEF_SERVER_REPLICATED );
+// CONVAR_FLOAT( sv_gravity, 800, CVARF_DEF_SERVER_REPLICATED );
+CONVAR_FLOAT( phys_gravity_player, -( CH_GRAVITY_SPEED * 2.f ), CVARF_DEF_SERVER_REPLICATED, "Player Gravity, Different from phys_gravity" );
 
-CONVAR( cl_stepspeed, 8 );
-CONVAR( cl_steptime, 0.25 );
-CONVAR( cl_stepduration, 0.22 );
+CONVAR_FLOAT( cl_stepspeed, 8 );
+CONVAR_FLOAT( cl_steptime, 0.25 );
+CONVAR_FLOAT( cl_stepduration, 0.22 );
 
-CONVAR( sv_view_height, 1.7, CVARF_DEF_SERVER_REPLICATED );  // 67
-CONVAR( sv_view_height_duck, 0.888, CVARF_DEF_SERVER_REPLICATED );  // 35
-CONVAR( sv_view_height_lerp, 15, CVARF_DEF_SERVER_REPLICATED );  // 0.015
+CONVAR_FLOAT( sv_view_height, 1.7, CVARF_DEF_SERVER_REPLICATED, "View Height in Meters" );              // 67
+CONVAR_FLOAT( sv_view_height_duck, 0.888, CVARF_DEF_SERVER_REPLICATED, "View Duck Height in Meters" );  // 35
+CONVAR_FLOAT( sv_view_height_lerp, 15, CVARF_DEF_SERVER_REPLICATED );                                   // 0.015
 
-CONVAR( player_model_scale, 0.025373 );
+CONVAR_FLOAT( player_model_scale, 0.025373, "yeah" );
 
-CONVAR( cl_thirdperson, 0 );
-CONVAR( cl_playermodel_enable, 1 );
-CONVAR( cl_playermodel_shadow_local, 1 );
-CONVAR( cl_playermodel_shadow, 0 );
-CONVAR( cl_playermodel_cam_ang, 1 );
-CONVAR( cl_cam_x, 0 );
-CONVAR( cl_cam_y, 0 );
-CONVAR( cl_cam_z, -3 );
-CONVAR( cl_show_player_stats, 0 );
+CONVAR_BOOL( cl_thirdperson, 0 );
+CONVAR_BOOL( cl_playermodel_enable, 1 );
+CONVAR_BOOL( cl_playermodel_shadow_local, 1 );
+CONVAR_BOOL( cl_playermodel_shadow, 0 );
+CONVAR_BOOL( cl_playermodel_cam_ang, 1 );
 
-CONVAR( phys_dbg_player, 0 );
+CONVAR_VEC3( cl_cam_offset, 0, 0, -3.f );
 
-CONVAR( r_fov, 106.f, CVARF_ARCHIVE );
-CONVAR( r_nearz, 0.01f );
-CONVAR( r_farz, 1000.f );
+CONVAR_FLOAT( cl_show_player_stats, 0 );
 
-CONVAR( cl_zoom_fov, 40 );
-CONVAR( cl_zoom_duration, 0.4 );
+CONVAR_BOOL( phys_dbg_player, 0 );
 
-CONVAR( cl_duck_time, 0.4 );
+CONVAR_FLOAT( r_fov, 106.f, CVARF_ARCHIVE, "Player FOV" );
+CONVAR_FLOAT( r_nearz, 0.01f, "Player Near Z" );
+CONVAR_FLOAT( r_farz, 1000.f, "Player Far Z" );
 
-CONVAR( sv_land_smoothing, 1 );
-CONVAR( sv_land_max_speed, 30 );
-CONVAR( sv_land_vel_scale, 1 );      // 0.01
-CONVAR( sv_land_power_scale, 2 );  // 0.01
-CONVAR( sv_land_time_scale, 2 );
+CONVAR_FLOAT( cl_zoom_fov, 40 );
+CONVAR_FLOAT( cl_zoom_duration, 0.4 );
 
-CONVAR( cl_bob_enabled, 1 );
-CONVAR( cl_bob_magnitude, 0.5 );
-CONVAR( cl_bob_freq, 45 );
-CONVAR( cl_bob_speed_scale, 0.013 );
-CONVAR( cl_bob_exit_lerp, 0.1 );
-CONVAR( cl_bob_exit_threshold, 0.1 );
-CONVAR( cl_bob_sound_threshold, 0.1 );
-CONVAR( cl_bob_offset, 0.25 );
-CONVAR( cl_bob_time_offset, -0.6 );
-CONVAR( cl_bob_debug, 0 );
+CONVAR_FLOAT( cl_duck_time, 0.4 );
 
-CONVAR( r_flashlight_brightness, 10.f );
-CONVAR( r_flashlight_lock, 0.f );
-CONVAR( r_flashlight_offset_x, -0.1f );
-CONVAR( r_flashlight_offset_y, -0.1f );
-CONVAR( r_flashlight_offset_z, -0.1f );
+CONVAR_BOOL( sv_land_smoothing, 1 );
+CONVAR_FLOAT( sv_land_max_speed, 30 );
+CONVAR_FLOAT( sv_land_vel_scale, 1 );  // 0.01
+CONVAR_FLOAT( sv_land_power_scale, 2 );  // 0.01
+CONVAR_FLOAT( sv_land_time_scale, 2 );
 
-extern ConVar   m_yaw, m_pitch;
+CONVAR_BOOL( cl_bob_enabled, 1 );
+CONVAR_FLOAT( cl_bob_magnitude, 0.5 );
+CONVAR_FLOAT( cl_bob_freq, 45 );
+CONVAR_FLOAT( cl_bob_speed_scale, 0.013 );
+CONVAR_FLOAT( cl_bob_exit_lerp, 0.1 );
+CONVAR_FLOAT( cl_bob_exit_threshold, 0.1 );
+CONVAR_FLOAT( cl_bob_sound_threshold, 0.1 );
+CONVAR_FLOAT( cl_bob_offset, 0.25 );
+CONVAR_FLOAT( cl_bob_time_offset, -0.6 );
+CONVAR_BOOL( cl_bob_debug, 0 );
+
+CONVAR_FLOAT( r_flashlight_brightness, 10.f );
+CONVAR_BOOL( r_flashlight_lock, 0 );
+
+CONVAR_VEC3( r_flashlight_offset, -0.1f, -0.1f, -0.1f );
+CONVAR_VEC3( r_flashlight_color, 1, 1, 1 );
+
+// CONVAR_FLOAT_EXT( m_yaw );
+// CONVAR_FLOAT_EXT( m_pitch );
+extern const float &m_yaw, &m_pitch;
 
 // 2.069860757751118
 constexpr float         PLAYER_MASS            = 10.503715f;
@@ -446,10 +448,10 @@ void PlayerManager::Create( Entity player )
 	Ent_AddComponent( playerInfo->aCamera, "direction" );
 
 	CCamera* camera = Ent_AddComponent< CCamera >( playerInfo->aCamera, "camera" );
-	camera->aFov    = r_fov.GetFloat();
+	camera->aFov    = r_fov;
 
-	zoom->aOrigFov             = r_fov.GetFloat();
-	zoom->aNewFov              = r_fov.GetFloat();
+	zoom->aOrigFov             = r_fov;
+	zoom->aNewFov              = r_fov;
 
 	// ------------------------------------------------------------------------------
 	// Setup Flashlight
@@ -458,8 +460,8 @@ void PlayerManager::Create( Entity player )
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
-	// flashlight->aColor    = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
-	flashlight->aColor.Edit()  = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
+	// flashlight->aColor    = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+	flashlight->aColor.Edit()  = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
 	// ------------------------------------------------------------------------------
 	// Setup Physics Shapes
@@ -566,8 +568,8 @@ void PlayerManager::Respawn( Entity player )
 	camTransform->aAng.Edit()     = playerSpawnSpot.aAng;
 #endif
 
-	zoom->aOrigFov                = r_fov.GetFloat();
-	zoom->aNewFov                 = r_fov.GetFloat();
+	zoom->aOrigFov                = r_fov;
+	zoom->aNewFov                 = r_fov;
 
 	// physObjComp->aTransformMode   = EPhysTransformMode_None;
 
@@ -635,9 +637,7 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 		flashlight->aPos        = transform->aPos.Get() + camTransform->aPos.Get();
 
-		glm::vec3 offset( r_flashlight_offset_x.GetFloat(), r_flashlight_offset_y.GetFloat(), r_flashlight_offset_z.GetFloat() );
-
-		flashlight->aPos += offset * camDir->aUp.Get();
+		flashlight->aPos += r_flashlight_offset * camDir->aUp.Get();
 	};
 
 	// Toggle flashlight on or off
@@ -657,10 +657,10 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 	if ( flashlight->aEnabled )
 	{
-		// flashlight->aColor = { r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat(), r_flashlight_brightness.GetFloat() };
-		flashlight->aColor.Edit() = { 1.f, 1.f, 1.f, r_flashlight_brightness.GetFloat() };
+		// flashlight->aColor = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+		flashlight->aColor.Edit() = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
-		if ( !r_flashlight_lock.GetBool() )
+		if ( !r_flashlight_lock )
 		{
 			UpdateTransform();
 		}
@@ -797,8 +797,8 @@ void PlayerManager::UpdateLocalPlayer()
 
 		UpdateView( playerInfo, player );
 
-		// if ( ( cl_thirdperson.GetBool() && cl_playermodel_enable.GetBool() ) || !playerInfo->aIsLocalPlayer )
-		if ( cl_playermodel_enable && ( cl_thirdperson.GetBool() || !playerInfo->aIsLocalPlayer ) )
+		// if ( ( cl_thirdperson && cl_playermodel_enable ) || !playerInfo->aIsLocalPlayer )
+		if ( cl_playermodel_enable && ( cl_thirdperson || !playerInfo->aIsLocalPlayer ) )
 		{
 			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
 
@@ -833,7 +833,7 @@ void PlayerManager::UpdateLocalPlayer()
 			else
 				renderData->aCastShadow = false;
 
-			float     scaleBase = player_model_scale.GetFloat();
+			float     scaleBase = player_model_scale;
 
 			// This is to squish the model when the player crouches
 			// TODO: HANDLE WHEN THE PLAYER IS IN THE AIR !!!! NETWORK THAT DATA !!!!
@@ -984,10 +984,10 @@ void CalcZoom( CCamera* camera, Entity player )
 #if 1
 	if ( userCmd )
 	{
-		if ( zoom->aOrigFov != r_fov.GetFloat() )
+		if ( zoom->aOrigFov != r_fov )
 		{
 			zoom->aZoomTime = 0.f;  // idk lol
-			zoom->aOrigFov  = r_fov.GetFloat();
+			zoom->aOrigFov  = r_fov;
 		}
 
 		if ( Game_IsPaused() )
@@ -1041,8 +1041,8 @@ void CalcZoom( CCamera* camera, Entity player )
 		}
 	}
 #else
-	zoom->aOrigFov = r_fov.GetFloat();
-	zoom->aNewFov  = r_fov.GetFloat();
+	zoom->aOrigFov = r_fov;
+	zoom->aNewFov  = r_fov;
 #endif
 
 #if CH_CLIENT
@@ -1105,13 +1105,13 @@ void PlayerManager::UpdateView( CPlayerInfo* info, Entity player )
 	//Transform transformView = transform;
 	//transformView.aAng += move.aViewAngOffset;
 
-	if ( cl_thirdperson.GetBool() )
+	if ( cl_thirdperson )
 	{
 		Transform thirdPerson = {
-			.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()}
+			.aPos = cl_cam_offset
 		};
 
-		// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
+		// thirdPerson.aPos = {cl_cam_x, cl_cam_y, cl_cam_z};
 
 		glm::mat4 viewMatrixZ;
 		Util_ToViewMatrixZ( viewMatrixZ, transformView.aPos, transformView.aAng );
@@ -1285,7 +1285,7 @@ void PlayerMovement::OnPlayerSpawn( Entity player )
 
 	SetMoveType( *move, EPlayerMoveType_Walk );
 
-	camTransform->aPos.Edit() = { 0, 0, sv_view_height.GetFloat() };
+	camTransform->aPos.Edit() = { 0, 0, sv_view_height };
 }
 
 
@@ -1317,7 +1317,7 @@ void PlayerMovement::MovePlayer( Entity player, UserCmd_t* spUserCmd )
 
 	apUserCmd         = spUserCmd;
 
-	apCharacter->SetAllowDebugDraw( phys_dbg_player.GetBool() );
+	apCharacter->SetAllowDebugDraw( phys_dbg_player );
 
 	// update velocity
 	apRigidBody->aVel = apCharacter->GetLinearVelocity();
@@ -1579,9 +1579,9 @@ void PlayerMovement::UpdateInputs()
 		moveScale = sv_sprint_mult;
 	}
 
-	const float forwardSpeed = forward_speed * moveScale;
-	const float sideSpeed = side_speed * moveScale;
-	apMove->aMaxSpeed = max_speed * moveScale;
+	const float forwardSpeed = sv_forward_speed * moveScale;
+	const float sideSpeed    = sv_side_speed * moveScale;
+	apMove->aMaxSpeed        = sv_max_speed * moveScale;
 
 	if ( apUserCmd->aButtons & EBtnInput_Forward ) apRigidBody->aAccel.Edit()[ W_FORWARD ] = forwardSpeed;
 	if ( apUserCmd->aButtons & EBtnInput_Back )    apRigidBody->aAccel.Edit()[ W_FORWARD ] += -forwardSpeed;
@@ -1590,7 +1590,7 @@ void PlayerMovement::UpdateInputs()
 
 	if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
 	{
-		apRigidBody->aVel.Edit()[ W_UP ] = jump_force;
+		apRigidBody->aVel.Edit()[ W_UP ] = sv_jump_force;
 	}
 
 	apMove->aPlayerFlags.Set( newFlags );
@@ -1640,7 +1640,7 @@ private:
 };
 
 
-CONVAR( phys_player_max_sep_dist, 1 );
+CONVAR_FLOAT( phys_player_max_sep_dist, 1 );
 
 // Post Physics Simulation Update
 void PlayerMovement::UpdatePosition( Entity player )
@@ -1744,7 +1744,7 @@ void PlayerMovement::DoSmoothDuck()
 			apMove->aDuckDuration = Lerp_GetDuration( sv_view_height, sv_view_height_duck, apMove->aPrevViewHeight );
 
 			// this is stupid
-			if ( apMove->aTargetViewHeight == sv_view_height.GetFloat() )
+			if ( apMove->aTargetViewHeight == sv_view_height )
 				apMove->aDuckDuration = 1 - apMove->aDuckDuration;
 
 			apMove->aDuckDuration *= cl_duck_time;
@@ -1773,7 +1773,7 @@ void PlayerMovement::DoSmoothDuck()
 
 
 // The maximum angle of slope that character can still walk on
-CONVAR( phys_player_max_slope_ang, 40, 0, "The maximum angle of slope that character can still walk on" );
+CONVAR_FLOAT( phys_player_max_slope_ang, 40, "The maximum angle of slope that character can still walk on" );
 
 
 bool PlayerMovement::CalcOnGround( bool sSetFlag )
@@ -1857,7 +1857,7 @@ float PlayerMovement::GetMaxSpeed()
 
 float PlayerMovement::GetMaxSpeedBase()
 {
-	return max_speed;
+	return sv_max_speed;
 }
 
 
@@ -1873,12 +1873,12 @@ float PlayerMovement::GetMaxDuckSpeed()
 }
 
 
-CONVAR( cl_step_sound_speed_vol, 0.001 );
-CONVAR( cl_step_sound_speed_offset, 1 );
-CONVAR( cl_step_sound_gravity_scale, 4 );
-CONVAR( cl_step_sound_min_speed, 0.075 );
-CONVAR( cl_step_sound, 1 );
-CONVAR( cl_impact_sound, 1 );
+CONVAR_FLOAT( cl_step_sound_speed_vol, 0.001 );
+CONVAR_FLOAT( cl_step_sound_speed_offset, 1 );
+CONVAR_FLOAT( cl_step_sound_gravity_scale, 4 );
+CONVAR_FLOAT( cl_step_sound_min_speed, 0.075 );
+CONVAR_FLOAT( cl_step_sound, 1 );
+CONVAR_FLOAT( cl_impact_sound, 1 );
 
 
 #if CH_CLIENT
@@ -1923,7 +1923,7 @@ void PlayerMovement::StopStepSound( bool force )
 
 void PlayerMovement::PlayStepSound()
 {
-	if ( !cl_step_sound.GetBool() )
+	if ( !cl_step_sound )
 		return;
 
 	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
@@ -1968,7 +1968,7 @@ void PlayerMovement::StopImpactSound()
 
 void PlayerMovement::PlayImpactSound()
 {
-	if ( !cl_impact_sound.GetBool() )
+	if ( !cl_impact_sound )
 		return;
 
 	//float vel = glm::length( glm::vec2(aVelocity.x, aVelocity.y) ); 
@@ -2026,7 +2026,7 @@ void PlayerMovement::FlyMove()
 }
 
 
-CONVAR( cl_land_sound_threshold, 0.1 );
+CONVAR_FLOAT( cl_land_sound_threshold, 0.1 );
 
 
 class PlayerStairsCheck : public PhysCollisionCollector
@@ -2123,7 +2123,7 @@ void PlayerMovement::WalkMove()
 	if ( groundState != EPhysGroundState_OnGround )
 	{
 		// glm::vec3 gravity = GetPhysEnv()->GetGravity();
-		glm::vec3 gravity( 0.f, 0.f, phys_gravity_player.GetFloat() );
+		glm::vec3 gravity( 0.f, 0.f, phys_gravity_player );
 		apRigidBody->aVel += gravity * gFrameTime;
 	}
 	else
@@ -2133,7 +2133,7 @@ void PlayerMovement::WalkMove()
 		// Handle Jumping
 		if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
 		{
-			newVel.z = jump_force;
+			newVel.z = sv_jump_force;
 		}
 		else
 		{
@@ -2201,7 +2201,7 @@ void PlayerMovement::DoSmoothLand( bool wasOnGround )
 		if ( CalcOnGround() && !wasOnGround )
 		// if ( CalcOnGround() && !WasOnGround() )
 		{
-			float baseLandVel  = abs( apRigidBody->aVel.Get()[ W_UP ] * sv_land_vel_scale.GetFloat() ) / sv_land_max_speed.GetFloat();
+			float baseLandVel  = abs( apRigidBody->aVel.Get()[ W_UP ] * sv_land_vel_scale ) / sv_land_max_speed;
 			float landVel      = std::clamp( baseLandVel * M_PI, 0.0, M_PI );
 
 			apMove->aLandPower = ( -cos( landVel ) + 1 ) / 2;
@@ -2257,7 +2257,7 @@ void PlayerMovement::DoViewBob()
 	{
 		// lerp back to 0 to not snap view the offset (not good enough) and reset input
 		apMove->aWalkTime        = 0.f;
-		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount.Get(), 0.f, cl_bob_exit_lerp.GetFloat() );
+		apMove->aBobOffsetAmount = glm::mix( apMove->aBobOffsetAmount.Get(), 0.f, cl_bob_exit_lerp );
 		apCamTransform->aPos.Edit()[ W_UP ] += apMove->aBobOffsetAmount;
 		//inExit = aBobOffsetAmount > 0.01;
 		//prevMove = aMove;
@@ -2317,16 +2317,16 @@ void PlayerMovement::DoViewBob()
 }
 
 
-CONVAR( cl_tilt, 1, CVARF_ARCHIVE );
-CONVAR( cl_tilt_speed, 0.1 );
-CONVAR( cl_tilt_threshold, 200 );
+CONVAR_FLOAT( cl_tilt, 1, CVARF_ARCHIVE );
+CONVAR_FLOAT( cl_tilt_speed, 0.1 );
+CONVAR_FLOAT( cl_tilt_threshold, 200 );
 
-CONVAR( cl_tilt_type, 1 );
-CONVAR( cl_tilt_lerp, 5 );
-CONVAR( cl_tilt_lerp_new, 10 );
-CONVAR( cl_tilt_speed_scale, 1.7 );
-CONVAR( cl_tilt_scale, 0.2 );
-CONVAR( cl_tilt_threshold_new, 12 );
+CONVAR_INT( cl_tilt_type, 1 );
+CONVAR_FLOAT( cl_tilt_lerp, 5 );
+CONVAR_FLOAT( cl_tilt_lerp_new, 10 );
+CONVAR_FLOAT( cl_tilt_speed_scale, 1.7 );
+CONVAR_FLOAT( cl_tilt_scale, 0.2 );
+CONVAR_FLOAT( cl_tilt_threshold_new, 12 );
 
 
 void PlayerMovement::DoViewTilt()
@@ -2357,20 +2357,20 @@ void PlayerMovement::DoViewTilt()
 }
 
 
-CONVAR( sv_friction_idk, 16 );
+CONVAR_FLOAT( sv_friction_idk, 16 );
 
-CONVAR( sv_friction2, 800 );
+CONVAR_FLOAT( sv_friction2, 800 );
 
-/*CONVAR( sv_friction_scale, 0.005 );
-CONVAR( sv_friction_scale2, 10 );
-CONVAR( sv_friction_offset, 6 );
-CONVAR( sv_friction_lerp, 5 );
+/*CONVAR_FLOAT( sv_friction_scale, 0.005 );
+CONVAR_FLOAT( sv_friction_scale2, 10 );
+CONVAR_FLOAT( sv_friction_offset, 6 );
+CONVAR_FLOAT( sv_friction_lerp, 5 );
 
-CONVAR( sv_friction_stop_lerp, 2 );
-CONVAR( sv_friction_scale3, 0.01 );
-CONVAR( sv_friction_scaleeee, 1 );
+CONVAR_FLOAT( sv_friction_stop_lerp, 2 );
+CONVAR_FLOAT( sv_friction_scale3, 0.01 );
+CONVAR_FLOAT( sv_friction_scaleeee, 1 );
 
-CONVAR( sv_friction_power, 2 );*/
+CONVAR_FLOAT( sv_friction_power, 2 );*/
 
 
 // TODO: make your own version of this that uses this to find the friction value:
@@ -2410,12 +2410,12 @@ void PlayerMovement::AddFriction()
 	//trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
 
 	//if (trace.fraction == 1.0)
-	//	friction = sv_friction.GetFloat() * sv_edgefriction.value;
+	//	friction = sv_friction * sv_edgefriction.value;
 	//else
 		friction = sv_friction;
 
 	// apply friction
-	float control = speed < stop_speed ? stop_speed : speed;
+		float control            = speed < sv_stop_speed ? sv_stop_speed : speed;
 	float newspeed = glm::max( 0.f, speed - gFrameTime * control * friction );
 
 	newspeed /= speed;
@@ -2427,7 +2427,7 @@ void PlayerMovement::AddFriction()
 void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir )
 {
 	//float baseWishSpeed = inAir ? glm::min( 30.f, vec3_norm( wishDir ) ) : wishSpeed;
-	float baseWishSpeed = inAir ? glm::min( accel_speed_air.GetFloat(), vec3_norm( wishDir ) ) : wishSpeed;
+	float baseWishSpeed = inAir ? glm::min( sv_accel_speed_air, vec3_norm( wishDir ) ) : wishSpeed;
 
 	float currentspeed  = glm::dot( apRigidBody->aVel.Get(), wishDir );
 	float addspeed      = baseWishSpeed - currentspeed;
@@ -2435,7 +2435,7 @@ void PlayerMovement::Accelerate( float wishSpeed, glm::vec3 wishDir, bool inAir 
 	if ( addspeed <= 0.f )
 		return;
 
-	addspeed = glm::min( addspeed, accel_speed * gFrameTime * wishSpeed );
+	addspeed = glm::min( addspeed, sv_accel_speed * gFrameTime * wishSpeed );
 
 	for ( int i = 0; i < 3; i++ )
 		apRigidBody->aVel.Edit()[ i ] += addspeed * wishDir[ i ];

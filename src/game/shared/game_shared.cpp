@@ -53,9 +53,11 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 {
 	PROF_SCOPE();
 
-	std::string                commandName;
-	std::string                fullCommand;
-	std::vector< std::string > args;
+	std::string                              commandName;
+	std::string                              fullCommand;
+	std::vector< std::string >               args;
+
+	const std::vector< ConVarDescriptor_t >& cvarList = Con_GetConVarList();
 
 	for ( size_t i = 0; i < sCommand.size(); i++ )
 	{
@@ -65,16 +67,27 @@ void Game_ExecCommandsSafe( ECommandSource sSource, std::string_view sCommand )
 		Con_ParseCommandLineEx( sCommand, commandName, args, fullCommand, i );
 		str_lower( commandName );
 
-		ConVarBase* cvarBase = Con_GetConVarBase( commandName );
+		ConVarDescriptor_t cvarDescriptor = Con_SearchConVarCmd( commandName.data(), commandName.size() );
 
-		if ( !cvarBase )
+		if ( !cvarDescriptor.apData )
 		{
 			// how did this happen?
 			Log_ErrorF( "Game_ExecCommandsSafe(): Failed to find command \"%s\"\n", commandName.c_str() );
 			continue;
 		}
 
-		ConVarFlag_t flags = cvarBase->GetFlags();
+		ConVarFlag_t flags = CVARF_NONE;
+
+		if ( cvarDescriptor.aIsConVar )
+		{
+			ConVarData_t* cvarData = static_cast< ConVarData_t* >( cvarDescriptor.apData );
+			flags = cvarData->aFlags;
+		}
+		else
+		{
+			ConCommand* cmd = static_cast< ConCommand* >( cvarDescriptor.apData );
+			flags           = cmd->aFlags;
+		}
 
 		// if the command is from the server and we are the client, make sure they can execute it
 #if CH_CLIENT

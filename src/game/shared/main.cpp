@@ -20,7 +20,7 @@
 #include <SDL_system.h>
 #include <SDL_hints.h>
 
-#include <algorithm>
+#include <algorithm>z
 
 
 IInputSystem*     input     = nullptr;
@@ -48,10 +48,8 @@ Entity           gLocalPlayer = CH_ENT_INVALID;
 ViewportCamera_t gView{};
 
 extern bool      gRunning;
-extern ConVar    r_nearz, r_farz, r_fov;
-extern ConVar    host_timescale;
 
-CONVAR( phys_friction, 10 );
+CONVAR_FLOAT( phys_friction, 10, "" );
 
 
 // CON_COMMAND( pause )
@@ -87,6 +85,4 @@ bool Game_IsPaused()
 {
 	return gPaused;
 }
-
-
 

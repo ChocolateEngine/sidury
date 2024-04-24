@@ -21,7 +21,7 @@ EntitySystemData& EntSysData()
 }
 
 
-CONVAR( ent_show_translations, 0, "Show Entity ID Translations" );
+CONVAR_BOOL( ent_show_translations, 0, "Show Entity ID Translations" );
 
 
 // void* EntComponentRegistry_Create( std::string_view sName )
@@ -995,7 +995,7 @@ Entity Entity_TranslateEntityID( Entity sEntity, bool sCreate )
 			return CH_ENT_INVALID;
 		}
 
-		if ( ent_show_translations.GetBool() )
+		if ( ent_show_translations )
 			Log_DevF( gLC_Entity, 3, "Translating Entity ID %zd -> %zd\n", sEntity, it->second );
 
 		return it->second;

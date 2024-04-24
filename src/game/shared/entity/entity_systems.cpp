@@ -4,7 +4,7 @@
 #include "igraphics.h"
 
 
-CONVAR( r_debug_draw_transforms, 0 );
+CONVAR_BOOL( r_debug_draw_transforms, 0, "Draw an Axis where renderable entities are" );
 
 
 void LightSystem::ComponentAdded( Entity sEntity, void* spData )

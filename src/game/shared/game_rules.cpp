@@ -32,8 +32,9 @@ inline void sv_set_gamerule_dropdown_vartype(
 
 
 static void sv_set_gamerule_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 #if 0
 	for ( const auto& [ name, type ] : GameRules()->aVarTypes )

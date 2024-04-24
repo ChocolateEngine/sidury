@@ -12,7 +12,7 @@
 #include "imgui/imgui_impl_sdl2.h"
 
 
-CONVAR( r_render, 1 );
+CONVAR_BOOL( r_render, 1, "" );
 
 // blech
 u32                 gMainViewportIndex = UINT32_MAX;

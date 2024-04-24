@@ -31,8 +31,8 @@ constexpr const char* CH_EDITOR_MODEL_GIZMO_SCALE = "";
 EditorRenderables     gEditorRenderables;
 
 
-CONVAR( editor_gizmo_scale, 0.006, CVARF_ARCHIVE, "Scale of the Editor Gizmos" );
-CONVAR( editor_gizmo_scale_enabled, 1, "Enable Editor Gizmo Scaling" );
+CONVAR_FLOAT( editor_gizmo_scale, 0.006, CVARF_ARCHIVE, "Scale of the Editor Gizmos" );
+CONVAR_BOOL( editor_gizmo_scale_enabled, 1, "Enable Editor Gizmo Scaling" );
 
 
 // adds the entity to the selection list, making sure it's not in the list multiple times
@@ -1316,7 +1316,7 @@ void EntEditor_DrawUI()
 			float     dist   = glm::sqrt( powf( camPos.x - pos.x, 2 ) + powf( camPos.y - pos.y, 2 ) + powf( camPos.z - pos.z, 2 ) );
 
 			glm::vec3 scale  = { dist, dist, dist };
-			scale *= editor_gizmo_scale.GetFloat();
+			scale *= editor_gizmo_scale;
 
 			gizmoPosMat = Util_ToMatrix( &pos, nullptr, &scale );
 		}
@@ -1328,7 +1328,6 @@ void EntEditor_DrawUI()
 		// Draw the Selection Gizmo
 		gizmoTranslation->aVisible     = true;
 		gizmoTranslation->aModelMatrix = gizmoPosMat;
-
 	}
 }
 

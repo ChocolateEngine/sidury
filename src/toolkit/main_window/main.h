@@ -64,9 +64,9 @@ extern SDL_Window*               gpWindow;
 extern ChHandle_t                gGraphicsWindow;
 extern std::vector< LoadedTool > gTools;
 
-extern ConVar                    r_nearz;
-extern ConVar                    r_farz;
-extern ConVar                    r_fov;
+CONVAR_FLOAT_EXT( r_nearz );
+CONVAR_FLOAT_EXT( r_farz );
+CONVAR_FLOAT_EXT( r_fov );
 
 void                             Util_DrawTextureInfo( TextureInfo_t& info );
 

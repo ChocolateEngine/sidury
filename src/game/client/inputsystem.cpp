@@ -16,23 +16,30 @@ REGISTER_BUTTON( IN_FORWARD );
 REGISTER_BUTTON( IN_BACK );
 
 
-CONVAR( m_pitch, 0.022, CVARF_ARCHIVE );
-CONVAR( m_yaw, 0.022, CVARF_ARCHIVE );
-CONVAR( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
+CONVAR_FLOAT( m_pitch, 0.022, CVARF_ARCHIVE, "Mouse Pitch" );
+CONVAR_FLOAT( m_yaw, 0.022, CVARF_ARCHIVE, "Mouse Yaw" );
+CONVAR_FLOAT( m_sensitivity, 1.0, CVARF_ARCHIVE, "Mouse Sensitivity" );
 
 
-static glm::vec2                                  gMouseDelta{};
-static glm::vec2                                  gMouseDeltaScale{ 1.f, 1.f };
-static std::vector< ButtonInput_t >               gButtonInputs;
-static ButtonInput_t                              gButtons;
-static std::unordered_map< EButton, std::string > gKeyBinds;
-static std::unordered_map< EButton, std::string > gKeyBindToggle;
-
-static std::vector< ConVar* >                     gInputCvars;
-static std::unordered_map< EButton, ConVar* >     gInputCvarKeys;
+struct InputConVar_t
+{
+	const char*   apName;
+	int*          aValue;
+};
 
 
-static bool                                       gResetBindings = Args_Register( "Reset All Keybindings", "-reset-binds" );
+static glm::vec2                                    gMouseDelta{};
+static glm::vec2                                    gMouseDeltaScale{ 1.f, 1.f };
+static std::vector< ButtonInput_t >                 gButtonInputs;
+static ButtonInput_t                                gButtons;
+static std::unordered_map< EButton, std::string >   gKeyBinds;
+static std::unordered_map< EButton, std::string >   gKeyBindToggle;
+
+// static std::vector< ConVar* >                     gInputCvars;
+static std::unordered_map< EButton, InputConVar_t > gInputCvarKeys;
+
+
+static bool                                         gResetBindings = Args_Register( "Reset All Key Bindings", "-reset-binds" );
 
 
 // TODO: buffered input
@@ -65,8 +72,9 @@ CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 
 
 static void bind_dropdown_keys(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
 	{
@@ -103,10 +111,11 @@ static void bind_dropdown_keys(
 }
 
 static void bind_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
-	bind_dropdown_keys( args, results );
+	bind_dropdown_keys( args, fullCommand, results );
 
 	if ( results.size() > 1 )
 		return;
@@ -249,7 +258,7 @@ CONCMD_VA( unbindall, "Unbind all keys" )
 }
 
 
-CONVAR( in_show_scancodes, 0 );
+CONVAR_BOOL( in_show_scancodes, 0, "" );
 
 
 static const char* gDefaultBinds[] = {
@@ -305,22 +314,22 @@ void Input_Init()
 	Con_AddArchiveCallback( CmdBindArchive );
 
 	// Find all Convars with the CVARF_INPUT flag on it
-	for ( uint32_t i = 0; i < Con_GetConVarCount(); i++ )
-	{
-		ConVarBase* current = Con_GetConVar( i );
-
-		if ( typeid( *current ) != typeid( ConVar ) )
-			continue;
-
-		ConVar* cvar = static_cast< ConVar* >( current );
-
-		if ( cvar->aFlags & CVARF_INPUT )
-			gInputCvars.push_back( cvar );
-	}
+//	for ( uint32_t i = 0; i < Con_GetConVarCount(); i++ )
+//	{
+//		ConVarBase* current = Con_GetConVar( i );
+//
+//		if ( typeid( *current ) != typeid( ConVar ) )
+//			continue;
+//
+//		ConVar* cvar = static_cast< ConVar* >( current );
+//
+//		if ( cvar->aFlags & CVARF_INPUT )
+//			gInputCvars.push_back( cvar );
+//	}
 
 	if ( gResetBindings )
 	{
-		bind_reset_all( {} );
+		bind_reset_all( {}, {} );
 	}
 }
 
@@ -347,19 +356,19 @@ void Input_Update()
 	{
 		if ( input->KeyJustPressed( scancode ) )
 		{
-			cvar->SetValue( IN_CVAR_JUST_PRESSED );
+			Con_SetConVarValue( cvar.apName, IN_CVAR_JUST_PRESSED );
 		}
-		else if ( input->KeyPressed( scancode ) && cvar->GetFloat() == IN_CVAR_JUST_PRESSED )
+		else if ( input->KeyPressed( scancode ) && *cvar.aValue == IN_CVAR_JUST_PRESSED )
 		{
-			cvar->SetValue( IN_CVAR_PRESSED );
+			Con_SetConVarValue( cvar.apName, IN_CVAR_PRESSED );
 		}
 		else if ( input->KeyJustReleased( scancode ) )
 		{
-			cvar->SetValue( IN_CVAR_JUST_RELEASED );
+			Con_SetConVarValue( cvar.apName, IN_CVAR_JUST_RELEASED );
 		}
-		else if ( input->KeyReleased( scancode ) && cvar->GetFloat() == IN_CVAR_JUST_RELEASED )
+		else if ( input->KeyReleased( scancode ) && *cvar.aValue == IN_CVAR_JUST_RELEASED )
 		{
-			cvar->SetValue( IN_CVAR_RELEASED );
+			Con_SetConVarValue( cvar.apName, IN_CVAR_RELEASED );
 		}
 	}
 	
@@ -445,14 +454,22 @@ void Input_BindKey( EButton key, const std::string& cmd )
 	std::vector< std::string > args;
 	Con_ParseCommandLine( cmd, name, args, fullCommand );
 
-	ConVar* cvar = Con_GetConVar( name );
+	ConVarData_t* cvar = Con_GetConVarData( name.data() );
 
 	if ( !cvar )
 		return;
 
+	if ( cvar->aType != EConVarType_RangeInt )
+	{
+		Log_WarnF( gLC_GameInput, "Input ConVar \"%s\" is not a ranged integer type\n", name.data() );
+		return;
+	}
+
 	if ( cvar->aFlags & CVARF_INPUT )
 	{
-		gInputCvarKeys[ key ] = cvar;
+		InputConVar_t& inputCvar = gInputCvarKeys[ key ];
+		inputCvar.apName = Util_AllocString( name.data(), name.size() );
+		inputCvar.aValue = cvar->aRangeInt.apData;
 	}
 }
 

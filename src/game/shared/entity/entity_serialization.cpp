@@ -15,8 +15,8 @@
 
 LOG_CHANNEL2( Entity );
 
-CONVAR( ent_always_full_update, 0, "For debugging, always send a full update" );
-CONVAR( ent_show_component_net_updates, 0, "Show Component Network Updates" );
+CONVAR_BOOL( ent_always_full_update, 0, "For debugging, always send a full update" );
+CONVAR_BOOL( ent_show_component_net_updates, 0, "Show Component Network Updates" );
 
 
 // Read and write from the network

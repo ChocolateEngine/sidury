@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 
-CONVAR( matedit_texture_size, 64, CVARF_ARCHIVE, "Size of textures drawn in the image preview" );
+CONVAR_INT( matedit_texture_size, 64, CVARF_ARCHIVE, "Size of textures drawn in the image preview" );
 
 
 int gMainMenuBarHeight = 0;
@@ -353,7 +353,7 @@ void MaterialEditor_DrawMaterialData()
 		{
 			ChHandle_t        texHandle   = graphics->Mat_GetTexture( gMatEditor.mat, shaderVar.name );
 
-			float             size        = std::clamp( matedit_texture_size.GetFloat(), 2.f, 8192.f );
+			float             size        = std::clamp( matedit_texture_size, 2, 8192 );
 
 			ImVec2            texSize     = { size, size };
 

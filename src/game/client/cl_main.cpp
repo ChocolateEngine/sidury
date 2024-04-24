@@ -62,7 +62,7 @@ std::vector< std::string >        gMapList;
 static bool                       gRebuildMapList  = true;
 static float                      gRebuildMapTimer = 0.f;
 
-CONVAR( cl_map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
+CONVAR_FLOAT( cl_map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
 CONCMD_VA( cl_map_list_rebuild, "Rebuild the map list now" )
@@ -73,33 +73,34 @@ CONCMD_VA( cl_map_list_rebuild, "Rebuild the map list now" )
 // NEW_CVAR_FLAG( CVARF_CLIENT );
 
 
-CONVAR( cl_connect_timeout_duration, 30.f, "How long we will wait for the server to send us connection information" );
-CONVAR( cl_timeout_duration, 120.f, "How long we will wait for the server to start responding again before disconnecting" );
-CONVAR( cl_timeout_threshold, 4.f, "If the server doesn't send anything after this amount of time, show the connection problem message" );
+CONVAR_FLOAT( cl_connect_timeout_duration, 30.f, "How long we will wait for the server to send us connection information" );
+CONVAR_FLOAT( cl_timeout_duration, 120.f, "How long we will wait for the server to start responding again before disconnecting" );
+CONVAR_FLOAT( cl_timeout_threshold, 4.f, "If the server doesn't send anything after this amount of time, show the connection problem message" );
 
-CONVAR( in_forward, 0, CVARF( INPUT ) );
-CONVAR( in_back, 0, CVARF( INPUT ) );
-CONVAR( in_left, 0, CVARF( INPUT ) );
-CONVAR( in_right, 0, CVARF( INPUT ) );
+INPUT_CONVAR( in_forward, "" );
+INPUT_CONVAR( in_back, "" );
+INPUT_CONVAR( in_left, "" );
+INPUT_CONVAR( in_right, "" );
 
-CONVAR( in_duck, 0, CVARF( INPUT ) );
-CONVAR( in_sprint, 0, CVARF( INPUT ) );
-CONVAR( in_jump, 0, CVARF( INPUT ) );
-CONVAR( in_zoom, 0, CVARF( INPUT ) );
-CONVAR( in_flashlight, 0, CVARF( INPUT ) );
+INPUT_CONVAR( in_duck, "" );
+INPUT_CONVAR( in_sprint, "" );
+INPUT_CONVAR( in_jump, "" );
+INPUT_CONVAR( in_zoom, "" );
+INPUT_CONVAR( in_flashlight, "" );
 
 
-CONVAR_CMD_EX( cl_username, "greg", CVARF_ARCHIVE, "Your Username" )
+CONVAR_STRING_CMD( cl_username, "greg", CVARF_ARCHIVE, "Your Username" )
 {
-	if ( cl_username.GetValue().size() <= CH_MAX_USERNAME_LEN )
+	size_t usernameLen = strlen( cl_username );
+	if ( usernameLen <= CH_MAX_USERNAME_LEN )
 		return;
 
-	Log_WarnF( gLC_Client, "Username is too long (%zd chars), max is %d chars\n", cl_username.GetValue().size(), CH_MAX_USERNAME_LEN );
-	cl_username.SetValue( prevString );
+	Log_WarnF( gLC_Client, "Username \"%s\" is too long (%zd chars), max is %d chars\n", newValue, usernameLen, CH_MAX_USERNAME_LEN );
+	Con_SetConVarValue( "cl_username", prevValue );
 }
 
 
-CONVAR_CMD_EX( cl_username_use_steam, 1, CVARF_ARCHIVE, "Use username from steam instead of what cl_username contains" )
+CONVAR_BOOL_CMD( cl_username_use_steam, 1, CVARF_ARCHIVE, "Use username from steam instead of what cl_username contains" )
 {
 	// TODO: callback to send a username change to a server if we are connected to one
 }
@@ -999,9 +1000,6 @@ void CL_UpdateMenuShown()
 }
 
 
-ConVarRef snd_volume( "snd_volume" );
-
-
 void CL_DrawMainMenu()
 {
 	PROF_SCOPE();
@@ -1072,6 +1070,8 @@ void CL_DrawMainMenu()
 		ImGui::EndChild();
 	}
 
+	static float& snd_volume = Con_GetConVarData_Float( "snd_volume", 0.5 );
+
 	// Quick Settings
 	{
 		ImVec2 childSize = itemSize;
@@ -1082,10 +1082,10 @@ void CL_DrawMainMenu()
 		// if ( ImGui::BeginChild( "Quick Settings", childSize, true ) )
 		if ( ImGui::BeginChild( "Quick Settings", {}, true ) )
 		{
-			float vol = snd_volume.GetFloat();
+			float vol = snd_volume;
 			if ( ImGui::SliderFloat( "Volume", &vol, 0.f, 1.f ) )
 			{
-				snd_volume.SetValue( vol );
+				Con_SetConVarValue( "snd_volume", vol );
 			}
 		}
 	

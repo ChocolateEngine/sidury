@@ -23,7 +23,7 @@ IPhysicsEnvironment*     GetPhysEnv()
 }
 
 // CONVAR_CMD_EX( phys_gravity, -20.2984, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
-CONVAR_CMD_EX( phys_gravity, -CH_GRAVITY_SPEED, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
+CONVAR_FLOAT_CMD( phys_gravity, -CH_GRAVITY_SPEED, CVARF( SERVER ) | CVARF( REPLICATED ), "Physics Engine Gravity" )
 {
 	// if ( Game_GetCommandSource() != ECommandSource_Console )
 	// 	return;
@@ -33,22 +33,22 @@ CONVAR_CMD_EX( phys_gravity, -CH_GRAVITY_SPEED, CVARF( SERVER ) | CVARF( REPLICA
 	GetPhysEnv()->SetGravityZ( phys_gravity );
 }
 
-ConVarRef r_debug_draw( "r_debug_draw" );
+bool&                                       r_debug_draw = Con_GetConVarData_Bool( "r_debug_draw", false );
 
 
 // constexpr glm::vec3 vec3_default( 255, 255, 255 );
 // constexpr glm::vec4 vec4_default( 255, 255, 255, 255 );
 
-constexpr glm::vec3           vec3_default( 1, 1, 1 );
-constexpr glm::vec4           vec4_default( 1, 1, 1, 1 );
+constexpr glm::vec3                         vec3_default( 1, 1, 1 );
+constexpr glm::vec4                         vec4_default( 1, 1, 1, 1 );
 
-static Handle                 gShader_Debug     = InvalidHandle;
-static Handle                 gShader_DebugLine = InvalidHandle;
+static Handle                               gShader_Debug     = InvalidHandle;
+static Handle                               gShader_DebugLine = InvalidHandle;
 
-static Handle                 gMatSolid         = InvalidHandle;
-static Handle                 gMatWire          = InvalidHandle;
+static Handle                               gMatSolid         = InvalidHandle;
+static Handle                               gMatWire          = InvalidHandle;
 
-static std::unordered_map< Handle, Handle >       gPhysRenderables;
+static std::unordered_map< Handle, Handle > gPhysRenderables;
 
 
 // ==============================================================

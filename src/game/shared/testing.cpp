@@ -18,19 +18,22 @@
 // and will be quite messy
 
 
-CONVAR( vrcmdl_scale, 40 );
-CONVAR( in_proto_spam, 0, CVARF( CVARF_INPUT ) );
-CONVAR( proto_look, 1 );
-CONVAR( proto_follow, 0 );
-CONVAR( proto_follow_speed, 400 );
-CONVAR( proto_swap_target_sec_min, 1.0 );
-CONVAR( proto_swap_target_sec_max, 10.0 );
-CONVAR( proto_swap_turn_time_min, 0.2 );
-CONVAR( proto_swap_turn_time_max, 3.0 );
-CONVAR( proto_look_at_entities, 1 );
+// INPUT_CONVAR( in_proto_spam, "" );
 
-extern ConVar                 phys_friction;
-extern ConVar                 cl_view_height;
+CONVAR_FLOAT( vrcmdl_scale, 40, "" );
+CONVAR_BOOL( proto_look, 1, "" );
+CONVAR_BOOL( proto_follow, 0, "" );
+CONVAR_FLOAT( proto_follow_speed, 400, "" );
+CONVAR_FLOAT( proto_swap_target_sec_min, 1.0, "" );
+CONVAR_FLOAT( proto_swap_target_sec_max, 10.0, "" );
+CONVAR_FLOAT( proto_swap_turn_time_min, 0.2, "" );
+CONVAR_FLOAT( proto_swap_turn_time_max, 3.0, "" );
+CONVAR_BOOL( proto_look_at_entities, 1, "" );
+
+CONVAR_FLOAT( snd_cube_scale, 0.05, "" );
+
+CONVAR_FLOAT_EXT( phys_friction );
+CONVAR_FLOAT_EXT( cl_view_height );
 
 // Audio Channels
 Handle                        hAudioMusic = InvalidHandle;
@@ -38,8 +41,6 @@ Handle                        hAudioMusic = InvalidHandle;
 // testing
 std::vector< Entity >         gAudioTestEntitiesCl{};
 std::vector< Entity >         gAudioTestEntitiesSv{};
-
-ConVar                        snd_cube_scale( "snd_cube_scale", "0.05" );
 
 
 #if CH_CLIENT
@@ -205,7 +206,7 @@ void CreateProtogen_f( const std::string& path )
 	auto        playerTransform = Ent_GetComponent< CTransform >( player, "transform" );
 
 	transform->aPos            = playerTransform->aPos;
-	transform->aScale.Set( { vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat(), vrcmdl_scale.GetFloat() } );
+	transform->aScale.Set( { vrcmdl_scale, vrcmdl_scale, vrcmdl_scale } );
 #endif
 }
 
@@ -277,8 +278,9 @@ CONCMD_VA( create_proto, CVARF( CL_EXEC ) )
 
 
 static void model_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
 	{
@@ -475,7 +477,7 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 
 		bool matrixChanged = false;
 
-		if ( proto_look.GetBool() )
+		if ( proto_look )
 		{
 			matrixChanged = true;
 
@@ -511,8 +513,8 @@ void TaskUpdateProtoLook( ftl::TaskScheduler *taskScheduler, void *arg )
 #endif
 
 
-CONVAR( r_proto_line_dist, 32.f );
-CONVAR( r_proto_line_dist2, 32.f );
+CONVAR_FLOAT( r_proto_line_dist, 32.f, "" );
+CONVAR_FLOAT( r_proto_line_dist2, 32.f, "" );
 
 
 void TEST_CL_UpdateProtos( float frameTime )
@@ -576,9 +578,9 @@ void TEST_CL_UpdateProtos( float frameTime )
 
 		// glm::vec3 modelForward, modelRight, modelUp;
 		// Util_GetMatrixDirection( protoTransform->ToMatrix(), &modelForward, &modelRight, &modelUp );
-		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist.GetFloat() ), { 1.f, 0.f, 0.f } );
-		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist.GetFloat() ), { 0.f, 1.f, 0.f } );
-		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist.GetFloat() ), { 0.f, 0.f, 1.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelForward * r_proto_line_dist ), { 1.f, 0.f, 0.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelRight * r_proto_line_dist ), { 0.f, 1.f, 0.f } );
+		// graphics->DrawLine( protoTransform->aPos, protoTransform->aPos + ( modelUp * r_proto_line_dist ), { 0.f, 0.f, 1.f } );
 	}
 
 	gProtoSystem.aUpdated.clear();
@@ -672,9 +674,9 @@ void TEST_SV_UpdateProtos( float frameTime )
 			Util_ToMatrix( playerMatrix, playerTransform->aPos, playerTransform->aAng );
 			Util_GetMatrixDirection( playerMatrix, &forward, &right, &up );
 
-			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2.GetFloat() ), { 1.f, 0.f, 0.f } );
-			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2.GetFloat() ), { 0.f, 1.f, 0.f } );
-			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2.GetFloat() ), { 0.f, 0.f, 1.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( forward * r_proto_line_dist2 ), { 1.f, 0.f, 0.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( right * r_proto_line_dist2 ), { 0.f, 1.f, 0.f } );
+			// graphics->DrawLine( protoTransform.aPos, protoTransform.aPos + ( up * r_proto_line_dist2 ), { 0.f, 0.f, 1.f } );
 
 			glm::vec3 protoView    = protoTransform->aPos;
 			//protoView.z += cl_view_height;
@@ -687,7 +689,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 			glm::vec3 vForward, vRight, vUp;
 			Util_GetViewMatrixZDirection( protoViewMat, vForward, vRight, vUp );
 		}
-		else if ( proto_look.GetBool() && !Game_IsPaused() )
+		else if ( proto_look && !Game_IsPaused() )
 		{
 			glm::vec3 up;
 			Util_GetDirectionVectors( playerTransform->aAng, nullptr, nullptr, &up );
@@ -733,7 +735,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 			protoTransform->aScale = glm::vec3( protoScale );
 		}
 
-		if ( proto_follow.GetBool() && !Game_IsPaused() )
+		if ( proto_follow && !Game_IsPaused() )
 		{
 			glm::vec3 modelUp, modelRight, modelForward;
 
@@ -754,18 +756,18 @@ void TEST_SV_UpdateProtos( float frameTime )
 		
 			float randTurn       = glm::mix( protoTurn.aLastRand, protoTurn.aRand, protoTurn.aNextTime - gCurTime );
 		
-			protoTransform->aPos = protoTransform->aPos + ( modelUp * proto_follow_speed.GetFloat() * gFrameTime );
+			protoTransform->aPos = protoTransform->aPos + ( modelUp * proto_follow_speed * gFrameTime );
 		
-			// protoTransform.aAng    = protoTransform.aAng + ( modelForward * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
-			protoTransform->aAng = protoTransform->aAng + ( modelRight * randTurn * proto_follow_speed.GetFloat() * gFrameTime );
+			// protoTransform.aAng    = protoTransform.aAng + ( modelForward * randTurn * proto_follow_speed * gFrameTime );
+			protoTransform->aAng = protoTransform->aAng + ( modelRight * randTurn * proto_follow_speed * gFrameTime );
 		}
 	}
 #endif
 }
 
 
-CONVAR( snd_test_vol, 0.25 );
-CONVAR( snd_test_falloff, 1.f );
+CONVAR_FLOAT( snd_test_vol, 0.25, "" );
+CONVAR_FLOAT( snd_test_falloff, 1.f, "" );
 
 
 // constexpr const char* SND_TEST_PATH = "sound/endymion_mono.ogg";
@@ -821,8 +823,8 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 	transform->aScale.Edit() = { 20.f, 20.f, 20.f };
 
 	sound->aPath             = srPath;
-	sound->aVolume           = snd_test_vol.GetFloat();
-	sound->aFalloff          = snd_test_falloff.GetFloat();
+	sound->aVolume           = snd_test_vol;
+	sound->aFalloff          = snd_test_falloff;
 	sound->aStartPlayback    = true;
 
 #if CH_CLIENT

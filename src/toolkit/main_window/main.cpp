@@ -60,17 +60,17 @@ float                     gFrameTime        = 0.f;
 double                    gCurTime          = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
 extern bool               gRunning;
-extern ConVar             host_timescale;
 
 u32                       gMainViewportHandle   = UINT32_MAX;
 
 int                       gMainMenuBarHeight    = 0.f;
 static bool               gShowQuitConfirmation = false;
 
+CONVAR_FLOAT_EXT( host_timescale );
 
-CONVAR( r_nearz, 0.01 );
-CONVAR( r_farz, 10000 );
-CONVAR( r_fov, 106 );
+CONVAR_FLOAT( r_nearz, 0.01, "Camera Near Z Plane" );
+CONVAR_FLOAT( r_farz, 10000, "Camera Far Z Plane" );
+CONVAR_FLOAT( r_fov, 106, "FOV" );
 
 
 void Util_DrawTextureInfo( TextureInfo_t& info )
@@ -104,13 +104,15 @@ void Main_DrawGraphicsSettings()
 		return;
 	}
 
-	static ConVarRef r_msaa( "r_msaa" );
-	static ConVarRef r_msaa_samples( "r_msaa_samples" );
-	static ConVarRef r_msaa_textures( "r_msaa_textures" );
-	static ConVarRef r_fov( "r_fov" );
+	static ConVarData_t* r_msaa          = Con_GetConVarData( "r_msaa" );
+	static ConVarData_t* r_msaa_samples  = Con_GetConVarData( "r_msaa_samples" );
+	static ConVarData_t* r_msaa_textures = Con_GetConVarData( "r_msaa_textures" );
+	static ConVarData_t* r_fov           = Con_GetConVarData( "r_fov" );
 
-	bool             msaa_textures = r_msaa_textures.GetBool();
-	float            fov           = r_fov.GetFloat();
+	bool                 msaa            = *r_msaa->aBool.apData;
+	int                  msaa_samples    = *r_msaa_samples->aInt.apData;
+	bool                 msaa_textures   = *r_msaa_textures->aBool.apData;
+	float                fov             = *r_fov->aFloat.apData;
 
 	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
 	{
@@ -118,10 +120,10 @@ void Main_DrawGraphicsSettings()
 		Con_QueueCommandSilent( "r_fov " + fovStr );
 	}
 
-	std::string msaaPreview = r_msaa.GetBool() ? ToString( r_msaa_samples ) + "X" : "Off";
+	std::string msaaPreview = msaa ? ToString( msaa_samples ) + "X" : "Off";
 	if ( ImGui::BeginCombo( "MSAA", msaaPreview.c_str() ) )
 	{
-		if ( ImGui::Selectable( "Off", !r_msaa.GetBool() ) )
+		if ( ImGui::Selectable( "Off", !msaa ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 0" );
 		}
@@ -129,32 +131,32 @@ void Main_DrawGraphicsSettings()
 		int maxSamples = render->GetMaxMSAASamples();
 
 		// TODO: check what your graphics card actually supports
-		if ( maxSamples >= 2 && ImGui::Selectable( "2X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 2 ) )
+		if ( maxSamples >= 2 && ImGui::Selectable( "2X", msaa && msaa_samples == 2 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 2" );
 		}
 
-		if ( maxSamples >= 4 && ImGui::Selectable( "4X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 4 ) )
+		if ( maxSamples >= 4 && ImGui::Selectable( "4X", msaa && msaa_samples == 4 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 4" );
 		}
 
-		if ( maxSamples >= 8 && ImGui::Selectable( "8X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 8 ) )
+		if ( maxSamples >= 8 && ImGui::Selectable( "8X", msaa && msaa_samples == 8 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 8" );
 		}
 
-		if ( maxSamples >= 16 && ImGui::Selectable( "16X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 16 ) )
+		if ( maxSamples >= 16 && ImGui::Selectable( "16X", msaa && msaa_samples == 16 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 16" );
 		}
 
-		if ( maxSamples >= 32 && ImGui::Selectable( "32X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 32 ) )
+		if ( maxSamples >= 32 && ImGui::Selectable( "32X", msaa && msaa_samples == 32 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 32" );
 		}
 
-		if ( maxSamples >= 64 && ImGui::Selectable( "64X", r_msaa.GetBool() && r_msaa_samples.GetFloat() == 64 ) )
+		if ( maxSamples >= 64 && ImGui::Selectable( "64X", msaa && msaa_samples == 64 ) )
 		{
 			Con_QueueCommandSilent( "r_msaa 1; r_msaa_samples 64" );
 		}

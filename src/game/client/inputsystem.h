@@ -16,6 +16,10 @@ struct InputContext_t
 };
 
 
+#define INPUT_CONVAR( name, desc ) \
+	CONVAR_RANGE_INT( name, 0, IN_CVAR_JUST_RELEASED, IN_CVAR_JUST_PRESSED, CVARF( INPUT ), desc );
+
+
 void                 Input_Init();
 void                 Input_Update();
 

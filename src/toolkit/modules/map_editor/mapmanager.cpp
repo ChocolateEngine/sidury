@@ -20,7 +20,7 @@ static bool                gRebuildMapList = true;
 static float               gRebuildMapTimer = 0.f;
 
 
-CONVAR( map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
+CONVAR_FLOAT( map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
 CONCMD_VA( map_list_rebuild, "Rebuild the map list now" )
@@ -30,8 +30,9 @@ CONCMD_VA( map_list_rebuild, "Rebuild the map list now" )
 
 
 void map_dropdown(
-	const std::vector< std::string >& args,  // arguments currently typed in by the user
-	std::vector< std::string >& results )      // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	const std::vector< std::string >& mapList = MapManager_GetMapList();
 

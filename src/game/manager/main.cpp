@@ -21,9 +21,11 @@
 #endif
 
 
-CONVAR( host_max_frametime, 0.1 );
-CONVAR( host_fps_max, 300 );
-CONVAR( host_timescale, 1 );
+CONVAR_RANGE_FLOAT( host_fps_max, 300, 0, 5000, "Maximum FPS the App can run at" );
+CONVAR_RANGE_FLOAT( host_timescale, 1, 0, FLT_MAX, "Scaled Frametime of the App" );
+CONVAR_RANGE_FLOAT( host_max_frametime, 0.1, 0, FLT_MAX, "Max time in seconds a frame can be" );
+
+CONVAR_RANGE_FLOAT( map_list_rebuild_timer, 30.f, 0, FLT_MAX, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
 int                        gWidth             = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
@@ -64,7 +66,6 @@ inline bool                RunningClient()
 	return client && !gDedicatedServer;
 }
 
-CONVAR( map_list_rebuild_timer, 30.f, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
 CONCMD_VA( map_list_rebuild, "Rebuild the map list now" )
@@ -151,7 +152,7 @@ enum ECurrentModule
 static ECurrentModule gCurrentModule;
 
 
-bool CvarF_ClientExecuteCallback( ConVarBase* spBase, const std::vector< std::string >& args )
+bool CvarF_ClientExecuteCallback( const std::string& srName, const std::vector< std::string >& args, const std::string& fullCommand )
 {
 	// Must be running a dedicated server
 	if ( !client )
@@ -161,7 +162,7 @@ bool CvarF_ClientExecuteCallback( ConVarBase* spBase, const std::vector< std::st
 		return true;
 
 	// Forward to server if we are the client
-	client->SendConVar( spBase->aName, args );
+	client->SendConVar( srName, args );
 	return false;
 }
 
@@ -208,8 +209,9 @@ void Map_UpdateTimer( float frameTime )
 
 
 void map_dropdown(
-  const std::vector< std::string >& args,  // arguments currently typed in by the user
-  std::vector< std::string >&       results )    // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	const std::vector< std::string >& mapList = Map_GetMapList();
 
@@ -409,11 +411,11 @@ bool UpdateFrameTime( std::chrono::steady_clock::time_point& startTime, std::chr
 	time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 
 	// don't let the time go too crazy, usually happens when in a breakpoint
-	time        = glm::min( time, host_max_frametime.GetFloat() );
+	time        = glm::min( time, host_max_frametime );
 
-	if ( host_fps_max.GetFloat() > 0.f )
+	if ( host_fps_max > 0.f )
 	{
-		float maxFps       = glm::clamp( host_fps_max.GetFloat(), 10.f, 5000.f );
+		float maxFps       = glm::clamp( host_fps_max, 10.f, 5000.f );
 
 		// check if we still have more than 2ms till next frame and if so, wait for "1ms"
 		float minFrameTime = 1.0f / maxFps;

@@ -21,7 +21,7 @@ IPhysicsEnvironment*     GetPhysEnv()
 	return physenv;
 }
 
-CONVAR_CMD_EX( phys_gravity, -1, 0, "Physics Engine Gravity" )
+CONVAR_FLOAT_CMD( phys_gravity, -1, 0, "Physics Engine Gravity" )
 {
 	// if ( Game_GetCommandSource() != ECommandSource_Console )
 	// 	return;
@@ -30,8 +30,6 @@ CONVAR_CMD_EX( phys_gravity, -1, 0, "Physics Engine Gravity" )
 
 	GetPhysEnv()->SetGravityZ( phys_gravity );
 }
-
-ConVarRef r_debug_draw( "r_debug_draw" );
 
 
 // constexpr glm::vec3 vec3_default( 255, 255, 255 );
@@ -47,6 +45,9 @@ static Handle                               gMatSolid         = InvalidHandle;
 static Handle                               gMatWire          = InvalidHandle;
 
 static std::unordered_map< Handle, Handle > gPhysRenderables;
+
+
+bool&                                       r_debug_draw = Con_GetConVarData_Bool( "r_debug_draw", false );
 
 
 // ==============================================================

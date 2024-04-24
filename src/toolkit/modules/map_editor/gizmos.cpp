@@ -9,8 +9,8 @@ static ChHandle_t gGizmoTranslationModel = CH_INVALID_HANDLE;
 
 constexpr float   CH_GIZMO_SCALE         = 1.f;
 
-extern ConVar     editor_gizmo_scale_enabled;
-extern ConVar     editor_gizmo_scale;
+CONVAR_BOOL_EXT( editor_gizmo_scale_enabled );
+CONVAR_FLOAT_EXT( editor_gizmo_scale );
 
 
 static ChHandle_t CreateAxisMaterial( const char* name, ChHandle_t shader, glm::vec3 color )
@@ -294,7 +294,7 @@ void Gizmo_UpdateTranslationInputs( EditorContext_t* context, Ray& ray, glm::mat
 		float     dist  = glm::sqrt( powf( camPos.x - entityPos.x, 2 ) + powf( camPos.y - entityPos.y, 2 ) + powf( camPos.z - entityPos.z, 2 ) );
 
 		glm::vec3 scale = { dist, dist, dist };
-		scale *= editor_gizmo_scale.GetFloat();
+		scale *= editor_gizmo_scale;
 
 		for ( int i = 0; i < 3; i++ )
 		{

@@ -15,25 +15,26 @@
 #include "imgui/imgui_internal.h"
 
 
-CONVAR( r_fov, 106.f, CVARF_ARCHIVE );
-CONVAR( r_nearz, 1.f );
-CONVAR( r_farz, 10000.f );
+CONVAR_FLOAT( r_fov, 106.f, CVARF_ARCHIVE, "FOV" );
+CONVAR_FLOAT( r_nearz, 0.01f, "Near Z Plane" );
+CONVAR_FLOAT( r_farz, 1000.f, "Far Z Plane" );
 
-extern ConVar m_yaw, m_pitch;
+CONVAR_FLOAT_EXT( m_yaw );
+CONVAR_FLOAT_EXT( m_pitch );
 
-CONVAR( view_move_slow, 0.2f );
-CONVAR( view_move_fast, 3.0f );
+CONVAR_FLOAT( view_move_slow, 0.2f );
+CONVAR_FLOAT( view_move_fast, 3.0f );
 
-CONVAR( view_move_forward, 500.0f );
-CONVAR( view_move_side, 500.0f );
-CONVAR( view_move_up, 500.0f );
+CONVAR_FLOAT( view_move_forward, 500.0f );
+CONVAR_FLOAT( view_move_side, 500.0f );
+CONVAR_FLOAT( view_move_up, 500.0f );
 
-CONVAR( view_move_min, 0.125f );
-CONVAR( view_move_max, 15.f );
-CONVAR( view_move_scroll_sens, 0.125f );
+CONVAR_FLOAT( view_move_min, 0.125f );
+CONVAR_FLOAT( view_move_max, 15.f );
+CONVAR_FLOAT( view_move_scroll_sens, 0.125f );
 
-CONVAR( editor_show_pos, 1.f );
-CONVAR( editor_spew_imgui_window_hover, 0 );
+CONVAR_BOOL( editor_show_pos, 1.f, "Show Position on-screen" );
+CONVAR_BOOL( editor_spew_imgui_window_hover, 0 );
 
 
 static bool gClearSelection = false;
@@ -220,7 +221,7 @@ void EditorView_UpdateInputs( bool mouseInView )
 	if ( mouseScroll.y != 0 )
 	{
 		gMoveScale += mouseScroll.y * view_move_scroll_sens;
-		gMoveScale = std::clamp( gMoveScale, view_move_min.GetFloat(), view_move_max.GetFloat() );
+		gMoveScale = std::clamp( gMoveScale, view_move_min, view_move_max );
 		Log_DevF( 2, "Movement Speed Scale: %.4f\n", gMoveScale );
 	}
 
@@ -309,10 +310,10 @@ void EditorView_UpdateView( EditorContext_t* spContext )
 	// if ( cl_thirdperson.GetBool() )
 	// {
 	// 	Transform thirdPerson = {
-	// 		.aPos = { cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat() }
+	// 		.aPos = { cl_cam_x, cl_cam_y, cl_cam_z }
 	// 	};
 	// 
-	// 	// thirdPerson.aPos = {cl_cam_x.GetFloat(), cl_cam_y.GetFloat(), cl_cam_z.GetFloat()};
+	// 	// thirdPerson.aPos = {cl_cam_x, cl_cam_y, cl_cam_z};
 	// 
 	// 	glm::mat4 viewMatrixZ;
 	// 	Util_ToViewMatrixZ( viewMatrixZ, transformView.aPos, transformView.aAng );

@@ -19,40 +19,42 @@ LOG_REGISTER_CHANNEL2( Server, LogColor::Green );
 
 static const char* gServerPort = Args_Register( "41628", "Test Server Port", "-port" );
 
-CONVAR( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE );
-CONVAR( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
-CONVAR( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
-CONVAR( sv_pause, 0, CVARF_SERVER, "Pauses the Server Code" );
+CONVAR_STRING( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE, "Server Name" );
+CONVAR_FLOAT( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );
+CONVAR_BOOL( sv_client_timeout_enable, 1, CVARF_SERVER | CVARF_ARCHIVE );
+CONVAR_BOOL( sv_pause, 0, CVARF_SERVER, "Pauses the Server Code" );
 
-CONVAR_CMD_EX( sv_max_clients, 32, CVARF_SERVER, "Max Clients the Server Allows" )
+CONVAR_INT_CMD( sv_max_clients, 32, CVARF_SERVER, "Max Clients the Server Allows" )
 {
-	if ( sv_max_clients.GetInt() > CH_MAX_CLIENTS )
+	if ( newValue > CH_MAX_CLIENTS )
 	{
 		Log_WarnF( gLC_Server, "Can't go over max internal client limit of %d\n", CH_MAX_CLIENTS );
-		sv_max_clients.SetValue( CH_MAX_CLIENTS );
+		newValue = CH_MAX_CLIENTS;
 	}
-	else if ( sv_max_clients < gServerData.aClients.size() )
+	else if ( newValue < gServerData.aClients.size() )
 	{
 		Log_WarnF( gLC_Server, "Can't reduce max client limit less than the amount of clients connected (%zd connected)\n", gServerData.aClients.size() );
-		sv_max_clients.SetValue( gServerData.aClients.size() );
+		newValue = gServerData.aClients.size();
 	}
-	else if ( sv_max_clients < 1 )
+	else if ( newValue < 1 )
 	{
 		Log_WarnF( gLC_Server, "Can't set max clients less than 1\n" );
-		sv_max_clients.SetValue( 1 );
+		newValue = 1;
 	}
 }
 
-static std::unordered_set< ConVarBase* > gReplicatedCmds;
+static std::unordered_set< std::string_view > gReplicatedCmds;
 
-bool CvarFReplicatedCallback( ConVarBase* spBase, const std::vector< std::string >& args )
+bool CvarFReplicatedCallback( const std::string& sName, const std::vector< std::string >& args, const std::string& fullCommand )
 {
 	if ( args.empty() )
 		return true;
 
-	if ( typeid( *spBase ) != typeid( ConVar ) )
+	ConVarData_t* cvarData = Con_GetConVarData( sName.data() );
+
+	if ( !cvarData )
 	{
-		Log_ErrorF( gLC_Server, "ConCommand or ConVarRef found using CVARF_REPLICATED: \"%s\"\n", spBase->aName );
+		Log_ErrorF( gLC_Server, "ConVar for CVARF_REPLICATED not found, may be a ConCommand: \"%s\"\n", sName.data() );
 		return true;
 	}
 
@@ -60,7 +62,7 @@ bool CvarFReplicatedCallback( ConVarBase* spBase, const std::vector< std::string
 	if ( SV_IsHosting() && Game_GetCommandSource() == ECommandSource_Console )
 	{
 		// Add this to a vector of convars to send values to the client
-		gReplicatedCmds.emplace( spBase );
+		gReplicatedCmds.emplace( sName );
 		return true;
 	}
 	// The Message Has to be from the server otherwise
@@ -69,7 +71,7 @@ bool CvarFReplicatedCallback( ConVarBase* spBase, const std::vector< std::string
 		return true;
 	}
 
-	Log_ErrorF( gLC_Server, "Can't change Server Replicated ConVar if you're not the host! - \"%s\"\n", spBase->aName );
+	Log_ErrorF( gLC_Server, "Can't change Server Replicated ConVar if you're not the host! - \"%s\"\n", sName.data() );
 	return false;
 }
 
@@ -414,7 +416,7 @@ void SV_BuildServerInfo( flatbuffers::FlatBufferBuilder& srMessage )
 {
 	Log_DevF( gLC_Server, 1, "Building Server Info\n" );
 
-	auto serverName = srMessage.CreateString( sv_server_name.GetValue().data() );
+	auto serverName = srMessage.CreateString( sv_server_name );
 	auto mapName    = srMessage.CreateString( MapManager_GetMapPath().data() );
 
 	auto serverInfo = CreateNetMsg_ServerInfo( srMessage, serverName, gServerData.aClients.size(), sv_max_clients, mapName );
@@ -1021,9 +1023,9 @@ void SV_ConnectClient( ch_sockaddr& srAddr, ChVector< char >& srData )
 // }
 
 
-void SV_SendConVar( ConVarBase* spConVar )
+void SV_SendConVar( std::string_view sConVar )
 {
-	gReplicatedCmds.emplace( spConVar );
+	gReplicatedCmds.emplace( sConVar );
 }
 
 
@@ -1032,17 +1034,13 @@ bool SV_BuildConVarMsg( flatbuffers::FlatBufferBuilder& srMessage, bool sFullUpd
 	// We have to send EVERY ConVar with CVARF_REPLICATED in a Full Update
 	if ( sFullUpdate )
 	{
-		for ( uint32_t i = 0; i < Con_GetConVarCount(); i++ )
+		for ( const auto& [ cvarName, cvarData ] : Con_GetConVarMap() )
 		{
-			ConVarBase* cvarBase = Con_GetConVar( i );
-			if ( !cvarBase )
-				continue;
-
 			// Only ConVars here, no ConCommands, that will be in another tab
-			if ( typeid( *cvarBase ) != typeid( ConVar ) && cvarBase->aFlags & CVARF_REPLICATED )
+			if ( cvarData->aFlags & CVARF_REPLICATED )
 				continue;
 
-			gReplicatedCmds.emplace( cvarBase );
+			gReplicatedCmds.emplace( cvarName );
 		}
 	}
 	
@@ -1055,8 +1053,7 @@ bool SV_BuildConVarMsg( flatbuffers::FlatBufferBuilder& srMessage, bool sFullUpd
 	// Join it all into one string
 	for ( auto& cmd : gReplicatedCmds )
 	{
-		ConVar* cvar = static_cast< ConVar* >( cmd );
-		command += vstring( "%s %s;", cvar->aName, cvar->GetChar() );
+		command += vstring( "%s %s;", cmd.data(), Con_GetConVarValueStr( cmd.data() ).data() );
 	}
 
 	// Clear it

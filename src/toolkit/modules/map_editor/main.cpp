@@ -38,15 +38,16 @@ float            gFrameTime   = 0.f;
 double           gCurTime     = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
 extern bool      gRunning;
-extern ConVar    r_nearz, r_farz, r_fov;
 
-CONVAR( phys_friction, 10 );
-CONVAR( dbg_global_axis, 1 );
-CONVAR( dbg_global_axis_size, 15 );
-CONVAR( ui_show_imgui_demo, 0 );
+CONVAR_FLOAT_EXT( r_nearz );
+CONVAR_FLOAT_EXT( r_farz );
+CONVAR_FLOAT_EXT( r_fov );
 
-extern ConVar                   editor_gizmo_scale_enabled;
-extern ConVar                   editor_gizmo_scale;
+CONVAR_FLOAT( phys_friction, 10, "Friction" );
+CONVAR_BOOL( ui_show_imgui_demo, 0, "Show the ImGui Demo" );
+
+CONVAR_BOOL_EXT( editor_gizmo_scale_enabled );
+CONVAR_FLOAT_EXT( editor_gizmo_scale );
 
 
 int                             gMainMenuBarHeight    = 0.f;
@@ -93,6 +94,7 @@ void DrawQuitConfirmation();
 
 void Main_DrawGraphicsSettings()
 {
+#if 0
 	auto windowSize = ImGui::GetWindowSize();
 	windowSize.x -= 60;
 	windowSize.y -= 60;
@@ -174,6 +176,7 @@ void Main_DrawGraphicsSettings()
 	//ImGui::SetWindowSize( windowSize );
 
 	ImGui::EndChild();
+#endif
 }
 
 
@@ -248,7 +251,7 @@ void Main_DrawSettingsMenu()
 
 		if ( ImGui::BeginTabItem( "Other" ) )
 		{
-			bool scaleEnabled = editor_gizmo_scale_enabled.GetBool();
+			bool scaleEnabled = editor_gizmo_scale_enabled;
 			if ( ImGui::Checkbox( "Gizmo Scaling", &scaleEnabled ) )
 			{
 				if ( scaleEnabled )
@@ -257,10 +260,10 @@ void Main_DrawSettingsMenu()
 					Con_QueueCommandSilent( "editor_gizmo_scale_enabled 0" );
 			}
 
-			float scale = editor_gizmo_scale.GetFloat();
+			float scale = editor_gizmo_scale;
 			if ( ImGui::DragFloat( "Gizmo Scale", &scale, 0.0005, 0.f, 0.1f, "%.6f" ) )
 			{
-				editor_gizmo_scale.SetValue( scale );
+				Con_SetConVarValue( "editor_gizmo_scale", scale );
 			}
 
 			ImGui::EndTabItem();

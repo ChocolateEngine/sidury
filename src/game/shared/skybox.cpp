@@ -9,8 +9,8 @@
 #include "render/irender.h"
 
 
-CONVAR( r_skybox, 1 );
-CONVAR( r_skybox_ang_freeze, 0 );
+CONVAR_BOOL( r_skybox, 1, "" );
+CONVAR_BOOL( r_skybox_ang_freeze, 0, "" );
 
 
 constexpr float         SKYBOX_SCALE = 100.0f;
@@ -23,8 +23,9 @@ static Handle           gSkyboxShader = InvalidHandle;
 
 
 void skybox_set_dropdown(
-	const std::vector< std::string >& args,  // arguments currently typed in by the user
-	std::vector< std::string >& results )      // results to populate the dropdown list with
+  const std::vector< std::string >& args,         // arguments currently typed in by the user
+  const std::string&                fullCommand,  // the full command line the user has typed in
+  std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
 	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
 	{
@@ -139,7 +140,7 @@ void Skybox_SetAng( const glm::vec3& srAng )
 	if ( Renderable_t* renderable = graphics->GetRenderableData( gSkyboxDraw ) )
 	{
 		Util_ToViewMatrixY( renderable->aModelMatrix, srAng );
-		renderable->aVisible = r_skybox.GetBool();
+		renderable->aVisible = r_skybox;
 	}
 }
 
