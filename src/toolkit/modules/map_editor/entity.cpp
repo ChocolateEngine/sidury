@@ -104,7 +104,7 @@ ChHandle_t Entity_Create()
 
 	ent->aLightEnabled     = true;
 
-	Log_DevF( 1, "Created Entity With Selection Color of (%d, %d, %d)\n", ent->aSelectColor[ 0 ], ent->aSelectColor[ 1 ], ent->aSelectColor[ 2 ] );
+	Log_DevF( 2, "Created Entity With Selection Color of (%d, %d, %d)\n", ent->aSelectColor[ 0 ], ent->aSelectColor[ 1 ], ent->aSelectColor[ 2 ] );
 
 	return entHandle;
 }
