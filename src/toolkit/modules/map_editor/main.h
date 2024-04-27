@@ -127,6 +127,7 @@ struct EditorData_t
 {
 	// Inputs
 	glm::vec3  aMove{};
+	bool       aMouseInView;
 	bool       aMouseCaptured;
 
 	// hack for single window mode

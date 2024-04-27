@@ -7,7 +7,11 @@
 
 static ChHandle_t gGizmoTranslationModel = CH_INVALID_HANDLE;
 
-constexpr float   CH_GIZMO_SCALE         = 1.f;
+constexpr float   CH_GIZMO_SCALE         = 0.33f;
+constexpr float   CH_GIZMO_LINE_LEN      = 45.f;
+constexpr float   CH_GIZMO_ARROW_SIZE    = 6.f;
+constexpr float   CH_GIZMO_ARROW_LEN     = 15.f;
+constexpr float   CH_GIZMO_ARROW_END_POS = CH_GIZMO_LINE_LEN + CH_GIZMO_ARROW_LEN;
 
 CONVAR_BOOL_EXT( editor_gizmo_scale_enabled );
 CONVAR_FLOAT_EXT( editor_gizmo_scale );
@@ -73,38 +77,38 @@ bool Gizmo_BuildTranslationMesh()
 
 	// create the main rectangle mesh now
 	// Create Bottom Face (-Z)
-	CreateTri( { 15, 1, -1 }, { 15, -1, -1 }, { -1, -1, -1 } );
-	CreateTri( { -1, 1, -1 }, { 15, 1, -1 }, { -1, -1, -1 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, 1, -1 }, { CH_GIZMO_LINE_LEN, -1, -1 }, { -1, -1, -1 } );
+	CreateTri( { -1, 1, -1 }, { CH_GIZMO_LINE_LEN, 1, -1 }, { -1, -1, -1 } );
 
 	// Create Top Face (+Z)
-	CreateTri( { 15, 1, 1 }, { 1, 1, 1 }, { 1, -1, 1 } );
-	CreateTri( { 15, -1, 1 }, { 15, 1, 1 }, { 1, -1, 1 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, 1, 1 }, { 1, 1, 1 }, { 1, -1, 1 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, -1, 1 }, { CH_GIZMO_LINE_LEN, 1, 1 }, { 1, -1, 1 } );
 
 	// Create Left Face (-X)
-	// CreateTri( { -1, 15, -1 }, { -1, -1, -1 }, { -1, -1, 1 } );
-	// CreateTri( { -1, 15, 1 }, { -1, 1, -1 }, { -1, -1, 1 } );
+	// CreateTri( { -1, CH_GIZMO_LINE_LEN, -1 }, { -1, -1, -1 }, { -1, -1, 1 } );
+	// CreateTri( { -1, CH_GIZMO_LINE_LEN, 1 }, { -1, 1, -1 }, { -1, -1, 1 } );
 	
 	// Create Right Face (+X)
-	// CreateTri( { 15, -1, -1 }, { 15, 1, -1 }, { 15, 1, 1 } );
-	// CreateTri( { 15, -1, 1 }, { 15, -1, -1 }, { 15, 1, 1 } );
+	// CreateTri( { CH_GIZMO_LINE_LEN, -1, -1 }, { CH_GIZMO_LINE_LEN, 1, -1 }, { CH_GIZMO_LINE_LEN, 1, 1 } );
+	// CreateTri( { CH_GIZMO_LINE_LEN, -1, 1 }, { CH_GIZMO_LINE_LEN, -1, -1 }, { CH_GIZMO_LINE_LEN, 1, 1 } );
 	
 	// Create Back Face (+Y)
-	CreateTri( { 1, 1, 1 }, { 15, 1, 1 }, { 15, 1, -1 } );
-	CreateTri( { 1, 1, -1 }, { 1, 1, 1 }, { 15, 1, -1 } );
+	CreateTri( { 1, 1, 1 }, { CH_GIZMO_LINE_LEN, 1, 1 }, { CH_GIZMO_LINE_LEN, 1, -1 } );
+	CreateTri( { 1, 1, -1 }, { 1, 1, 1 }, { CH_GIZMO_LINE_LEN, 1, -1 } );
 	
 	// Create Front Face (-Y)
-	CreateTri( { -1, -1, 1 }, { -1, -1, -1 }, { 15, -1, -1 } );
-	CreateTri( { 15, -1, 1 }, { -1, -1, 1 }, { 15, -1, -1 } );
+	CreateTri( { -1, -1, 1 }, { -1, -1, -1 }, { CH_GIZMO_LINE_LEN, -1, -1 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, -1, 1 }, { -1, -1, 1 }, { CH_GIZMO_LINE_LEN, -1, -1 } );
 
 	// create the triangle
 	// Create Bottom Face
-	CreateTri( { 15, 2, -2 }, { 15, -2, -2 }, { 15, -2, 2 } );
-	CreateTri( { 15, 2, 2 }, { 15, 2, -2 }, { 15, -2, 2 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, 6, -6 }, { CH_GIZMO_LINE_LEN, -6, -6 }, { CH_GIZMO_LINE_LEN, -6, 6 } );
+	CreateTri( { CH_GIZMO_LINE_LEN, 6, 6 }, { CH_GIZMO_LINE_LEN, 6, -6 }, { CH_GIZMO_LINE_LEN, -6, 6 } );
 	
-	CreateTri( { 15, 2, 2 },   { 15, -2, 2 },  { 20, 0, 0 } );      // Front Triangle
-	CreateTri( { 15, -2, -2 }, { 15,  2, -2 }, { 20, 0, 0 } );  // Back Triangle
-	CreateTri( { 15, -2, 2 },  { 15, -2, -2 }, { 20, 0, 0 } );    // Left Triangle
-	CreateTri( { 15, 2, -2 },  { 15,  2, 2 },  { 20, 0, 0 } );    // Right Triangle
+	CreateTri( { CH_GIZMO_LINE_LEN, 6, 6 },   { CH_GIZMO_LINE_LEN, -6, 6 },  { CH_GIZMO_ARROW_END_POS, 0, 0 } );      // Front Triangle
+	CreateTri( { CH_GIZMO_LINE_LEN, -6, -6 }, { CH_GIZMO_LINE_LEN,  6, -6 }, { CH_GIZMO_ARROW_END_POS, 0, 0 } );  // Back Triangle
+	CreateTri( { CH_GIZMO_LINE_LEN, -6, 6 },  { CH_GIZMO_LINE_LEN, -6, -6 }, { CH_GIZMO_ARROW_END_POS, 0, 0 } );    // Left Triangle
+	CreateTri( { CH_GIZMO_LINE_LEN, 6, -6 },  { CH_GIZMO_LINE_LEN,  6, 6 },  { CH_GIZMO_ARROW_END_POS, 0, 0 } );    // Right Triangle
 	
 	// -------------------------------------------------------------------------------------
 	// Y - AXIS
@@ -114,24 +118,24 @@ bool Gizmo_BuildTranslationMesh()
 	
 	// create the main rectangle mesh now
 	// Create Bottom Face (-Z)
-	CreateTri( { 1, 15, -1 }, { 1, -1, -1 }, { -1, -1, -1 } );
-	CreateTri( { -1, 15, -1 }, { 1, 15, -1 }, { -1, -1, -1 } );
+	CreateTri( { 1, CH_GIZMO_LINE_LEN, -1 }, { 1, -1, -1 }, { -1, -1, -1 } );
+	CreateTri( { -1, CH_GIZMO_LINE_LEN, -1 }, { 1, CH_GIZMO_LINE_LEN, -1 }, { -1, -1, -1 } );
 	
 	// Create Top Face (+Z)
-	CreateTri( { 1, 15, 1 }, { -1, 15, 1 }, { -1, -1, 1 } );
-	CreateTri( { 1, -1, 1 }, { 1, 15, 1 }, { -1, -1, 1 } );
+	CreateTri( { 1, CH_GIZMO_LINE_LEN, 1 }, { -1, CH_GIZMO_LINE_LEN, 1 }, { -1, -1, 1 } );
+	CreateTri( { 1, -1, 1 }, { 1, CH_GIZMO_LINE_LEN, 1 }, { -1, -1, 1 } );
 	
 	// Create Left Face (-X)
-	CreateTri( { -1, 15, -1 }, { -1, -1, -1 }, { -1, -1, 1 } );
-	CreateTri( { -1, 15, 1 }, { -1, 15, -1 }, { -1, -1, 1 } );
+	CreateTri( { -1, CH_GIZMO_LINE_LEN, -1 }, { -1, -1, -1 }, { -1, -1, 1 } );
+	CreateTri( { -1, CH_GIZMO_LINE_LEN, 1 }, { -1, CH_GIZMO_LINE_LEN, -1 }, { -1, -1, 1 } );
 	
 	// Create Right Face (+X)
-	CreateTri( { 1, -1, -1 }, { 1, 15, -1 }, { 1, 15, 1 } );
-	CreateTri( { 1, -1, 1 }, { 1, -1, -1 }, { 1, 15, 1 } );
+	CreateTri( { 1, -1, -1 }, { 1, CH_GIZMO_LINE_LEN, -1 }, { 1, CH_GIZMO_LINE_LEN, 1 } );
+	CreateTri( { 1, -1, 1 }, { 1, -1, -1 }, { 1, CH_GIZMO_LINE_LEN, 1 } );
 	
 	// Create Back Face (+Y)
-	// CreateTri( { -1, 15, 1 }, { 1, 15, 1 }, { 1, 15, -1 } );
-	// CreateTri( { -1, 15, -1 }, { -1, 15, 1 }, { 1, 15, -1 } );
+	// CreateTri( { -1, CH_GIZMO_LINE_LEN, 1 }, { 1, CH_GIZMO_LINE_LEN, 1 }, { 1, CH_GIZMO_LINE_LEN, -1 } );
+	// CreateTri( { -1, CH_GIZMO_LINE_LEN, -1 }, { -1, CH_GIZMO_LINE_LEN, 1 }, { 1, CH_GIZMO_LINE_LEN, -1 } );
 	
 	// Create Front Face (-Y)
 	CreateTri( { -1, -1, 1 }, { -1, -1, -1 }, { 1, -1, -1 } );
@@ -139,13 +143,13 @@ bool Gizmo_BuildTranslationMesh()
 	
 	// create the triangle
 	// Create Bottom Face
-	CreateTri( { 2, 15, 2 }, { -2, 15, 2 }, { -2, 15, -2 } );
-	CreateTri( { 2, 15, -2 }, { 2, 15, 2 }, { -2, 15, -2 } );
+	CreateTri( { 6, CH_GIZMO_LINE_LEN, 6 }, { -6, CH_GIZMO_LINE_LEN, 6 }, { -6, CH_GIZMO_LINE_LEN, -6 } );
+	CreateTri( { 6, CH_GIZMO_LINE_LEN, -6 }, { 6, CH_GIZMO_LINE_LEN, 6 }, { -6, CH_GIZMO_LINE_LEN, -6 } );
 	
-	CreateTri( { 2, 15, -2 }, { -2, 15, -2 }, { 0, 20, 0 } );  // Front Triangle
-	CreateTri( { -2, 15, 2 }, { 2, 15, 2 }, { 0, 20, 0 } );  // Back Triangle
-	CreateTri( { -2, 15, -2 }, { -2, 15, 2 }, { 0, 20, 0 } );  // Left Triangle
-	CreateTri( { 2, 15, 2 }, { 2, 15, -2 }, { 0, 20, 0 } );  // Right Triangle
+	CreateTri( { 6, CH_GIZMO_LINE_LEN, -6 }, { -6, CH_GIZMO_LINE_LEN, -6 }, { 0, CH_GIZMO_ARROW_END_POS, 0 } );  // Front Triangle
+	CreateTri( { -6, CH_GIZMO_LINE_LEN, 6 }, { 6, CH_GIZMO_LINE_LEN, 6 }, { 0, CH_GIZMO_ARROW_END_POS, 0 } );  // Back Triangle
+	CreateTri( { -6, CH_GIZMO_LINE_LEN, -6 }, { -6, CH_GIZMO_LINE_LEN, 6 }, { 0, CH_GIZMO_ARROW_END_POS, 0 } );  // Left Triangle
+	CreateTri( { 6, CH_GIZMO_LINE_LEN, 6 }, { 6, CH_GIZMO_LINE_LEN, -6 }, { 0, CH_GIZMO_ARROW_END_POS, 0 } );  // Right Triangle
 
 	// -------------------------------------------------------------------------------------
 	// Z - AXIS
@@ -159,34 +163,34 @@ bool Gizmo_BuildTranslationMesh()
 	// CreateTri( { -1, 1, -1 }, { 1, 1, -1 }, { -1, -1, -1 } );
 	
 	// Create Top Face (+Z)
-	// // CreateTri( { 1, 1, 15 }, { -1, 1, 15 }, { -1, -1, 15 } );
-	// // CreateTri( { 1, -1, 15 }, { 1, 1, 15 }, { -1, -1, 15 } );
+	// // CreateTri( { 1, 1, CH_GIZMO_LINE_LEN }, { -1, 1, CH_GIZMO_LINE_LEN }, { -1, -1, CH_GIZMO_LINE_LEN } );
+	// // CreateTri( { 1, -1, CH_GIZMO_LINE_LEN }, { 1, 1, CH_GIZMO_LINE_LEN }, { -1, -1, CH_GIZMO_LINE_LEN } );
 	
 	// Create Left Face (-X)
-	CreateTri( { -1, 1, 1 }, { -1, -1, -1 }, { -1, -1, 15 } );
-	CreateTri( { -1, 1, 15 }, { -1, 1, 1 }, { -1, -1, 15 } );
+	CreateTri( { -1, 1, 1 }, { -1, -1, -1 }, { -1, -1, CH_GIZMO_LINE_LEN } );
+	CreateTri( { -1, 1, CH_GIZMO_LINE_LEN }, { -1, 1, 1 }, { -1, -1, CH_GIZMO_LINE_LEN } );
 	
 	// Create Right Face (+X)
-	CreateTri( { 1, -1, -1 }, { 1, 1, -1 }, { 1, 1, 15 } );
-	CreateTri( { 1, -1, 15 }, { 1, -1, -1 }, { 1, 1, 15 } );
+	CreateTri( { 1, -1, -1 }, { 1, 1, -1 }, { 1, 1, CH_GIZMO_LINE_LEN } );
+	CreateTri( { 1, -1, CH_GIZMO_LINE_LEN }, { 1, -1, -1 }, { 1, 1, CH_GIZMO_LINE_LEN } );
 	
 	// Create Back Face (+Y)
-	CreateTri( { -1, 1, 15 }, { 1, 1, 15 }, { 1, 1, -1 } );
-	CreateTri( { -1, 1, -1 }, { -1, 1, 15 }, { 1, 1, -1 } );
+	CreateTri( { -1, 1, CH_GIZMO_LINE_LEN }, { 1, 1, CH_GIZMO_LINE_LEN }, { 1, 1, -1 } );
+	CreateTri( { -1, 1, -1 }, { -1, 1, CH_GIZMO_LINE_LEN }, { 1, 1, -1 } );
 	
 	// Create Front Face (-Y)
-	CreateTri( { -1, -1, 15 }, { -1, -1, -1 }, { 1, -1, -1 } );
-	CreateTri( { 1, -1, 15 }, { -1, -1, 15 }, { 1, -1, -1 } );
+	CreateTri( { -1, -1, CH_GIZMO_LINE_LEN }, { -1, -1, -1 }, { 1, -1, -1 } );
+	CreateTri( { 1, -1, CH_GIZMO_LINE_LEN }, { -1, -1, CH_GIZMO_LINE_LEN }, { 1, -1, -1 } );
 	
 	// create the triangle
 	// Create Bottom Face
-	CreateTri( { 2, -2, 15 }, { -2, -2, 15 }, { -2, 2, 15 } );
-	CreateTri( { 2, 2, 15 }, { 2, -2, 15 }, { -2, 2, 15 } );
+	CreateTri( { 6, -6, CH_GIZMO_LINE_LEN }, { -6, -6, CH_GIZMO_LINE_LEN }, { -6, 6, CH_GIZMO_LINE_LEN } );
+	CreateTri( { 6, 6, CH_GIZMO_LINE_LEN }, { 6, -6, CH_GIZMO_LINE_LEN }, { -6, 6, CH_GIZMO_LINE_LEN } );
 	
-	CreateTri( { 2, 2, 15 }, { -2, 2, 15 }, { 0, 0, 20 } );    // Front Triangle
-	CreateTri( { -2, -2, 15 }, { 2, -2, 15 }, { 0, 0, 20 } );  // Back Triangle
-	CreateTri( { -2, 2, 15 }, { -2, -2, 15 }, { 0, 0, 20 } );   // Left Triangle
-	CreateTri( { 2, -2, 15 }, { 2, 2, 15 }, { 0, 0, 20 } );   // Right Triangle
+	CreateTri( { 6, 6, CH_GIZMO_LINE_LEN }, { -6, 6, CH_GIZMO_LINE_LEN }, { 0, 0, CH_GIZMO_ARROW_END_POS } );    // Front Triangle
+	CreateTri( { -6, -6, CH_GIZMO_LINE_LEN }, { 6, -6, CH_GIZMO_LINE_LEN }, { 0, 0, CH_GIZMO_ARROW_END_POS } );  // Back Triangle
+	CreateTri( { -6, 6, CH_GIZMO_LINE_LEN }, { -6, -6, CH_GIZMO_LINE_LEN }, { 0, 0, CH_GIZMO_ARROW_END_POS } );   // Left Triangle
+	CreateTri( { 6, -6, CH_GIZMO_LINE_LEN }, { 6, 6, CH_GIZMO_LINE_LEN }, { 0, 0, CH_GIZMO_ARROW_END_POS } );   // Right Triangle
 
 	// -------------------------------------------------------------------------------------
 	

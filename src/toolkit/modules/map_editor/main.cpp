@@ -45,6 +45,7 @@ CONVAR_FLOAT_EXT( r_fov );
 
 CONVAR_FLOAT( phys_friction, 10, "Friction" );
 CONVAR_BOOL( ui_show_imgui_demo, 0, "Show the ImGui Demo" );
+CONVAR_BOOL( ui_show_render_stats, true, "Show Renderer Stats" );
 
 CONVAR_BOOL_EXT( editor_gizmo_scale_enabled );
 CONVAR_FLOAT_EXT( editor_gizmo_scale );
@@ -342,6 +343,10 @@ void Main_DrawMenuBar()
 			{
 				Con_QueueCommand( "map D:\\projects\\chocolate\\dev\\output\\projects\\riverhouse_v1" );
 			}
+			if ( ImGui::MenuItem( "Open Test Map 2" ) )
+			{
+				Con_QueueCommand( "map D:\\projects\\chocolate\\dev\\output\\projects\\l4d_maps\\c2m1_highway" );
+			}
 
 			ImGui::EndMenu();
 		}
@@ -398,6 +403,9 @@ void Main_DrawMenuBar()
 #define CH_LIVE_WINDOW_RESIZE 1
 
 
+RenderStats_t gRenderStats{};
+
+
 void UpdateLoop( float frameTime, bool sResize, glm::uvec2 sOffset )
 {
 	PROF_SCOPE();
@@ -409,6 +417,24 @@ void UpdateLoop( float frameTime, bool sResize, glm::uvec2 sOffset )
 		MapEditor_UpdateEditor( frameTime );
 
 	Phys_Simulate( GetPhysEnv(), frameTime );
+
+	if ( ui_show_render_stats )
+	{
+		SDL_bool relativeMouse = SDL_GetRelativeMouseMode();
+		gui->DebugMessage( "Relative Mouse Mode: %s", relativeMouse ? "ON" : "OFF" );
+
+		static const bool& r_vis          = Con_GetConVarData_Bool( "r_vis", true );
+		static const bool& r_msaa         = Con_GetConVarData_Bool( "r_msaa", false );
+		static const int&  r_msaa_samples = Con_GetConVarData_Int( "r_msaa_samples", 1 );
+
+		gui->DebugMessage( "%d Draw Calls", gRenderStats.aDrawCalls );
+		gui->DebugMessage( "%d Vertices", gRenderStats.aVerticesDrawn );
+		gui->DebugMessage( "%d Triangles", gRenderStats.aVerticesDrawn / 3 );
+		gui->DebugMessage( "VIS %s", r_vis ? "ON" : "OFF" );
+
+		if ( r_msaa )
+			gui->DebugMessage( "MSAA %dX", r_msaa_samples );
+	}
 
 	gui->Update( frameTime );
 
@@ -826,7 +852,13 @@ void Editor_SetContext( ChHandle_t sContext )
 	if ( gEditorContexts.Get( lastContextIdx, &lastContext ) )
 	{
 		Entity_SetEntitiesVisibleNoChild( lastContext->aMap.aMapEntities.apData, lastContext->aMap.aMapEntities.aSize, false );
+
+		// Remove Last Search Path
+		FileSys_RemoveSearchPath( lastContext->aMap.aMapPath );
 	}
+
+	// Set New Search Path
+	FileSys_InsertSearchPath( 0, context->aMap.aMapPath );
 
 	// Show Entities in New Context
 	Entity_SetEntitiesVisibleNoChild( context->aMap.aMapEntities.apData, context->aMap.aMapEntities.aSize, true );
@@ -925,6 +957,8 @@ void MapEditor::Render( float frameTime, bool resize, glm::uvec2 offset )
 void MapEditor::Present()
 {
 	renderOld->Present( gToolData.graphicsWindow, &gMainViewport, 1 );
+
+	gRenderStats = graphics->GetStats();
 }
 
 

@@ -867,7 +867,7 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 		return;
 	}
 
-	if ( sBinding > EBinding_Count )
+	if ( sBinding >= EBinding_Count )
 	{
 		Log_ErrorF( gLC_EditorInput, "Trying to bind key \"%s\" to Invalid Binding: \"%d\"\n", Input_GetKeyComboName( spKeys, sKeyCount ).c_str(), sBinding );
 		return;
@@ -879,18 +879,15 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	ChVector< EButton > newKeyList;
 	EModMask            modMask = Input_GetModMask( spKeys, sKeyCount, newKeyList );
 
-	// Clearing Old Bindings of this key, disabled so you can have a key do multiple things depending on the context
-	// For example, shift to sprint move, and shift to snap the gizmos in increments
-#if 0
-	// this is kind weird
+	// Check if the key is already bound to the exact same binding
 	for ( auto& [ key, value ] : gKeyBinds )
 	{
 		if ( newKeyList.size() != key.aCount )
 			continue;
-	
+
 		if ( modMask != key.aModMask )
 			continue;
-	
+
 		bool found = true;
 		for ( u8 i = 0; i < key.aCount; i++ )
 		{
@@ -900,25 +897,33 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 				break;
 			}
 		}
-	
+
 		if ( found )
 		{
+			if ( value == sBinding )
+			{
+				Log_DevF( gLC_EditorInput, 1, "Key Binding Already Exists: \"%s\" - \"%s\"\n", Input_GetKeyComboName( spKeys, sKeyCount ).c_str(), Input_BindingToStr( sBinding ) );
+				return;
+			}
+
+			// Clearing Old Bindings of this key, disabled so you can have a key do multiple things depending on the context
+			// For example, shift to sprint move, and shift to snap the gizmos in increments
+
+#if 0
 			Input_ClearBinding( value );
 
 			//value = sBinding;
-	
+
 			//Input_ClearBinding( sBinding );
 			// gBindingToKey[ sBinding ] = key;
-	
+
 			//Input_PrintNewBinding( spKeys, sKeyCount, sBinding );
 			//return;
+#endif
 
 			break;
 		}
 	}
-
-	Input_ClearBinding( sBinding );
-#endif
 
 	// Did not find key, allocate new one
 

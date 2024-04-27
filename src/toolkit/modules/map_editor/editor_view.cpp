@@ -466,57 +466,65 @@ void EditorView_Update()
 		EditorView_CheckSelectionResult( context );
 	}
 
-	gEditorData.aMouseCaptured = EditorView_IsMouseInView();
+	if ( !gEditorData.aMouseCaptured )
+		gEditorData.aMouseInView = EditorView_IsMouseInView();
 
-	// for now until some focus thing
-	// if ( !gui->IsConsoleShown() )
-	{
-		// Handle Inputs
-		EditorView_UpdateInputs( gEditorData.aMouseCaptured );
-	}
+	// Handle Inputs
+
+	ImGuiContext* imContext = ImGui::GetCurrentContext();
+
+	ImGuiID       activeID = imContext->ActiveId;
+
+	if ( !activeID )
+		EditorView_UpdateInputs( gEditorData.aMouseInView );
 
 	bool centerMouse = false;
 
-	// for now until some focus thing
-	// if ( !gui->IsConsoleShown() && Input_KeyPressed( EBinding_Viewport_MouseLook ) )
-	if ( gEditorData.aMouseCaptured && Input_KeyPressed( EBinding_Viewport_MouseLook ) )
+	if ( gEditorData.aMouseInView && Input_KeyJustPressed( EBinding_Viewport_MouseLook ) )
 	{
-		// if ( Input_KeyJustPressed( EBinding_Viewport_MouseLook ) )
-		// {
-  		// 	SDL_SetRelativeMouseMode( SDL_TRUE );
-		// 	SDL_ShowCursor( SDL_FALSE );
-		// }
-
 		SDL_SetRelativeMouseMode( SDL_TRUE );
-		SDL_ShowCursor( SDL_FALSE );
+		gEditorData.aMouseCaptured = true;
 
-		// Handle Mouse Input
-		const glm::vec2 mouse = Input_GetMouseDelta();
-
-		// transform.aAng[PITCH] = -mouse.y;
-		context->aView.aAng[ PITCH ] += mouse.y * m_pitch;
-		context->aView.aAng[ YAW ] += mouse.x * m_yaw;
-
-		ClampAngles( context->aView.aAng );
-
-		centerMouse = true;
+		// clear any focused text input
+		ImGui::ClearActiveID();
 	}
-	else if ( Input_KeyJustReleased( EBinding_Viewport_MouseLook ) )
-	{
-		SDL_SetRelativeMouseMode( SDL_FALSE );
-		SDL_ShowCursor( SDL_TRUE );
 
-		if ( gEditorData.aMouseCaptured )
+	if ( gEditorData.aMouseCaptured )
+	{
+		if ( Input_KeyPressed( EBinding_Viewport_MouseLook ) )
+		{
+			// not sure why i need to do this after updating imgui
+			SDL_ShowCursor( SDL_FALSE );
+
+			// Handle Mouse Input
+			const glm::vec2 mouse = Input_GetMouseDelta();
+
+			// transform.aAng[PITCH] = -mouse.y;
+			context->aView.aAng[ PITCH ] += mouse.y * m_pitch;
+			context->aView.aAng[ YAW ] += mouse.x * m_yaw;
+
+			ClampAngles( context->aView.aAng );
+
 			centerMouse = true;
+		}
+		else
+		{
+			SDL_SetRelativeMouseMode( SDL_FALSE );
+			SDL_ShowCursor( SDL_TRUE );
 
-		gEditorData.aMouseCaptured = false;
+			if ( gEditorData.aMouseCaptured )
+				centerMouse = true;
+
+			gEditorData.aMouseInView   = false;
+			gEditorData.aMouseCaptured = false;
+		}
 	}
 
-	if ( Input_KeyReleased( EBinding_Viewport_MouseLook ) )
-	{
-		SDL_SetRelativeMouseMode( SDL_FALSE );
-		SDL_ShowCursor( SDL_TRUE );
-	}
+	// if ( Input_KeyReleased( EBinding_Viewport_MouseLook ) )
+	// {
+	// 	SDL_SetRelativeMouseMode( SDL_FALSE );
+	// 	//SDL_ShowCursor( SDL_TRUE );
+	// }
 
 	// Handle View
 	EditorView_UpdateView( context );
