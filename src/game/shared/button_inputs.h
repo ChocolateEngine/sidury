@@ -20,8 +20,8 @@ enum EBtnInput
 };
 
 
-constexpr float IN_CVAR_JUST_RELEASED = -1.f;
-constexpr float IN_CVAR_RELEASED      = 0.f;
-constexpr float IN_CVAR_PRESSED       = 1.f;
-constexpr float IN_CVAR_JUST_PRESSED  = 2.f;
+constexpr int IN_CVAR_JUST_RELEASED = -1;
+constexpr int IN_CVAR_RELEASED      = 0;
+constexpr int IN_CVAR_PRESSED       = 1;
+constexpr int IN_CVAR_JUST_PRESSED  = 2;
 
