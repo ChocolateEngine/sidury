@@ -23,7 +23,10 @@
 
 LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
 
-SiduryMap*    gpMap = nullptr;
+SiduryMap*    gpMap    = nullptr;
+
+chmap::Map*   gpChMap  = nullptr;
+std::string   gMapPath = "";
 
 
 enum ESMF_CommandVersion : u16
@@ -42,6 +45,21 @@ void MapManager_Update()
 
 void MapManager_CloseMap()
 {
+	if ( gpChMap )
+	{
+		chmap::Free( gpChMap );
+		gpChMap = nullptr;
+	}
+
+	if ( gMapPath.size() )
+	{
+		FileSys_RemoveSearchPath( gMapPath, ESearchPathType_Path );
+	}
+
+	gMapPath.clear();
+
+
+
 	if ( gpMap == nullptr )
 		return;
 
@@ -345,6 +363,8 @@ bool MapManager_LoadMap( const std::string& path )
 		Log_ErrorF( gLC_Map, "Failed to Load Map: \"%s\"\n", path.c_str() );
 		return false;
 	}
+
+	FileSys_InsertSearchPath( 0, absPath );
 
 	// Only load the primary scene for now
 	// Each scene gets it's own editor context
