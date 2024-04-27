@@ -350,20 +350,25 @@ bool MapManager_LoadMap( const std::string &path )
 		return false;
 	}
 
+	// Set New Search Path
+	FileSys_InsertSearchPath( 0, absPath );
+
 	// Only load the primary scene for now
 	// Each scene gets it's own editor context
 	// TODO: make an editor project system
 	if ( !MapManager_LoadScene( map->scenes[ map->primaryScene ] ) )
 	{
 		Log_ErrorF( gLC_Map, "Failed to Load Primary Scene: \"%s\" - Scene \"%s\"\n", path.c_str(), map->scenes[ map->primaryScene ].name );
+		FileSys_RemoveSearchPath( absPath );
 		return false;
 	}
 
 	if ( map->skybox )
 	{
 		Editor_GetContext()->aMap.aSkybox = map->skybox;
-		Editor_SetContext( gEditorContextIdx );
 	}
+
+	Editor_SetContext( gEditorContextIdx );
 
 	return true;
 }
