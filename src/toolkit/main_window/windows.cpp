@@ -149,9 +149,31 @@ void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 	}
 
 	tool.tool->Render( frameTime, sResize, {} );
-	tool.tool->Present();
 
 	ImGui::SetCurrentContext( origContext );
 	input->SetCurrentWindow( gpWindow );
+}
+
+
+void Window_Present( LoadedTool& tool )
+{
+	if ( !tool.running )
+		return;
+
+	AppWindow* window      = tool.window;
+	auto       origContext = ImGui::GetCurrentContext();
+
+	ImGui::SetCurrentContext( window->context );
+	tool.tool->Present();
+	ImGui::SetCurrentContext( origContext );
+}
+
+
+void Window_PresentAll()
+{
+	for ( LoadedTool& tool : gTools )
+	{
+		Window_Present( tool );
+	}
 }
 

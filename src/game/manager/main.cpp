@@ -531,6 +531,7 @@ void MainLoopDedicated()
 
 		if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 		{
+			renderOld->PrePresent();
 			renderOld->Present( gGraphicsWindow, &gDedicatedViewport, 1 );
 		}
 		else

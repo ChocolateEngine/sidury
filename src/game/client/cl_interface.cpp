@@ -230,6 +230,7 @@ public:
 
 			graphics->SetViewportRenderList( gMainViewportIndex, renderList.data(), renderList.size() );
 
+			renderOld->PrePresent();
 			renderOld->Present( gGraphicsWindow, viewportList, graphics->GetViewportCount() );
 
 			free( viewportList );

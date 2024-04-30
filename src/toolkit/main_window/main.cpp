@@ -531,8 +531,6 @@ void RenderMainWindow( float frameTime, bool sResize )
 
 	if ( sResize )
 		UpdateProjection();
-
-	renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
 }
 
 
@@ -592,6 +590,10 @@ void UpdateLoop( float frameTime, bool sResize )
 	if ( sResize )
 		return;
 
+	renderOld->PrePresent();
+	renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
+	Window_PresentAll();
+
 	Con_Update();
 }
 
@@ -602,6 +604,9 @@ void WindowResizeCallback( void* hwnd )
 	if ( hwnd == gpSysWindow )
 	{
 		UpdateLoop( 0.f, true );
+
+		renderOld->PrePresent();
+		renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
 		return;
 	}
 
@@ -614,7 +619,9 @@ void WindowResizeCallback( void* hwnd )
 			continue;
 
 		Window_Render( tool, 0.f, true );
-		break;
+		renderOld->PrePresent();
+		Window_Present( tool );
+		return;
 	}
 #endif
 }

@@ -81,6 +81,8 @@ AppWindow*                       Window_Create( const char* windowName );
 void                             Window_OnClose( AppWindow& window );
 void                             Window_Focus( AppWindow* window );
 void                             Window_Render( LoadedTool& tool, float frameTime, bool sResize );
+void                             Window_Present( LoadedTool& window );
+void                             Window_PresentAll();
 
 bool                             AssetBrowser_Init();
 void                             AssetBrowser_Close();
