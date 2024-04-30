@@ -206,6 +206,8 @@ void Skybox_SetMaterial( const std::string& srPath )
 
 	renderable->aVisible = true;
 	gSkyboxValid         = true;
+
+	graphics->ResetRenderableMaterials( gSkyboxDraw );
 }
 
 
