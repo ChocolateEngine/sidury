@@ -224,6 +224,9 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				else if ( strcmp( it->second.apString, "spot" ) == 0 )
 				{
 					ent->apLight = graphics->CreateLight( ELightType_Spot );
+
+					// ???
+					ent->apLight->aInnerFov = 0.f;
 				}
 				// else if ( strcmp( it->second.apString, "capsule" ) == 0 )
 				// {
