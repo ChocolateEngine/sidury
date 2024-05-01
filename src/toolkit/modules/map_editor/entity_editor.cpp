@@ -1065,7 +1065,7 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent
 		return;
 	}
 
-	std::string entName = vstring( "Entity %zd", sParent );
+	// std::string entName = vstring( "Entity %zd", sParent );
 
 	ImGui::PushID( sParent );
 
@@ -1083,7 +1083,7 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent
 		}
 	}
 
-	if ( ImGui::Selectable( entity->apName ? entity->apName : entName.c_str(), selected ) )
+	if ( ImGui::Selectable( entity->apName ? entity->apName : "INVALID", selected ) )
 	{
 		if ( !input->KeyPressed( (EButton)SDL_SCANCODE_LSHIFT ) )
 			context->aEntitiesSelected.clear();
