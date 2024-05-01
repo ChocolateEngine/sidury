@@ -163,7 +163,9 @@ void Window_Present( LoadedTool& tool )
 	AppWindow* window      = tool.window;
 	auto       origContext = ImGui::GetCurrentContext();
 
-	ImGui::SetCurrentContext( window->context );
+	if ( window )
+		ImGui::SetCurrentContext( window->context );
+
 	tool.tool->Present();
 	ImGui::SetCurrentContext( origContext );
 }
