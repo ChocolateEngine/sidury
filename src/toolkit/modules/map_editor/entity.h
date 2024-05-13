@@ -70,6 +70,9 @@ void                                                Entity_SetEntityVisible( ChH
 void                                                Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible );
 void                                                Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool sVisible );
 
+// Do an update on these entities
+void                                                Entity_SetEntitiesDirty( ChHandle_t* sEntities, u32 sCount );
+
 // Get the highest level parent for this entity, returns self if not parented
 ChHandle_t                                          Entity_GetRootParent( ChHandle_t sSelf );
 

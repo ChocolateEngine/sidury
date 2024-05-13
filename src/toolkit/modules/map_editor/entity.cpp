@@ -9,11 +9,16 @@ LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
 
 
 static ResourceList< Entity_t >                      gEntityList;
+static std::unordered_set< ChHandle_t >              gEntityDirtyList;
+static std::unordered_map< ChHandle_t, glm::mat4 >   gEntityWorldMatrices;
 
 // Entity Parents
 // [ child ] = parent
 static std::unordered_map< ChHandle_t, ChHandle_t >  gEntityParents;
 // static std::unordered_set< glm::vec3 >               gUsedColors;
+
+
+void Entity_CalcWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity );
 
 
 bool Entity_Init()
@@ -32,16 +37,15 @@ void Entity_Update()
 {
 	// update renderables
 
-	for ( ChHandle_t entityHandle : gEntityList.aHandles )
+	// for ( ChHandle_t entityHandle : gEntityList.aHandles )
+	for ( ChHandle_t entityHandle : gEntityDirtyList )
 	{
 		Entity_t* ent = nullptr;
 		if ( !gEntityList.Get( entityHandle, &ent ) )
 			continue;
 
 		glm::mat4 worldMatrix;
-
-		// BAD AND SLOW
-		Entity_GetWorldMatrix( worldMatrix, entityHandle );
+		Entity_CalcWorldMatrix( worldMatrix, entityHandle );
 
 		// Update Light Position and Angle
 		if ( ent->apLight )
@@ -67,6 +71,8 @@ void Entity_Update()
 
 		graphics->UpdateRenderableAABB( ent->aRenderable );
 	}
+
+	gEntityDirtyList.clear();
 }
 
 
@@ -106,6 +112,9 @@ ChHandle_t Entity_Create()
 
 	Log_DevF( 2, "Created Entity With Selection Color of (%d, %d, %d)\n", ent->aSelectColor[ 0 ], ent->aSelectColor[ 1 ], ent->aSelectColor[ 2 ] );
 
+	gEntityDirtyList.emplace( entHandle );
+	gEntityWorldMatrices[ entHandle ] = glm::identity< glm::mat4 >();
+
 	return entHandle;
 }
 
@@ -121,6 +130,17 @@ void Entity_Delete( ChHandle_t sHandle )
 		Log_ErrorF( "Invalid Entity: %d", sHandle );
 		return;
 	}
+
+	// Check if this entity is in the dirty list
+	auto it = std::find( gEntityDirtyList.begin(), gEntityDirtyList.end(), sHandle );
+
+	if ( it != gEntityDirtyList.end() )
+	{
+		gEntityDirtyList.erase( it );
+	}
+
+	// remove the world matrix
+	gEntityWorldMatrices.erase( sHandle );
 
 	if ( ent->apName )
 	{
@@ -253,6 +273,8 @@ void Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible )
 	}
 
 	renderable->aVisible = sVisible;
+
+	gEntityDirtyList.emplace( sEntity );
 }
 
 
@@ -313,6 +335,8 @@ void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible
 
 		Entity_GetChildrenRecurse( sEntities[ i ], child_entities );
 		new_count++;
+
+		gEntityDirtyList.emplace( sEntities[ i ] );
 	}
 
 	if ( new_count == 0 )
@@ -343,6 +367,8 @@ void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible
 			}
 
 			new_count++;
+
+			gEntityDirtyList.emplace( ent_handle );
 		}
 
 		if ( new_count == 0 )
@@ -384,6 +410,18 @@ void Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool s
 	Entity_SetEntitiesVisibleBase( entity_list, new_count, sVisible );
 
 	ch_free( entity_list );
+}
+
+
+void Entity_SetEntitiesDirty( ChHandle_t* sEntities, u32 sCount )
+{
+	for ( u32 i = 0; i < sCount; i++ )
+	{
+		// get child entities
+		// Entity_GetChildrenRecurse( sEntities[ i ], gEntityDirtyList );
+
+		gEntityDirtyList.emplace( sEntities[ i ] );
+	}
 }
 
 
@@ -502,6 +540,8 @@ void Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent )
 	{
 		gEntityParents[ sEntity ] = sParent;
 	}
+
+	gEntityDirtyList.emplace( sEntity );
 }
 
 
@@ -512,7 +552,8 @@ const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap()
 
 
 // Returns a Model Matrix with parents applied in world space
-void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
+// TODO: Cache this
+void Entity_CalcWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 {
 	PROF_SCOPE();
 
@@ -522,7 +563,7 @@ void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 	if ( parent != CH_INVALID_HANDLE )
 	{
 		// Get the world matrix recursively
-		Entity_GetWorldMatrix( parentMat, parent );
+		Entity_CalcWorldMatrix( parentMat, parent );
 	}
 
 	Entity_t* entity = Entity_GetData( sEntity );
@@ -566,6 +607,33 @@ void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 	srMat = glm::scale( srMat, entity->aTransform.aScale );
 
 	srMat = parentMat * srMat;
+
+	gEntityWorldMatrices[ sEntity ] = srMat;
+}
+
+
+void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
+{
+	// Is this entity in the dirty list?
+	auto it = gEntityDirtyList.find( sEntity );
+
+	if ( it != gEntityDirtyList.end() )
+	{
+		Entity_CalcWorldMatrix( srMat, sEntity );
+		return;
+	}
+
+	// Check if we have a cached world matrix
+	auto it2 = gEntityWorldMatrices.find( sEntity );
+
+	if ( it2 != gEntityWorldMatrices.end() )
+	{
+		srMat = it2->second;
+		return;
+	}
+
+	Log_ErrorF( "Entity %d does not have a cached world matrix, should never happen, but here we are\n", sEntity );
+	Entity_CalcWorldMatrix( srMat, sEntity );
 }
 
 

@@ -801,9 +801,16 @@ void EntEditor_DrawEntityData()
 	// -------------------------------------------------------------------------------------
 	// Entity Transform
 
-	ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.0025f, nullptr, nullptr, nullptr, 1.f );
-	ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
-	ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.001f, nullptr, nullptr, nullptr, 1.f );
+	bool transformChanged = false;
+
+	transformChanged |= ImGui::DragScalarN( "Position", ImGuiDataType_Float, &entity->aTransform.aPos.x, 3, 0.0025f, nullptr, nullptr, nullptr, 1.f );
+	transformChanged |= ImGui::DragScalarN( "Angle", ImGuiDataType_Float, &entity->aTransform.aAng.x, 3, 0.25f, nullptr, nullptr, nullptr, 1.f );
+	transformChanged |= ImGui::DragScalarN( "Scale", ImGuiDataType_Float, &entity->aTransform.aScale.x, 3, 0.001f, nullptr, nullptr, nullptr, 1.f );
+
+	if ( transformChanged )
+	{
+		Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
+	}
 
 	ImGui::Separator();
 
@@ -857,6 +864,8 @@ void EntEditor_DrawEntityData()
 					entity->aMaterialColors[ i ].g = RandomU8( 0, 255 );
 					entity->aMaterialColors[ i ].b = RandomU8( 0, 255 );
 				}
+
+				Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
 			}
 		}
 	}
@@ -881,6 +890,8 @@ void EntEditor_DrawEntityData()
 			{
 				graphics->DestroyLight( entity->apLight );
 				entity->apLight = nullptr;
+
+				Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
 			}
 			else
 			{
@@ -896,6 +907,8 @@ void EntEditor_DrawEntityData()
 					entity->apLight          = graphics->CreateLight( ELightType_Point );
 					entity->apLight->aColor  = { 1, 1, 1, 10 };
 					entity->apLight->aRadius = 500;
+
+					Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
 				}
 				else if ( ImGui::Selectable( "Cone Light" ) )
 				{
@@ -909,10 +922,14 @@ void EntEditor_DrawEntityData()
 
 					entity->apLight->aInnerFov = 0.f;  // FOV
 					entity->apLight->aOuterFov = 45.f;  // FOV
+
+					Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
 				}
 				else if ( ImGui::Selectable( "World Light" ) )
 				{
 					entity->apLight = graphics->CreateLight( ELightType_Directional );
+
+					Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
 				}
 				// else if ( ImGui::Selectable( "Capsule Light" ) )
 				// {

@@ -565,29 +565,10 @@ void EditorView_Update()
 	}
 #endif
 
+	// TODO: should only update this when the viewport is actually changed
 	graphics->SetViewportRenderList( gMainViewport, renderList.data(), renderList.size() );
 
 	if ( centerMouse )
 		CenterMouseOnScreen( context );
-}
-
-
-void Util_ComputeCameraRay( glm::vec3& srStart, glm::vec3& srDir, glm::vec2 sMousePos, glm::vec2 sViewportSize )
-{
-	if ( sMousePos.x == FLT_MAX && sMousePos.y == FLT_MAX )
-	{
-		sMousePos = input->GetMousePos();
-	}
-
-	if ( sViewportSize.x == FLT_MAX && sViewportSize.y == FLT_MAX )
-	{
-		int width, height;
-		render->GetSurfaceSize( gToolData.graphicsWindow, width, height );
-
-		sViewportSize.x = width;
-		sViewportSize.y = height;
-	}
-
-
 }
 
