@@ -23,6 +23,33 @@ struct ToolLaunchData
 };
 
 
+// function pointer to draw the dockable window
+typedef void( *Func_DockableWindowDraw )();
+
+
+// Dockable Window - will behave similar to visual studio's dockable windows
+// This is a window that can be docked into the main window, the tab bar of the main window, or into other dockable main windows?
+// Not sure if we could give these their own tabs or not to dock stuff too, or if that's useful
+struct DockableWindow
+{
+//	const char*             name;
+//	Func_DockableWindowDraw draw;
+//
+//	SDL_Window*             window         = nullptr;
+//	void*                   sysWindow      = nullptr;
+//	ChHandle_t              graphicsWindow = CH_INVALID_HANDLE;
+//	ImGuiContext*           context        = nullptr;
+};
+
+
+struct DockingArea
+{
+	// DockingArea* parent;
+	// DockingArea* children;
+	// DockableWindow* windows;
+};
+
+
 // Interface for Tools Interacting with the Main Toolkit
 class IToolkit : public ISystem
 {
@@ -52,24 +79,28 @@ class ITool : public ISystem
 	// Buttons
 	// virtual ChHandle_t  GetIcon() = 0;
 
-	virtual const char* GetName()                                                 = 0;
+	virtual const char*     GetName()                                                 = 0;
 
-	virtual bool        Launch( const ToolLaunchData& launchData )                = 0;
-	virtual void        Close()                                                   = 0;
+	virtual bool            Launch( const ToolLaunchData& launchData )                = 0;
+	virtual void            Close()                                                   = 0;
 
 	// General Update
-	virtual void        Update( float frameTime )                                 = 0;
+	virtual void            Update( float frameTime )                                 = 0;
 
 	// Rendering Code + ImGui
 	// resize is true when in a window resize
 	// sOffset is used when rendering in the main window as a tab
-	virtual void        Render( float frameTime, bool resize, glm::uvec2 offset ) = 0;
+	virtual void            Render( float frameTime, bool resize, glm::uvec2 offset ) = 0;
 
 	// Have the tool present the viewports to the screen, only when in it's own window
-	virtual void        Present()                                                 = 0;
+	virtual void            Present()                                                 = 0;
 
 	// Tell this tool to try to open an asset for editing
-	virtual bool        OpenAsset( const std::string& path )                      = 0;
+	virtual bool            OpenAsset( const std::string& path )                      = 0;
+
+	// idea?
+// 	virtual u32             GetDockableWindowCount()                                  = 0;
+// 	virtual DockableWindow* GetDockableWindows()                                      = 0;
 };
 
 

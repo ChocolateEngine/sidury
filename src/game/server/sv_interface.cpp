@@ -92,7 +92,7 @@ class ServerSystem : public IServerSystem
 
 	void StartServer( const std::string& srMap ) override
 	{
-		if ( !MapManager_FindMap( srMap ) )
+		if ( !MapManager_MapExists( srMap ) )
 		{
 			Log_Error( "Failed to Find map - Failed to Start Server\n" );
 			return;

@@ -62,17 +62,45 @@ const char* gAssetTypeIconPaths[] = {
 };
 
 
+constexpr ch_string ext_texture  = { (char*)"ktx", 3 };
+constexpr ch_string ext_material = { (char*)"cmt", 3 };
+
+
+constexpr ch_string ext_models[] = {
+	{ (char*)"obj", 3 },
+	{ (char*)"glb", 3 },
+	{ (char*)"gltf", 4 },
+};
+
+
+constexpr ch_string ext_image[]  = {
+	{ (char*)"png", 3 },
+	{ (char*)"jpg", 3 },
+	{ (char*)"gif", 3 },
+	{ (char*)"jxl", 3 },
+	{ (char*)"jpeg", 4 },
+	{ (char*)"webp", 4 },
+	{ (char*)"avif", 4 },
+};
+
+
+constexpr ch_string ext_sound[]  = {
+	{ (char*)"ogg", 3 },
+	{ (char*)"wav", 3 },
+};
+
+
 static_assert( CH_ARR_SIZE( gAssetTypeStr ) == EAssetType_Count );
 static_assert( CH_ARR_SIZE( gAssetTypeIconPaths ) == EAssetType_Count );
 
 
 struct Asset_t
 {
-	std::string path;
-	std::string fileName;
-	std::string ext;
+	ch_string  path;
+	ch_string  fileName;
+	ch_string  ext;
 
-	EAssetType  type;
+	EAssetType type;
 };
 
 
@@ -85,8 +113,8 @@ struct AssetBrowserData_t
 	ImTextureID            iconsImGui[ EAssetType_Count ];
 
 	ESearchPathType        searchType;
-	std::string            currentPath;
-	std::string            currentSearchPath;
+	ch_string              currentPath;
+	ch_string              currentSearchPath;
 
 	std::vector< Asset_t > fileList;
 	bool                   fileListDirty = true;
@@ -112,66 +140,69 @@ bool AssetBrowser_CanDragAssetToView( Asset_t& srAsset )
 
 static void AssetBrowser_ScanFolder( AssetBrowserData_t& srData )
 {
-	std::vector< std::string > fileList;
+	std::vector< ch_string > fileList;
 
-	if ( gAssetBrowserData.currentPath.empty() )
+	if ( !gAssetBrowserData.currentPath.data )
 	{
-		const std::vector< std::string >* searchPaths = nullptr;
+		u32 searchPathCount  = 0;
+		ch_string* searchPaths = nullptr;
 
 		if ( gAssetBrowserData.searchType == ESearchPathType_SourceAssets )
 		{
-			searchPaths = &FileSys_GetSourcePaths();
+			searchPathCount = FileSys_GetSourcePaths( &searchPaths );
 		}
 		else
 		{
-			searchPaths = &FileSys_GetSearchPaths();
+			searchPathCount = FileSys_GetSearchPaths( &searchPaths );
 		}
 
 		// TODO: this isn't very good
-		for ( const auto& searchPath : *searchPaths )
+		for ( u32 i = 0; i < searchPathCount; i++ )
 		{
-			auto fileList2 = FileSys_ScanDir( searchPath, ReadDir_AbsPaths | ReadDir_Recursive | ReadDir_NoDirs );
+			ch_string& searchPath = searchPaths[ i ];
+			auto fileList2 = FileSys_ScanDir( searchPath.data, searchPath.size, ReadDir_AbsPaths | ReadDir_Recursive | ReadDir_NoDirs );
 			fileList.insert( fileList.end(), fileList2.begin(), fileList2.end() );
 		}
 	}
 	else
 	{
-		srData.currentPath = FileSys_CleanPath( srData.currentPath );
-		fileList           = FileSys_ScanDir( srData.currentPath, ReadDir_AbsPaths | ReadDir_Recursive | ReadDir_NoDirs );
+		// srData.currentPath = FileSys_CleanPath( srData.currentPath.data() );
+		srData.currentPath = FileSys_CleanPath( srData.currentPath.data, srData.currentPath.size, srData.currentPath.data );
+		fileList           = FileSys_ScanDir( srData.currentPath.data, srData.currentPath.size, ReadDir_AbsPaths | ReadDir_Recursive | ReadDir_NoDirs );
 	}
 
 	for ( size_t i = 0; i < fileList.size(); i++ )
 	{
-		std::string_view file    = fileList[ i ];
-		std::string      fileExt = FileSys_GetFileExt( file );
+		ch_string& file    = fileList[ i ];
+		ch_string  fileExt = FileSys_GetFileExt( file.data, file.size );
 
 		Asset_t          asset{};
-		asset.path     = file;
-		asset.fileName = FileSys_GetFileName( file );
+		asset.path     = ch_str_copy( file.data, file.size );
+		asset.fileName = FileSys_GetFileName( file.data, file.size );
 		asset.ext      = fileExt;
 
 		// TODO: improve this
-		if ( fileExt == "obj" || fileExt == "gltf" || fileExt == "glb" )
+		if ( ch_str_equals_any( fileExt, CH_ARR_SIZE( ext_models ), ext_models ) )
 		{
 			asset.type = EAssetType_Model;
 		}
-		else if ( fileExt == "ktx" )
+		else if ( ch_str_equals( fileExt, ext_texture ) )
 		{
 			asset.type = EAssetType_Texture;
 		}
-		else if ( fileExt == "cmt" )
+		else if ( ch_str_equals( fileExt, ext_material ) )
 		{
 			asset.type = EAssetType_Material;
 		}
-		else if ( fileExt == "png" || fileExt == "jpg" || fileExt == "jpeg" || fileExt == "webp" || fileExt == "jxl" || fileExt == "gif" )
+		else if ( ch_str_equals_any( fileExt, CH_ARR_SIZE( ext_image ), ext_image ) )
 		{
 			asset.type = EAssetType_Image;
 		}
-		else if ( fileExt == "ogg" || fileExt == "wav" )
+		else if ( ch_str_equals_any( fileExt, CH_ARR_SIZE( ext_sound ), ext_sound ) )
 		{
 			asset.type = EAssetType_Sound;
 		}
-		else if ( FileSys_IsDir( file.data(), true ) )
+		else if ( FileSys_IsDir( file.data, file.size, true ) )
 		{
 			asset.type = EAssetType_Directory;
 		}
@@ -289,12 +320,15 @@ void AssetBrowser_Draw()
 	ImGui::SameLine();
 
 	// Search Path Drop Down - TODO: allow custom path inputs?
-	if ( ImGui::BeginCombo( "Search Path", gAssetBrowserData.currentPath.empty() ? "All" : gAssetBrowserData.currentPath.c_str() ) )
+	if ( ImGui::BeginCombo( "Search Path", gAssetBrowserData.currentPath.data ? gAssetBrowserData.currentPath.data : "All" ) )
 	{
 		if ( ImGui::Selectable( "All" ) )
 		{
 			gAssetBrowserData.fileListDirty = true;
-			gAssetBrowserData.currentPath.clear();
+
+			ch_str_free( gAssetBrowserData.currentPath.data );
+			gAssetBrowserData.currentPath.data = nullptr;
+			gAssetBrowserData.currentPath.size = 0;
 		}
 
 		//ImGui::Separator();
@@ -307,20 +341,23 @@ void AssetBrowser_Draw()
 
 		//ImGui::Separator();
 
-		const std::vector< std::string >* searchPaths = nullptr;
+		ch_string* searchPaths     = nullptr;
+		u32        searchPathCount = 0;
 
 		if ( gAssetBrowserData.searchType == ESearchPathType_SourceAssets )
 		{
-			searchPaths = &FileSys_GetSourcePaths();
+			searchPathCount = FileSys_GetSourcePaths( &searchPaths );
 		}
 		else
 		{
-			searchPaths = &FileSys_GetSearchPaths();
+			searchPathCount = FileSys_GetSearchPaths( &searchPaths );
 		}
 
-		for ( const auto& searchPath : *searchPaths )
+		for ( u32 i = 0; i < searchPathCount; i++ )
 		{
-			if ( ImGui::Selectable( searchPath.c_str() ) )
+			ch_string& searchPath = searchPaths[ i ];
+
+			if ( ImGui::Selectable( searchPath.data ) )
 			{
 				gAssetBrowserData.currentPath   = searchPath;
 				gAssetBrowserData.fileListDirty = true;
@@ -355,7 +392,7 @@ void AssetBrowser_Draw()
 				continue;
 			}
 
-			if ( searchTextLen && file.path.find( gAssetBrowserData.searchText ) != std::string::npos )
+			if ( searchTextLen && ch_str_contains( file.path.data, file.path.size, gAssetBrowserData.searchText, searchTextLen ) != SIZE_MAX )
 			{
 				gAssetBrowserData.searchResults.push_back( assetIndex );
 			}
@@ -407,12 +444,12 @@ void AssetBrowser_Draw()
 
 			ImGui::PushStyleVar( ImGuiStyleVar_ChildBorderSize, 1 );
 
-			ImVec2 textSize = ImGui::CalcTextSize( asset.fileName.data(), 0, false, imageDisplaySize.x );
+			ImVec2 textSize = ImGui::CalcTextSize( asset.fileName.data, 0, false, imageDisplaySize.x );
 
 			if ( ImGui::BeginChild( assetIndex + 1, { assetBoxX, imageDisplaySize.y + ( textSize.y ) + 18.f }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
 			{
 				ImGui::Image( gAssetBrowserData.iconsImGui[ asset.type ], { imageDisplaySize.x, imageDisplaySize.y } );
-				ImGui::TextWrapped( asset.fileName.data() );
+				ImGui::TextWrapped( asset.fileName.data );
 			}
 
 			ImGui::EndChild();
@@ -421,7 +458,7 @@ void AssetBrowser_Draw()
 			{
 				if ( ImGui::BeginTooltip() )
 				{
-					ImGui::Text( asset.path.data() );
+					ImGui::Text( asset.path.data );
 					// TextureInfo_t info = render->GetTextureInfo( CH_INVALID_HANDLE );
 					// Editor_DrawTextureInfo( info );
 				}
@@ -434,7 +471,7 @@ void AssetBrowser_Draw()
 				// TODO: improve this
 				if ( asset.type == EAssetType_Material )
 				{
-					toolkit.OpenAsset( CH_TOOL_MAT_EDITOR_NAME, asset.path.data() );
+					toolkit.OpenAsset( CH_TOOL_MAT_EDITOR_NAME, asset.path.data );
 				}
 			}
 

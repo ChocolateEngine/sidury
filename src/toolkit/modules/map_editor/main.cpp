@@ -527,30 +527,31 @@ std::string DrawSkyboxSelectionWindow()
 		gSkyboxSelectPath.clear();
 	}
 
-	auto fileList = FileSys_ScanDir(gSkyboxSelectPath, ReadDir_AbsPaths);
+	std::vector< ch_string > fileList = FileSys_ScanDir( gSkyboxSelectPath.data(), gSkyboxSelectPath.size(), ReadDir_AbsPaths );
 
-	for (std::string_view file : fileList)
+	for ( ch_string file : fileList )
 	{
-		bool isDir = FileSys_IsDir(file.data(), true);
+		bool isDir = FileSys_IsDir(file.data, file.size, true);
 
-		if (!isDir)
+		if ( !isDir )
 		{
-			bool model = file.ends_with(".cmt");
+			bool model = ch_str_ends_with( file, ".cmt", 4 );
 
-			if (!model)
+			if ( !model )
 				continue;
 		}
 
-		if (ImGui::Selectable(file.data()))
+		if ( ImGui::Selectable( file.data ) )
 		{
-			if (isDir)
+			if ( isDir )
 			{
-				gSkyboxSelectPath = FileSys_CleanPath(file);
+				ch_string_auto cleanedPath = FileSys_CleanPath( file.data, file.size );
+				gSkyboxSelectPath = std::string( cleanedPath.data, cleanedPath.size );
 			}
 			else
 			{
 				ImGui::End();
-				return file.data();
+				return std::string( file.data, file.size );
 			}
 		}
 	}
@@ -854,11 +855,11 @@ void Editor_SetContext( ChHandle_t sContext )
 		Entity_SetEntitiesVisibleNoChild( lastContext->aMap.aMapEntities.apData, lastContext->aMap.aMapEntities.aSize, false );
 
 		// Remove Last Search Path
-		FileSys_RemoveSearchPath( lastContext->aMap.aMapPath );
+		FileSys_RemoveSearchPath( lastContext->aMap.aMapPath.data(), lastContext->aMap.aMapPath.size() );
 	}
 
 	// Set New Search Path
-	FileSys_InsertSearchPath( 0, context->aMap.aMapPath );
+	FileSys_InsertSearchPath( 0, context->aMap.aMapPath.data(), context->aMap.aMapPath.size() );
 
 	// Show Entities in New Context
 	Entity_SetEntitiesVisibleNoChild( context->aMap.aMapEntities.apData, context->aMap.aMapEntities.aSize, true );

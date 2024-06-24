@@ -91,7 +91,8 @@ struct CMapRoot
 };
 
 
-bool                              MapManager_FindMap( const std::string& srPath );
+ch_string                         MapManager_FindMap( const std::string& srPath );
+bool                              MapManager_MapExists( const std::string& srPath );
 bool                              MapManager_LoadMap( const std::string& srPath );
 // SiduryMap*       MapManager_CreateMap();
 void                              MapManager_WriteMap( const std::string& srPath );

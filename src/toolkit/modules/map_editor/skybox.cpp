@@ -25,20 +25,24 @@ void skybox_set_dropdown(
   const std::string&                fullCommand,  // the full command line the user has typed in
   std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
-	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
+	std::vector< ch_string > files = FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive );
+
+	for ( const auto& file : files )
 	{
-		if ( file.ends_with( ".." ) )
+		if ( ch_str_ends_with( file.data, file.size, "..", 2 ) )
 			continue;
 
 		// Make sure it's a chocolate material file
-		if ( !file.ends_with( ".cmt" ) )
+		if ( !ch_str_ends_with( file.data, file.size, ".cmt", 4 ) )
 			continue;
 
-		if ( args.size() && !file.starts_with( args[ 0 ] ) )
+		if ( args.size() && !ch_str_starts_with( file.data, file.size, args[ 0 ].data(), args[ 0 ].size() ) )
 			continue;
 
-		results.push_back( file );
+		results.emplace_back( file.data, file.size );
 	}
+
+	ch_str_free( files.data(), files.size() );
 }
 
 
@@ -184,7 +188,7 @@ void Skybox_SetMaterial( const std::string& srPath )
 	if ( srPath.empty() )
 		return;
 
-	Handle mat = graphics->LoadMaterial( srPath );
+	Handle mat = graphics->LoadMaterial( srPath.data(), srPath.size() );
 	if ( mat == InvalidHandle )
 		return;
 

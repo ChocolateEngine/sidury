@@ -1024,18 +1024,32 @@ void CL_DrawMainMenu()
 	{
 		gMapList.clear();
 
-		for ( const auto& mapFolder : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+		std::vector< ch_string > mapFolders = FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles );
+
+		for ( const auto& mapFolder : mapFolders )
 		{
-			if ( mapFolder.ends_with( ".." ) )
+			if ( ch_str_ends_with( mapFolder, "..", 2 ) )
 				continue;
 
 			// Check for legacy map file and new map file
-			if ( !FileSys_IsFile( mapFolder + "/mapInfo.smf", true ) && !FileSys_IsFile( mapFolder + "/mapData.smf", true ) )
-				continue;
+			const char*    strings[]    = { mapFolder.data, CH_PATH_SEP_STR "mapInfo.smf" };
+			const u64      stringLens[] = { mapFolder.size, 14 };
+			ch_string_auto mapInfoPath  = ch_str_concat( 2, strings, stringLens );
 
-			std::string mapName = FileSys_GetFileName( mapFolder );
-			gMapList.push_back( mapName );
+			const char*    strings2[]    = { mapFolder.data, CH_PATH_SEP_STR "mapData.smf" };
+			const u64      stringLens2[] = { mapFolder.size, 14 };
+			ch_string_auto mapDataPath   = ch_str_concat( 2, strings2, stringLens2 );
+
+			if ( !FileSys_IsFile( mapInfoPath.data, mapInfoPath.size, true ) && !FileSys_IsFile( mapDataPath.data, mapDataPath.size, true ) )
+			{
+				continue;
+			}
+
+			ch_string_auto mapName = FileSys_GetFileName( mapFolder.data, mapFolder.size );
+			gMapList.emplace_back( mapName.data, mapName.size );
 		}
+
+		ch_str_free( mapFolders );
 
 		gRebuildMapList  = false;
 		gRebuildMapTimer = cl_map_list_rebuild_timer;
@@ -1062,7 +1076,11 @@ void CL_DrawMainMenu()
 			{
 				if ( ImGui::Selectable( map.c_str() ) )
 				{
-					Con_QueueCommand( vstring( "map \"%s\"", map.c_str() ) );
+					const char*    strings[]    = { "map \"", map.c_str(), "\"" };
+					const u64      stringLens[] = { 5, map.size(), 1 };
+					ch_string_auto cmd          = ch_str_concat( 3, strings, stringLens );
+
+					Con_QueueCommand( cmd.data, cmd.size );
 				}
 			}
 		}

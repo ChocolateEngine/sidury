@@ -18,13 +18,13 @@ static bool CheckJsonType( JsonObject_t& object, EJsonType type )
 
 static void CopyString( char*& out, char* string, size_t stringLen )
 {
-	out = Util_AllocString( string, stringLen );
+	out = ch_str_copy( string, stringLen ).data;
 }
 
 
 static void CopyString( char*& out, const char* string, size_t stringLen )
 {
-	out = Util_AllocString( string, stringLen );
+	out = ch_str_copy( string, stringLen ).data;
 }
 
 
@@ -225,9 +225,9 @@ static void FreeScene( Scene& scene )
 }
 
 
-static bool LoadScene( Map* map, const std::string& scenePath )
+static bool LoadScene( Map* map, const char* scenePath, s64 scenePathLen = -1 )
 {
-	std::vector< char > data = FileSys_ReadFile( scenePath );
+	std::vector< char > data = FileSys_ReadFile( scenePath, scenePathLen );
 
 	if ( data.empty() )
 		return false;
@@ -241,10 +241,10 @@ static bool LoadScene( Map* map, const std::string& scenePath )
 		return false;
 	}
 
-	std::string sceneName = FileSys_GetFileNameNoExt( scenePath );
+	ch_string_auto sceneName = FileSys_GetFileNameNoExt( scenePath, scenePathLen );
 
 	Scene       scene;
-	CopyString( scene.name, sceneName.data(), sceneName.size() );
+	CopyString( scene.name, sceneName.data, sceneName.size );
 
 	for ( size_t i = 0; i < root.aObjects.size(); i++ )
 	{
@@ -307,20 +307,22 @@ static bool LoadScene( Map* map, const std::string& scenePath )
 }
 
 
-Map* chmap::Load( std::string_view path )
+Map* chmap::Load( const char* path, u64 pathLen )
 {
 	// Load mapInfo.json5 to kick things off
-	std::string mapInfoPath = path.data();
-	mapInfoPath += PATH_SEP_STR;
-	mapInfoPath += "mapInfo.json5";
+	const char*    strings[]      = { path, PATH_SEP_STR "mapInfo.json5" };
+	const size_t   sizes[]        = { pathLen, 16 };
+	ch_string_auto mapInfoPath    = ch_str_concat( 2, strings, sizes );
 
-	if ( FileSys_FindFile( mapInfoPath ).empty() )
+	ch_string_auto absMapInfoPath = FileSys_FindFile( mapInfoPath.data, mapInfoPath.size );
+
+	if ( !absMapInfoPath.data )
 	{
-		Log_ErrorF( "No mapInfo.json5 file in map: \"%s\"\n", path.data() );
+		Log_ErrorF( "No mapInfo.json5 file in map: \"%s\"\n", path );
 		return nullptr;
 	}
 	
-	std::vector< char > data = FileSys_ReadFile( mapInfoPath );
+	std::vector< char > data = FileSys_ReadFile( mapInfoPath.data, mapInfoPath.size );
 
 	if ( data.empty() )
 		return nullptr;
@@ -368,7 +370,7 @@ Map* chmap::Load( std::string_view path )
 
 			if ( map->name )
 			{
-				Log_ErrorF( "Duplicate Name Entry in map: \"%s\"\n", path.data() );
+				Log_ErrorF( "Duplicate Name Entry in map: \"%s\"\n", path );
 				free( map->name );
 			}
 
@@ -413,30 +415,37 @@ Map* chmap::Load( std::string_view path )
 
 	if ( map->version == 0 || map->version == UINT32_MAX )
 	{
-		Log_ErrorF( "Map Version not specified for map \"%s\"\n", path.data() );
+		Log_ErrorF( "Map Version not specified for map \"%s\"\n", path );
 		Free( map );
 		return nullptr;
 	}
 
 	// Load Scenes
-	std::string scenesDir = path.data();
-	scenesDir += PATH_SEP_STR;
-	scenesDir += "scenes";
+	const char*              scenesStr[]   = { path, PATH_SEP_STR "scenes" };
+	const size_t             scenesSizes[] = { pathLen, 7 };
+	ch_string                scenesDir     = ch_str_concat( 2, scenesStr, scenesSizes );
 
-	for ( const std::string& scenePath : FileSys_ScanDir( scenesDir, ReadDir_NoDirs | ReadDir_Recursive ) )
+	std::vector< ch_string > scenePaths = FileSys_ScanDir( scenesDir.data, scenesDir.size, ReadDir_NoDirs | ReadDir_Recursive );
+
+	for ( const ch_string& scenePath : scenePaths )
 	{
-		if ( !scenePath.ends_with( ".json5" ) )
+		if ( !ch_str_ends_with( scenePath, ".json5", 6 ) )
 			continue;
 
-		if ( !LoadScene( map, scenesDir + scenePath ) )	
+		const ch_string strings[]     = { scenesDir, scenePath };
+		ch_string_auto  scenePathFull = ch_str_concat( 2, strings );
+
+		if ( !LoadScene( map, scenePathFull.data ) )	
 		{
-			Log_ErrorF( "Failed to load map scene: Map \"%s\" - Scene \"%s\"\n", path.data(), scenePath.c_str() );
+			Log_ErrorF( "Failed to load map scene: Map \"%s\" - Scene \"%s\"\n", path, scenePath.data );
 		}
 	}
 
+	ch_str_free( scenePaths.data(), scenePaths.size() );
+
 	if ( map->scenes.empty() )
 	{
-		Log_ErrorF( "No Scenes Loaded in map: \"%s\"\n", path.data() );
+		Log_ErrorF( "No Scenes Loaded in map: \"%s\"\n", path );
 		Free( map );
 		return nullptr;
 	}
@@ -456,7 +465,7 @@ Map* chmap::Load( std::string_view path )
 
 	if ( map->primaryScene == UINT32_MAX )
 	{
-		Log_ErrorF( "No Primary Scene specified for map, defaulting to scene 0: \"%s\"\n", path.data() );
+		Log_ErrorF( "No Primary Scene specified for map, defaulting to scene 0: \"%s\"\n", path );
 		map->primaryScene = 0;
 	}
 

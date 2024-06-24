@@ -81,8 +81,8 @@ struct ToolLoadDesc
 
 
 static ToolLoadDesc gToolModules[] = {
-	{ "modules/ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
-	{ "modules/ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
+	{ "modules" CH_PATH_SEP_STR "ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+	{ "modules" CH_PATH_SEP_STR "ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
 };
 
 
@@ -108,11 +108,23 @@ extern "C"
 		}
 
 		// Load the game's app info
-		if ( !Core_AddAppInfo( FileSys_GetExePath() + PATH_SEP_STR + gArgGamePath ) )
+		ch_string appInfoPath;
+
 		{
+			const char* strings[] = { FileSys_GetExePath().data, CH_PATH_SEP_STR, gArgGamePath };
+			u64         lengths[] = { FileSys_GetExePath().size, 1, strlen( strings[ 2 ] ) };
+			appInfoPath           = ch_str_concat( ARR_SIZE( strings ), strings, lengths );
+		}
+
+		std::string dumb( appInfoPath.data, appInfoPath.size );
+		if ( !Core_AddAppInfo( dumb ) )
+		{
+			ch_str_free( appInfoPath.data );
 			ShowInvalidGameOptionWindow( "Failed to Load App Info" );
 			return 1;
 		}
+
+		ch_str_free( appInfoPath.data );
 
 		IMGUI_CHECKVERSION();
 

@@ -56,7 +56,7 @@ IClientSystem*             client           = nullptr;
 IServerSystem*             server           = nullptr;
 
 
-std::vector< std::string > gMapList;
+std::vector< ch_string >   gMapList;
 static bool                gRebuildMapList  = true;
 static float               gRebuildMapTimer = 0.f;
 
@@ -169,24 +169,39 @@ bool CvarF_ClientExecuteCallback( const std::string& srName, const std::vector< 
 
 void Map_RebuildMapList()
 {
+	ch_str_free( gMapList.data(), gMapList.size() );
 	gMapList.clear();
 
-	for ( const auto& mapFolder : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	std::vector< ch_string > mapList = FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles );
+
+	for ( const auto& mapFolder : mapList )
 	{
-		if ( mapFolder.ends_with( ".." ) )
+		if ( ch_str_ends_with( mapFolder, "..", 2 ) )
 			continue;
 
 		// Check for legacy map file and new map file
-		if ( !FileSys_IsFile( mapFolder + "/mapInfo.smf", true ) && !FileSys_IsFile( mapFolder + "/mapData.smf", true ) )
-			continue;
+		const char*    strings[]     = { mapFolder.data, CH_PATH_SEP_STR "mapInfo.smf" };
+		const u64      stringLens[]  = { mapFolder.size, 14 };
+		ch_string_auto mapInfoPath   = ch_str_concat( 2, strings, stringLens );
 
-		std::string mapName = FileSys_GetFileName( mapFolder );
-		gMapList.push_back( mapName );
+		const char*    strings2[]    = { mapFolder.data, CH_PATH_SEP_STR "mapData.smf" };
+		const u64      stringLens2[] = { mapFolder.size, 14 };
+		ch_string_auto mapDataPath   = ch_str_concat( 2, strings2, stringLens2 );
+
+		if ( !FileSys_IsFile( mapInfoPath.data, mapInfoPath.size, true ) && !FileSys_IsFile( mapDataPath.data, mapDataPath.size, true ) )
+		{
+			continue;
+		}
+
+		ch_string_auto mapName = FileSys_GetFileName( mapFolder.data, mapFolder.size );
+		gMapList.emplace_back( mapName.data, mapName.size );
 	}
+
+	ch_str_free( mapList.data(), mapList.size() );
 }
 
 
-const std::vector< std::string >& Map_GetMapList()
+const std::vector< ch_string >& Map_GetMapList()
 {
 	if ( gRebuildMapList )
 	{
@@ -213,14 +228,14 @@ void map_dropdown(
   const std::string&                fullCommand,  // the full command line the user has typed in
   std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
-	const std::vector< std::string >& mapList = Map_GetMapList();
+	const std::vector< ch_string >& mapList = Map_GetMapList();
 
 	for ( const auto& map : mapList )
 	{
-		if ( args.size() && !map.starts_with( args[ 0 ] ) )
+		if ( args.size() && !ch_str_starts_with( map, args[ 0 ].data(), args[ 0 ].size() ) )
 			continue;
 
-		results.push_back( map );
+		results.emplace_back( map.data, map.size );
 	}
 }
 

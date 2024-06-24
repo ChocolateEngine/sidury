@@ -75,13 +75,14 @@ CONVAR_FLOAT( r_fov, 106, "FOV" );
 
 void Util_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
 
-	if ( info.aPath.size() )
-		ImGui::Text( info.aPath.data() );
+	if ( info.aPath.size )
+		ImGui::Text( info.aPath.data );
 
 	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
+	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 	ImGui::Text( "Ref Count: %d", info.aRefCount );
 }
@@ -117,7 +118,9 @@ void Main_DrawGraphicsSettings()
 	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
 	{
 		std::string fovStr = ToString( fov );
-		Con_QueueCommandSilent( "r_fov " + fovStr );
+		const ch_string strings[] = { { (char*)"r_fov", 5 }, { fovStr.data(), fovStr.size() } };
+		ch_string_auto  fovCmd    = ch_str_concat( 2, strings );
+		Con_QueueCommandSilent( fovCmd.data, fovCmd.size );
 	}
 
 	std::string msaaPreview = msaa ? ToString( msaa_samples ) + "X" : "Off";

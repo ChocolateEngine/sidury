@@ -58,13 +58,14 @@ static int StringTextInput( ImGuiInputTextCallbackData* data )
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
 
-	if ( info.aPath.size() )
-		ImGui::Text( info.aPath.data() );
+	if ( info.aPath.size )
+		ImGui::Text( info.aPath.data );
 
 	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
+	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 	ImGui::Text( "Ref Count: %d", info.aRefCount );
 }
@@ -408,7 +409,7 @@ void MaterialEditor_DrawMaterialData()
 
 					TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 
-					ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
+					ImGui::Text( texInfo.aName.data ? texInfo.aName.data : texInfo.aPath.data );
 
 					if ( ImGui::IsItemHovered() )
 					{
@@ -623,7 +624,7 @@ void MaterialEditor_FreeMaterial( ChHandle_t mat )
 
 bool MaterialEditor_LoadMaterial( const std::string& path )
 {
-	ChHandle_t mat = graphics->LoadMaterial( path );
+	ChHandle_t mat = graphics->LoadMaterial( path.data(), path.size() );
 
 	if ( mat == CH_INVALID_HANDLE )
 		return false;
@@ -640,10 +641,12 @@ bool MaterialEditor_LoadMaterial( const std::string& path )
 		}
 	}
 
-	MaterialEntry& matEntry = gMatEditor.materialList.emplace_back();
-	matEntry.mat            = mat;
-	matEntry.path           = path;
-	matEntry.name           = FileSys_GetFileNameNoExt( path );
+	ch_string_auto fileNameNoExt = FileSys_GetFileNameNoExt( path.data(), path.size() );
+
+	MaterialEntry& matEntry      = gMatEditor.materialList.emplace_back();
+	matEntry.mat                 = mat;
+	matEntry.path                = path;
+	matEntry.name                = std::string( fileNameNoExt.data, fileNameNoExt.size );
 
 	MaterialEditor_SetActiveMaterial( mat );
 

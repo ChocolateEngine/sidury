@@ -133,7 +133,7 @@ struct Map
 };
 
 
-Map*    Load( std::string_view path );
+Map*    Load( const char* path, u64 pathLen );
 void    Free( Map* map );
 Map*    Create();
 bool    Save( Map* map );

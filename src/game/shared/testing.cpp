@@ -282,17 +282,19 @@ static void model_dropdown(
   const std::string&                fullCommand,  // the full command line the user has typed in
   std::vector< std::string >&       results )     // results to populate the dropdown list with
 {
-	for ( const auto& file : FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive ) )
+	const std::vector< ch_string > materials = FileSys_ScanDir( "materials", ReadDir_AllPaths | ReadDir_NoDirs | ReadDir_Recursive );
+
+	for ( const auto& file : materials )
 	{
-		if ( file.ends_with( ".." ) )
+		if ( ch_str_ends_with( file, "..", 2 ) )
 			continue;
 
-		if ( args.size() && !file.starts_with( args[ 0 ] ) )
+		if ( args.size() && !( ch_str_ends_with( file, args[ 0 ].data(), args[ 0 ].size() ) ) )
 			continue;
 
-		// make sure it's a format we can open
-		if ( file.ends_with( ".obj" ) || file.ends_with( ".glb" ) || file.ends_with( ".gltf" ) )
-			results.push_back( file );
+		// make sure it's a format we can open (TODO: CHECK HEADERS)
+		if ( ch_str_ends_with( file, ".obj", 4 ) || ch_str_ends_with( file, ".glb", 4 ) || ch_str_ends_with( file, ".gltf", 5 ) )
+			results.emplace_back( file.data, file.size );
 	}
 }
 

@@ -95,5 +95,9 @@ inline float Game_GetCurTime()
 }
 
 
+constexpr const char* MAP_DATA_FILE     = "mapData.smf";
+constexpr u64         MAP_DATA_FILE_LEN = 12;
+
+
 // Undo Stack
 

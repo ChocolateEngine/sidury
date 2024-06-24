@@ -164,10 +164,14 @@ void ResourceUsage_DrawMaterials()
 		ChHandle_t  mat     = graphics->GetMaterialByIndex( i );
 		const char* matName = graphics->Mat_GetName( mat );
 
-		if ( ImGui::Selectable( matName ) )
+		ImGui::PushID( i );
+
+		if ( ImGui::Selectable( matName ? matName : "nullptr" ) )
 		{
 			// launch it?
 		}
+
+		ImGui::PopID();
 	}
 
 	ImGui::EndChild();

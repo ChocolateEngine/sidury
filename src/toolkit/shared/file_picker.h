@@ -15,7 +15,7 @@ struct FilePickerData_t
 	bool                       childWindow;
 	bool                       open;
 	bool                       allowMultiSelect;  // NOT IMPLEMENTED YET
-	std::string                path;
+	ch_string                  path;
 	std::vector< std::string > filterExt;
 	std::vector< std::string > selectedItems;     // Get the selected item here
 	std::vector< std::string > filesInFolder;

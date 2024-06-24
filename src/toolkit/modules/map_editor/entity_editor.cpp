@@ -150,13 +150,14 @@ int                                                    gTextureListViewMode = 0;
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size() ? info.aName.data() : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
 
-	if ( info.aPath.size() )
-		ImGui::Text( info.aPath.data() );
+	if ( info.aPath.size )
+		ImGui::Text( info.aPath.data );
 
 	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
+	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 	ImGui::Text( "Ref Count: %d", info.aRefCount );
 }
@@ -618,7 +619,7 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 		if ( spEntity->aModel )
 		{
 			std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
-			gModelBrowserData.path     = FileSys_GetDirName( modelPath );
+			gModelBrowserData.path     = FileSys_GetDirName( modelPath.data(), modelPath.size() );
 		}
 		else
 		{

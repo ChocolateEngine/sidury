@@ -104,18 +104,32 @@ void MapManager_RebuildMapList()
 {
 	gMapList.clear();
 
-	for ( const auto& mapFolder : FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles ) )
+	std::vector< ch_string > mapFolders = FileSys_ScanDir( "maps", ReadDir_AllPaths | ReadDir_NoFiles );
+
+	for ( const auto& mapFolder : mapFolders )
 	{
-		if ( mapFolder.ends_with( ".." ) )
+		if ( ch_str_ends_with( mapFolder, "..", 2 ) )
 			continue;
 
 		// Check for legacy map file and new map file
-		if ( !FileSys_IsFile( mapFolder + "/mapInfo.smf", true ) && !FileSys_IsFile( mapFolder + "/mapData.smf", true ) )
-			continue;
+		const char*    strings[]     = { mapFolder.data, CH_PATH_SEP_STR "mapInfo.smf" };
+		const u64      stringLens[]  = { mapFolder.size, 14 };
+		ch_string_auto mapInfoPath   = ch_str_concat( 2, strings, stringLens );
 
-		std::string mapName = FileSys_GetFileName( mapFolder );
-		gMapList.push_back( mapName );
+		const char*    strings2[]    = { mapFolder.data, CH_PATH_SEP_STR "mapData.smf" };
+		const u64      stringLens2[] = { mapFolder.size, 14 };
+		ch_string_auto mapDataPath   = ch_str_concat( 2, strings2, stringLens2 );
+
+		if ( !FileSys_IsFile( mapInfoPath.data, mapInfoPath.size, true ) && !FileSys_IsFile( mapDataPath.data, mapDataPath.size, true ) )
+		{
+			continue;
+		}
+
+		ch_string_auto mapName = FileSys_GetFileName( mapFolder.data, mapFolder.size );
+		gMapList.emplace_back( mapName.data, mapName.size );
 	}
+
+	ch_str_free( mapFolders.data(), mapFolders.size() );
 }
 
 
@@ -134,12 +148,27 @@ const std::vector< std::string >& MapManager_GetMapList()
 
 bool MapManager_FindMap( const std::string& path )
 {
-	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
+	ch_string mapPath;
 
-	if ( absPath == "" )
-		return false;
+	if ( FileSys_IsAbsolute( path.c_str() ) )
+	{
+		mapPath = ch_str_copy( path.data(), path.size() );
+	}
+	else
+	{
+		const char* strings[] = { "maps/", path.c_str() };
+		const u64   lengths[] = { 5, path.size() };
+		mapPath               = ch_str_concat( 2, strings, lengths );
+	}
 
-	return true;
+	ch_string absPath = FileSys_FindDir( mapPath.data, mapPath.size );
+
+	bool found = absPath.data != nullptr;
+
+	ch_str_free( mapPath.data );
+	ch_str_free( absPath.data );
+
+	return found;
 }
 
 
@@ -337,15 +366,28 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 
 bool MapManager_LoadMap( const std::string &path )
 {
-	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
+	ch_string_auto mapPath;
 
-	if ( absPath.empty() )
+	if ( FileSys_IsAbsolute( path.c_str() ) )
+	{
+		mapPath = ch_str_copy( path.data(), path.size() );
+	}
+	else
+	{
+		const char* strings[] = { "maps/", path.c_str() };
+		const u64   lengths[] = { 5, path.size() };
+		mapPath               = ch_str_concat( 2, strings, lengths );
+	}
+
+	ch_string_auto absPath = FileSys_FindDir( mapPath.data, mapPath.size );
+
+	if ( !absPath.data )
 	{
 		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"\n", path.c_str() );
 		return false;
 	}
 
-	chmap::Map* map = chmap::Load( absPath );
+	chmap::Map* map = chmap::Load( absPath.data, absPath.size );
 
 	if ( map == nullptr )
 	{
@@ -354,7 +396,7 @@ bool MapManager_LoadMap( const std::string &path )
 	}
 
 	// Set New Search Path
-	FileSys_InsertSearchPath( 0, absPath );
+	FileSys_InsertSearchPath( 0, absPath.data, absPath.size );
 
 	// Only load the primary scene for now
 	// Each scene gets it's own editor context
@@ -362,7 +404,7 @@ bool MapManager_LoadMap( const std::string &path )
 	if ( !MapManager_LoadScene( map->scenes[ map->primaryScene ] ) )
 	{
 		Log_ErrorF( gLC_Map, "Failed to Load Primary Scene: \"%s\" - Scene \"%s\"\n", path.c_str(), map->scenes[ map->primaryScene ].name );
-		FileSys_RemoveSearchPath( absPath );
+		FileSys_RemoveSearchPath( absPath.data, absPath.size );
 		return false;
 	}
 

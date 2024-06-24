@@ -12,17 +12,17 @@ static int FilePicker_PathInput( ImGuiInputTextCallbackData* data )
 }
 
 
-static void FilePicker_ScanFolder( FilePickerData_t& srData, std::string_view srFile )
+static void FilePicker_ScanFolder( FilePickerData_t& srData, const char* spFile, u64 size )
 {
-	srData.path   = FileSys_CleanPath( srFile );
-	auto fileList = FileSys_ScanDir( srData.path, ReadDir_AbsPaths );
+	srData.path                       = FileSys_CleanPath( spFile, size );
+	std::vector< ch_string > fileList = FileSys_ScanDir( srData.path.data, srData.path.size, ReadDir_AbsPaths );
 
 	srData.filesInFolder.clear();
 
 	for ( size_t i = 0; i < fileList.size(); i++ )
 	{
-		std::string_view file  = fileList[ i ];
-		bool isDir = FileSys_IsDir( file.data(), true );
+		ch_string file  = fileList[ i ];
+		bool isDir = FileSys_IsDir( file.data, file.size, true );
 
 		if ( !isDir && srData.filterExt.size() )
 		{
@@ -30,7 +30,7 @@ static void FilePicker_ScanFolder( FilePickerData_t& srData, std::string_view sr
 			for ( size_t filterI = 0; filterI < srData.filterExt.size(); filterI++ )
 			{
 				std::string_view ext = srData.filterExt[ filterI ];
-				if ( file.ends_with( ext ) )
+				if ( ch_str_ends_with( file, ext.data(), ext.size() ) )
 				{
 					valid = true;
 					break;
@@ -41,8 +41,10 @@ static void FilePicker_ScanFolder( FilePickerData_t& srData, std::string_view sr
 				continue;
 		}
 
-		srData.filesInFolder.push_back( file.data() );
+		srData.filesInFolder.emplace_back( file.data, file.size );
 	}
+
+	ch_str_free( fileList.data(), fileList.size() );
 }
 
 
@@ -71,24 +73,34 @@ EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData, const char* spWindo
 		}
 	}
 
-	if ( srData.path.empty() )
+	if ( !srData.path.data )
 	{
 		// Default to Root Path
-		srData.path = FileSys_GetExePath();
+		srData.path.data = ch_malloc< char >( PATH_LEN );
+		srData.path.size = FileSys_GetExePath().size;
+
+		memcpy( srData.path.data, FileSys_GetExePath().data, FileSys_GetExePath().size * sizeof( char ) );
 	}
 
 	// Draw Title Bar
 	if ( ImGui::Button( "Up" ) )
 	{
-		// BLECH
-		srData.path = fs::path( srData.path ).parent_path().string();
+		ch_string dirName = FileSys_GetDirName( srData.path.data, srData.path.size );
+
+		if ( dirName.data )
+		{
+			// wipe memory first
+			memset( srData.path.data, 0, PATH_LEN );
+			memcpy( srData.path.data, dirName.data, dirName.size );
+			srData.path.size = dirName.size;
+		}
+
 		srData.filesInFolder.clear();
 	}
 
 	ImGui::SameLine();
 
-	srData.path.reserve( PATH_LEN );
-	if ( ImGui::InputText( "Path", srData.path.data(), PATH_LEN, ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_EnterReturnsTrue, FilePicker_PathInput, &srData.path ) )
+	if ( ImGui::InputText( "Path", srData.path.data, PATH_LEN, ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_EnterReturnsTrue, FilePicker_PathInput, &srData.path ) )
 	{
 		srData.filesInFolder.clear();
 	}
@@ -102,7 +114,7 @@ EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData, const char* spWindo
 
 	if ( srData.filesInFolder.empty() )
 	{
-		FilePicker_ScanFolder( srData, srData.path );
+		FilePicker_ScanFolder( srData, srData.path.data, srData.path.size );
 	}
 
 	// Draw Items in Folder
@@ -126,7 +138,7 @@ EFilePickerReturn FilePicker_Draw( FilePickerData_t& srData, const char* spWindo
 
 				if ( isDir )
 				{
-					FilePicker_ScanFolder( srData, file );
+					FilePicker_ScanFolder( srData, file.data(), file.size() );
 					srData.selectedItems.clear();
 					selectedIndex = SIZE_MAX;
 				}

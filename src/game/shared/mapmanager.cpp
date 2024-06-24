@@ -53,12 +53,10 @@ void MapManager_CloseMap()
 
 	if ( gMapPath.size() )
 	{
-		FileSys_RemoveSearchPath( gMapPath, ESearchPathType_Path );
+		FileSys_RemoveSearchPath( gMapPath.data(), gMapPath.size(), ESearchPathType_Path );
 	}
 
 	gMapPath.clear();
-
-
 
 	if ( gpMap == nullptr )
 		return;
@@ -75,21 +73,37 @@ void MapManager_CloseMap()
 }
 
 
-bool MapManager_FindMap( const std::string& path )
+ch_string MapManager_FindMap( const std::string& path )
 {
-	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
+	ch_string_auto mapPath;
 
-	if ( absPath == "" )
-		return false;
+	if ( FileSys_IsAbsolute( path.c_str() ) )
+	{
+		mapPath = ch_str_copy( path.data(), path.size() );
+	}
+	else
+	{
+		const char* strings[] = { "maps/", path.c_str() };
+		const u64   lengths[] = { 5, path.size() };
+		mapPath               = ch_str_concat( 2, strings, lengths );
+	}
 
-	return true;
+	ch_string absPath = FileSys_FindDir( mapPath.data, mapPath.size );
+	return absPath;
+}
+
+
+bool MapManager_MapExists( const std::string& path )
+{
+	ch_string_auto mapPath = MapManager_FindMap( path );
+	return mapPath.data;
 }
 
 
 // Temporary, will be removed
 bool MapManager_LoadLegacyV1Map( const std::string &path )
 {
-	MapInfo* mapInfo = MapManager_ParseMapInfo( path + "/mapInfo.smf" );
+	MapInfo* mapInfo = MapManager_ParseMapInfo( path + CH_PATH_SEP_STR "mapInfo.smf" );
 
 	if ( mapInfo == nullptr )
 		return false;
@@ -348,15 +362,15 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 
 bool MapManager_LoadMap( const std::string& path )
 {
-	std::string absPath = FileSys_FindDir( FileSys_IsAbsolute( path.c_str() ) ? path : "maps/" + path );
+	ch_string absPath = MapManager_FindMap( path );
 
-	if ( absPath.empty() )
+	if ( !absPath.data )
 	{
 		Log_WarnF( gLC_Map, "Map does not exist: \"%s\"\n", path.c_str() );
 		return false;
 	}
 
-	chmap::Map* map = chmap::Load( absPath );
+	chmap::Map* map = chmap::Load( absPath.data, absPath.size );
 
 	if ( map == nullptr )
 	{
@@ -364,7 +378,7 @@ bool MapManager_LoadMap( const std::string& path )
 		return false;
 	}
 
-	FileSys_InsertSearchPath( 0, absPath );
+	FileSys_InsertSearchPath( 0, absPath.data, absPath.size );
 
 	// Only load the primary scene for now
 	// Each scene gets it's own editor context
@@ -552,17 +566,17 @@ gMapInfoKeys;
 
 MapInfo *MapManager_ParseMapInfo( const std::string &path )
 {
-	if ( !FileSys_Exists( path ) )
+	if ( !FileSys_Exists( path.data(), path.size() ) )
 	{
-		Log_WarnF( gLC_Map, "Map Info does not exist: \"%s\"", path.c_str() );
+		Log_WarnF( gLC_Map, "Map Info does not exist: \"%s\"", path.data() );
 		return nullptr;
 	}
 
-	std::vector< char > rawData = FileSys_ReadFile( path );
+	std::vector< char > rawData = FileSys_ReadFile( path.data(), path.size() );
 
 	if ( rawData.empty() )
 	{
-		Log_WarnF( gLC_Map, "Failed to read file: %s\n", path.c_str() );
+		Log_WarnF( gLC_Map, "Failed to read file: %s\n", path.data() );
 		return nullptr;
 	}
 
@@ -574,7 +588,7 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 
 	if ( err != KeyValueErrorCode::NO_ERROR )
 	{
-		Log_WarnF( gLC_Map, "Failed to parse file: %s\n", path.c_str() );
+		Log_WarnF( gLC_Map, "Failed to parse file: %s\n", path.data() );
 		return nullptr;
 	}
 

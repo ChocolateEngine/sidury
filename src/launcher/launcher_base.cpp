@@ -26,7 +26,7 @@ Module client = 0;
 #ifdef _WIN32
 Module sys_load_library( const char* path )
 {
-	return (Module)LoadLibrary( path );
+	return (Module)LoadLibraryA( path );
 }
 
 void sys_close_library( Module mod )
@@ -48,7 +48,7 @@ const char* sys_get_error()
 
 	LPSTR strErrorMessage = NULL;
 
-	FormatMessage(
+	FormatMessageA(
 	  FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ARGUMENT_ARRAY | FORMAT_MESSAGE_ALLOCATE_BUFFER,
 	  NULL,
 	  errorID,
@@ -150,7 +150,7 @@ void set_search_directory()
 	strcat( path, cwd );
 	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER );
 
-	auto ret = SetDllDirectory( path );
+	auto ret = SetDllDirectoryA( path );
 #endif
 }
 
@@ -159,14 +159,16 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 {
 	set_search_directory();
 
-	int  ( *app_init )()                                                = 0;
+	int  ( *app_init )()                                                  = 0;
 	void ( *core_init )( int argc, char* argv[], const char* gamePath ) = 0;
-	void ( *core_exit )( bool writeArchive )                            = 0;
+	void ( *core_exit )( bool writeArchive )                              = 0;
 
 	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
 	//	return -1;
+
 	if ( load_object( &core, "bin/" CH_PLAT_FOLDER "/ch_core" EXT_DLL ) == -1 )
 		return -1;
+
 	if ( load_object( &imgui, "bin/" CH_PLAT_FOLDER "/imgui" EXT_DLL ) == -1 )
 		return -1;
 

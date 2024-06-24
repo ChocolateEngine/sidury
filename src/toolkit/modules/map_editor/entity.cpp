@@ -95,7 +95,7 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->apName = Util_AllocStringF( "Entity %zd", entHandle );
+	ent->apName = ch_str_copy_f( "Entity %zd", entHandle ).data;
 	if ( ent->apName == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
@@ -144,7 +144,7 @@ void Entity_Delete( ChHandle_t sHandle )
 
 	if ( ent->apName )
 	{
-		Util_FreeString( ent->apName );
+		ch_str_free( ent->apName );
 		ent->apName = nullptr;
 	}
 
@@ -237,7 +237,7 @@ void Entity_SetName( ChHandle_t sHandle, const char* name )
 	if ( name == nullptr )
 		return;
 
-	ent->apName = Util_ReallocString( ent->apName, name );
+	ent->apName = ch_str_realloc( ent->apName, name ).data;
 }
 
 

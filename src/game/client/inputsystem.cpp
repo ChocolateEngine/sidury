@@ -347,7 +347,7 @@ void Input_Update()
 		for ( auto& [ scancode, command ] : gKeyBinds )
 		{
 			if ( input->KeyJustPressed( scancode ) )
-				Con_RunCommand( command );
+				Con_RunCommand( command.data(), command.size() );
 		}
 	}
 
@@ -468,7 +468,7 @@ void Input_BindKey( EButton key, const std::string& cmd )
 	if ( cvar->aFlags & CVARF_INPUT )
 	{
 		InputConVar_t& inputCvar = gInputCvarKeys[ key ];
-		inputCvar.apName = Util_AllocString( name.data(), name.size() );
+		inputCvar.apName = ch_str_copy( name.data(), name.size() ).data;
 		inputCvar.aValue = cvar->aRangeInt.apData;
 	}
 }
