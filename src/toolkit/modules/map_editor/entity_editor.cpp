@@ -153,11 +153,11 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
 
 	if ( info.aPath.size )
-		ImGui::Text( info.aPath.data );
+		ImGui::TextUnformatted( info.aPath.data );
 
 	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
-	ImGui::Text( "Format: TODO" );
-	ImGui::Text( "Mip Levels: TODO" );
+	ImGui::TextUnformatted( "Format: TODO" );
+	ImGui::TextUnformatted( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
 	ImGui::Text( "Ref Count: %d", info.aRefCount );
 }
@@ -406,7 +406,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 		//return;
 	}
 
-	ImGui::Text( matPath );
+	ImGui::TextUnformatted( matPath );
 
 	// ImGui::SameLine();
 	// 
@@ -602,7 +602,7 @@ void EntEditor_DrawRenderableUI( Entity_t* spEntity )
 	if ( spEntity->aModel )
 	{
 		std::string_view modelPath = graphics->GetModelPath( spEntity->aModel );
-		ImGui::Text( modelPath.data() );
+		ImGui::TextUnformatted( modelPath.data() );
 
 		if ( ImGui::IsItemHovered() )
 		{
@@ -699,7 +699,7 @@ void EntEditor_DrawEntityData()
 
 	if ( context->aEntitiesSelected.empty() )
 	{
-		ImGui::Text( "No Entity Selected" );
+		ImGui::TextUnformatted( "No Entity Selected" );
 		return;
 	}
 
@@ -717,7 +717,7 @@ void EntEditor_DrawEntityData()
 				return;
 			}
 
-			ImGui::Text( entity->apName );
+			ImGui::TextUnformatted( entity->aName.data, &entity->aName.data[ entity->aName.size ] );
 		}
 
 		return;
@@ -733,7 +733,7 @@ void EntEditor_DrawEntityData()
 		return;
 	}
 
-	ImGui::InputText( "Name", entity->apName, NAME_LEN );
+	ImGui::InputText( "Name", entity->aName.data, NAME_LEN );
 
 	// std::string entName = vstring( "Entity %zd", gSelectedEntity );
 	// ImGui::Text( entName.data() );
@@ -747,7 +747,7 @@ void EntEditor_DrawEntityData()
 	if ( parent )
 	{
 		Entity_t* parentData = Entity_GetData( parent );
-		parentName = parentData->apName ? parentData->apName : vstring( "Entity %zd", parent );
+		parentName = parentData->aName.data ? parentData->aName.data : vstring( "Entity %zd", parent );
 	}
 	
 	if ( ImGui::BeginCombo( "Set Parent", parentName.c_str() ) )
@@ -786,7 +786,7 @@ void EntEditor_DrawEntityData()
 
 			ImGui::PushID( entityHandle );
 	
-			if ( ImGui::Selectable( entityToParent->apName ? entityToParent->apName : entName.c_str() ) )
+			if ( ImGui::Selectable( entityToParent->aName.data ? entityToParent->aName.data : entName.data() ) )
 			{
 				Entity_SetParent( selectedEntity, entityHandle );
 			}
@@ -1042,16 +1042,16 @@ void EntEditor_DrawMapDataUI()
 {
 	ChHandle_t mat = Skybox_GetMaterial();
 
-	ImGui::Text( "Skybox" );
+	ImGui::TextUnformatted( "Skybox" );
 
 	if ( mat == CH_INVALID_HANDLE )
 	{
-		ImGui::Text( "No Skybox Material Loaded" );
+		ImGui::TextUnformatted( "No Skybox Material Loaded" );
 	}
 	else
 	{
 		std::string_view path = graphics->GetMaterialPath( mat );
-		ImGui::Text( path.data() );
+		ImGui::TextUnformatted( path.data() );
 	}
 
 	if ( ImGui::Button( "Load Skybox" ) )
@@ -1101,7 +1101,7 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent
 		}
 	}
 
-	if ( ImGui::Selectable( entity->apName ? entity->apName : "INVALID", selected ) )
+	if ( ImGui::Selectable( entity->aName.data ? entity->aName.data : "INVALID", selected ) )
 	{
 		if ( !input->KeyPressed( (EButton)SDL_SCANCODE_LSHIFT ) )
 			context->aEntitiesSelected.clear();

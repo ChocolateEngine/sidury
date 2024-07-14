@@ -41,10 +41,15 @@ struct ComponentValue
 
 	union
 	{
-		std::vector< ComponentValue > aObjects{};  // REMOVE ME AND USE POINTERS - TAKES UP 32 BYTES !!!!!!!!!!!!!!!!
+		struct Array_t
+		{
+			ComponentValue* data;
+			u64             size;
+		} aObjects;
+
 		int64_t                       aInteger;
 		double                        aDouble;
-		char*                         apString;
+		ch_string                     aString;
 		glm::vec2                     aVec2;
 		glm::vec3                     aVec3;
 		glm::vec4                     aVec4;
@@ -67,9 +72,9 @@ struct ComponentValue
 
 struct Component
 {
-	char*                                             name = nullptr;
+	ch_string                                              name;
 	// std::vector< ComponentValue >                     values{};
-	std::unordered_map< std::string, ComponentValue > values{};
+	std::unordered_map< std::string_view, ComponentValue > values{};
 };
 
 
@@ -78,7 +83,7 @@ struct Entity
 {
 	u64                      id     = UINT32_MAX;
 	u64                      parent = UINT32_MAX;  // Optional
-	char*                    name   = nullptr;     // Optional
+	ch_string                name;     // Optional
 
 	glm::vec3                pos{};
 	glm::vec3                ang{};
@@ -101,7 +106,7 @@ struct NestedScene
 
 struct Scene
 {
-	char*                      name               = nullptr;
+	ch_string                  name;
 	u32                        sceneFormatVersion = UINT32_MAX;
 
 	u64                        dateCreated        = 0;
@@ -125,7 +130,7 @@ struct Config
 struct Map
 {
 	u32                  version      = UINT32_MAX;
-	char*                name         = nullptr;
+	ch_string            name;
 	char*                skybox       = nullptr;    // MAY REMOVE ONE DAY IF WE GO WITH A SKYBOX ENTITY COMPONENT
 
 	u32                  primaryScene = UINT32_MAX;  // index of the default scene to load

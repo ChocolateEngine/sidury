@@ -101,7 +101,7 @@ extern "C"
 
 		srand( (unsigned int)time( 0 ) );  // setup rand(  )
 
-		if ( gArgGamePath == nullptr || gArgGamePath == "" )
+		if ( gArgGamePath == nullptr || gArgGamePath[ 0 ] == '\0' )
 		{
 			ShowInvalidGameOptionWindow( "No Game Specified" );
 			return 1;

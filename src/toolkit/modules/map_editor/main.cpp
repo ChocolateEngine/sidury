@@ -416,7 +416,7 @@ void UpdateLoop( float frameTime, bool sResize, glm::uvec2 sOffset )
 	if ( !sResize )
 		MapEditor_UpdateEditor( frameTime );
 
-	Phys_Simulate( GetPhysEnv(), frameTime );
+//	Phys_Simulate( GetPhysEnv(), frameTime );
 
 	if ( ui_show_render_stats )
 	{
@@ -819,6 +819,20 @@ ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
 
 void Editor_FreeContext( ChHandle_t sContext )
 {
+	// Delete Entities
+	EditorContext_t* context = nullptr;
+	if ( !gEditorContexts.Get( sContext, &context ) )
+	{
+		Log_ErrorF( "Tried to free invalid editor context handle: %zd\n", sContext );
+		return;
+	}
+
+	for ( u32 i = 0; i < context->aMap.aMapEntities.aSize; i++ )
+	{
+		ChHandle_t entity = context->aMap.aMapEntities.apData[ i ];
+		Entity_Delete( entity );
+	}
+
 	gEditorContexts.Remove( sContext );
 }
 
@@ -915,6 +929,11 @@ void MapEditor::Close()
 	// Save and Close all open Materials
 	Log_Msg( "TODO: Save all open maps\n" );
 
+	while ( gEditorContexts.aHandles.size() )
+	{
+		Editor_FreeContext( gEditorContexts.aHandles[ 0 ] );
+	}
+
 	gEditorContexts.clear();
 
 	EntEditor_Shutdown();
@@ -1008,7 +1027,7 @@ void CreatePhysObjectTest( const std::string& path )
 	if ( !ctx )
 		return;
 
-	IPhysicsShape* shape = GetPhysEnv()->LoadShape( path, PhysShapeType::StaticCompound );
+	IPhysicsShape* shape = GetPhysEnv()->LoadShape( path.data(), path.size(), PhysShapeType::StaticCompound );
 
 	if ( !shape )
 		return;

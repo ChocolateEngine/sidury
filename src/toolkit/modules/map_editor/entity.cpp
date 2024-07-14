@@ -95,8 +95,8 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->apName = ch_str_copy_f( "Entity %zd", entHandle ).data;
-	if ( ent->apName == nullptr )
+	ent->aName = ch_str_copy_f( "Entity %zd", entHandle );
+	if ( ent->aName.data == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
 		Entity_Delete( entHandle );
@@ -142,10 +142,11 @@ void Entity_Delete( ChHandle_t sHandle )
 	// remove the world matrix
 	gEntityWorldMatrices.erase( sHandle );
 
-	if ( ent->apName )
+	if ( ent->aName.data )
 	{
-		ch_str_free( ent->apName );
-		ent->apName = nullptr;
+		ch_str_free( ent->aName.data );
+		ent->aName.data = nullptr;
+		ent->aName.size = 0;
 	}
 
 	// Check if this entity has a light on it
@@ -224,7 +225,7 @@ const std::vector< ChHandle_t > &Entity_GetHandleList()
 }
 
 
-void Entity_SetName( ChHandle_t sHandle, const char* name )
+void Entity_SetName( ChHandle_t sHandle, const char* name, s64 nameLen )
 {
 	Entity_t* ent = nullptr;
 
@@ -237,7 +238,13 @@ void Entity_SetName( ChHandle_t sHandle, const char* name )
 	if ( name == nullptr )
 		return;
 
-	ent->apName = ch_str_realloc( ent->apName, name ).data;
+	if ( nameLen == -1 )
+		nameLen = strlen( name );
+
+	if ( nameLen == 0 )
+		return;
+
+	ent->aName = ch_str_realloc( ent->aName.data, name, nameLen );
 }
 
 

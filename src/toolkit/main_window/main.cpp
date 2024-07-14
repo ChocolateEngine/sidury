@@ -225,7 +225,7 @@ LoadedTool* App_GetTool( const char* tool )
 
 	for ( u32 i = 0; i < gTools.size(); i++ )
 	{
-		if ( strcmp( gTools[ i ].interface, tool ) == 0 )
+		if ( ch_str_equals( gTools[ i ].interface, tool ) )
 			return &gTools[ i ];
 	}
 

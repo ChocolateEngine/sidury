@@ -192,7 +192,7 @@ bool Phys_CreatePhysShapeComponent( CPhysShape* compPhysShape )
 		case PhysShapeType::Mesh:
 		case PhysShapeType::StaticCompound:
 		case PhysShapeType::MutableCompound:
-			shape = GetPhysEnv()->LoadShape( compPhysShape->aPath, compPhysShape->aShapeType );
+			shape = GetPhysEnv()->LoadShape( compPhysShape->aPath.Get().data(), compPhysShape->aPath.Get().size(), compPhysShape->aShapeType );
 			break;
 
 		// Uses the path for this

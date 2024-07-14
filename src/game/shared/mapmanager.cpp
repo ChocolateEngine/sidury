@@ -211,7 +211,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 		for ( chmap::Component& comp : mapEntity.components )
 		{
 			// Load a renderable
-			if ( strcmp( comp.name, "renderable" ) == 0 )
+			if ( ch_str_equals( comp.name, "renderable", 10 ) )
 			{
 				auto it = comp.values.find( "path" );
 				if ( it == comp.values.end() )
@@ -224,14 +224,14 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 					continue;
 
 				auto renderable   = Ent_AddComponent< CRenderable >( ent, "renderable" );
-				renderable->aPath = it->second.apString;
+				renderable->aPath = it->second.aString.data;
 
 				// Load other renderable data
 				// for ( const auto& [ name, compValue ] : comp.values )
 				// {
 				// }
 			}
-			else if ( strcmp( comp.name, "light" ) == 0 )
+			else if ( ch_str_equals( comp.name, "light", 5 ) )
 			{
 				auto it = comp.values.find( "type" );
 				if ( it == comp.values.end() )
@@ -245,39 +245,39 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 
 				auto light = Ent_AddComponent< CLight >( ent, "light" );
 
-				if ( strcmp( it->second.apString, "world" ) == 0 )
+				if ( ch_str_equals( it->second.aString, "world", 5 ) )
 				{
 					light->aType = ELightType_World;
 				}
-				else if ( strcmp( it->second.apString, "point" ) == 0 )
+				else if ( ch_str_equals( it->second.aString, "point", 5 ) )
 				{
 					light->aType = ELightType_Point;
 				}
-				else if ( strcmp( it->second.apString, "spot" ) == 0 )
+				else if ( ch_str_equals( it->second.aString, "spot", 4 ) )
 				{
 					light->aType = ELightType_Spot;
 				}
-				// else if ( strcmp( it->second.apString, "capsule" ) == 0 )
+				// else if ( ch_str_equals( it->second.aString, "capsule" ))
 				// {
 				// 	light->aType = ELightType_Capsule;
 				// }
 				else
 				{
-					Log_ErrorF( gLC_Map, "Unknown Light Type: %s\n", it->second.apString );
+					Log_ErrorF( gLC_Map, "Unknown Light Type: %s\n", it->second.aString.data );
 					continue;
 				}
 
 				// Read the rest of the light data
 				for ( const auto& [ name, compValue ] : comp.values )
 				{
-					if ( name == "color" )
+					if ( ch_str_equals( name.data(), name.size(), "color", 5 ) )
 					{
 						if ( compValue.type != chmap::EComponentType_Vec4 )
 							continue;
 
 						light->aColor = compValue.aVec4;
 					}
-					else if ( name == "radius" )
+					else if ( ch_str_equals( name.data(), name.size(), "radius", 6 ) )
 					{
 						if ( compValue.type == chmap::EComponentType_Int )
 							light->aRadius = compValue.aInteger;
@@ -287,7 +287,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 					}
 				}
 			}
-			else if ( strcmp( comp.name, "phys_object" ) == 0 )
+			else if ( ch_str_equals( comp.name, "phys_object", 11 ) )
 			{
 				auto it = comp.values.find( "path" );
 				if ( it == comp.values.end() )
@@ -307,16 +307,16 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				auto physShape   = Ent_AddComponent< CPhysShape >( ent, "physShape" );
 				auto physObject  = Ent_AddComponent< CPhysObject >( ent, "physObject" );
 
-				physShape->aPath = it->second.apString;
+				physShape->aPath = it->second.aString.data;
 
-				if ( strcmp( itType->second.apString, "convex" ) == 0 )
+				if ( ch_str_equals( itType->second.aString, "convex", 6 ) )
 				{
 					physObject->aStartActive   = true;
 					physObject->aMass          = 10.f;
 					physObject->aTransformMode = EPhysTransformMode_Update;
 					physShape->aShapeType      = PhysShapeType::Convex;
 				}
-				else if ( strcmp( itType->second.apString, "static_compound" ) == 0 )
+				else if ( ch_str_equals( itType->second.aString, "static_compound", 15 ) )
 				{
 					physObject->aStartActive   = true;
 					physObject->aMass          = 10.f;
@@ -326,7 +326,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 					physObject->aAllowSleeping = false;
 					physShape->aShapeType      = PhysShapeType::StaticCompound;
 				}
-				else if ( strcmp( itType->second.apString, "mesh" ) == 0 )
+				else if ( ch_str_equals( itType->second.aString, "mesh", 4 ) )
 					physShape->aShapeType = PhysShapeType::Mesh;
 				else
 					physShape->aShapeType = PhysShapeType::Convex;

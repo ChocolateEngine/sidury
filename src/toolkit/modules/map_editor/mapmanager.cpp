@@ -192,7 +192,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 			return false;
 		}
 
-		Entity_SetName( entHandle, mapEntity.name );
+		Entity_SetName( entHandle, mapEntity.name.data, mapEntity.name.size );
 
 		Entity_t* ent                 = Entity_GetData( entHandle );
 
@@ -206,7 +206,8 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 		for ( chmap::Component& comp : mapEntity.components )
 		{
 			// Load a renderable
-			if ( strcmp( comp.name, "renderable" ) == 0 )
+			// if ( ch_str_equals( comp.name, "renderable", 10 ) )
+			if ( CH_STR_EQUALS_STATIC( comp.name, "renderable" ) )
 			{
 				auto it = comp.values.find( "path" );
 				if ( it == comp.values.end() )
@@ -218,7 +219,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				if ( it->second.type != chmap::EComponentType_String )
 					continue;
 
-				ent->aModel = graphics->LoadModel( it->second.apString );
+				ent->aModel = graphics->LoadModel( it->second.aString.data );
 
 				if ( ent->aModel == CH_INVALID_HANDLE )
 					continue;
@@ -230,7 +231,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				// {
 				// }
 			}
-			else if ( strcmp( comp.name, "light" ) == 0 )
+			else if ( ch_str_equals( comp.name, "light", 5 ) )
 			{
 				auto it = comp.values.find( "type" );
 				if ( it == comp.values.end() )
@@ -242,42 +243,42 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				if ( it->second.type != chmap::EComponentType_String )
 					continue;
 
-				if ( strcmp( it->second.apString, "world" ) == 0 )
+				if ( ch_str_equals( it->second.aString , "world", 5 ) )
 				{
 					ent->apLight = graphics->CreateLight( ELightType_World );
 				}
-				else if ( strcmp( it->second.apString, "point" ) == 0 )
+				else if ( ch_str_equals( it->second.aString, "point", 5 ) )
 				{
 					ent->apLight = graphics->CreateLight( ELightType_Point );
 				}
-				else if ( strcmp( it->second.apString, "spot" ) == 0 )
+				else if ( ch_str_equals( it->second.aString, "spot", 4 ) )
 				{
 					ent->apLight = graphics->CreateLight( ELightType_Spot );
 
 					// ???
 					ent->apLight->aInnerFov = 0.f;
 				}
-				// else if ( strcmp( it->second.apString, "capsule" ) == 0 )
+				// else if ( ch_str_equals( it->second.apString, lightTypeLen, "capsule", 7 ) )
 				// {
 				// 	ent->apLight = graphics->CreateLight( ELightType_Capsule );
 				// }
 				else
 				{
-					Log_ErrorF( gLC_Map, "Unknown Light Type: %s\n", it->second.apString );
+					Log_ErrorF( gLC_Map, "Unknown Light Type: %s\n", it->second.aString.data );
 					continue;
 				}
 
 				// Read the rest of the light data
 				for ( const auto& [ name, compValue ] : comp.values )
 				{
-					if ( name == "color" )
+					if ( ch_str_equals( name.data(), name.size(), "color", 5 ) )
 					{
 						if ( compValue.type != chmap::EComponentType_Vec4 )
 							continue;
 
 						ent->apLight->aColor = compValue.aVec4;
 					}
-					else if ( name == "radius" )
+					else if ( ch_str_equals( name.data(), name.size(), "radius", 6 ) )
 					{
 						if ( compValue.type == chmap::EComponentType_Int )
 							ent->apLight->aRadius = compValue.aInteger;
@@ -287,7 +288,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 					}
 				}
 			}
-			else if ( strcmp( comp.name, "phys_object" ) == 0 )
+			else if ( ch_str_equals( comp.name, "phys_object", 11 ) )
 			{
 				auto it = comp.values.find( "path" );
 				if ( it == comp.values.end() )
@@ -306,17 +307,17 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				PhysShapeType     shapeType;
 				PhysicsObjectInfo settings{};
 
-				if ( strcmp( itType->second.apString, "convex" ) == 0 )
+				if ( ch_str_equals( itType->second.aString, "convex", 6 ) )
 				{
 					shapeType            = PhysShapeType::Convex;
 					settings.aMotionType = PhysMotionType::Dynamic;
 				}
-				else if ( strcmp( itType->second.apString, "static_compound" ) == 0 )
+				else if ( ch_str_equals( itType->second.aString, "static_compound", 15 ) )
 				{
 					shapeType            = PhysShapeType::StaticCompound;
 					settings.aMotionType = PhysMotionType::Dynamic;
 				}
-				else if ( strcmp( itType->second.apString, "mesh" ) == 0 )
+				else if ( ch_str_equals( itType->second.aString, "mesh", 4 ) )
 				{
 					shapeType            = PhysShapeType::Mesh;
 					settings.aMotionType = PhysMotionType::Static;
@@ -328,7 +329,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 				}
 
 
-				IPhysicsShape* shape = GetPhysEnv()->LoadShape( it->second.apString, shapeType );
+				IPhysicsShape* shape = GetPhysEnv()->LoadShape( it->second.aString.data, it->second.aString.size, shapeType );
 
 				if ( !shape )
 					continue;

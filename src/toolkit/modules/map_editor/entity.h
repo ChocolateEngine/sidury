@@ -22,7 +22,7 @@ struct Color3
 // not sure i really need much of a component system for an editor
 struct Entity_t
 {
-	char*              apName;
+	ch_string          aName;
 
 	Transform          aTransform;
 
@@ -64,7 +64,7 @@ void                                                Entity_Delete( ChHandle_t sH
 Entity_t*                                           Entity_GetData( ChHandle_t sHandle );
 const std::vector< ChHandle_t >&                    Entity_GetHandleList();
 
-void                                                Entity_SetName( ChHandle_t sHandle, const char* name );
+void                                                Entity_SetName( ChHandle_t sHandle, const char* name, s64 nameLen = -1 );
 
 void                                                Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible );
 void                                                Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible );

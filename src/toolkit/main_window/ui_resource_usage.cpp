@@ -43,6 +43,8 @@ void ResourceUsage_DrawTextures()
 			rtMemoryUsage += info.aMemoryUsage;
 		else
 			memoryUsage += info.aMemoryUsage;
+
+		render->FreeTextureInfo( info );
 	}
 
 	ImGui::Text(
@@ -100,6 +102,8 @@ void ResourceUsage_DrawTextures()
 			}
 
 			ImGui::EndChild();
+
+			render->FreeTextureInfo( info );
 		}
 		else
 		{
@@ -127,6 +131,7 @@ void ResourceUsage_DrawTextures()
 					{
 						TextureInfo_t info = render->GetTextureInfo( texture );
 						Util_DrawTextureInfo( info );
+						render->FreeTextureInfo( info );
 					}
 
 					ImGui::EndTooltip();
@@ -195,7 +200,15 @@ void ResourceUsage_DrawStats()
 			rtMemoryUsage += info.aMemoryUsage;
 		else
 			memoryUsage += info.aMemoryUsage;
+
+		render->FreeTextureInfo( info );
 	}
+
+	u64 stringCount  = ch_str_get_alloc_count();
+	u64 stringMemory = ch_str_get_alloc_size();
+
+	ImGui::Text( "String Count: %d", stringCount );
+	ImGui::Text( "String Memory Usage: %.6f KB", Util_BytesToKB( stringMemory ) );
 
 	ImGui::Text( "Renderable Count: %d", renderCount );
 	ImGui::Text( "Model Count: TODO - EXPOSE THIS" );

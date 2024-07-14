@@ -147,7 +147,7 @@ void Net_InitAdapterInfo()
 			PIP_ADDR_STRING ipAddrStr = &adapter->IpAddressList;
 			while ( ipAddrStr )
 			{
-				if ( strcmp( "127.0.0.1", ipAddrStr->IpAddress.String ) == 0 )
+				if ( ch_str_equals( "127.0.0.1", ipAddrStr->IpAddress.String ) == 0 )
 				{
 					foundloopback = true;
 				}
@@ -502,7 +502,7 @@ Socket_t Net_OpenSocket( const char* spPort )
 
 	// Make this socket broadcast capable
 	// HACK FOR CLIENT
-	if ( strcmp( spPort, "0" ) != 0 )
+	if ( ch_str_equals( spPort, "0", 1 ) != 0 )
 	{
 		int i = 1;
 		if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )

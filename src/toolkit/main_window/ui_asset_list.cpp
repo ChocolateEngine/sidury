@@ -138,6 +138,19 @@ bool AssetBrowser_CanDragAssetToView( Asset_t& srAsset )
 }
 
 
+static void AssetBrowser_FreeAsset( Asset_t& srAsset )
+{
+	if ( srAsset.path.data )
+		ch_str_free( srAsset.path.data );
+
+	if ( srAsset.fileName.data )
+		ch_str_free( srAsset.fileName.data );
+
+	if ( srAsset.ext.data )
+		ch_str_free( srAsset.ext.data );
+}
+
+
 static void AssetBrowser_ScanFolder( AssetBrowserData_t& srData )
 {
 	std::vector< ch_string > fileList;
@@ -176,10 +189,7 @@ static void AssetBrowser_ScanFolder( AssetBrowserData_t& srData )
 		ch_string& file    = fileList[ i ];
 		ch_string  fileExt = FileSys_GetFileExt( file.data, file.size );
 
-		Asset_t          asset{};
-		asset.path     = ch_str_copy( file.data, file.size );
-		asset.fileName = FileSys_GetFileName( file.data, file.size );
-		asset.ext      = fileExt;
+		Asset_t    asset{};
 
 		// TODO: improve this
 		if ( ch_str_equals_any( fileExt, CH_ARR_SIZE( ext_models ), ext_models ) )
@@ -208,12 +218,22 @@ static void AssetBrowser_ScanFolder( AssetBrowserData_t& srData )
 		}
 		else
 		{
+			// skip this file
+			if ( fileExt.data )
+				ch_str_free( fileExt.data );
+			
 			continue;
 		}
+
+		asset.path     = ch_str_copy( file.data, file.size );
+		asset.fileName = FileSys_GetFileName( file.data, file.size );
+		asset.ext      = fileExt;
 
 		// TODO: store each asset type in it's own list?
 		srData.fileList.push_back( asset );
 	}
+
+	ch_str_free( fileList );
 }
 
 
@@ -248,6 +268,12 @@ void AssetBrowser_Close()
 
 		render->FreeTextureFromImGui( gAssetBrowserData.icons[ i ] );
 		render->FreeTexture( gAssetBrowserData.icons[ i ] );
+	}
+
+	// Free Strings
+	for ( Asset_t& asset : gAssetBrowserData.fileList )
+	{
+		AssetBrowser_FreeAsset( asset );
 	}
 }
 
@@ -371,6 +397,11 @@ void AssetBrowser_Draw()
 
 	if ( gAssetBrowserData.fileListDirty )
 	{
+		for ( Asset_t& asset : gAssetBrowserData.fileList )
+		{
+			AssetBrowser_FreeAsset( asset );
+		}
+
 		gAssetBrowserData.fileList.clear();
 		AssetBrowser_ScanFolder( gAssetBrowserData );
 	}
