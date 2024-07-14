@@ -251,13 +251,13 @@ static void FreeScene( Scene& scene )
 
 static bool LoadScene( Map* map, const char* scenePath, s64 scenePathLen = -1 )
 {
-	std::vector< char > data = FileSys_ReadFile( scenePath, scenePathLen );
+	ch_string_auto data = FileSys_ReadFile( scenePath, scenePathLen );
 
-	if ( data.empty() )
+	if ( !data.data )
 		return false;
 
 	JsonObject_t root;
-	EJsonError   err = Json_Parse( &root, data.data() );
+	EJsonError   err = Json_Parse( &root, data.data );
 
 	if ( err != EJsonError_None )
 	{
@@ -346,13 +346,13 @@ Map* chmap::Load( const char* path, u64 pathLen )
 		return nullptr;
 	}
 	
-	std::vector< char > data = FileSys_ReadFile( mapInfoPath.data, mapInfoPath.size );
+	ch_string_auto data = FileSys_ReadFile( mapInfoPath.data, mapInfoPath.size );
 
-	if ( data.empty() )
+	if ( !data.data )
 		return nullptr;
 
 	JsonObject_t root;
-	EJsonError   err = Json_Parse( &root, data.data() );
+	EJsonError   err = Json_Parse( &root, data.data );
 
 	if ( err != EJsonError_None )
 	{

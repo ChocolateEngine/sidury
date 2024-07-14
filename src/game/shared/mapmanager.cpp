@@ -572,19 +572,16 @@ MapInfo *MapManager_ParseMapInfo( const std::string &path )
 		return nullptr;
 	}
 
-	std::vector< char > rawData = FileSys_ReadFile( path.data(), path.size() );
+	ch_string_auto rawData = FileSys_ReadFile( path.data(), path.size() );
 
-	if ( rawData.empty() )
+	if ( !rawData.data )
 	{
 		Log_WarnF( gLC_Map, "Failed to read file: %s\n", path.data() );
 		return nullptr;
 	}
 
-	// append a null terminator for c strings
-	rawData.push_back( '\0' );
-
 	KeyValueRoot kvRoot;
-	KeyValueErrorCode err = kvRoot.Parse( rawData.data() );
+	KeyValueErrorCode err = kvRoot.Parse( rawData.data );
 
 	if ( err != KeyValueErrorCode::NO_ERROR )
 	{
