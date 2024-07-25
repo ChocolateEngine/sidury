@@ -117,9 +117,9 @@ void Main_DrawGraphicsSettings()
 
 	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
 	{
-		std::string fovStr = ToString( fov );
-		const ch_string strings[] = { { (char*)"r_fov", 5 }, { fovStr.data(), fovStr.size() } };
-		ch_string_auto  fovCmd    = ch_str_concat( 2, strings );
+		std::string    fovStr = ToString( fov );
+		ch_string_auto fovCmd = ch_str_join( "r_fov ", 6, fovStr.data(), (s64)fovStr.size() );
+
 		Con_QueueCommandSilent( fovCmd.data, fovCmd.size );
 	}
 

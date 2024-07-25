@@ -336,7 +336,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 	// Load mapInfo.json5 to kick things off
 	const char*    strings[]      = { path, PATH_SEP_STR "mapInfo.json5" };
 	const size_t   sizes[]        = { pathLen, 16 };
-	ch_string_auto mapInfoPath    = ch_str_concat( 2, strings, sizes );
+	ch_string_auto mapInfoPath    = ch_str_join( 2, strings, sizes );
 
 	ch_string_auto absMapInfoPath = FileSys_FindFile( mapInfoPath.data, mapInfoPath.size );
 
@@ -438,7 +438,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 	// Load Scenes
 	const char*              scenesStr[]   = { path, PATH_SEP_STR "scenes" };
 	const size_t             scenesSizes[] = { pathLen, 7 };
-	ch_string                scenesDir     = ch_str_concat( 2, scenesStr, scenesSizes );
+	ch_string                scenesDir     = ch_str_join( 2, scenesStr, scenesSizes );
 
 	std::vector< ch_string > scenePaths = FileSys_ScanDir( scenesDir.data, scenesDir.size, ReadDir_NoDirs | ReadDir_Recursive );
 
@@ -448,7 +448,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 			continue;
 
 		const ch_string strings[]     = { scenesDir, scenePath };
-		ch_string_auto  scenePathFull = ch_str_concat( 2, strings );
+		ch_string_auto  scenePathFull = ch_str_join( 2, strings );
 
 		if ( !LoadScene( map, scenePathFull.data ) )	
 		{

@@ -26,7 +26,7 @@ AppWindow* Window_Create( const char* windowName )
 #else
 	int flags         = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
-	testWindow.window = SDL_CreateWindow( windowName, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+	appWindow->window = SDL_CreateWindow( windowName, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 	                                      800, 600, flags );
 #endif
 

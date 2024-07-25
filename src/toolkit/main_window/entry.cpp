@@ -113,11 +113,10 @@ extern "C"
 		{
 			const char* strings[] = { FileSys_GetExePath().data, CH_PATH_SEP_STR, gArgGamePath };
 			u64         lengths[] = { FileSys_GetExePath().size, 1, strlen( strings[ 2 ] ) };
-			appInfoPath           = ch_str_concat( ARR_SIZE( strings ), strings, lengths );
+			appInfoPath           = ch_str_join( ARR_SIZE( strings ), strings, lengths );
 		}
 
-		std::string dumb( appInfoPath.data, appInfoPath.size );
-		if ( !Core_AddAppInfo( dumb ) )
+		if ( !Core_AddAppInfo( CH_STR_UR( appInfoPath ) ) )
 		{
 			ch_str_free( appInfoPath.data );
 			ShowInvalidGameOptionWindow( "Failed to Load App Info" );

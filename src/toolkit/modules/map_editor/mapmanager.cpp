@@ -114,11 +114,11 @@ void MapManager_RebuildMapList()
 		// Check for legacy map file and new map file
 		const char*    strings[]     = { mapFolder.data, CH_PATH_SEP_STR "mapInfo.smf" };
 		const u64      stringLens[]  = { mapFolder.size, 14 };
-		ch_string_auto mapInfoPath   = ch_str_concat( 2, strings, stringLens );
+		ch_string_auto mapInfoPath   = ch_str_join( 2, strings, stringLens );
 
 		const char*    strings2[]    = { mapFolder.data, CH_PATH_SEP_STR "mapData.smf" };
 		const u64      stringLens2[] = { mapFolder.size, 14 };
-		ch_string_auto mapDataPath   = ch_str_concat( 2, strings2, stringLens2 );
+		ch_string_auto mapDataPath   = ch_str_join( 2, strings2, stringLens2 );
 
 		if ( !FileSys_IsFile( mapInfoPath.data, mapInfoPath.size, true ) && !FileSys_IsFile( mapDataPath.data, mapDataPath.size, true ) )
 		{
@@ -158,7 +158,7 @@ bool MapManager_FindMap( const std::string& path )
 	{
 		const char* strings[] = { "maps/", path.c_str() };
 		const u64   lengths[] = { 5, path.size() };
-		mapPath               = ch_str_concat( 2, strings, lengths );
+		mapPath               = ch_str_join( 2, strings, lengths );
 	}
 
 	ch_string absPath = FileSys_FindDir( mapPath.data, mapPath.size );
@@ -377,7 +377,7 @@ bool MapManager_LoadMap( const std::string &path )
 	{
 		const char* strings[] = { "maps/", path.c_str() };
 		const u64   lengths[] = { 5, path.size() };
-		mapPath               = ch_str_concat( 2, strings, lengths );
+		mapPath               = ch_str_join( 2, strings, lengths );
 	}
 
 	ch_string_auto absPath = FileSys_FindDir( mapPath.data, mapPath.size );

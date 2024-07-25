@@ -159,9 +159,9 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 {
 	set_search_directory();
 
-	int  ( *app_init )()                                                  = 0;
-	void ( *core_init )( int argc, char* argv[], const char* gamePath ) = 0;
-	void ( *core_exit )( bool writeArchive )                              = 0;
+	int  ( *app_init )()                                                         = 0;
+	void ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
+	void ( *core_exit )( bool writeArchive )                                     = 0;
 
 	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
 	//	return -1;

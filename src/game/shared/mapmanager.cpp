@@ -85,7 +85,7 @@ ch_string MapManager_FindMap( const std::string& path )
 	{
 		const char* strings[] = { "maps/", path.c_str() };
 		const u64   lengths[] = { 5, path.size() };
-		mapPath               = ch_str_concat( 2, strings, lengths );
+		mapPath               = ch_str_join( 2, strings, lengths );
 	}
 
 	ch_string absPath = FileSys_FindDir( mapPath.data, mapPath.size );
