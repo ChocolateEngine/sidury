@@ -239,21 +239,21 @@ static void AssetBrowser_ScanFolder( AssetBrowserData_t& srData )
 
 bool AssetBrowser_Init()
 {
-	TextureCreateData_t createInfo{};
-	createInfo.aUsage = EImageUsage_Sampled;
-
-	for ( u32 i = 0; i < EAssetType_Count; i++ )
-	{
-		render->LoadTexture( gAssetBrowserData.icons[ i ], gAssetTypeIconPaths[ i ], createInfo );
-
-		if ( gAssetBrowserData.icons[ i ] == CH_INVALID_HANDLE )
-		{
-			Log_ErrorF( "Failed to Load Icon: \"%s\"\n", gAssetTypeIconPaths[ i ] );
-			return false;
-		}
-
-		gAssetBrowserData.iconsImGui[ i ] = render->AddTextureToImGui( gAssetBrowserData.icons[ i ] );
-	}
+//	TextureCreateData_t createInfo{};
+//	createInfo.aUsage = EImageUsage_Sampled;
+//
+//	for ( u32 i = 0; i < EAssetType_Count; i++ )
+//	{
+//		render->LoadTexture( gAssetBrowserData.icons[ i ], gAssetTypeIconPaths[ i ], createInfo );
+//
+//		if ( gAssetBrowserData.icons[ i ] == CH_INVALID_HANDLE )
+//		{
+//			Log_ErrorF( "Failed to Load Icon: \"%s\"\n", gAssetTypeIconPaths[ i ] );
+//			return false;
+//		}
+//
+//		gAssetBrowserData.iconsImGui[ i ] = render->AddTextureToImGui( gAssetBrowserData.icons[ i ] );
+//	}
 
 	return true;
 }
@@ -261,25 +261,26 @@ bool AssetBrowser_Init()
 
 void AssetBrowser_Close()
 {
-	for ( u32 i = 0; i < EAssetType_Count; i++ )
-	{
-		if ( gAssetBrowserData.icons[ i ] == CH_INVALID_HANDLE )
-			continue;
-
-		render->FreeTextureFromImGui( gAssetBrowserData.icons[ i ] );
-		render->FreeTexture( gAssetBrowserData.icons[ i ] );
-	}
-
-	// Free Strings
-	for ( Asset_t& asset : gAssetBrowserData.fileList )
-	{
-		AssetBrowser_FreeAsset( asset );
-	}
+//	for ( u32 i = 0; i < EAssetType_Count; i++ )
+//	{
+//		if ( gAssetBrowserData.icons[ i ] == CH_INVALID_HANDLE )
+//			continue;
+//
+//		render->FreeTextureFromImGui( gAssetBrowserData.icons[ i ] );
+//		render->FreeTexture( gAssetBrowserData.icons[ i ] );
+//	}
+//
+//	// Free Strings
+//	for ( Asset_t& asset : gAssetBrowserData.fileList )
+//	{
+//		AssetBrowser_FreeAsset( asset );
+//	}
 }
 
 
 void AssetBrowser_Draw()
 {
+#if 0
 	// set position
 	int width, height;
 	render->GetSurfaceSize( gGraphicsWindow, width, height );
@@ -524,5 +525,6 @@ void AssetBrowser_Draw()
 	gAssetBrowserSize.y = ImGui::GetWindowHeight();
 
 	ImGui::End();
+#endif
 }
 

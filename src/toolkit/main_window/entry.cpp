@@ -4,8 +4,7 @@
 #include "core/profiler.h"
 
 #include "iinput.h"
-#include "render/irender.h"
-#include "igraphics.h"
+#include "irender3.h"
 #include "iaudio.h"
 #include "igui.h"
 #include "physics/iphysics.h"
@@ -52,23 +51,19 @@ CONCMD( mimalloc_print )
 
 
 extern IGuiSystem*       gui;
-extern IRender*          render;
+extern IRender3*         render;
 extern IInputSystem*     input;
 extern IAudioSystem*     audio;
 extern Ch_IPhysics*      ch_physics;
-extern IGraphics*        graphics;
-extern IRenderSystemOld* renderOld;
 
 
 static AppModule_t gAppModules[] = 
 {
-	{ (ISystem**)&input,      "ch_input",           IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,     "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
-	{ (ISystem**)&audio,      "ch_aduio",           IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&ch_physics, "ch_physics",         IPHYSICS_NAME, IPHYSICS_HASH },
-    { (ISystem**)&graphics,   "ch_render",          IGRAPHICS_NAME, IGRAPHICS_VER },
-    { (ISystem**)&renderOld,  "ch_render",          IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
-	{ (ISystem**)&gui,        "ch_gui",             IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&render,     "ch_render_3", CH_RENDER3, CH_RENDER3_VER },
+//	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_VER },
+//	{ (ISystem**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
 };
 
 
@@ -81,8 +76,10 @@ struct ToolLoadDesc
 
 
 static ToolLoadDesc gToolModules[] = {
-	{ "modules" CH_PATH_SEP_STR "ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
-	{ "modules" CH_PATH_SEP_STR "ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
+	// { "modules" CH_PATH_SEP_STR "ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+	// { "modules" CH_PATH_SEP_STR "ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
+
+	{ "modules" CH_PATH_SEP_STR "ch_render3_test", CH_TOOL_RENDER_TEST_NAME, CH_TOOL_RENDER_TEST_VER },
 };
 
 
@@ -134,11 +131,6 @@ extern "C"
 		// Needs to be done before Renderer is loaded
 		ImGui::CreateContext();
 
-		// if ( gArgUseGL )
-		// {
-		// 	gAppModules[ 1 ].apModuleName = "ch_render_gl";
-		// }
-
 		// Load Modules and Initialize them in this order
 		if ( !Mod_AddSystems( gAppModules, ARR_SIZE( gAppModules ) ) )
 		{
@@ -147,6 +139,7 @@ extern "C"
 		}
 
 		// Add Tools
+#if 0
 		gTools.reserve( ARR_SIZE( gToolModules ) );
 		for ( u32 i = 0; i < ARR_SIZE( gToolModules ); i++ )
 		{
@@ -169,6 +162,7 @@ extern "C"
 			tool.interface   = gToolModules[ i ].interface;
 			tool.tool        = (ITool*)toolSystem;
 		}
+#endif
 
 		if ( !App_CreateMainWindow() )
 		{

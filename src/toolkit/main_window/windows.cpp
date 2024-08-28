@@ -40,7 +40,7 @@ AppWindow* Window_Create( const char* windowName )
 	appWindow->context = ImGui::CreateContext();
 	ImGui::SetCurrentContext( appWindow->context );
 
-	appWindow->graphicsWindow = render->CreateWindow( appWindow->window, appWindow->sysWindow );
+	appWindow->graphicsWindow = render->window_create( appWindow->window, appWindow->sysWindow );
 
 	if ( appWindow->graphicsWindow == CH_INVALID_HANDLE )
 	{
@@ -56,12 +56,11 @@ AppWindow* Window_Create( const char* windowName )
 	// Create the Main Viewport - TODO: use this more across the game code
 	//appWindow->viewport = graphics->CreateViewport();
 
-	int width = 0, height = 0;
-	render->GetSurfaceSize( appWindow->graphicsWindow, width, height );
+	glm::uvec2 surface_size = render->window_surface_size( appWindow->graphicsWindow );
 
-	auto& io                   = ImGui::GetIO();
-	io.DisplaySize.x           = width;
-	io.DisplaySize.y           = height;
+	auto&      io           = ImGui::GetIO();
+	io.DisplaySize.x        = surface_size.x;
+	io.DisplaySize.y        = surface_size.y;
 
 	//ViewportShader_t* viewport = graphics->GetViewportData( appWindow->viewport );
 	//
@@ -96,7 +95,7 @@ void Window_OnClose( AppWindow& window )
 	ImGui::SetCurrentContext( window.context );
 
 	//graphics->FreeViewport( window.viewport );
-	render->DestroyWindow( window.graphicsWindow );
+	render->window_free( window.graphicsWindow );
 	ImGui_ImplSDL2_Shutdown();
 
 	ImGui::DestroyContext( window.context );
@@ -117,14 +116,13 @@ void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 
 	if ( sResize )
 	{
-		renderOld->Reset( window->graphicsWindow );
+		render->reset( window->graphicsWindow );
 
-		int width = 0, height = 0;
-		render->GetSurfaceSize( window->graphicsWindow, width, height );
+		glm::uvec2 surface_size = render->window_surface_size( window->graphicsWindow );
 
-		auto& io                   = ImGui::GetIO();
-		io.DisplaySize.x           = width;
-		io.DisplaySize.y           = height;
+		auto&      io           = ImGui::GetIO();
+		io.DisplaySize.x        = surface_size.x;
+		io.DisplaySize.y        = surface_size.y;
 
 		// ViewportShader_t* viewport = graphics->GetViewportData( window->viewport );
 		// 
@@ -144,8 +142,8 @@ void Window_Render( LoadedTool& tool, float frameTime, bool sResize )
 
 	{
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
-		ImGui::NewFrame();
-		ImGui_ImplSDL2_NewFrame();
+//		ImGui::NewFrame();
+//		ImGui_ImplSDL2_NewFrame();
 	}
 
 	tool.tool->Render( frameTime, sResize, {} );

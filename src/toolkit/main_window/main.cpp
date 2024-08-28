@@ -6,8 +6,7 @@
 
 #include "iinput.h"
 #include "igui.h"
-#include "render/irender.h"
-#include "igraphics.h"
+#include "irender3.h"
 #include "physics/iphysics.h"
 
 #include "imgui/imgui.h"
@@ -38,11 +37,9 @@ std::vector< LoadedTool > gTools;
 
 
 IGuiSystem*               gui               = nullptr;
-IRender*                  render            = nullptr;
+IRender3*                 render            = nullptr;
 IInputSystem*             input             = nullptr;
 IAudioSystem*             audio             = nullptr;
-IGraphics*                graphics          = nullptr;
-IRenderSystemOld*         renderOld         = nullptr;
 Ch_IPhysics*              ch_physics        = nullptr;
 
 //ITool*                    toolMapEditor     = nullptr;
@@ -73,19 +70,19 @@ CONVAR_FLOAT( r_farz, 10000, "Camera Far Z Plane" );
 CONVAR_FLOAT( r_fov, 106, "FOV" );
 
 
-void Util_DrawTextureInfo( TextureInfo_t& info )
-{
-	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
-
-	if ( info.aPath.size )
-		ImGui::Text( info.aPath.data );
-
-	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
-	ImGui::Text( "Format: TODO" );
-	ImGui::Text( "Mip Levels: TODO" );
-	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
-	ImGui::Text( "Ref Count: %d", info.aRefCount );
-}
+//void Util_DrawTextureInfo( TextureInfo_t& info )
+//{
+//	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
+//
+//	if ( info.aPath.size )
+//		ImGui::Text( info.aPath.data );
+//
+//	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+//	ImGui::Text( "Format: TODO" );
+//	ImGui::Text( "Mip Levels: TODO" );
+//	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
+//	ImGui::Text( "Ref Count: %d", info.aRefCount );
+//}
 
 
 void DrawQuitConfirmation();
@@ -93,6 +90,7 @@ void DrawQuitConfirmation();
 
 void Main_DrawGraphicsSettings()
 {
+#if 0
 	auto windowSize = ImGui::GetWindowSize();
 	windowSize.x -= 60;
 	windowSize.y -= 60;
@@ -178,6 +176,7 @@ void Main_DrawGraphicsSettings()
 	//ImGui::SetWindowSize( windowSize );
 
 	ImGui::EndChild();
+#endif
 }
 
 
@@ -356,8 +355,7 @@ void Main_DrawMenuBar()
 }
 
 
-// disabled cause for some reason, it could jump to the WindowProc function mid frame and call this 
-#define CH_LIVE_WINDOW_RESIZE 1
+#define CH_LIVE_WINDOW_RESIZE 0
 
 
 // return true if we should stop the UpdateLoop
@@ -445,10 +443,9 @@ void RenderMainWindow( float frameTime, bool sResize )
 	static bool wasConsoleShown = false;
 
 	// set position
-	int         width, height;
-	render->GetSurfaceSize( gGraphicsWindow, width, height );
+	glm::uvec2 surface_size = render->window_surface_size( gGraphicsWindow );
 
-	// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height) - gMainMenuBarHeight ) }, { (float)width, (float)( (height) - gMainMenuBarHeight ) } );
+	// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (surface_size.y) - gMainMenuBarHeight ) }, { (float)width, (float)( (surface_size.y) - gMainMenuBarHeight ) } );
 	//if ( showConsole )
 	//	ImGui::SetNextWindowSizeConstraints( { (float)width, 64 }, { (float)width, 64 } );
 	//else
@@ -464,11 +461,11 @@ void RenderMainWindow( float frameTime, bool sResize )
 	if ( inToolTab )
 	{
 		// ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( gMainMenuBarHeight + titleBarHeight ) }, { (float)width, (float)( gMainMenuBarHeight + titleBarHeight ) } );
-		ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( titleBarHeight ) }, { (float)width, (float)( titleBarHeight ) } );
+		ImGui::SetNextWindowSizeConstraints( { (float)surface_size.x, (float)( titleBarHeight ) }, { (float)surface_size.x, (float)( titleBarHeight ) } );
 	}
 	else
 	{
-		ImGui::SetNextWindowSizeConstraints( { (float)width, (float)( (height)-gMainMenuBarHeight ) }, { (float)width, (float)( (height)-gMainMenuBarHeight ) } );
+		ImGui::SetNextWindowSizeConstraints( { (float)surface_size.x, (float)( ( surface_size.y ) - gMainMenuBarHeight ) }, { (float)surface_size.x, (float)( ( surface_size.y ) - gMainMenuBarHeight ) } );
 	}
 
 	if ( ImGui::Begin( "##Asset Browser", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse ) )
@@ -543,17 +540,17 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	{
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
-		ImGui::NewFrame();
-		ImGui_ImplSDL2_NewFrame();
+//		ImGui::NewFrame();
+//		ImGui_ImplSDL2_NewFrame();
 	}
 
 	if ( App_HandleEvents() )
 		return;
 
-	renderOld->NewFrame();
+	render->new_frame();
 
 	if ( sResize )
-		renderOld->Reset( gGraphicsWindow );
+		render->reset( gGraphicsWindow );
 
 	// Run Tools
 	if ( !sResize )
@@ -569,12 +566,12 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 	{
-		RenderMainWindow( frameTime, sResize );
+//		RenderMainWindow( frameTime, sResize );
 	}
 	else
 	{
 		PROF_SCOPE_NAMED( "Imgui End Frame" );
-		ImGui::EndFrame();
+//		ImGui::EndFrame();
 	}
 
 	if ( !sResize )
@@ -593,8 +590,9 @@ void UpdateLoop( float frameTime, bool sResize )
 	if ( sResize )
 		return;
 
-	renderOld->PrePresent();
-	renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
+//	render->PrePresent();
+//	render->present( gGraphicsWindow, &gMainViewportHandle, 1 );
+	render->present( gGraphicsWindow );
 	Window_PresentAll();
 
 	Con_Update();
@@ -664,7 +662,7 @@ bool App_CreateMainWindow()
 		return false;
 	}
 
-	render->SetMainSurface( gpWindow, gpSysWindow );
+	render->set_main_surface( gpWindow, gpSysWindow );
 
 	input->AddWindow( gpWindow, ImGui::GetCurrentContext() );
 
@@ -674,7 +672,7 @@ bool App_CreateMainWindow()
 
 bool App_Init()
 {
-	gGraphicsWindow = render->CreateWindow( gpWindow, gpSysWindow );
+	gGraphicsWindow = render->window_create( gpWindow, gpSysWindow );
 
 	if ( gGraphicsWindow == CH_INVALID_HANDLE )
 	{
@@ -685,11 +683,11 @@ bool App_Init()
 	gui->StyleImGui();
 
 	// Create the Main Viewport - TODO: use this more across the game code
-	gMainViewportHandle = graphics->CreateViewport();
+//	gMainViewportHandle = graphics->CreateViewport();
 
 	UpdateProjection();
 #ifdef _WIN32
-	Sys_SetResizeCallback( WindowResizeCallback );
+//	Sys_SetResizeCallback( WindowResizeCallback );
 #endif /* _WIN32  */
 
 	AssetBrowser_Init();
@@ -701,10 +699,9 @@ bool App_Init()
 
 static void DrawQuitConfirmation()
 {
-	int width = 0, height = 0;
-	render->GetSurfaceSize( gGraphicsWindow, width, height );
+	glm::uvec2 surface_size = render->window_surface_size( gGraphicsWindow );
 
-	ImGui::SetNextWindowSize({ (float)width, (float)height });
+	ImGui::SetNextWindowSize( { (float)surface_size.x, (float)surface_size.y } );
 	ImGui::SetNextWindowPos({0.f, 0.f});
 
 	if (ImGui::Begin("FullScreen Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav))
@@ -713,7 +710,7 @@ static void DrawQuitConfirmation()
 
 		ImGui::SetNextWindowSize({ 250, 60 });
 
-		ImGui::SetNextWindowPos( { (width / 2.f) - 125.f, (height / 2.f) - 30.f } );
+		ImGui::SetNextWindowPos( { ( surface_size.x / 2.f ) - 125.f, ( surface_size.y / 2.f ) - 30.f } );
 
 		if ( !ImGui::Begin( "Quit Editor", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove ) )
 		{
@@ -748,31 +745,30 @@ void UpdateProjection()
 {
 	PROF_SCOPE();
 
-	int width = 0, height = 0;
-	render->GetSurfaceSize( gGraphicsWindow, width, height );
+	glm::uvec2 surface_size = render->window_surface_size( gGraphicsWindow );
 
-	auto& io          = ImGui::GetIO();
-	io.DisplaySize.x  = width;
-	io.DisplaySize.y  = height;
+	auto&      io           = ImGui::GetIO();
+	io.DisplaySize.x        = surface_size.x;
+	io.DisplaySize.y        = surface_size.y;
 
-	ViewportShader_t* viewport  = graphics->GetViewportData( gMainViewportHandle );
-
-	if ( !viewport )
-		return;
-
-	// HACK HACK HACK
-	// if ( !gSingleWindow )
-	{
-		viewport->aNearZ      = r_nearz;
-		viewport->aFarZ       = r_farz;
-		viewport->aSize       = { width, height };
-		viewport->aOffset     = { 0, 0 };
-		viewport->aProjection = glm::mat4( 1.f );
-		viewport->aView       = glm::mat4( 1.f );
-		viewport->aProjView   = glm::mat4( 1.f );
-	}
-
-	graphics->SetViewportUpdate( true );
+//	ViewportShader_t* viewport  = graphics->GetViewportData( gMainViewportHandle );
+//
+//	if ( !viewport )
+//		return;
+//
+//	// HACK HACK HACK
+//	// if ( !gSingleWindow )
+//	{
+//		viewport->aNearZ      = r_nearz;
+//		viewport->aFarZ       = r_farz;
+//		viewport->aSize       = { width, height };
+//		viewport->aOffset     = { 0, 0 };
+//		viewport->aProjection = glm::mat4( 1.f );
+//		viewport->aView       = glm::mat4( 1.f );
+//		viewport->aProjView   = glm::mat4( 1.f );
+//	}
+//
+//	graphics->SetViewportUpdate( true );
 }
 
 

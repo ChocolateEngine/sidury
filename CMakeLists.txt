@@ -30,11 +30,11 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CH_ROOT}/obj/sidury/Release )
 # Now Add Sidury Projects
 add_subdirectory( src/launcher )
 
-if ( GAME_OLD )
-	add_subdirectory( src/game )
-else()
-	add_subdirectory( src/sidury2 )
-endif( GAME_OLD )
+# if ( GAME_OLD )
+# 	add_subdirectory( src/game )
+# else()
+# 	add_subdirectory( src/sidury2 )
+# endif( GAME_OLD )
 
 if( EDITOR )
 	add_subdirectory( src/toolkit )

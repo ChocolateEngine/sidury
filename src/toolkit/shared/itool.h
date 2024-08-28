@@ -111,3 +111,6 @@ class ITool : public ISystem
 #define CH_TOOL_MAP_EDITOR_NAME "MapEditor"
 #define CH_TOOL_MAP_EDITOR_VER  1
 
+#define CH_TOOL_RENDER_TEST_NAME "RenderTest"
+#define CH_TOOL_RENDER_TEST_VER  1
+

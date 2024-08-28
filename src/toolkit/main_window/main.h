@@ -5,19 +5,16 @@
 #include "itool.h"
 
 #include "iinput.h"
-#include "render/irender.h"
+#include "irender3.h"
 #include "igui.h"
-#include "igraphics.h"
 #include "physics/iphysics.h"
 
 #include "imgui/imgui.h"
 
 class IGuiSystem;
-class IRender;
+class IRender3;
 class IInputSystem;
 class IAudioSystem;
-class IGraphics;
-class IRenderSystemOld;
 class ImGuiContext;
 
 
@@ -51,11 +48,9 @@ class Toolkit : public IToolkit
 
 
 extern IGuiSystem*               gui;
-extern IRender*                  render;
+extern IRender3*                 render;
 extern IInputSystem*             input;
 extern IAudioSystem*             audio;
-extern IGraphics*                graphics;
-extern IRenderSystemOld*         renderOld;
 
 extern Toolkit                   toolkit;
 
@@ -68,7 +63,7 @@ CONVAR_FLOAT_EXT( r_nearz );
 CONVAR_FLOAT_EXT( r_farz );
 CONVAR_FLOAT_EXT( r_fov );
 
-void                             Util_DrawTextureInfo( TextureInfo_t& info );
+// void                             Util_DrawTextureInfo( TextureInfo_t& info );
 
 LoadedTool*                      App_GetTool( const char* tool );
 bool                             App_CreateMainWindow();
