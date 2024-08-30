@@ -538,6 +538,27 @@ void UpdateLoop( float frameTime, bool sResize )
 {
 	PROF_SCOPE();
 
+	// dump fps to console for now
+
+	// calc fps from frametime
+	static float fps = 0.f;
+	fps = 1.f / frameTime;
+
+	// only print every 60 frames
+	static u32 frameCount = 0;
+	frameCount++;
+
+	if ( frameCount % 60 == 0 )
+	{
+		// float to string c
+		char fps_str[ 16 ];
+		gcvt( fps, 4, fps_str );
+
+	// 	ch_print( "FPS: " );
+		ch_print( fps_str );
+		ch_print( "\n" );
+	}
+
 	{
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
 //		ImGui::NewFrame();
