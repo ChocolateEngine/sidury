@@ -214,6 +214,21 @@ void ResourceUsage_DrawStats()
 	ImGui::Text( "String Count: %d", stringCount );
 	ImGui::Text( "String Memory Usage: %.6f KB", Util_BytesToKB( stringMemory ) );
 
+	ImGui::TextUnformatted( "-------------------------------------------------------------\nRendering Info" );
+
+	float fps = ImGui::GetIO().Framerate;
+
+	ImGui::Text( "GPU: %s", render->get_device_name() );
+	ImGui::Text( "FPS: %.4f", fps );  // TODO: smooth this
+
+	static float average_fps = 60.0f;
+	// average_fps = average_fps * 0.9f + fps * 0.1f;
+	// average_fps = average_fps * 0.99f + fps * 0.01f;
+	float        alpha       = 0.99f;
+	average_fps              = alpha * average_fps + ( 1.0 - alpha ) * fps;
+
+	ImGui::Text( "FPS (Smooth): %.4f", average_fps );  // TODO: smooth this
+
 //	ImGui::Text( "Renderable Count: %d", renderCount );
 //	ImGui::Text( "Model Count: TODO - EXPOSE THIS" );
 //	ImGui::Text( "Material Count: %d", matCount );

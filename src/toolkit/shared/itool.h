@@ -36,7 +36,7 @@ struct DockableWindow
 //	Func_DockableWindowDraw draw;
 //
 //	SDL_Window*             window         = nullptr;
-//	void*                   sysWindow      = nullptr;
+//	void*                   nativeWindow      = nullptr;
 //	ChHandle_t              graphicsWindow = CH_INVALID_HANDLE;
 //	ImGuiContext*           context        = nullptr;
 };

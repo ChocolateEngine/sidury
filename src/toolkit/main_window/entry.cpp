@@ -24,7 +24,7 @@ static const char* gArgGamePath     = Args_Register( nullptr, "Path to the game 
 static bool        gRunning         = true;
 
 
-CONVAR_RANGE_FLOAT( host_fps_max, 300, 0, 5000, "Maximum FPS the App can run at" );
+CONVAR_RANGE_FLOAT( host_fps_max, 0, 0, 5000, "Maximum FPS the App can run at" );
 CONVAR_RANGE_FLOAT( host_timescale, 1, 0, FLT_MAX, "Scaled Frametime of the App" );
 CONVAR_RANGE_FLOAT( host_max_frametime, 0.1, 0, FLT_MAX, "Max time in seconds a frame can be" );
 
@@ -161,6 +161,7 @@ extern "C"
 			LoadedTool& tool = gTools.emplace_back();
 			tool.interface   = gToolModules[ i ].interface;
 			tool.tool        = (ITool*)toolSystem;
+			tool.window      = UINT16_MAX;
 		}
 #endif
 

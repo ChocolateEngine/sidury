@@ -35,12 +35,11 @@ Toolkit                   toolkit;
 // std::vector< AppWindow >  gWindows;
 std::vector< LoadedTool > gTools;
 
-
-IGuiSystem*               gui               = nullptr;
-IRender3*                 render            = nullptr;
-IInputSystem*             input             = nullptr;
-IAudioSystem*             audio             = nullptr;
-Ch_IPhysics*              ch_physics        = nullptr;
+IGuiSystem*               gui                = nullptr;
+IRender3*                 render             = nullptr;
+IInputSystem*             input              = nullptr;
+IAudioSystem*             audio              = nullptr;
+Ch_IPhysics*              ch_physics         = nullptr;
 
 //ITool*                    toolMapEditor     = nullptr;
 //ITool*                    toolMatEditor     = nullptr;
@@ -49,12 +48,12 @@ Ch_IPhysics*              ch_physics        = nullptr;
 //bool                      toolMapEditorOpen = false;
 //bool                      toolMatEditorOpen = false;
 
-static bool               gPaused           = false;
-float                     gFrameTime        = 0.f;
+static bool               gPaused            = false;
+float                     gFrameTime         = 0.f;
 
 // TODO: make gRealTime and gGameTime
 // real time is unmodified time since engine launched, and game time is time affected by host_timescale and pausing
-double                    gCurTime          = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
+double                    gCurTime           = 0.0;  // i could make this a size_t, and then just have it be every 1000 is 1 second
 
 extern bool               gRunning;
 
@@ -237,10 +236,19 @@ AppWindow* App_GetToolWindow( const char* toolInterface )
 {
 	LoadedTool* tool = App_GetTool( toolInterface );
 
-	if ( tool && tool->window )
-		return tool->window;
+	if ( tool && tool->window != UINT16_MAX )
+	{
+		if ( tool->window < g_app_window_count )
+			return &g_app_window[ tool->window ];
+		else
+			Log_ErrorF( "Tool Window Index out of bounds!\n" );
+	}
+	else
+	{
+		Log_ErrorF( "Failed to find window for tool!\n" );
+	}
 
-	Log_ErrorF( "Failed to find window for tool!\n" );
+	Log_ErrorF( "Failed to find tool to get window from!\n" );
 	return nullptr;
 }
 
@@ -257,8 +265,8 @@ void App_LaunchTool( const char* toolInterface )
 
 	if ( tool->running )
 	{
-		if ( tool->window )
-			Window_Focus( tool->window );
+		if ( tool->window != UINT16_MAX )
+			Window_Focus( g_app_window[ tool->window ] );
 		else
 			Log_ErrorF( "TODO: FOCUS TOOL TAB!\n" );
 
@@ -268,12 +276,13 @@ void App_LaunchTool( const char* toolInterface )
 	// Launch this tool instead
 	const char* windowName = tool->tool->GetName();
 	AppWindow*  window     = nullptr;
+	u16         window_id  = UINT16_MAX;
 
 	if ( !gSingleWindow )
 	{
-		window = Window_Create( windowName );
+		window_id = Window_Create( windowName );
 
-		if ( !window )
+		if ( window_id == UINT16_MAX )
 		{
 			Log_ErrorF( "Failed to open tool window: \"%s\"\n", windowName );
 			return;
@@ -298,12 +307,41 @@ void App_LaunchTool( const char* toolInterface )
 	{
 		Log_ErrorF( "Failed to launch tool: \"%s\"\n", windowName );
 
-		if ( window )
-			Window_OnClose( *window );
+		App_CloseTool( tool );
+		return;
 	}
 
-	tool->window  = window;
+	tool->window  = window_id;
 	tool->running = true;
+}
+
+
+void App_CloseTool( LoadedTool* tool )
+{
+	if ( !tool )
+		return;
+
+	tool->tool->Close();
+	tool->running   = false;
+
+	u16 windowIndex = tool->window;
+
+	if ( windowIndex != UINT16_MAX )
+	{
+		Window_Close( windowIndex );
+
+		// shift the indexes of the windows down if they're above the index of the current window
+		for ( u32 i = 0; i < gTools.size(); i++ )
+		{
+			if ( gTools[ i ].window == UINT16_MAX )
+				continue;
+
+			if ( gTools[ i ].window > windowIndex )
+				gTools[ i ].window--;  // will be shifted down in Window_Close()
+		}
+	}
+
+	tool->window = UINT16_MAX;
 }
 
 
@@ -355,7 +393,7 @@ void Main_DrawMenuBar()
 }
 
 
-#define CH_LIVE_WINDOW_RESIZE 0
+#define CH_LIVE_WINDOW_RESIZE 1
 
 
 // return true if we should stop the UpdateLoop
@@ -368,20 +406,39 @@ void App_CloseMainWindow()
 		{
 			gTools[ i ].tool->Close();
 		}
-
-		if ( gTools[ i ].window )
-		{
-			input->RemoveWindow( gTools[ i ].window->window );
-			Window_OnClose( *gTools[ i ].window );
-		}
 	}
 
 	gTools.clear();
+
+	Window_CloseAll();
 
 	AssetBrowser_Close();
 
 	// lazy way to tell engine to quit
 	Con_RunCommand( "quit" );
+}
+
+
+u16 App_GetWindowIndex( SDL_Window* sdl_window )
+{
+	for ( u32 i = 0; i < g_app_window_count; i++ )
+	{
+		if ( g_app_window[ i ].window == sdl_window )
+			return i;
+	}
+
+	return UINT16_MAX;
+}
+
+
+u16 App_GetWindowIndexFromID( u32 window_id )
+{
+	SDL_Window* sdl_window = SDL_GetWindowFromID( window_id );
+
+	if ( !sdl_window )
+		return UINT16_MAX;
+
+	return App_GetWindowIndex( sdl_window );
 }
 
 
@@ -391,39 +448,65 @@ bool App_HandleEvents()
 
 	for ( SDL_Event& event : *events )
 	{
-		if ( event.type == SDL_QUIT )
+		switch ( event.type )
 		{
-			App_CloseMainWindow();
-			return true;
-		}
-
-		else if ( event.type == SDL_WINDOWEVENT )
-		{
-			if ( event.window.event == SDL_WINDOWEVENT_CLOSE )
+			case SDL_QUIT:
 			{
-				SDL_Window* sdlWindow = SDL_GetWindowFromID( event.window.windowID );
+				App_CloseMainWindow();
+				return true;
+			}
+			case SDL_WINDOWEVENT:
+			{
+				SDL_Window* sdl_window = SDL_GetWindowFromID( event.window.windowID );
 
-				// Is this the main window?
-				if ( sdlWindow == gpWindow )
+				switch ( event.window.event )
 				{
-					App_CloseMainWindow();
-					return true;
+					case SDL_WINDOWEVENT_CLOSE:
+					{
+						// Is this the main window?
+						if ( sdl_window == gpWindow )
+						{
+							App_CloseMainWindow();
+							return true;
+						}
+
+						u16 windowIndex = App_GetWindowIndex( sdl_window );
+
+						if ( windowIndex == UINT16_MAX )
+							break;
+
+						for ( u32 i = 0; i < gTools.size(); i++ )
+						{
+							if ( gTools[ i ].window != windowIndex )
+								continue;
+
+							App_CloseTool( &gTools[ i ] );
+							break;
+						}
+
+						break;
+					}
+					case SDL_WINDOWEVENT_SIZE_CHANGED:
+					{
+						u16 windowIndex = App_GetWindowIndex( sdl_window );
+
+						if ( windowIndex == UINT16_MAX )
+							break;
+
+						App_UpdateImGuiDisplaySize( g_app_window[ windowIndex ] );
+
+						render->reset( g_app_window[ windowIndex ].graphicsWindow );
+						
+						Log_Msg( "SDL Window Size Changed\n" );
+						break;
+					}
 				}
 
-				for ( u32 i = 0; i < gTools.size(); i++ )
-				{
-					if ( !gTools[ i ].window )
-						continue;
-
-					if ( gTools[ i ].window->window != sdlWindow )
-						continue;
-
-					gTools[ i ].tool->Close();
-					Window_OnClose( *gTools[ i ].window );
-					gTools[ i ].window  = nullptr;
-					gTools[ i ].running = false;
-					break;
-				}
+				break;
+			}
+			default:
+			{
+				break;
 			}
 		}
 	}
@@ -467,6 +550,8 @@ void RenderMainWindow( float frameTime, bool sResize )
 	{
 		ImGui::SetNextWindowSizeConstraints( { (float)surface_size.x, (float)( ( surface_size.y ) - gMainMenuBarHeight ) }, { (float)surface_size.x, (float)( ( surface_size.y ) - gMainMenuBarHeight ) } );
 	}
+
+	ImGui::SetNextWindowPos( { 0, (float)gMainMenuBarHeight } );
 
 	if ( ImGui::Begin( "##Asset Browser", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse ) )
 	{
@@ -561,8 +646,8 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	{
 		PROF_SCOPE_NAMED( "Imgui New Frame" );
-//		ImGui::NewFrame();
-//		ImGui_ImplSDL2_NewFrame();
+		ImGui::NewFrame();
+		ImGui_ImplSDL2_NewFrame();
 	}
 
 	if ( App_HandleEvents() )
@@ -587,12 +672,12 @@ void UpdateLoop( float frameTime, bool sResize )
 
 	if ( !( SDL_GetWindowFlags( gpWindow ) & SDL_WINDOW_MINIMIZED ) )
 	{
-//		RenderMainWindow( frameTime, sResize );
+		RenderMainWindow( frameTime, sResize );
 	}
 	else
 	{
 		PROF_SCOPE_NAMED( "Imgui End Frame" );
-//		ImGui::EndFrame();
+		ImGui::EndFrame();
 	}
 
 	if ( !sResize )
@@ -607,6 +692,8 @@ void UpdateLoop( float frameTime, bool sResize )
 				Window_Render( tool, frameTime, sResize );
 		}
 	}
+
+	ImGui::Render();
 
 	if ( sResize )
 		return;
@@ -627,23 +714,23 @@ void WindowResizeCallback( void* hwnd )
 	{
 		UpdateLoop( 0.f, true );
 
-		renderOld->PrePresent();
-		renderOld->Present( gGraphicsWindow, &gMainViewportHandle, 1 );
+		// render->PrePresent();
+		// render->present( gGraphicsWindow, &gMainViewportHandle, 1 );
+		render->present( gGraphicsWindow );
 		return;
 	}
 
 	for ( LoadedTool& tool: gTools )
 	{
-		if ( !tool.window )
+		if ( tool.window == UINT16_MAX )
 			continue;
 
-		if ( tool.window->sysWindow != hwnd )
-			continue;
-
-		Window_Render( tool, 0.f, true );
-		renderOld->PrePresent();
-		Window_Present( tool );
-		return;
+		if ( g_app_window[ tool.window ].nativeWindow == hwnd )
+		{
+			Window_Render( tool, 0.f, true );
+			Window_Present( tool );
+			break;
+		}
 	}
 #endif
 }
@@ -687,6 +774,19 @@ bool App_CreateMainWindow()
 
 	input->AddWindow( gpWindow, ImGui::GetCurrentContext() );
 
+	// add it to the window list
+	g_app_window_count       = 1;
+	g_app_window             = ch_malloc< AppWindow >( g_app_window_count );
+
+	AppWindow& appWindow     = g_app_window[ 0 ];
+	appWindow.window         = gpWindow;
+	appWindow.context        = ImGui::GetCurrentContext();
+	appWindow.graphicsWindow = gGraphicsWindow;
+
+#ifdef _WIN32
+	appWindow.nativeWindow = gpSysWindow;
+#endif
+
 	return true;
 }
 
@@ -701,14 +801,18 @@ bool App_Init()
 		return false;
 	}
 
+	// lol
+	g_app_window[ 0 ].graphicsWindow = gGraphicsWindow;
+
 	gui->StyleImGui();
 
 	// Create the Main Viewport - TODO: use this more across the game code
 //	gMainViewportHandle = graphics->CreateViewport();
 
 	UpdateProjection();
+
 #ifdef _WIN32
-//	Sys_SetResizeCallback( WindowResizeCallback );
+	Sys_SetResizeCallback( WindowResizeCallback );
 #endif /* _WIN32  */
 
 	AssetBrowser_Init();
@@ -759,6 +863,22 @@ static void DrawQuitConfirmation()
 	}
 
 	ImGui::End();
+}
+
+
+void App_UpdateImGuiDisplaySize( AppWindow& app_window )
+{
+	ImGuiContext* context = ImGui::GetCurrentContext();
+	ImGui::SetCurrentContext( app_window.context );
+
+	glm::uvec2 surface_size = render->window_surface_size( app_window.graphicsWindow );
+
+	auto&      io           = ImGui::GetIO();
+	io.DisplaySize.x        = surface_size.x;
+	io.DisplaySize.y        = surface_size.y;
+
+	// restore original context
+	ImGui::SetCurrentContext( context );
 }
 
 
@@ -818,7 +938,7 @@ void Toolkit::OpenAsset( const char* spToolInterface, const char* spPath )
 		return;
 	}
 
-	if ( tool->window )
-		Window_Focus( tool->window );
+	if ( tool->window != UINT16_MAX )
+		Window_Focus( g_app_window[ tool->window ] );
 }
 
