@@ -144,6 +144,8 @@ static ForceMiMalloc_t forceMiMalloc;
 void set_search_directory()
 {
 #ifdef _WIN32
+	// TODO: this won't work if the exe is run from a different directory
+	// we need to get the path of the exe and use that
 	char* cwd = getcwd( 0, 0 );
 
 	char  path[ 512 ] = {};
@@ -160,7 +162,7 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 	set_search_directory();
 
 	int  ( *app_init )()                                                         = 0;
-	void ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
+	int  ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
 	void ( *core_exit )( bool writeArchive )                                     = 0;
 
 	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
@@ -189,7 +191,15 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 	}
 
 	// MUST LOAD THIS FIRST TO REGISTER LAUNCH ARGUMENTS
-	core_init( argc, argv, spGameName );
+	int core_ret = core_init( argc, argv, spGameName );
+
+	// Failed to initialize core systems
+	if ( core_ret != 0 )
+	{
+		core_exit( false );
+		unload_objects();
+		return core_ret;
+	}
 
 	char name[ 512 ] = {};
 
@@ -219,8 +229,8 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 		return -1;
 	}
 
-	int appRet = app_init();
-	core_exit( appRet == 0 );
+	int app_ret = app_init();
+	core_exit( app_ret == 0 );
 
 	unload_objects();
 

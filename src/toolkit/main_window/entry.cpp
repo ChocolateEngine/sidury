@@ -98,6 +98,13 @@ extern "C"
 
 		srand( (unsigned int)time( 0 ) );  // setup rand(  )
 
+		// Load main app info (Note that if you don't do this, you need to call FileSys_DefaultSearchPaths() before loading any files)
+		if ( !Core_LoadAppInfo() )
+		{
+			ShowInvalidGameOptionWindow( "Failed to Load App Info" );
+			return 1;
+		}
+
 		if ( gArgGamePath == nullptr || gArgGamePath[ 0 ] == '\0' )
 		{
 			ShowInvalidGameOptionWindow( "No Game Specified" );
@@ -116,7 +123,7 @@ extern "C"
 		if ( !Core_AddAppInfo( CH_STR_UR( appInfoPath ) ) )
 		{
 			ch_str_free( appInfoPath.data );
-			ShowInvalidGameOptionWindow( "Failed to Load App Info" );
+			ShowInvalidGameOptionWindow( "Failed to Load Game App Info" );
 			return 1;
 		}
 
