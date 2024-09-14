@@ -143,7 +143,7 @@ static ForceMiMalloc_t forceMiMalloc;
 int start( int argc, char *argv[], const char* spGameName, const char* spModuleName )
 {
 	int  ( *app_init )()                                                         = 0;
-	void ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
+	int  ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
 	void ( *core_exit )( bool writeArchive )                                     = 0;
 
 	if ( load_object( &core, "bin/" CH_PLAT_FOLDER "/ch_core" EXT_DLL ) == -1 )
@@ -169,7 +169,15 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 	}
 
 	// MUST LOAD THIS FIRST TO REGISTER LAUNCH ARGUMENTS
-	core_init( argc, argv, spGameName );
+	int core_ret = core_init( argc, argv, spGameName );
+
+	// Failed to initialize core systems
+	if ( core_ret != 0 )
+	{
+		core_exit( false );
+		unload_objects();
+		return core_ret;
+	}
 
 	char name[ 512 ] = {};
 
@@ -199,8 +207,8 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 		return -1;
 	}
 
-	int appRet = app_init();
-	core_exit( appRet == 0 );
+	int app_ret = app_init();
+	core_exit( app_ret == 0 );
 
 	unload_objects();
 
