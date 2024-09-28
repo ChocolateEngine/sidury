@@ -217,21 +217,22 @@ public:
 			// TODO: Make this less stupid with allocating memory each frame
 			u32* viewportList = ch_malloc< u32 >( graphics->GetViewportCount() );
 			viewportList[ 0 ] = gMainViewportIndex;
+			u32 viewportCount = 1;
 
 			// Add Shadowmaps to this list
-			for ( u32 i = 1, j = 0; i < graphics->GetLightCount(); i++ )
+			for ( u32 i = 0; i < graphics->GetLightCount(); i++ )
 			{
 				Light_t* light = graphics->GetLightByIndex( i );
 				if ( !light->apShadowMap )
 					continue;
 
-				viewportList[ j++ ] = light->apShadowMap->aViewportHandle;
+				viewportList[ viewportCount++ ] = light->apShadowMap->aViewportHandle;
 			}
 
 			graphics->SetViewportRenderList( gMainViewportIndex, renderList.data(), renderList.size() );
 
 			renderOld->PrePresent();
-			renderOld->Present( gGraphicsWindow, viewportList, graphics->GetViewportCount() );
+			renderOld->Present( gGraphicsWindow, viewportList, viewportCount );
 
 			free( viewportList );
 		}

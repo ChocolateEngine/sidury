@@ -100,109 +100,6 @@ const char* Net_ErrorString()
 }
 
 
-// temp
-struct NetInterface_t
-{
-	unsigned long aIP;
-	unsigned long aMask;
-};
-
-constexpr int                     CH_MAX_NET_ADAPTERS = 32;
-static ChVector< NetInterface_t > gNetInterfaces;
-
-
-void Net_InitAdapterInfo()
-{
-	PIP_ADAPTER_INFO adapterInfo = (IP_ADAPTER_INFO*)malloc( sizeof( IP_ADAPTER_INFO ) );
-	if ( !adapterInfo )
-	{
-		Log_FatalF( gLC_Network, "Failed to allocate memory: %d bytes", sizeof( IP_ADAPTER_INFO ) );
-	}
-
-	ULONG outBufLen = sizeof( IP_ADAPTER_INFO );
-
-	// Make an initial call to GetAdaptersInfo to get the necessary size
-	if ( GetAdaptersInfo( adapterInfo, &outBufLen ) == ERROR_BUFFER_OVERFLOW )
-	{
-		free( adapterInfo );
-		adapterInfo = (IP_ADAPTER_INFO*)malloc( outBufLen );
-		if ( !adapterInfo )
-		{
-			Log_FatalF( gLC_Network, "Failed to allocate memory: %ld bytes", outBufLen );
-		}
-	}
-
-	bool  foundloopback = false;
-	DWORD ret = 0;
-	if ( ( ret = GetAdaptersInfo( adapterInfo, &outBufLen ) ) != NO_ERROR )
-	{
-		// happens if you have no network connection
-		Log_ErrorF( gLC_Network, "GetAdaptersInfo failed (%ld).\n", ret );
-	}
-	else
-	{
-		PIP_ADAPTER_INFO adapter = adapterInfo;
-		while ( adapter )
-		{
-			PIP_ADDR_STRING ipAddrStr = &adapter->IpAddressList;
-			while ( ipAddrStr )
-			{
-				if ( ch_str_equals( "127.0.0.1", ipAddrStr->IpAddress.String ) == 0 )
-				{
-					foundloopback = true;
-				}
-
-				unsigned long addr = ntohl( inet_addr( ipAddrStr->IpAddress.String ) );
-				unsigned long mask = ntohl( inet_addr( ipAddrStr->IpMask.String ) );
-
-				// TODO: IPV6
-				// unsigned long addr = ntohl( inet_pton( AF_INET, ipAddrStr->IpAddress.String, ) );
-				// unsigned long mask = ntohl( inet_pton( AF_INET, ipAddrStr->IpMask.String ) );
-
-				// Skip NULL netmasks
-				if ( !mask )
-				{
-					Log_DevF( gLC_Network, 1, "Found Adapter: %s - %s NULL netmask - skipped\n",
-					          adapter->Description, ipAddrStr->IpAddress.String );
-
-					ipAddrStr = ipAddrStr->Next;
-					continue;
-				}
-
-				Log_DevF( gLC_Network, 1, "Found Adapter: %s - %s/%s\n",
-				          adapter->Description, ipAddrStr->IpAddress.String, ipAddrStr->IpMask.String );
-
-				NetInterface_t& interface = gNetInterfaces.emplace_back();
-				interface.aIP             = addr;
-				interface.aMask           = mask;
-
-				if ( gNetInterfaces.size() >= CH_MAX_NET_ADAPTERS )
-				{
-					Log_DevF( gLC_Network, 1, "MAX_INTERFACES(%d) hit.\n", CH_MAX_NET_ADAPTERS );
-					free( adapterInfo );
-					return;
-				}
-
-				ipAddrStr = ipAddrStr->Next;
-			}
-
-			adapter = adapter->Next;
-		}
-	}
-
-	if ( !foundloopback && gNetInterfaces.size() < CH_MAX_NET_ADAPTERS )
-	{
-		Log_Dev( gLC_Network, 1, "Adding loopback Adapter\n" );
-
-		NetInterface_t& interface = gNetInterfaces.emplace_back();
-		interface.aIP             = ntohl( inet_addr( "127.0.0.1" ) );
-		interface.aMask           = ntohl( inet_addr( "255.0.0.0" ) );
-	}
-
-	free( adapterInfo );
-}
-
-
 bool Net_Init()
 {
 	gNetInit = false;
@@ -463,10 +360,6 @@ Socket_t Net_OpenSocket( const char* spPort )
 	struct addrinfo* result = NULL;
 	struct addrinfo  hints;
 
-	int              iSendResult;
-	char             recvbuf[ CH_NET_BUF_LEN ];
-	int              recvbuflen = CH_NET_BUF_LEN;
-
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_family   = AF_INET;
 	// hints.ai_socktype = SOCK_STREAM;
@@ -501,8 +394,9 @@ Socket_t Net_OpenSocket( const char* spPort )
 	}
 
 	// Make this socket broadcast capable
-	// HACK FOR CLIENT
-	if ( ch_str_equals( spPort, "0", 1 ) != 0 )
+	// HACK FOR BINDING THE SERVER SOCKET TO A PORT
+	// we have the client open a socket with 0 as the port, and if it's not 0, we set it to broadcast
+	if ( !ch_str_equals( spPort, "0", 1 ) )
 	{
 		int i = 1;
 		if ( setsockopt( newSocket, SOL_SOCKET, SO_BROADCAST, (char*)&i, sizeof( i ) ) == SOCKET_ERROR )
