@@ -302,7 +302,7 @@ inline void Entity_SetEntitiesVisibleBase( Entity_t** entity_list, u32 count, bo
 
 		if ( ent->apLight )
 		{
-			ent->apLight->aEnabled != visible;
+			ent->apLight->aEnabled = visible;
 			graphics->UpdateLight( ent->apLight );
 		}
 
