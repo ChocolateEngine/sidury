@@ -75,7 +75,7 @@ const char* sys_get_error()
 
 Module sys_load_library( const char* path )
 {
-	return (Module)dlopen( path, RTLD_LAZY );
+	return (Module)dlopen( path, RTLD_NOW );
 }
 
 void sys_close_library( Module mod )
@@ -140,31 +140,11 @@ static ForceMiMalloc_t forceMiMalloc;
 #endif
 
 
-// This adds a DLL search path, so i can store all dll's in the bin/win64 folder, instead of having dependency dlls in the root folder
-void set_search_directory()
-{
-#ifdef _WIN32
-	char* cwd = getcwd( 0, 0 );
-
-	char  path[ 512 ] = {};
-	strcat( path, cwd );
-	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER );
-
-	auto ret = SetDllDirectoryA( path );
-#endif
-}
-
-
 int start( int argc, char *argv[], const char* spGameName, const char* spModuleName )
 {
-	set_search_directory();
-
 	int  ( *app_init )()                                                         = 0;
 	void ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
 	void ( *core_exit )( bool writeArchive )                                     = 0;
-
-	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
-	//	return -1;
 
 	if ( load_object( &core, "bin/" CH_PLAT_FOLDER "/ch_core" EXT_DLL ) == -1 )
 		return -1;
@@ -195,7 +175,7 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 
 	// TODO: remove path change in core_init()
 #if _WIN32
-	strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
+	// strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
 #else
 	strcat( name, ".." CH_PATH_SEP_STR );
 #endif
