@@ -122,10 +122,10 @@ CONCMD( mimalloc_print )
 
 static AppModule_t gAppModulesClient[] = 
 {
-	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
 	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
 	{ (ISystem**)&audio,     "ch_aduio",     IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_VER },
     { (ISystem**)&graphics,  "ch_render",  IGRAPHICS_NAME, IGRAPHICS_VER },
     { (ISystem**)&renderOld, "ch_render",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui",       IGUI_NAME, IGUI_HASH },
@@ -133,9 +133,9 @@ static AppModule_t gAppModulesClient[] =
 
 
 static AppModule_t gAppModulesServer[] = {
-	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
 	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
-	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_VER },
 	{ (ISystem**)&graphics,  "ch_render", IGRAPHICS_NAME, IGRAPHICS_VER },
 	{ (ISystem**)&renderOld, "ch_render", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui", IGUI_NAME, IGUI_HASH },
@@ -576,6 +576,13 @@ extern "C"
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
+
+		// Load main app info (Note that if you don't do this, you need to call FileSys_DefaultSearchPaths() before loading any files)
+		if ( !Core_LoadAppInfo() )
+		{
+			Log_FatalF( "Failed to Load App Info" );
+			return 1;
+		}
 
 		IMGUI_CHECKVERSION();
 

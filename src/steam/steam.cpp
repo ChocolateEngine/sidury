@@ -17,7 +17,7 @@ static ModuleInterface_t gInterfaces[] = {
 
 extern "C"
 {
-	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	DLL_EXPORT ModuleInterface_t* ch_get_interfaces( u8& srCount )
 	{
 		srCount = 1;
 		return gInterfaces;
@@ -85,7 +85,7 @@ CONCMD( steam_load_overlay )
 bool SteamAbstraction::Init()
 {
 	// Used for loading avatar images
-	render = Mod_GetInterfaceCast< IRender >( IRENDER_NAME, IRENDER_VER );
+	render = Mod_GetSystemCast< IRender >( IRENDER_NAME, IRENDER_VER );
 	if ( render == nullptr )
 	{
 		Log_Error( gLC_Steam, "Failed to load Renderer\n" );

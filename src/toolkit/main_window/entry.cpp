@@ -62,13 +62,53 @@ extern IRenderSystemOld* renderOld;
 
 static AppModule_t gAppModules[] = 
 {
-	{ (ISystem**)&input,      "ch_input",           IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&input,      "ch_input",           IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
 	{ (ISystem**)&render,     "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
 	{ (ISystem**)&audio,      "ch_aduio",           IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&ch_physics, "ch_physics",         IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&ch_physics, "ch_physics",         IPHYSICS_NAME, IPHYSICS_VER },
     { (ISystem**)&graphics,   "ch_render",          IGRAPHICS_NAME, IGRAPHICS_VER },
     { (ISystem**)&renderOld,  "ch_render",          IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,        "ch_gui",             IGUI_NAME, IGUI_HASH },
+};
+
+
+static const char* g_modules[] = {
+	"ch_input",
+	"ch_graphics_api_vk",
+	"ch_aduio",
+	"ch_physics",
+	"ch_render",
+	"ch_gui"
+};
+
+
+struct ch_system_entry_t
+{
+	ISystem**   system;  // TODO: try ISystem*&
+	const char* system_name;
+	u16         system_ver;
+	bool        required = true;
+};
+
+#define CH_SYS_PTR( var ) (ISystem**)&var
+
+static ch_system_entry_t g_systems[] = 
+{
+	{ (ISystem**)&input,      IINPUTSYSTEM_NAME,     IINPUTSYSTEM_VER },
+	{ (ISystem**)&render,     IRENDER_NAME,          IRENDER_VER },
+	{ (ISystem**)&audio,      IADUIO_NAME,           IADUIO_VER },
+	{ (ISystem**)&ch_physics, IPHYSICS_NAME,         IPHYSICS_VER },
+	{ (ISystem**)&graphics,   IGRAPHICS_NAME,        IGRAPHICS_VER },
+	{ (ISystem**)&renderOld,  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&gui,        IGUI_NAME,             IGUI_HASH },
+
+//	{ CH_SYS_PTR( input ),      IINPUTSYSTEM_NAME,     IINPUTSYSTEM_VER },
+//	{ CH_SYS_PTR( render ),     IRENDER_NAME,          IRENDER_VER },
+//	{ CH_SYS_PTR( audio ),      IADUIO_NAME,           IADUIO_VER },
+//	{ CH_SYS_PTR( ch_physics ), IPHYSICS_NAME,         IPHYSICS_VER },
+//	{ CH_SYS_PTR( graphics ),   IGRAPHICS_NAME,        IGRAPHICS_VER },
+//	{ CH_SYS_PTR( renderOld ),  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+//	{ CH_SYS_PTR( gui ),        IGUI_NAME,             IGUI_HASH },
 };
 
 
