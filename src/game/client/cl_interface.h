@@ -9,7 +9,7 @@ class IClientSystem : public ISystem
 
 	virtual void PostUpdate( float frameTime )                                                       = 0;
 
-	virtual void SetWindowInfo( SDL_Window* window, ChHandle_t graphicsWindow )                      = 0;
+	virtual void SetWindowInfo( SDL_Window* window, ch_handle_t graphicsWindow )                      = 0;
 
 	// Are we connected to a server
 	virtual bool Connected()                                                                         = 0;

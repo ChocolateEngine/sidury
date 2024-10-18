@@ -72,8 +72,8 @@ struct CPlayerMoveData
 	// HACK FOR IMPACT SOUND ON CLIENT - CHANGE THIS LATER
 	ComponentNetVar< glm::vec3 >       aPrevVel{};
 
-	std::vector< Handle >              aStepSounds;
-	std::vector< Handle >              aImpactSounds;
+	std::vector< ch_handle_t >              aStepSounds;
+	std::vector< ch_handle_t >              aImpactSounds;
 
 	// Physics
 
@@ -86,7 +86,7 @@ struct CPlayerMoveData
 	glm::vec3                          aGroundPosition{};
 	glm::vec3                          aGroundNormal{};
 	// glm::vec3               aGroundVelocity{};
-	// Handle                  aGroundMaterial;
+	// ch_handle_t                  aGroundMaterial;
 };
 
 
@@ -159,7 +159,7 @@ class PlayerMovement // : public ComponentSystem
 	void   DisplayPlayerStats( Entity player ) const;
 
 	// std::string             GetStepSound(  );
-	Handle GetStepSound();
+	ch_handle_t GetStepSound();
 
 	void   PlayStepSound();
 	void   StopStepSound( bool force = false );  // Temp Hack for sound system

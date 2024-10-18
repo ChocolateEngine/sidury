@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-LOG_REGISTER_CHANNEL2( Network, LogColor::DarkCyan );
+LOG_CHANNEL_REGISTER( Network, LogColor::DarkCyan );
 
 static bool        gOfflineMode    = Args_Register( "Disable All Networking", "-offline" );
 

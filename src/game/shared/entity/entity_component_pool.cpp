@@ -13,7 +13,7 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LOG_CHANNEL2( Entity );
+LOG_CHANNEL( Entity );
 
 
 // returns "CLIENT", "SERVER", or "GAME" depending on what we are processing

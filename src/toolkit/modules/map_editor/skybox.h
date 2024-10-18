@@ -8,5 +8,5 @@ void        Skybox_Destroy();
 void        Skybox_SetAng( const glm::vec3& srAng );
 void        Skybox_SetMaterial( const std::string& srPath );
 const char* Skybox_GetMaterialName();
-ChHandle_t  Skybox_GetMaterial();
+ch_handle_t  Skybox_GetMaterial();
 

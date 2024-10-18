@@ -18,7 +18,7 @@ CONVAR_BOOL( r_render, 1, "" );
 u32                 gMainViewportIndex = UINT32_MAX;
 
 SDL_Window*         gpWindow           = nullptr;
-ChHandle_t          gGraphicsWindow    = CH_INVALID_HANDLE;
+ch_handle_t          gGraphicsWindow    = CH_INVALID_HANDLE;
 
 extern EClientState gClientState;
 
@@ -205,7 +205,7 @@ public:
 		{
 			// update render lists
 			// for now, we only have one primary render list, no cameras or anything yet
-			static ChVector< ChHandle_t > renderList;
+			static ChVector< ch_handle_t > renderList;
 			renderList.clear();
 			renderList.resize( graphics->GetRenderableCount() );
 
@@ -267,7 +267,7 @@ public:
 	{
 	}
 
-	void SetWindowInfo( SDL_Window* window, ChHandle_t graphicsWindow ) override
+	void SetWindowInfo( SDL_Window* window, ch_handle_t graphicsWindow ) override
 	{
 		gpWindow        = window;
 		gGraphicsWindow = graphicsWindow;

@@ -5,7 +5,7 @@
 #include "gizmos.h"
 
 
-static ChHandle_t gGizmoTranslationModel = CH_INVALID_HANDLE;
+static ch_handle_t gGizmoTranslationModel = CH_INVALID_HANDLE;
 
 constexpr float   CH_GIZMO_SCALE         = 0.33f;
 constexpr float   CH_GIZMO_LINE_LEN      = 45.f;
@@ -17,9 +17,9 @@ CONVAR_BOOL_EXT( editor_gizmo_scale_enabled );
 CONVAR_FLOAT_EXT( editor_gizmo_scale );
 
 
-static ChHandle_t CreateAxisMaterial( const char* name, ChHandle_t shader, glm::vec3 color )
+static ch_handle_t CreateAxisMaterial( const char* name, ch_handle_t shader, glm::vec3 color )
 {
-	ChHandle_t mat = graphics->CreateMaterial( name, shader );
+	ch_handle_t mat = graphics->CreateMaterial( name, shader );
 
 	if ( mat == CH_INVALID_HANDLE )
 		return CH_INVALID_HANDLE;
@@ -31,7 +31,7 @@ static ChHandle_t CreateAxisMaterial( const char* name, ChHandle_t shader, glm::
 
 bool Gizmo_BuildTranslationMesh()
 {
-	ChHandle_t shader = graphics->GetShader( "gizmo" );
+	ch_handle_t shader = graphics->GetShader( "gizmo" );
 
 	if ( shader == CH_INVALID_HANDLE )
 	{
@@ -42,9 +42,9 @@ bool Gizmo_BuildTranslationMesh()
 	Model* model           = nullptr;
 	gGizmoTranslationModel = graphics->CreateModel( &model );
 
-	ChHandle_t  matX       = CreateAxisMaterial( "gizmo_translate_x", shader, {1, 0, 0} );
-	ChHandle_t  matY       = CreateAxisMaterial( "gizmo_translate_y", shader, {0, 1, 0} );
-	ChHandle_t  matZ       = CreateAxisMaterial( "gizmo_translate_z", shader, {0, 0, 1} );
+	ch_handle_t  matX       = CreateAxisMaterial( "gizmo_translate_x", shader, {1, 0, 0} );
+	ch_handle_t  matY       = CreateAxisMaterial( "gizmo_translate_y", shader, {0, 1, 0} );
+	ch_handle_t  matZ       = CreateAxisMaterial( "gizmo_translate_z", shader, {0, 0, 1} );
 
 	if ( !matX || !matY || !matZ )
 	{
@@ -324,7 +324,7 @@ void Gizmo_UpdateTranslationInputs( EditorContext_t* context, Ray& ray, glm::mat
 	if ( !Util_RayInteresectsWithAABBs( intersectionPoint, aabbIndex, ray, aabbList, 3 ) )
 		return;
 
-	ChHandle_t axisMatHandle = CH_INVALID_HANDLE;
+	ch_handle_t axisMatHandle = CH_INVALID_HANDLE;
 
 	switch ( aabbIndex )
 	{

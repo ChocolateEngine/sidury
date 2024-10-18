@@ -39,7 +39,7 @@ static bool                gRunning           = true;
 
 SDL_Window*                gpWindow           = nullptr;
 void*                      gpSysWindow        = nullptr;
-ChHandle_t                 gGraphicsWindow    = CH_INVALID_HANDLE;
+ch_handle_t                 gGraphicsWindow    = CH_INVALID_HANDLE;
 
 u32                        gDedicatedViewport = UINT32_MAX;
 

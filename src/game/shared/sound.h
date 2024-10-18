@@ -26,7 +26,7 @@ struct CSound
 	ComponentNetVar< bool >        aStartPlayback   = false;
 	bool                           aStartedPlayback = false;
 
-	Handle                         aHandle        = CH_INVALID_HANDLE;
+	ch_handle_t                         aHandle        = CH_INVALID_HANDLE;
 };
 
 

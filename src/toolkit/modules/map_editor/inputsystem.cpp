@@ -5,7 +5,7 @@
 
 extern IInputSystem* input;
 
-LOG_REGISTER_CHANNEL2( EditorInput, LogColor::Default );
+LOG_CHANNEL_REGISTER( EditorInput, LogColor::Default );
 
 
 CONVAR_FLOAT( m_pitch, 0.022, CVARF_ARCHIVE, "Mouse Pitch" );
@@ -932,7 +932,7 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	buttonList.aCount         = newKeyList.size();
 
 	if ( buttonList.aCount )
-		buttonList.apButtons = ch_malloc_count< EButton >( buttonList.aCount );
+		buttonList.apButtons = ch_malloc< EButton >( buttonList.aCount );
 
 	for ( u8 i = 0; i < buttonList.aCount; i++ )
 	{

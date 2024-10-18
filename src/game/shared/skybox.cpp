@@ -17,9 +17,9 @@ constexpr float         SKYBOX_SCALE = 100.0f;
 constexpr glm::vec3     vec3_zero( 0, 0, 0 );
 
 static bool             gSkyboxValid  = false;
-static Handle           gSkyboxDraw   = InvalidHandle;
-static Handle           gSkyboxModel  = InvalidHandle;
-static Handle           gSkyboxShader = InvalidHandle;
+static ch_handle_t           gSkyboxDraw   = CH_INVALID_HANDLE;
+static ch_handle_t           gSkyboxModel  = CH_INVALID_HANDLE;
+static ch_handle_t           gSkyboxShader = CH_INVALID_HANDLE;
 
 
 void skybox_set_dropdown(
@@ -65,7 +65,7 @@ bool Skybox_Init()
 
 	// create an empty material just to have for now
 	// kind of an issue with this, funny
-	Handle      mat = graphics->CreateMaterial( "__skybox", gSkyboxShader );
+	ch_handle_t      mat = graphics->CreateMaterial( "__skybox", gSkyboxShader );
 
 	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "__skybox_model" );
@@ -128,8 +128,8 @@ void Skybox_Destroy()
 	if ( gSkyboxDraw )
 		graphics->FreeRenderable( gSkyboxDraw );
 
-	gSkyboxModel = InvalidHandle;
-	gSkyboxDraw  = InvalidHandle;
+	gSkyboxModel = CH_INVALID_HANDLE;
+	gSkyboxDraw  = CH_INVALID_HANDLE;
 }
 
 
@@ -158,22 +158,22 @@ void Skybox_SetMaterial( const std::string& srPath )
 	}
 
 	graphics->FreeRenderable( gSkyboxDraw );
-	gSkyboxDraw    = InvalidHandle;
+	gSkyboxDraw    = CH_INVALID_HANDLE;
 	gSkyboxValid   = false;
 
-	Handle prevMat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
+	ch_handle_t prevMat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
 
 	if ( prevMat )
 	{
-		graphics->Model_SetMaterial( gSkyboxModel, 0, InvalidHandle );
+		graphics->Model_SetMaterial( gSkyboxModel, 0, CH_INVALID_HANDLE );
 		graphics->FreeMaterial( prevMat );
 	}
 
 	if ( srPath.empty() )
 		return;
 
-	Handle mat = graphics->LoadMaterial( srPath.data(), srPath.size() );
-	if ( mat == InvalidHandle )
+	ch_handle_t mat = graphics->LoadMaterial( srPath.data(), srPath.size() );
+	if ( mat == CH_INVALID_HANDLE )
 		return;
 
 	graphics->Model_SetMaterial( gSkyboxModel, 0, mat );
@@ -207,7 +207,7 @@ const char* Skybox_GetMaterialName()
 	if ( ( !gSkyboxModel && !Skybox_Init() ) || !gSkyboxValid )
 		return nullptr;
 
-	Handle mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
+	ch_handle_t mat = graphics->Model_GetMaterial( gSkyboxModel, 0 );
 	if ( mat == CH_INVALID_HANDLE )
 		return nullptr;
 

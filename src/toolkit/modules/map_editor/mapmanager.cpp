@@ -13,7 +13,7 @@
 #include <filesystem>
 
 
-LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
+LOG_CHANNEL_REGISTER( Map, LogColor::DarkGreen );
 
 std::vector< std::string > gMapList;
 static bool                gRebuildMapList = true;
@@ -175,16 +175,16 @@ bool MapManager_FindMap( const std::string& path )
 static bool MapManager_LoadScene( chmap::Scene& scene )
 {
 	EditorContext_t* context = nullptr;
-	ChHandle_t       handle  = Editor_CreateContext( &context );
+	ch_handle_t       handle  = Editor_CreateContext( &context );
 
 	if ( handle == CH_INVALID_HANDLE )
 		return false;
 
-	std::unordered_map< u32, ChHandle_t > entityHandles;
+	std::unordered_map< u32, ch_handle_t > entityHandles;
 
 	for ( chmap::Entity& mapEntity : scene.entites )
 	{
-		ChHandle_t entHandle = Entity_Create();
+		ch_handle_t entHandle = Entity_Create();
 
 		if ( entHandle == CH_INVALID_HANDLE )
 		{

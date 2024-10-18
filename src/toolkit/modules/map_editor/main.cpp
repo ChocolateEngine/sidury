@@ -59,7 +59,7 @@ u32                             gMainViewport         = 0;
 
 EditorData_t                    gEditorData{};
 
-ChHandle_t                      gEditorContextIdx = CH_INVALID_EDITOR_CONTEXT;
+ch_handle_t                      gEditorContextIdx = CH_INVALID_EDITOR_CONTEXT;
 ResourceList< EditorContext_t > gEditorContexts;
 
 
@@ -791,7 +791,7 @@ void Game_UpdateProjection()
 // ----------------------------------------------------------------------------
 
 
-ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
+ch_handle_t Editor_CreateContext( EditorContext_t** spContext )
 {
 	if ( gEditorContexts.size() >= CH_MAX_EDITOR_CONTEXTS )
 	{
@@ -800,7 +800,7 @@ ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
 	}
 
 	EditorContext_t* context = nullptr;
-	ChHandle_t       handle  = gEditorContexts.Create( &context );
+	ch_handle_t       handle  = gEditorContexts.Create( &context );
 
 	if ( handle == CH_INVALID_HANDLE )
 		return CH_INVALID_HANDLE;
@@ -817,7 +817,7 @@ ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
 }
 
 
-void Editor_FreeContext( ChHandle_t sContext )
+void Editor_FreeContext( ch_handle_t sContext )
 {
 	// Delete Entities
 	EditorContext_t* context = nullptr;
@@ -829,7 +829,7 @@ void Editor_FreeContext( ChHandle_t sContext )
 
 	for ( u32 i = 0; i < context->aMap.aMapEntities.aSize; i++ )
 	{
-		ChHandle_t entity = context->aMap.aMapEntities.apData[ i ];
+		ch_handle_t entity = context->aMap.aMapEntities.apData[ i ];
 		Entity_Delete( entity );
 	}
 
@@ -850,7 +850,7 @@ EditorContext_t* Editor_GetContext()
 }
 
 
-void Editor_SetContext( ChHandle_t sContext )
+void Editor_SetContext( ch_handle_t sContext )
 {
 	EditorContext_t* context = nullptr;
 	if ( !gEditorContexts.Get( sContext, &context ) )
@@ -859,7 +859,7 @@ void Editor_SetContext( ChHandle_t sContext )
 		return;
 	}
 
-	ChHandle_t       lastContextIdx = gEditorContextIdx;
+	ch_handle_t       lastContextIdx = gEditorContextIdx;
 	EditorContext_t* lastContext    = nullptr;
 	gEditorContextIdx               = sContext;
 

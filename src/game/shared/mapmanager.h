@@ -104,10 +104,6 @@ std::string_view                  MapManager_GetMapPath();
 
 void                              MapManager_Update();
 
-#if CH_CLIENT
-#endif
-
-MapInfo*                          MapManager_ParseMapInfo( const std::string& srPath );
 
 // ------------------------------------------------------------------------
 // Functions to become obsolete for Sidury Map Format Version 2

@@ -119,7 +119,7 @@ struct EditorContext_t
 	SiduryMap              aMap;
 
 	// Entities Selected - NOT IMPLEMENTED YET
-	ChVector< ChHandle_t > aEntitiesSelected;
+	ChVector< ch_handle_t > aEntitiesSelected;
 };
 
 
@@ -193,19 +193,19 @@ extern MapEditor                       gMapEditorTool;
 
 extern EditorData_t                    gEditorData;
 
-extern ChHandle_t                      gEditorContextIdx;
+extern ch_handle_t                      gEditorContextIdx;
 // extern std::vector< EditorContext_t > gEditorContexts;
 extern ResourceList< EditorContext_t > gEditorContexts;
 
 constexpr u32                          CH_MAX_EDITOR_CONTEXTS    = 32;
-constexpr ChHandle_t                   CH_INVALID_EDITOR_CONTEXT = CH_INVALID_HANDLE;
+constexpr ch_handle_t                   CH_INVALID_EDITOR_CONTEXT = CH_INVALID_HANDLE;
 
 // return the context index, input a pointer address to the context if one was made
-ChHandle_t                             Editor_CreateContext( EditorContext_t** spContext );
-void                                   Editor_FreeContext( ChHandle_t sContext );
+ch_handle_t                             Editor_CreateContext( EditorContext_t** spContext );
+void                                   Editor_FreeContext( ch_handle_t sContext );
 
 EditorContext_t*                       Editor_GetContext();
-void                                   Editor_SetContext( ChHandle_t sContext );
+void                                   Editor_SetContext( ch_handle_t sContext );
 
 // maybe do this?
 //

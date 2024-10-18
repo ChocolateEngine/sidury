@@ -36,7 +36,7 @@ CONVAR_BOOL( editor_gizmo_scale_enabled, 1, "Enable Editor Gizmo Scaling" );
 
 
 // adds the entity to the selection list, making sure it's not in the list multiple times
-void EntEditor_AddToSelection( EditorContext_t* context, ChHandle_t entity )
+void EntEditor_AddToSelection( EditorContext_t* context, ch_handle_t entity )
 {
 	u32 index = context->aEntitiesSelected.index( entity );
 	if ( index == UINT32_MAX )	
@@ -44,9 +44,9 @@ void EntEditor_AddToSelection( EditorContext_t* context, ChHandle_t entity )
 }
 
 
-void EntEditor_LoadEditorRenderable( ChVector< const char* >& failList, ChHandle_t& handle, SelectionRenderable& select, const char* path )
+void EntEditor_LoadEditorRenderable( ChVector< const char* >& failList, ch_handle_t& handle, SelectionRenderable& select, const char* path )
 {
-	ChHandle_t model = graphics->LoadModel( path );
+	ch_handle_t model = graphics->LoadModel( path );
 
 	if ( !model )
 	{
@@ -97,11 +97,11 @@ bool EntEditor_Init()
 	}
 
 	// setup materials for the gizmo
-	// ChHandle_t shader = graphics->GetShader( "debug" );
+	// ch_handle_t shader = graphics->GetShader( "debug" );
 	// 
-	// ChHandle_t matGizmoX = graphics->CreateMaterial( "gizmo_x", shader );
-	// ChHandle_t matGizmoY = graphics->CreateMaterial( "gizmo_y", shader );
-	// ChHandle_t matGizmoZ = graphics->CreateMaterial( "gizmo_z", shader );
+	// ch_handle_t matGizmoX = graphics->CreateMaterial( "gizmo_x", shader );
+	// ch_handle_t matGizmoY = graphics->CreateMaterial( "gizmo_y", shader );
+	// ch_handle_t matGizmoZ = graphics->CreateMaterial( "gizmo_z", shader );
 
 	if ( !Gizmo_Init() )
 		return false;
@@ -136,15 +136,15 @@ void EntEditor_DrawImporter()
 		{
 			ImportSettings importSettings{};
 			importSettings.inputFile = gImporterFilePicker.selectedItems[ 0 ];
-			ChHandle_t importHandle = Importer_StartImport( importSettings );
+			ch_handle_t importHandle = Importer_StartImport( importSettings );
 		}
 	}
 #endif
 }
 
 
-static std::unordered_map< ChHandle_t, ImTextureID >   gImGuiTextures;
-static std::unordered_map< ChHandle_t, TextureInfo_t > gTextureInfo;
+static std::unordered_map< ch_handle_t, ImTextureID >   gImGuiTextures;
+static std::unordered_map< ch_handle_t, TextureInfo_t > gTextureInfo;
 int                                                    gTextureListViewMode = 0;
 
 
@@ -166,7 +166,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 void Editor_DrawTextureList()
 {
 	// Draws all currently loaded textures
-	std::vector< ChHandle_t > textures   = render->GetTextureList();
+	std::vector< ch_handle_t > textures   = render->GetTextureList();
 	ImVec2                 windowSize = ImGui::GetWindowSize();
 
 	glm::vec2              imageDisplaySize = { 96, 96 };
@@ -193,7 +193,7 @@ void Editor_DrawTextureList()
 	u32  memoryUsage       = 0;
 	u32  rtMemoryUsage     = 0;
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		TextureInfo_t info = render->GetTextureInfo( texture );
 
@@ -213,7 +213,7 @@ void Editor_DrawTextureList()
 		return;
 	}
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		ImTextureID imTexture = 0;
 
@@ -385,7 +385,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 	// if ( !ImGui::BeginChild( matI + 1, {}, ImGuiChildFlags_Border ) )
 	// if ( !ImGui::BeginChild( matI + 1, {} ) )
 
-	ChHandle_t  mat     = renderable->apMaterials[ matI ];
+	ch_handle_t  mat     = renderable->apMaterials[ matI ];
 	const char* matPath = graphics->Mat_GetName( mat );
 
 	//ImGui::PushID( matI + 1 );
@@ -433,7 +433,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 		ImGui::Text( "shader" );
 
 		ImGui::TableSetColumnIndex( 1 );
-		ChHandle_t shader = graphics->Mat_GetShader( mat );
+		ch_handle_t shader = graphics->Mat_GetShader( mat );
 
 		const char* shaderName = graphics->GetShaderName( shader );
 
@@ -463,7 +463,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 
 				case EMatVar_Texture:
 				{
-					ChHandle_t    texHandle = graphics->Mat_GetTexture( mat, varI );
+					ch_handle_t    texHandle = graphics->Mat_GetTexture( mat, varI );
 					TextureInfo_t texInfo   = render->GetTextureInfo( texHandle );
 
 					ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
@@ -551,7 +551,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 	//
 	//		case EMatVar_Texture:
 	//		{
-	//			ChHandle_t texHandle  = graphics->Mat_GetTexture( mat, varI );
+	//			ch_handle_t texHandle  = graphics->Mat_GetTexture( mat, varI );
 	//			TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 	//
 	//			ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
@@ -707,7 +707,7 @@ void EntEditor_DrawEntityData()
 	{
 		ImGui::Text( "%d Entities Selected", context->aEntitiesSelected.size() );
 
-		for ( ChHandle_t entityHandle : context->aEntitiesSelected )
+		for ( ch_handle_t entityHandle : context->aEntitiesSelected )
 		{
 			Entity_t* entity = Entity_GetData( entityHandle );
 			if ( entity == nullptr )
@@ -723,7 +723,7 @@ void EntEditor_DrawEntityData()
 		return;
 	}
 
-	ChHandle_t selectedEntity = context->aEntitiesSelected[ 0 ];
+	ch_handle_t selectedEntity = context->aEntitiesSelected[ 0 ];
 	Entity_t*  entity         = Entity_GetData( selectedEntity );
 
 	if ( entity == nullptr )
@@ -741,7 +741,7 @@ void EntEditor_DrawEntityData()
 	// -------------------------------------------------------------------------------------
 	// Entity Parenting
 
-	ChHandle_t  parent     = Entity_GetParent( selectedEntity );
+	ch_handle_t  parent     = Entity_GetParent( selectedEntity );
 	std::string parentName = "None";
 
 	if ( parent )
@@ -758,12 +758,12 @@ void EntEditor_DrawEntityData()
 		}
 
 		// Can't parent it to any of these
-		std::unordered_set< ChHandle_t > children;
+		std::unordered_set< ch_handle_t > children;
 		Entity_GetChildrenRecurse( selectedEntity, children );
 
-		const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
+		const ChVector< ch_handle_t >& entityHandles = context->aMap.aMapEntities;
 
-		for ( ChHandle_t entityHandle : entityHandles )
+		for ( ch_handle_t entityHandle : entityHandles )
 		{
 			if ( Entity_GetParent( selectedEntity ) == entityHandle || selectedEntity == entityHandle )
 				continue;
@@ -832,7 +832,7 @@ void EntEditor_DrawEntityData()
 		{
 			gModelBrowserData.open = false;
 
-			ChHandle_t model       = graphics->LoadModel( gModelBrowserData.selectedItems[ 0 ] );
+			ch_handle_t model       = graphics->LoadModel( gModelBrowserData.selectedItems[ 0 ] );
 
 			if ( model == CH_INVALID_HANDLE )
 			{
@@ -1040,7 +1040,7 @@ void EntEditor_DrawEntityData()
 
 void EntEditor_DrawMapDataUI()
 {
-	ChHandle_t mat = Skybox_GetMaterial();
+	ch_handle_t mat = Skybox_GetMaterial();
 
 	ImGui::TextUnformatted( "Skybox" );
 
@@ -1074,7 +1074,7 @@ void EntEditor_DrawMapDataUI()
 }
 
 
-void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent )
+void EntEditor_DrawEntityChildTree( EditorContext_t* context, ch_handle_t sParent )
 {
 	Entity_t* entity = Entity_GetData( sParent );
 	if ( entity == nullptr )
@@ -1092,7 +1092,7 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent
 	ImGui::SameLine();
 
 	bool selected = false;
-	for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+	for ( ch_handle_t selectedEnt : context->aEntitiesSelected )
 	{
 		if ( selectedEnt == sParent )
 		{
@@ -1112,11 +1112,11 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ChHandle_t sParent
 
 	if ( treeOpen )
 	{
-		ChVector< ChHandle_t > children;
+		ChVector< ch_handle_t > children;
 
 		Entity_GetChildren( sParent, children );
 
-		for ( ChHandle_t child : children )
+		for ( ch_handle_t child : children )
 		{
 			EntEditor_DrawEntityChildTree( context, child );
 		}
@@ -1176,7 +1176,7 @@ void EntEditor_DrawEntityList( EditorContext_t* context, glm::uvec2 sOffset )
 
 			if ( ImGui::Button( "Create" ) )
 			{
-				ChHandle_t selectedEntity = Entity_Create();
+				ch_handle_t selectedEntity = Entity_Create();
 
 				context->aEntitiesSelected.clear();
 				context->aEntitiesSelected.push_back( selectedEntity );
@@ -1197,7 +1197,7 @@ void EntEditor_DrawEntityList( EditorContext_t* context, glm::uvec2 sOffset )
 
 			if ( ImGui::Button( "Delete" ) )
 			{
-				for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+				for ( ch_handle_t selectedEnt : context->aEntitiesSelected )
 				{
 					Entity_Delete( selectedEnt );
 				}
@@ -1208,10 +1208,10 @@ void EntEditor_DrawEntityList( EditorContext_t* context, glm::uvec2 sOffset )
 			// Entity List
 			if ( ImGui::BeginChild( "Entity List", {}, true ) )
 			{
-				const ChVector< ChHandle_t >& entityHandles = context->aMap.aMapEntities;
+				const ChVector< ch_handle_t >& entityHandles = context->aMap.aMapEntities;
 				auto&                         entityParents = Entity_GetParentMap();
 
-				for ( ChHandle_t entityHandle : entityHandles )
+				for ( ch_handle_t entityHandle : entityHandles )
 				{
 					auto it = entityParents.find( entityHandle );
 
@@ -1288,7 +1288,7 @@ void EntEditor_DrawUI()
 	if ( gEditorData.gizmo.selectedAxis != EGizmoAxis_None )
 	{
 		// offset all selected entities
-		for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+		for ( ch_handle_t selectedEnt : context->aEntitiesSelected )
 		{
 			Entity_t* entity = Entity_GetData( selectedEnt );
 
@@ -1298,7 +1298,7 @@ void EntEditor_DrawUI()
 	}
 
 	// Draw Axis and Bounding Boxes around selected entities
-	for ( ChHandle_t selectedEnt : context->aEntitiesSelected )
+	for ( ch_handle_t selectedEnt : context->aEntitiesSelected )
 	{
 		Entity_t* entity = Entity_GetData( selectedEnt );
 
@@ -1316,7 +1316,7 @@ void EntEditor_DrawUI()
 	}
 
 	// For Now, just draw a gizmo at the first selected entity
-	ChHandle_t selectedEnt  = context->aEntitiesSelected[ 0 ];
+	ch_handle_t selectedEnt  = context->aEntitiesSelected[ 0 ];
 	Entity_t*  entity       = Entity_GetData( selectedEnt );
 
 	glm::mat4  mat( 1.f );

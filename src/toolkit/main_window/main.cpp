@@ -29,7 +29,7 @@ static bool               gSingleWindow   = Args_Register( "Single Window Mode, 
 
 SDL_Window*               gpWindow        = nullptr;
 void*                     gpSysWindow     = nullptr;
-ChHandle_t                gGraphicsWindow = CH_INVALID_HANDLE;
+ch_handle_t                gGraphicsWindow = CH_INVALID_HANDLE;
 
 Toolkit                   toolkit;
 
@@ -118,7 +118,7 @@ void Main_DrawGraphicsSettings()
 	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
 	{
 		std::string    fovStr = ToString( fov );
-		ch_string_auto fovCmd = ch_str_join( "r_fov ", 6, fovStr.data(), (s64)fovStr.size() );
+		ch_string_auto fovCmd = ch_str_join( "r_fov ", 6, fovStr.data(), fovStr.size() );
 
 		Con_QueueCommandSilent( fovCmd.data, fovCmd.size );
 	}

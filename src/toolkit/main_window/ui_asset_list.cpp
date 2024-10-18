@@ -109,7 +109,7 @@ EAssetType gAssetTypeView = EAssetType_Count;  // EAssetType_Count will be all a
 
 struct AssetBrowserData_t
 {
-	ChHandle_t             icons[ EAssetType_Count ];
+	ch_handle_t             icons[ EAssetType_Count ];
 	ImTextureID            iconsImGui[ EAssetType_Count ];
 
 	ESearchPathType        searchType;

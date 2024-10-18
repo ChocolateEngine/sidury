@@ -803,20 +803,20 @@ void PlayerManager::UpdateLocalPlayer()
 			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
 
 			// I hate this so much
-			if ( renderComp->aRenderable == InvalidHandle )
+			if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 			{
 				if ( renderComp->aPath.Get().empty() )
 					continue;
 
-				if ( renderComp->aModel == InvalidHandle )
+				if ( renderComp->aModel == CH_INVALID_HANDLE )
 				{
 					renderComp->aModel = graphics->LoadModel( renderComp->aPath );
-					if ( renderComp->aModel == InvalidHandle )
+					if ( renderComp->aModel == CH_INVALID_HANDLE )
 						continue;
 				}
 
 				renderComp->aRenderable = graphics->CreateRenderable( renderComp->aModel );
-				if ( renderComp->aRenderable == InvalidHandle )
+				if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 					continue;
 			}
 			
@@ -879,7 +879,7 @@ void PlayerManager::UpdateLocalPlayer()
 		{
 			// Make sure this thing is hidden
 			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
-			if ( renderComp->aRenderable == InvalidHandle )
+			if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 				continue;
 
 			Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
@@ -1893,18 +1893,18 @@ CONVAR_FLOAT( cl_impact_sound, 1 );
 }*/
 
 
-Handle PlayerMovement::GetStepSound()
+ch_handle_t PlayerMovement::GetStepSound()
 {
 	char soundName[128];
 	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
 	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
 
 	// audio system should auto free it i think?
-	if ( Handle stepSound = audio->OpenSound( soundName ) )
+	if ( ch_handle_t stepSound = audio->OpenSound( soundName ) )
 		// return audio->PreloadSound( stepSound ) ? stepSound : nullptr;
 		return stepSound;
 
-	return InvalidHandle;
+	return CH_INVALID_HANDLE;
 }
 
 
@@ -1939,7 +1939,7 @@ void PlayerMovement::PlayStepSound()
 	StopStepSound( true );
 
 	// if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
-	if ( Handle stepSound = GetStepSound() )
+	if ( ch_handle_t stepSound = GetStepSound() )
 	{
 		audio->SetVolume( stepSound, speedFactor );
 		audio->PlaySound( stepSound );
@@ -1987,7 +1987,7 @@ void PlayerMovement::PlayImpactSound()
 		audio->PlaySound( apMove->apImpactSound );
 	}*/
 
-	if ( Handle impactSound = GetStepSound() )
+	if ( ch_handle_t impactSound = GetStepSound() )
 	{
 		audio->SetVolume( impactSound, speedFactor );
 		audio->PlaySound( impactSound );
@@ -2130,7 +2130,7 @@ void PlayerMovement::WalkMove()
 	{
 		glm::vec3 newVel = apRigidBody->aVel;
 
-		// Handle Jumping
+		// ch_handle_t Jumping
 		if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
 		{
 			newVel.z = sv_jump_force;

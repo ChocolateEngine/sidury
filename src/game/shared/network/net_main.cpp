@@ -60,7 +60,7 @@ void Net_TestPacked()
 
 #if 0
 
-LOG_REGISTER_CHANNEL2( Network, LogColor::DarkRed );
+LOG_CHANNEL_REGISTER( Network, LogColor::DarkRed );
 
 static bool gOfflineMode = Args_Register( "Disable All Networking", "-offline" );
 static bool gNetInit     = false;

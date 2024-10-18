@@ -2,13 +2,13 @@
 
 
 int                                           gTextureListViewMode = 1;
-std::unordered_map< ChHandle_t, ImTextureID > gImGuiTextures;
+std::unordered_map< ch_handle_t, ImTextureID > gImGuiTextures;
 
 
 void ResourceUsage_DrawTextures()
 {
 	// Draws all currently loaded textures
-	std::vector< ChHandle_t > textures         = render->GetTextureList();
+	std::vector< ch_handle_t > textures         = render->GetTextureList();
 	ImVec2                    windowSize       = ImGui::GetWindowSize();
 
 	glm::vec2                 imageDisplaySize = { 96, 96 };
@@ -35,7 +35,7 @@ void ResourceUsage_DrawTextures()
 	u32  memoryUsage       = 0;
 	u32  rtMemoryUsage     = 0;
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		TextureInfo_t info = render->GetTextureInfo( texture );
 
@@ -57,7 +57,7 @@ void ResourceUsage_DrawTextures()
 		return;
 	}
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		ImTextureID imTexture = 0;
 
@@ -166,7 +166,7 @@ void ResourceUsage_DrawMaterials()
 
 	for ( u32 i = 0; i < matCount; i++ )
 	{
-		ChHandle_t  mat     = graphics->GetMaterialByIndex( i );
+		ch_handle_t  mat     = graphics->GetMaterialByIndex( i );
 		const char* matName = graphics->Mat_GetName( mat );
 
 		ImGui::PushID( i );
@@ -185,14 +185,14 @@ void ResourceUsage_DrawMaterials()
 
 void ResourceUsage_DrawStats()
 {
-	std::vector< ChHandle_t > textures      = render->GetTextureList();
+	std::vector< ch_handle_t > textures      = render->GetTextureList();
 	u32                       matCount      = graphics->GetMaterialCount();
 	u32                       renderCount   = graphics->GetRenderableCount();
 
 	u32                       memoryUsage   = 0;
 	u32                       rtMemoryUsage = 0;
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		TextureInfo_t info = render->GetTextureInfo( texture );
 

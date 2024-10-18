@@ -25,7 +25,7 @@ struct AppWindow
 {
 	SDL_Window*   window         = nullptr;
 	void*         sysWindow      = nullptr;
-	ChHandle_t    graphicsWindow = CH_INVALID_HANDLE;
+	ch_handle_t    graphicsWindow = CH_INVALID_HANDLE;
 	ImGuiContext* context        = nullptr;
 };
 
@@ -61,7 +61,7 @@ extern Toolkit                   toolkit;
 
 extern u32                       gMainViewportHandle;
 extern SDL_Window*               gpWindow;
-extern ChHandle_t                gGraphicsWindow;
+extern ch_handle_t                gGraphicsWindow;
 extern std::vector< LoadedTool > gTools;
 
 CONVAR_FLOAT_EXT( r_nearz );

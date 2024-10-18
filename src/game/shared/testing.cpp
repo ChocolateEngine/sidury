@@ -36,7 +36,7 @@ CONVAR_FLOAT_EXT( phys_friction );
 CONVAR_FLOAT_EXT( cl_view_height );
 
 // Audio Channels
-Handle                        hAudioMusic = InvalidHandle;
+ch_handle_t                        hAudioMusic = CH_INVALID_HANDLE;
 
 // testing
 std::vector< Entity >         gAudioTestEntitiesCl{};
@@ -137,7 +137,7 @@ class ProtogenSystem : public IEntityComponentSystem
 		}
 		else
 		{
-			renderable->aRenderable = InvalidHandle;
+			renderable->aRenderable = CH_INVALID_HANDLE;
 		}
 #endif
 	}
@@ -192,7 +192,7 @@ void CreateProtogen_f( const std::string& path )
 
 	Ent_AddComponent( proto, "protogen" );
 
-	// Handle       model          = graphics->LoadModel( path );
+	// ch_handle_t       model          = graphics->LoadModel( path );
 
 	CRenderable* renderable     = Ent_AddComponent< CRenderable >( proto, "renderable" );
 	renderable->aPath           = path;
@@ -231,7 +231,7 @@ void CreatePhysEntity( const std::string& path )
 #if 0
 	Entity         physEnt    = Entity_CreateEntity();
 
-	Handle         model      = graphics->LoadModel( path );
+	ch_handle_t         model      = graphics->LoadModel( path );
 
 	CRenderable_t& renderComp = Entity_AddComponent< CRenderable_t >( physEnt );
 	renderComp.aHandle        = graphics->CreateRenderable( model );
@@ -427,7 +427,7 @@ void TEST_EntUpdate()
 
 		if ( Renderable_t* renderable = graphics->GetRenderableData( renderComp.aHandle ) )
 		{
-			if ( renderable->aModel == InvalidHandle )
+			if ( renderable->aModel == CH_INVALID_HANDLE )
 				continue;
 
 			// Model *physObjList = &Entity_GetComponent< Model >( ent );
@@ -547,18 +547,18 @@ void TEST_CL_UpdateProtos( float frameTime )
 			continue;
 
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
-		if ( renderComp->aRenderable == InvalidHandle )
+		if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 		{
-			if ( renderComp->aModel == InvalidHandle )
+			if ( renderComp->aModel == CH_INVALID_HANDLE )
 			{
 				if ( renderComp->aPath.Get().empty() )
 
 				renderComp->aModel = graphics->LoadModel( renderComp->aPath );
-				if ( renderComp->aModel == InvalidHandle )
+				if ( renderComp->aModel == CH_INVALID_HANDLE )
 					continue;
 			}
 
-			Handle        renderable = graphics->CreateRenderable( renderComp->aModel );
+			ch_handle_t        renderable = graphics->CreateRenderable( renderComp->aModel );
 			Renderable_t* renderData = graphics->GetRenderableData( renderable );
 
 			if ( !renderData )
@@ -782,7 +782,7 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 	if ( !audio )
 		return;
 
-	Handle soundHandle = audio->OpenSound( srPath );
+	ch_handle_t soundHandle = audio->OpenSound( srPath );
 
 	if ( soundHandle == CH_INVALID_HANDLE )
 		return;

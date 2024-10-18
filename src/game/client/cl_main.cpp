@@ -30,7 +30,7 @@
 //   - how many workshop addons you've subscribed to in total
 //   
 
-LOG_REGISTER_CHANNEL2( Client, LogColor::White );
+LOG_CHANNEL_REGISTER( Client, LogColor::White );
 
 static Socket_t                   gClientSocket = CH_INVALID_SOCKET;
 ch_sockaddr                       gClientAddr;
@@ -339,7 +339,7 @@ const char* CL_GetUserName()
 }
 
 
-void CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar )
+void CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, ch_handle_t sAvatar )
 {
 	for ( CL_Client_t& client : gClClients )
 	{
@@ -366,7 +366,7 @@ void CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, Hand
 }
 
 
-Handle CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize )
+ch_handle_t CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize )
 {
 	for ( CL_Client_t& client : gClClients )
 	{
@@ -386,11 +386,11 @@ Handle CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize )
 		}
 	}
 
-	return InvalidHandle;
+	return CH_INVALID_HANDLE;
 }
 
 
-Handle CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth )
+ch_handle_t CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth )
 {
 	for ( CL_Client_t& client : gClClients )
 	{
@@ -407,7 +407,7 @@ Handle CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth )
 			return client.aAvatarLarge;
 	}
 
-	return InvalidHandle;
+	return CH_INVALID_HANDLE;
 }
 
 

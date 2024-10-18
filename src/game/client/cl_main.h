@@ -44,9 +44,9 @@ struct CL_Client_t
 	SteamID64_t aSteamID      = 0;
 	Entity      aEntity       = CH_ENT_INVALID;
 
-	Handle      aAvatarLarge  = InvalidHandle;
-	Handle      aAvatarMedium = InvalidHandle;
-	Handle      aAvatarSmall  = InvalidHandle;
+	ch_handle_t      aAvatarLarge  = CH_INVALID_HANDLE;
+	ch_handle_t      aAvatarMedium = CH_INVALID_HANDLE;
+	ch_handle_t      aAvatarSmall  = CH_INVALID_HANDLE;
 };
 
 
@@ -62,15 +62,15 @@ void                   CL_Update( float frameTime );
 void                   CL_GameUpdate( float frameTime );
 
 const char*            CL_GetUserName();
-void                   CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar );
+void                   CL_SetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize, ch_handle_t sAvatar );
 
 // NOTE: Will only work when the avatar is already loaded
 // though, maybe we can somehow pre-allocate that handle to a missing texture or something
 // and then when we have downloaded the avatar from steam, we update the texture data without replacing the handle?
-Handle                 CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize );
+ch_handle_t                 CL_GetClientSteamAvatar( SteamID64_t sSteamID, ESteamAvatarSize sSize );
 
 // Pick the best available steam avatar based on width
-Handle                 CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth );
+ch_handle_t                 CL_PickClientSteamAvatar( SteamID64_t sSteamID, int sWidth );
 
 // =======================================================================
 // Client Networking

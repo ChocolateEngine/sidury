@@ -148,21 +148,21 @@ static bool UpdateModelHandle( CRenderable* modelInfo )
 	if ( !modelInfo )
 		return false;
 
-	if ( !( modelInfo->aPath.aIsDirty || ( modelInfo->aModel == InvalidHandle && modelInfo->aPath.Get().size() ) ) )
+	if ( !( modelInfo->aPath.aIsDirty || ( modelInfo->aModel == CH_INVALID_HANDLE && modelInfo->aPath.Get().size() ) ) )
 		return false;
 
-	if ( modelInfo->aModel != InvalidHandle )
+	if ( modelInfo->aModel != CH_INVALID_HANDLE )
 	{
 		std::string_view curModel = graphics->GetModelPath( modelInfo->aModel );
 			
 		if ( curModel != modelInfo->aPath.Get() )
 		{
 			graphics->FreeModel( modelInfo->aModel );
-			modelInfo->aModel = InvalidHandle;
+			modelInfo->aModel = CH_INVALID_HANDLE;
 		}
 	}
 
-	if ( modelInfo->aModel == InvalidHandle )
+	if ( modelInfo->aModel == CH_INVALID_HANDLE )
 		modelInfo->aModel = graphics->LoadModel( modelInfo->aPath );
 
 	// Update Renderable if needed

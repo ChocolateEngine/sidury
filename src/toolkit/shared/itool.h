@@ -19,7 +19,7 @@ struct ToolLaunchData
 {
 	IToolkit*   toolkit;
 	SDL_Window* window;
-	ChHandle_t  graphicsWindow;
+	ch_handle_t  graphicsWindow;
 };
 
 
@@ -37,7 +37,7 @@ struct DockableWindow
 //
 //	SDL_Window*             window         = nullptr;
 //	void*                   sysWindow      = nullptr;
-//	ChHandle_t              graphicsWindow = CH_INVALID_HANDLE;
+//	ch_handle_t              graphicsWindow = CH_INVALID_HANDLE;
 //	ImGuiContext*           context        = nullptr;
 };
 
@@ -77,7 +77,7 @@ class ITool : public ISystem
 {
    public:
 	// Buttons
-	// virtual ChHandle_t  GetIcon() = 0;
+	// virtual ch_handle_t  GetIcon() = 0;
 
 	virtual const char*     GetName()                                                 = 0;
 
