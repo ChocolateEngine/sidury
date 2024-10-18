@@ -1,7 +1,7 @@
 #include "steam.h"
 
-LOG_CHANNEL_REGISTER( Steam, LogColor::Default );
-LOG_CHANNEL_REGISTER( SteamAPI, LogColor::Default );
+LOG_CHANNEL_REGISTER( Steam, ELogColor_Default );
+LOG_CHANNEL_REGISTER( SteamAPI, ELogColor_Default );
 
 SteamAbstraction*        gSteam        = new SteamAbstraction;
 bool                     gSteamLoaded  = false;

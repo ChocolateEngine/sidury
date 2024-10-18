@@ -20,7 +20,7 @@
 #include <SDL_system.h>
 #include <SDL_hints.h>
 
-#include <algorithm>z
+#include <algorithm>
 
 
 IInputSystem*     input     = nullptr;

@@ -30,7 +30,7 @@
 //   - how many workshop addons you've subscribed to in total
 //   
 
-LOG_CHANNEL_REGISTER( Client, LogColor::White );
+LOG_CHANNEL_REGISTER( Client, ELogColor_White );
 
 static Socket_t                   gClientSocket = CH_INVALID_SOCKET;
 ch_sockaddr                       gClientAddr;

@@ -21,7 +21,7 @@
 #include <filesystem>
 
 
-LOG_CHANNEL_REGISTER( Map, LogColor::DarkGreen );
+LOG_CHANNEL_REGISTER( Map, ELogColor_DarkGreen );
 
 SiduryMap*    gpMap    = nullptr;
 

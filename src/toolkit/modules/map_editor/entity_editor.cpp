@@ -84,7 +84,7 @@ bool EntEditor_Init()
 
 	if ( failed.size() )
 	{
-		LogGroup group = Log_GroupBeginEx( 0, LogType::Fatal );
+		LogGroup group = Log_GroupBeginEx( 0, ELogType_Fatal );
 		Log_Group( group, "Failed to load editor models:\n" );
 
 		for ( const char* model : failed )

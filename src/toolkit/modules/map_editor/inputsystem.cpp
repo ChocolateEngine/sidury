@@ -5,7 +5,7 @@
 
 extern IInputSystem* input;
 
-LOG_CHANNEL_REGISTER( EditorInput, LogColor::Default );
+LOG_CHANNEL_REGISTER( EditorInput, ELogColor_Default );
 
 
 CONVAR_FLOAT( m_pitch, 0.022, CVARF_ARCHIVE, "Mouse Pitch" );

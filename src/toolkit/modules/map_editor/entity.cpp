@@ -5,7 +5,7 @@
 #define NAME_LEN 64
 
 
-LOG_CHANNEL_REGISTER( Entity, LogColor::DarkPurple );
+LOG_CHANNEL_REGISTER( Entity, ELogColor_DarkPurple );
 
 
 static ResourceList< Entity_t >                      gEntityList;

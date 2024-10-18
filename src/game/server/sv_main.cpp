@@ -15,7 +15,7 @@
 // The Server, only runs if the engine is a dedicated server, or hosting on the client
 //
 
-LOG_CHANNEL_REGISTER( Server, LogColor::Green );
+LOG_CHANNEL_REGISTER( Server, ELogColor_Green );
 
 static const char* gServerPort = Args_Register( "41628", "Test Server Port", "-port" );
 

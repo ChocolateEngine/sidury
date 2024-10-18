@@ -6,7 +6,7 @@
 
 extern IInputSystem* input;
 
-LOG_CHANNEL_REGISTER( GameInput, LogColor::Default );
+LOG_CHANNEL_REGISTER( GameInput, ELogColor_Default );
 
 NEW_CVAR_FLAG( CVARF_INPUT );
 
