@@ -21,6 +21,11 @@ set(
 	ch_isteam.h
 )
 
+file(
+	GLOB_RECURSE PUBLIC_FILES CONFIGURE_DEPENDS
+	${CH_PUBLIC}/*.cpp
+	${CH_PUBLIC}/*.h
+)
 
 include_directories( "${STEAM_API_DIR}/public/steam" )
 link_directories( "${STEAM_API_BIN_DIR}" )
