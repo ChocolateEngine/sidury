@@ -305,7 +305,7 @@ void GameRulesDatabase::DeleteString( std::string_view sName )
 //	if ( it == aVars.end() )
 //	{
 //		GameRule_t& var = aVars[ sName.data() ];
-//		var.aName       = sName.data();
+//		var.name       = sName.data();
 //		var.aType       = sType;
 //
 //		return &var;

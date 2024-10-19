@@ -58,7 +58,7 @@ static void UpdateLightData( Entity sEntity, CLight* spLight )
 	}
 
 	spLight->apLight->aType     = spLight->aType;
-	spLight->apLight->aColor    = spLight->aColor;
+	spLight->apLight->color    = spLight->color;
 	spLight->apLight->aInnerFov = spLight->aInnerFov;
 	spLight->apLight->aOuterFov = spLight->aOuterFov;
 	spLight->apLight->aRadius   = spLight->aRadius;

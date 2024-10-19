@@ -162,7 +162,7 @@ ch_handle_t Phys_CreateTriangleBatchInd(
 		// pretty awful
 		meshBuilder.SetPos( srVerts[ srInd[ i ] ].aPos );
 		meshBuilder.SetNormal( srVerts[ srInd[ i ] ].aNorm );
-		meshBuilder.SetColor( srVerts[ srInd[ i ] ].aColor );
+		meshBuilder.SetColor( srVerts[ srInd[ i ] ].color );
 		meshBuilder.SetTexCoord( srVerts[ srInd[ i ] ].aUV );
 		meshBuilder.NextVertex();
 	}

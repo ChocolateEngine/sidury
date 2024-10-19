@@ -291,7 +291,7 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Se
 void PlayerManager::RegisterComponents()
 {
 	// CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None );
-	// // CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	// // CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, name, name );
 	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
 	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_None );  // don't mess with this
@@ -433,7 +433,7 @@ void PlayerManager::Create( Entity player )
 
 	health->aHealth = 100;
 
-	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
+	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->name.c_str() );
 
 	// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
 	// And we parent them to the player
@@ -460,8 +460,8 @@ void PlayerManager::Create( Entity player )
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
-	// flashlight->aColor    = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
-	flashlight->aColor.Edit()  = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
+	// flashlight->color    = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+	flashlight->color.Edit()  = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
 	// ------------------------------------------------------------------------------
 	// Setup Physics Shapes
@@ -657,8 +657,8 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 	if ( flashlight->aEnabled )
 	{
-		// flashlight->aColor = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
-		flashlight->aColor.Edit() = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
+		// flashlight->color = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+		flashlight->color.Edit() = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
 		if ( !r_flashlight_lock )
 		{
@@ -699,7 +699,7 @@ void PlayerManager::Update( float frameTime )
 			continue;
 
 		PROF_SCOPE_NAMED( "Player" );
-		CH_PROF_ZONE_TEXT( client->aName.c_str(), client->aName.size() );
+		CH_PROF_ZONE_TEXT( client->name.c_str(), client->name.size() );
 
 		UserCmd_t& userCmd    = client->aUserCmd;
 

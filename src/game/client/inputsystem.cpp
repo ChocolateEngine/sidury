@@ -54,7 +54,7 @@ static bool                                         gResetBindings = Args_Regist
 
 CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 {
-	LogGroup group = Log_GroupBegin( gLC_GameInput );
+	log_t group = Log_GroupBegin( gLC_GameInput );
 
 	Log_Group( group, "SDL2 Scancodes:\n\n" );
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
@@ -329,7 +329,7 @@ void Input_Init()
 
 	if ( gResetBindings )
 	{
-		bind_reset_all( {}, {} );
+		bind_reset_all_func( {}, {} );
 	}
 }
 

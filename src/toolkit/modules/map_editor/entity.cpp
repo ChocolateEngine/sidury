@@ -95,8 +95,8 @@ ch_handle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->aName = ch_str_copy_f( "Entity %zd", entHandle );
-	if ( ent->aName.data == nullptr )
+	ent->name = ch_str_copy_f( "Entity %zd", entHandle );
+	if ( ent->name.data == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
 		Entity_Delete( entHandle );
@@ -142,11 +142,11 @@ void Entity_Delete( ch_handle_t sHandle )
 	// remove the world matrix
 	gEntityWorldMatrices.erase( sHandle );
 
-	if ( ent->aName.data )
+	if ( ent->name.data )
 	{
-		ch_str_free( ent->aName.data );
-		ent->aName.data = nullptr;
-		ent->aName.size = 0;
+		ch_str_free( ent->name.data );
+		ent->name.data = nullptr;
+		ent->name.size = 0;
 	}
 
 	// Check if this entity has a light on it
@@ -244,7 +244,7 @@ void Entity_SetName( ch_handle_t sHandle, const char* name, s64 nameLen )
 	if ( nameLen == 0 )
 		return;
 
-	ent->aName = ch_str_realloc( ent->aName.data, name, nameLen );
+	ent->name = ch_str_realloc( ent->name.data, name, nameLen );
 }
 
 

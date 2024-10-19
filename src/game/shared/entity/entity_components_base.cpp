@@ -65,7 +65,7 @@ CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, EEntComponentNetType_Both
 CH_STRUCT_REGISTER_COMPONENT( CLight, light, EEntComponentNetType_Both, ECompRegFlag_None )
 {
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, ELightType, aType, type, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Color4, glm::vec4, aColor, color, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Color4, glm::vec4, color, color, ECompRegFlag_None );
 
 	// TODO: these 2 should not be here
 	// it should be attached to it's own entity that can be parented

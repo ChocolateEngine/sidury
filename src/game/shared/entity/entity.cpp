@@ -11,7 +11,7 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LogChannel gLC_Entity = Log_RegisterChannel( "Entity - " CH_MODULE_NAME, ELogColor_Cyan );
+log_channel_h_t gLC_Entity = Log_RegisterChannel( "Entity - " CH_MODULE_NAME, ELogColor_Cyan );
 
 
 EntitySystemData& EntSysData()
@@ -1028,7 +1028,7 @@ Entity Entity_TranslateEntityID( Entity sEntity, bool sCreate )
 
 GAME_CONCMD( ent_dump_registry )
 {
-	LogGroup group = Log_GroupBegin( gLC_Entity );
+	log_t group = Log_GroupBegin( gLC_Entity );
 
 	Log_GroupF( group, "Entity Count: %zd\n", Entity_GetEntityCount() );
 	Log_GroupF( group, "Registered Components: %zd\n", GetEntComponentRegistry().aComponents.size() );
@@ -1057,7 +1057,7 @@ GAME_CONCMD( ent_dump_registry )
 
 GAME_CONCMD( ent_dump )
 {
-	LogGroup group = Log_GroupBegin( gLC_Entity );
+	log_t group = Log_GroupBegin( gLC_Entity );
 
 	Log_GroupF( group, "Entity Count: %zd\n", Entity_GetEntityCount() );
 
@@ -1113,7 +1113,7 @@ GAME_CONCMD( ent_dump )
 
 GAME_CONCMD( ent_mem )
 {
-	LogGroup group = Log_GroupBegin( gLC_Entity );
+	log_t group = Log_GroupBegin( gLC_Entity );
 
 	size_t   componentPoolMapSize = Util_SizeOfUnordredMap( EntSysData().aComponentPools );
 	size_t componentPoolSize    = 0;

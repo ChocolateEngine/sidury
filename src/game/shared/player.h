@@ -109,7 +109,7 @@ struct CPlayerInfo
 	// Entity with a light component on it to be used as the flashlight
 	ComponentNetVar< Entity > aFlashlight    = CH_ENT_INVALID;
 
-	// std::string aName;
+	// std::string name;
 	bool                      aIsLocalPlayer = false;  // only used on client, probably should split off from this
 };
 

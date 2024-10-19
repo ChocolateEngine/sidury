@@ -276,7 +276,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 						if ( compValue.type != chmap::EComponentType_Vec4 )
 							continue;
 
-						ent->apLight->aColor = compValue.aVec4;
+						ent->apLight->color = compValue.aVec4;
 					}
 					else if ( ch_str_equals( name.data(), name.size(), "radius", 6 ) )
 					{

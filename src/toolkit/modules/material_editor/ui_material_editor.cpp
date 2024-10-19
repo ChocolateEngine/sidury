@@ -58,7 +58,7 @@ static int StringTextInput( ImGuiInputTextCallbackData* data )
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.name.size ? info.name.data : "UNNAMED" );
 
 	if ( info.aPath.size )
 		ImGui::Text( info.aPath.data );
@@ -409,7 +409,7 @@ void MaterialEditor_DrawMaterialData()
 
 					TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 
-					ImGui::Text( texInfo.aName.data ? texInfo.aName.data : texInfo.aPath.data );
+					ImGui::Text( texInfo.name.data ? texInfo.name.data : texInfo.aPath.data );
 
 					if ( ImGui::IsItemHovered() )
 					{

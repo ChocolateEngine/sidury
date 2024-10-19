@@ -547,7 +547,7 @@ bool SV_SendMessageToClient( SV_Client_t& srClient, flatbuffers::FlatBufferBuild
 	{
 		// Failed to write to client, disconnect them
 		srClient.aState = ESV_ClientState_Disconnected;
-		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
+		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.name.c_str() );
 		return false;
 	}
 
@@ -564,7 +564,7 @@ void SV_SendDisconnect( SV_Client_t& srClient )
 	if ( SV_SendMessageToClient( srClient, message ) )
 	{
 		srClient.aState = ESV_ClientState_Disconnected;
-		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.aName.c_str() );
+		Log_MsgF( gLC_Server, "Disconnecting Client: \"%s\"\n", srClient.name.c_str() );
 	}
 }
 
@@ -575,7 +575,7 @@ void SV_HandleMsg_ClientInfo( SV_Client_t& srClient, const NetMsg_ClientInfo* sp
 		return;
 
 	if ( spMessage->name() )
-		srClient.aName = spMessage->name()->str();
+		srClient.name = spMessage->name()->str();
 
 	srClient.aSteamID = spMessage->steam_id();
 }
@@ -586,7 +586,7 @@ void SV_HandleMsg_UserCmd( SV_Client_t& srClient, const NetMsg_UserCmd* spMessag
 	if ( !spMessage )
 		return;
 
-	//Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.aName.c_str() );
+	//Log_DevF( gLC_Server, 2, "Handling Message USER_CMD from Client \"%s\"\n", srClient.name.c_str() );
 
 	NetHelper_ReadVec3( spMessage->angles(), srClient.aUserCmd.aAng );
 
@@ -870,7 +870,7 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 {
 	if ( srClient.aState != ESV_ClientState_Connecting )
 	{
-		//Log_MsgF( gLC_Server, "Recieved Conn Connected: \"%s\"\n", srClient.aName.c_str() );
+		//Log_MsgF( gLC_Server, "Recieved Conn Connected: \"%s\"\n", srClient.name.c_str() );
 		return;
 	}
 
@@ -886,7 +886,7 @@ void SV_ConnectClientFinish( SV_Client_t& srClient )
 	// They just got here, so send them a full update
 	gServerData.aClientsFullUpdate.push_back( &srClient );
 
-	Log_MsgF( gLC_Server, "Client Connected: \"%s\"\n", srClient.aName.c_str() );
+	Log_MsgF( gLC_Server, "Client Connected: \"%s\"\n", srClient.name.c_str() );
 
 	// Spawn the player in!
 	players.Spawn( srClient.aEntity );

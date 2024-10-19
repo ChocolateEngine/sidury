@@ -30,7 +30,7 @@ enum EClientState
 
 struct CL_ServerData_t
 {
-	std::string aName;
+	std::string name;
 	std::string aMapName;
 	u8          aClientCount;
 	u8          aMaxClients;
@@ -40,7 +40,7 @@ struct CL_ServerData_t
 // Information about each client that our client knows
 struct CL_Client_t
 {
-	std::string aName         = "[unnamed]";
+	std::string name         = "[unnamed]";
 	SteamID64_t aSteamID      = 0;
 	Entity      aEntity       = CH_ENT_INVALID;
 

@@ -11,7 +11,7 @@ static bool CheckJsonType( JsonObject_t& object, EJsonType type )
 	if ( object.aType == type )
 		return false;
 
-	Log_ErrorF( "Expected Type \"%s\" for key \"%s\", got \"%s\" instead\n", Json_TypeToStr( type ), object.aName.data, Json_TypeToStr( object.aType ) );
+	Log_ErrorF( "Expected Type \"%s\" for key \"%s\", got \"%s\" instead\n", Json_TypeToStr( type ), object.name.data, Json_TypeToStr( object.aType ) );
 	return true;
 }
 
@@ -35,7 +35,7 @@ static VECTOR JsonToVector( JsonObject_t& object )
 	VECTOR vec{};
 	if ( object.aObjects.aCount < vec.length() )
 	{
-		Log_ErrorF( "Not enough items in array to fill Vector with a size of %d: \"%s\"\n", object.aName.data, vec.length() );
+		Log_ErrorF( "Not enough items in array to fill Vector with a size of %d: \"%s\"\n", object.name.data, vec.length() );
 		return vec;
 	}
 
@@ -70,7 +70,7 @@ static void LoadComponent( Scene& scene, Entity& entity, JsonObject_t& cur )
 	}
 
 	// Check for component name
-	if ( cur.aName.data == nullptr )
+	if ( cur.name.data == nullptr )
 	{
 		Log_Error( "Entity Component does not have a name!\n" );
 		return;
@@ -79,33 +79,33 @@ static void LoadComponent( Scene& scene, Entity& entity, JsonObject_t& cur )
 	// Check if this component already exists
 	for ( Component& component : entity.components )
 	{
-		if ( ch_str_equals( component.name, cur.aName.data ) )
+		if ( ch_str_equals( component.name, cur.name.data ) )
 		{
-			Log_ErrorF( "Entity already has a \"%s\" component\n", cur.aName.data );
+			Log_ErrorF( "Entity already has a \"%s\" component\n", cur.name.data );
 			return;
 		}
 	}
 
 	Component& comp = entity.components.emplace_back();
-	comp.name       = ch_str_copy( cur.aName.data, cur.aName.size );
+	comp.name       = ch_str_copy( cur.name.data, cur.name.size );
 
 	for ( u64 objI = 0; objI < cur.aObjects.aCount; objI++ )
 	{
 		JsonObject_t& object = cur.aObjects.apData[ objI ];
 
 		// ComponentValue& value = comp.values.emplace_back();
-		// CopyString( value.name, object.aName.data, strlen( object.aName.data ) );
+		// CopyString( value.name, object.name.data, strlen( object.name.data ) );
 
 		// TODO: why is this a hash map? just make it a simple struct array
 		// I think the only reason was for easy matching to see if a component already exists
-		auto it = comp.values.find( object.aName.data );
+		auto it = comp.values.find( object.name.data );
 		if ( it != comp.values.end() )
 		{
-			Log_ErrorF( "Entity already has a \"%s\" component value!\n", object.aName.data );
+			Log_ErrorF( "Entity already has a \"%s\" component value!\n", object.name.data );
 			continue;
 		}
 
-		ComponentValue& value = comp.values[ object.aName.data ];
+		ComponentValue& value = comp.values[ object.name.data ];
 
 		switch ( object.aType )
 		{
@@ -168,49 +168,49 @@ static void LoadEntity( Scene& scene, JsonObject_t& object )
 	{
 		JsonObject_t& cur = object.aObjects.apData[ objI ];
 
-		if ( ch_str_equals( cur.aName, "id", 2 ) )
+		if ( ch_str_equals( cur.name, "id", 2 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 				continue;
 
 			entity.id = cur.aInt;
 		}
-		else if ( ch_str_equals( cur.aName, "parent", 6 ) )
+		else if ( ch_str_equals( cur.name, "parent", 6 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 				continue;
 
 			entity.parent = cur.aInt;
 		}
-		else if ( ch_str_equals( cur.aName, "name", 4 ) )
+		else if ( ch_str_equals( cur.name, "name", 4 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_String ) )
 				continue;
 
 			entity.name = ch_str_copy( cur.aString.data, cur.aString.size );
 		}
-		else if ( ch_str_equals( cur.aName, "pos", 3 ) )
+		else if ( ch_str_equals( cur.name, "pos", 3 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Array ) )
 				continue;
 
 			entity.pos = JsonToVector< glm::vec3 >( cur );
 		}
-		else if ( ch_str_equals( cur.aName, "ang", 3 ) )
+		else if ( ch_str_equals( cur.name, "ang", 3 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Array ) )
 				continue;
 
 			entity.ang = JsonToVector< glm::vec3 >( cur );
 		}
-		else if ( ch_str_equals( cur.aName, "scale", 5 ) )
+		else if ( ch_str_equals( cur.name, "scale", 5 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Array ) )
 				continue;
 
 			entity.scale = JsonToVector< glm::vec3 >( cur );
 		}
-		else if ( ch_str_equals( cur.aName, "components", 10 ) )
+		else if ( ch_str_equals( cur.name, "components", 10 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Object ) )
 				continue;
@@ -274,7 +274,7 @@ static bool LoadScene( Map* map, const char* scenePath, s64 scenePathLen = -1 )
 	{
 		JsonObject_t& cur = root.aObjects.apData[ i ];
 
-		if ( ch_str_equals( cur.aName, "sceneFormatVersion", 18 ) )
+		if ( ch_str_equals( cur.name, "sceneFormatVersion", 18 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 			{
@@ -293,28 +293,28 @@ static bool LoadScene( Map* map, const char* scenePath, s64 scenePathLen = -1 )
 				return false;
 			}
 		}
-		else if ( ch_str_equals( cur.aName, "dateCreated", 11 ) )
+		else if ( ch_str_equals( cur.name, "dateCreated", 11 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 				continue;
 
 			scene.dateCreated = cur.aInt;
 		}
-		else if ( ch_str_equals( cur.aName, "dateModified", 12 ) )
+		else if ( ch_str_equals( cur.name, "dateModified", 12 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 				continue;
 
 			scene.dateModified = cur.aInt;
 		}
-		else if ( ch_str_equals( cur.aName, "changeNumber", 12 ) )
+		else if ( ch_str_equals( cur.name, "changeNumber", 12 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 				continue;
 
 			scene.changeNumber = cur.aInt;
 		}
-		else if ( ch_str_equals( cur.aName, "entities", 8 ) )
+		else if ( ch_str_equals( cur.name, "entities", 8 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Array ) )
 				continue;
@@ -368,7 +368,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 	{
 		JsonObject_t& cur = root.aObjects.apData[ i ];
 
-		if ( ch_str_equals( cur.aName, "version", 7 ) )
+		if ( ch_str_equals( cur.name, "version", 7 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_Int ) )
 			{
@@ -387,7 +387,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 				return nullptr;
 			}
 		}
-		else if ( ch_str_equals( cur.aName, "name", 4 ) )
+		else if ( ch_str_equals( cur.name, "name", 4 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_String ) )
 				continue;
@@ -400,14 +400,14 @@ Map* chmap::Load( const char* path, u64 pathLen )
 
 			map->name = ch_str_copy( cur.aString.data, cur.aString.size );
 		}
-		else if ( ch_str_equals( cur.aName, "primaryScene", 12 ) )
+		else if ( ch_str_equals( cur.name, "primaryScene", 12 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_String ) )
 				continue;
 
 			primaryScene = cur.aString;
 		}
-		else if ( ch_str_equals( cur.aName, "skybox", 6 ) )
+		else if ( ch_str_equals( cur.name, "skybox", 6 ) )
 		{
 			if ( CheckJsonType( cur, EJsonType_String ) )
 				continue;
@@ -416,7 +416,7 @@ Map* chmap::Load( const char* path, u64 pathLen )
 		}
 		else
 		{
-			Log_WarnF( "Unknown Key in map info: \"%s\"\n", cur.aName.data );
+			Log_WarnF( "Unknown Key in map info: \"%s\"\n", cur.name.data );
 		}
 	}
 

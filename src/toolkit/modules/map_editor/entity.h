@@ -22,7 +22,7 @@ struct Color3
 // not sure i really need much of a component system for an editor
 struct Entity_t
 {
-	ch_string          aName;
+	ch_string          name;
 
 	Transform          aTransform;
 

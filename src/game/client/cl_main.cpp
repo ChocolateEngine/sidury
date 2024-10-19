@@ -699,7 +699,7 @@ void CL_HandleMsg_ClientInfo( const NetMsg_ServerClientInfo* spMessage )
 		spClient = &gClClients.emplace_back();
 
 	if ( spMessage->name() )
-		spClient->aName = spMessage->name()->str();
+		spClient->name = spMessage->name()->str();
 	
 	spClient->aSteamID = spMessage->steam_id();
 	spClient->aEntity  = spMessage->entity_id();
@@ -744,7 +744,7 @@ void CL_HandleMsg_ServerInfo( const NetMsg_ServerInfo* spMsg )
 	gClientWait_ServerInfo = true;
 
 	if ( spMsg->name() )
-		gClientServerData.aName = spMsg->name()->str();
+		gClientServerData.name = spMsg->name()->str();
 
 	if ( spMsg->map_name() )
 		gClientServerData.aMapName = spMsg->map_name()->str();

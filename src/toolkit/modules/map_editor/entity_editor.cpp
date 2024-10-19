@@ -84,7 +84,7 @@ bool EntEditor_Init()
 
 	if ( failed.size() )
 	{
-		LogGroup group = Log_GroupBeginEx( 0, ELogType_Fatal );
+		log_t group = Log_GroupBeginEx( 0, ELogType_Fatal );
 		Log_Group( group, "Failed to load editor models:\n" );
 
 		for ( const char* model : failed )
@@ -150,7 +150,7 @@ int                                                    gTextureListViewMode = 0;
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.name.size ? info.name.data : "UNNAMED" );
 
 	if ( info.aPath.size )
 		ImGui::TextUnformatted( info.aPath.data );
@@ -341,7 +341,7 @@ void EntEditor_DrawLightUI( Entity_t* spEntity )
 	bool updateLight = false;
 
 	updateLight |= ImGui::Checkbox( "Enabled", &spEntity->aLightEnabled );
-	updateLight |= ImGui::ColorEdit4( "Color", &spEntity->apLight->aColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
+	updateLight |= ImGui::ColorEdit4( "Color", &spEntity->apLight->color.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR );
 
 	if ( spEntity->apLight->aType == ELightType_Directional )
 	{
@@ -466,7 +466,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 					ch_handle_t    texHandle = graphics->Mat_GetTexture( mat, varI );
 					TextureInfo_t texInfo   = render->GetTextureInfo( texHandle );
 
-					ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
+					ImGui::Text( texInfo.name.empty() ? texInfo.aPath.c_str() : texInfo.name.c_str() );
 
 					if ( ImGui::IsItemHovered() )
 					{
@@ -554,7 +554,7 @@ void EntEditor_DrawBasicMaterialData( Renderable_t* renderable, u32 matI )
 	//			ch_handle_t texHandle  = graphics->Mat_GetTexture( mat, varI );
 	//			TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 	//
-	//			ImGui::Text( texInfo.aName.empty() ? texInfo.aPath.c_str() : texInfo.aName.c_str() );
+	//			ImGui::Text( texInfo.name.empty() ? texInfo.aPath.c_str() : texInfo.name.c_str() );
 	//
 	//			break;
 	//		}
@@ -717,7 +717,7 @@ void EntEditor_DrawEntityData()
 				return;
 			}
 
-			ImGui::TextUnformatted( entity->aName.data, &entity->aName.data[ entity->aName.size ] );
+			ImGui::TextUnformatted( entity->name.data, &entity->name.data[ entity->name.size ] );
 		}
 
 		return;
@@ -733,7 +733,7 @@ void EntEditor_DrawEntityData()
 		return;
 	}
 
-	ImGui::InputText( "Name", entity->aName.data, NAME_LEN );
+	ImGui::InputText( "Name", entity->name.data, NAME_LEN );
 
 	// std::string entName = vstring( "Entity %zd", gSelectedEntity );
 	// ImGui::Text( entName.data() );
@@ -747,7 +747,7 @@ void EntEditor_DrawEntityData()
 	if ( parent )
 	{
 		Entity_t* parentData = Entity_GetData( parent );
-		parentName = parentData->aName.data ? parentData->aName.data : vstring( "Entity %zd", parent );
+		parentName = parentData->name.data ? parentData->name.data : vstring( "Entity %zd", parent );
 	}
 	
 	if ( ImGui::BeginCombo( "Set Parent", parentName.c_str() ) )
@@ -786,7 +786,7 @@ void EntEditor_DrawEntityData()
 
 			ImGui::PushID( entityHandle );
 	
-			if ( ImGui::Selectable( entityToParent->aName.data ? entityToParent->aName.data : entName.data() ) )
+			if ( ImGui::Selectable( entityToParent->name.data ? entityToParent->name.data : entName.data() ) )
 			{
 				Entity_SetParent( selectedEntity, entityHandle );
 			}
@@ -906,7 +906,7 @@ void EntEditor_DrawEntityData()
 				if ( ImGui::Selectable( "Point Light" ) )
 				{
 					entity->apLight          = graphics->CreateLight( ELightType_Point );
-					entity->apLight->aColor  = { 1, 1, 1, 10 };
+					entity->apLight->color  = { 1, 1, 1, 10 };
 					entity->apLight->aRadius = 500;
 
 					Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );
@@ -914,7 +914,7 @@ void EntEditor_DrawEntityData()
 				else if ( ImGui::Selectable( "Cone Light" ) )
 				{
 					entity->apLight         = graphics->CreateLight( ELightType_Cone );
-					entity->apLight->aColor = { 1, 1, 1, 10 };
+					entity->apLight->color = { 1, 1, 1, 10 };
 
 					// weird stuff to get the angle of the light correct from the player's view matrix stuff
 					// light->aAng.x = playerWorldTransform.aAng.z;
@@ -1101,7 +1101,7 @@ void EntEditor_DrawEntityChildTree( EditorContext_t* context, ch_handle_t sParen
 		}
 	}
 
-	if ( ImGui::Selectable( entity->aName.data ? entity->aName.data : "INVALID", selected ) )
+	if ( ImGui::Selectable( entity->name.data ? entity->name.data : "INVALID", selected ) )
 	{
 		if ( !input->KeyPressed( (EButton)SDL_SCANCODE_LSHIFT ) )
 			context->aEntitiesSelected.clear();

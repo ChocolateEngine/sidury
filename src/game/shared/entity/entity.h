@@ -661,7 +661,7 @@ struct EntityEventListener_t
 // 
 // 	EEntityFlag aFlags;
 // 	Entity      aParent;
-// 	std::string aName;
+// 	std::string name;
 // ;
 
 
@@ -1274,7 +1274,7 @@ struct CRenderable
 struct CLight
 {
 	ComponentNetVar< ELightType > aType = ELightType_Directional;
-	ComponentNetVar< glm::vec4 >  aColor{};
+	ComponentNetVar< glm::vec4 >  color{};
 	ComponentNetVar< glm::vec3 >  aPos{};
 	ComponentNetVar< glm::quat >  aRot{};
 	ComponentNetVar< float >      aInnerFov     = 45.f;

@@ -75,7 +75,7 @@ CONVAR_FLOAT( r_fov, 106, "FOV" );
 
 void Util_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.name.size ? info.name.data : "UNNAMED" );
 
 	if ( info.aPath.size )
 		ImGui::Text( info.aPath.data );

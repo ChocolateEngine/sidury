@@ -30,7 +30,7 @@ enum EGameRuleType
 // struct GameRule_t
 // {
 // 	EGameRuleType aType;
-// 	std::string   aName;
+// 	std::string   name;
 // 	// void*        apValue;
 // 
 // 	union

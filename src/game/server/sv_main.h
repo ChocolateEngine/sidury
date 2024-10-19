@@ -39,7 +39,7 @@ struct SV_Client_t
 
 	SteamID64_t    aSteamID = 0;
 
-	std::string    aName    = "[unnamed]";
+	std::string    name    = "[unnamed]";
 	ESVClientState aState;
 
 	double         aTimeout;
@@ -68,7 +68,7 @@ struct SV_Client_t
 		if ( aAddr.sa_family != srOther.aAddr.sa_family )
 			return false;
 
-		if ( aName != srOther.aName )
+		if ( name != srOther.name )
 			return false;
 
 		if ( aTimeout != aTimeout )

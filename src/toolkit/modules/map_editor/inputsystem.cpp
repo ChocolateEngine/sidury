@@ -31,7 +31,7 @@ static bool                                         gResetBindings = Args_Regist
 
 CONCMD_VA( in_dump_all_buttons, "Dump a List of All Button Names" )
 {
-	LogGroup group = Log_GroupBegin( gLC_EditorInput );
+	log_t group = Log_GroupBegin( gLC_EditorInput );
 
 	Log_Group( group, "Buttons:\n\n" );
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
