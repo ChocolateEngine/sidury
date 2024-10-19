@@ -7,23 +7,15 @@
   #include "mimalloc-new-delete.h"
 #endif
 
-#ifdef _WIN32
-  #include <Windows.h>
-  #include <direct.h>
-#endif
-
-#ifdef __unix__
-  #include <string.h>
-  #include <unistd.h>
-  #include <dlfcn.h>	
-#endif /* __unix __  */
-
 Module core = 0;
 Module imgui = 0;
 Module client = 0;
 
 
 #ifdef _WIN32
+#include <Windows.h>
+#include <direct.h>
+
 Module sys_load_library( const char* path )
 {
 	return (Module)LoadLibraryA( path );
@@ -72,6 +64,9 @@ const char* sys_get_error()
 }
 
 #elif __unix__
+#include <string.h>
+#include <unistd.h>
+#include <dlfcn.h>	
 
 Module sys_load_library( const char* path )
 {
