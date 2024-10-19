@@ -1,5 +1,5 @@
 #include "main.h"
-#include "core/systemmanager.h"
+#include "core/system_loader.h"
 #include "core/asserts.h"
 #include "core/app_info.h"
 #include "core/build_number.h"
@@ -13,7 +13,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 
-#include "util.h"
+#include "core/util.h"
 
 #include <SDL_system.h>
 #include <SDL_hints.h>
@@ -80,7 +80,7 @@ void Util_DrawTextureInfo( TextureInfo_t& info )
 	if ( info.aPath.size )
 		ImGui::Text( info.aPath.data );
 
-	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, ch_bytes_to_mb( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
 	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
@@ -117,13 +117,13 @@ void Main_DrawGraphicsSettings()
 
 	if ( ImGui::SliderFloat( "FOV", &fov, 0.1f, 179.9f ) )
 	{
-		std::string    fovStr = ToString( fov );
+		std::string    fovStr = ch_to_string( fov );
 		ch_string_auto fovCmd = ch_str_join( "r_fov ", 6, fovStr.data(), fovStr.size() );
 
 		Con_QueueCommandSilent( fovCmd.data, fovCmd.size );
 	}
 
-	std::string msaaPreview = msaa ? ToString( msaa_samples ) + "X" : "Off";
+	std::string msaaPreview = msaa ? ch_to_string( msaa_samples ) + "X" : "Off";
 	if ( ImGui::BeginCombo( "MSAA", msaaPreview.c_str() ) )
 	{
 		if ( ImGui::Selectable( "Off", !msaa ) )
@@ -639,7 +639,7 @@ bool App_CreateMainWindow()
 	windowName += vstring( " - Build %zd - Compiled On - %s %s", Core_GetBuildNumber(), Core_GetBuildDate(), Core_GetBuildTime() );
 
 #ifdef _WIN32
-	gpSysWindow = Sys_CreateWindow( windowName.c_str(), gWidth, gHeight, gMaxWindow );
+	gpSysWindow = sys_create_window( windowName.c_str(), gWidth, gHeight, gMaxWindow );
 
 	if ( !gpSysWindow )
 	{
@@ -689,7 +689,7 @@ bool App_Init()
 
 	UpdateProjection();
 #ifdef _WIN32
-	Sys_SetResizeCallback( WindowResizeCallback );
+	sys_set_resize_callback( WindowResizeCallback );
 #endif /* _WIN32  */
 
 	AssetBrowser_Init();

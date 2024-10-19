@@ -1,5 +1,5 @@
 #include "material_editor.h"
-#include "core/systemmanager.h"
+#include "core/system_loader.h"
 #include "core/asserts.h"
 
 #include "iinput.h"
@@ -8,7 +8,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 
-#include "util.h"
+#include "core/util.h"
 #include "igraphics.h"
 
 

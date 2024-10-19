@@ -4,7 +4,7 @@
 
 #include "main.h"
 #include "platform.h"
-#include "util.h"
+#include "core/util.h"
 
 
 std::vector< UndoOperation > gUndoOperations;

@@ -634,19 +634,19 @@ void TEST_SV_UpdateProtos( float frameTime )
 				if ( Entity_GetEntityCount() > 2 )
 				{
 					while ( protoLook.aLookTarget == 0 || protoLook.aLookTarget == proto )
-						protoLook.aLookTarget = RandomInt( 0, Entity_GetEntityCount() - 1 );
+						protoLook.aLookTarget = rand_int( 0, Entity_GetEntityCount() - 1 );
 				}
 			}
 			else
 			{
-				auto randIt           = std::next( std::begin( gServerData.aClientIDs ), RandomInt( 0, gServerData.aClientIDs.size() - 1 ) );
+				auto randIt           = std::next( std::begin( gServerData.aClientIDs ), rand_int( 0, gServerData.aClientIDs.size() - 1 ) );
 				protoLook.aLookTarget = SV_GetPlayerEnt( randIt->first );
 
 				if ( protoLook.aLookTarget == CH_ENT_INVALID )
 					continue;
 			}
 
-			protoLook.aTimeToDuel    = RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+			protoLook.aTimeToDuel    = rand_float( proto_swap_target_sec_min, proto_swap_target_sec_max );
 			protoLook.aTimeToDuelCur = 0.f;
 			targetChanged            = true;
 		}
@@ -703,7 +703,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 			if ( targetChanged )
 			{
 				protoLook.aStartAng    = protoTransform->aAng;
-				protoLook.aTurnEndTime = RandomFloat( proto_swap_turn_time_min, proto_swap_turn_time_max );
+				protoLook.aTurnEndTime = rand_float( proto_swap_turn_time_min, proto_swap_turn_time_max );
 				protoLook.aTurnCurTime = 0.f;
 
 				// Make sure we don't suddenly want to look at something else while midway through turning to look at something

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "system.h"
 #include "itool.h"
 
 #include "iinput.h"

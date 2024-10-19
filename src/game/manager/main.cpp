@@ -340,7 +340,7 @@ bool CreateMainWindow()
 	windowName += vstring( " - Build %zd - Compiled On - %s %s", Core_GetBuildNumber(), Core_GetBuildDate(), Core_GetBuildTime() );
 
 #ifdef _WIN32
-	gpSysWindow = Sys_CreateWindow( windowName.c_str(), gWidth, gHeight, gMaxWindow );
+	gpSysWindow = sys_create_window( windowName.c_str(), gWidth, gHeight, gMaxWindow );
 
 	if ( !gpSysWindow )
 	{

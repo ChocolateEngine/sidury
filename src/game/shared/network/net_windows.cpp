@@ -161,7 +161,7 @@ bool Net_ParseIPv4NetAddr( NetAddr_t& srAddr, std::string_view sString )
 		{
 			// parse the port
 			long num = 0;
-			if ( !ToLong3( portCheck + 1, num ) )
+			if ( !ch_to_long( portCheck + 1, num ) )
 			{
 				Log_WarnF( gLC_Network, "Failed to convert IPv4 Address Port to Integer: \"%s\"\n", portCheck + 1 );
 				return false;
@@ -205,7 +205,7 @@ bool Net_ParseIPv4NetAddr( NetAddr_t& srAddr, std::string_view sString )
 		}
 		
 		long num = 0;
-		if ( !ToLong2( numStr, num ) )
+		if ( !ch_to_long( numStr.data(), num ) )
 		{
 			Log_WarnF( gLC_Network, "Failed to convert part of IPv4 Address to Integer: \"%s\"\n", numStr.c_str() );
 			return false;

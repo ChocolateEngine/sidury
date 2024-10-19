@@ -1,7 +1,7 @@
 #include "main.h"
 #include "game_shared.h"
 #include "entity.h"
-#include "util.h"
+#include "core/util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "entity_systems.h"
@@ -241,11 +241,11 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType )
 
 		case EEntNetField_Float:
 		{
-			return ToString( *static_cast< float* >( spData ) );
+			return ch_to_string( *static_cast< float* >( spData ) );
 		}
 		case EEntNetField_Double:
 		{
-			return ToString( *static_cast< double* >( spData ) );
+			return ch_to_string( *static_cast< double* >( spData ) );
 		}
 
 		case EEntNetField_S8:
@@ -308,7 +308,7 @@ std::string EntComp_GetStrValueOfVar( void* spData, EEntNetField sVarType )
 		case EEntNetField_Color3:
 		case EEntNetField_Vec3:
 		{
-			return Vec2Str( *(const glm::vec3*)spData );
+			return ch_vec3_to_str( *(const glm::vec3*)spData );
 		}
 		case EEntNetField_Color4:
 		case EEntNetField_Vec4:
@@ -1115,7 +1115,7 @@ GAME_CONCMD( ent_mem )
 {
 	log_t group = Log_GroupBegin( gLC_Entity );
 
-	size_t   componentPoolMapSize = Util_SizeOfUnordredMap( EntSysData().aComponentPools );
+	size_t   componentPoolMapSize = ch_size_of_umap( EntSysData().aComponentPools );
 	size_t componentPoolSize    = 0;
 
 	for ( auto& [name, pool] : EntSysData().aComponentPools )
@@ -1139,15 +1139,15 @@ GAME_CONCMD( ent_mem )
 		compSize = regData->aSize * pool->GetCount();
 		curSize += compSize + compOtherSize;
 
-		Log_GroupF( group, "Component Pool \"%s\": %.6f KB\n", pool->apName, Util_BytesToKB( curSize ) );
+		Log_GroupF( group, "Component Pool \"%s\": %.6f KB\n", pool->apName, ch_bytes_to_kb( curSize ) );
 		Log_GroupF( group, "    %zd bytes per component * %zd components\n\n", regData->aSize, pool->GetCount() );
 
 		componentPoolSize += curSize;
 	}
 
-	Log_GroupF( group, "Component Pool Base Size: %.6f KB\n", Util_BytesToKB( sizeof( EntityComponentPool ) ) );
-	Log_GroupF( group, "Component Pool Map Size: %.6f KB\n", Util_BytesToKB( componentPoolMapSize ) );
-	Log_GroupF( group, "Component Pools: %.6f KB (%zd pools)\n", Util_BytesToKB( componentPoolSize ), EntSysData().aComponentPools.size() );
+	Log_GroupF( group, "Component Pool Base Size: %.6f KB\n", ch_bytes_to_kb( sizeof( EntityComponentPool ) ) );
+	Log_GroupF( group, "Component Pool Map Size: %.6f KB\n", ch_bytes_to_kb( componentPoolMapSize ) );
+	Log_GroupF( group, "Component Pools: %.6f KB (%zd pools)\n", ch_bytes_to_kb( componentPoolSize ), EntSysData().aComponentPools.size() );
 
 	Log_GroupEnd( group );
 }

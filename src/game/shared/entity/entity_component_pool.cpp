@@ -2,7 +2,7 @@
 #include "game_shared.h"
 #include "entity.h"
 #include "entity_systems.h"
-#include "util.h"
+#include "core/util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "mapmanager.h"

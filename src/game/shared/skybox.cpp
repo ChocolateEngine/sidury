@@ -1,5 +1,5 @@
 #include "main.h"
-#include "util.h"
+#include "core/util.h"
 #include "entity/entity.h"
 #include "skybox.h"
 

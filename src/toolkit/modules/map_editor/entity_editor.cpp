@@ -64,7 +64,7 @@ void EntEditor_LoadEditorRenderable( ChVector< const char* >& failList, ch_handl
 
 	for ( u32 color : select.colors )
 	{
-		color = ( RandomU8( 0, 255 ) << 16 | RandomU8( 0, 255 ) << 8 | RandomU8( 0, 255 ) );
+		color = ( rand_u8( 0, 255 ) << 16 | rand_u8( 0, 255 ) << 8 | rand_u8( 0, 255 ) );
 	}
 }
 
@@ -155,7 +155,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 	if ( info.aPath.size )
 		ImGui::TextUnformatted( info.aPath.data );
 
-	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, ch_bytes_to_mb( info.aMemoryUsage ) );
 	ImGui::TextUnformatted( "Format: TODO" );
 	ImGui::TextUnformatted( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
@@ -205,7 +205,7 @@ void Editor_DrawTextureList()
 
 	ImGui::Text(
 	  "Count: %d | Memory: %.4f MB | Render Target Memory: %.4f MB",
-	  textures.size(), Util_BytesToMB( memoryUsage ), Util_BytesToMB( rtMemoryUsage ) );
+	  textures.size(), ch_bytes_to_mb( memoryUsage ), ch_bytes_to_mb( rtMemoryUsage ) );
 
 	if ( !ImGui::BeginChild( "Texture List" ) )
 	{
@@ -861,9 +861,9 @@ void EntEditor_DrawEntityData()
 
 				for ( int i = 0; i < entity->aMaterialColors.size(); i++ )
 				{
-					entity->aMaterialColors[ i ].r = RandomU8( 0, 255 );
-					entity->aMaterialColors[ i ].g = RandomU8( 0, 255 );
-					entity->aMaterialColors[ i ].b = RandomU8( 0, 255 );
+					entity->aMaterialColors[ i ].r = rand_u8( 0, 255 );
+					entity->aMaterialColors[ i ].g = rand_u8( 0, 255 );
+					entity->aMaterialColors[ i ].b = rand_u8( 0, 255 );
 				}
 
 				Entity_SetEntitiesDirty( &context->aEntitiesSelected[ 0 ], 1 );

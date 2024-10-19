@@ -2,7 +2,7 @@
 
 #include "core/filesystem.h"
 #include "core/console.h"
-#include "util.h"
+#include "core/util.h"
 #include "main.h"
 #include "game_shared.h"
 #include "player.h"

@@ -378,8 +378,8 @@ void EditorView_UpdateView( EditorContext_t* spContext )
 
 	if ( editor_show_pos )
 	{
-		gui->DebugMessage( "Pos: %s", Vec2Str( spContext->aView.aPos ).c_str() );
-		gui->DebugMessage( "Ang: %s", Vec2Str( spContext->aView.aAng ).c_str() );
+		gui->DebugMessage( "Pos: %s", ch_vec3_to_str( spContext->aView.aPos ).c_str() );
+		gui->DebugMessage( "Ang: %s", ch_vec3_to_str( spContext->aView.aAng ).c_str() );
 	}
 }
 

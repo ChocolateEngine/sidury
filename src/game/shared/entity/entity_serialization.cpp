@@ -1,7 +1,7 @@
 #include "main.h"
 #include "game_shared.h"
 #include "entity.h"
-#include "util.h"
+#include "core/util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "entity_systems.h"

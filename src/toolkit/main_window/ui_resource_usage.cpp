@@ -49,7 +49,7 @@ void ResourceUsage_DrawTextures()
 
 	ImGui::Text(
 	  "Count: %d | Memory: %.4f MB | Render Target Memory: %.4f MB",
-	  textures.size(), Util_BytesToMB( memoryUsage ), Util_BytesToMB( rtMemoryUsage ) );
+	  textures.size(), ch_bytes_to_mb( memoryUsage ), ch_bytes_to_mb( rtMemoryUsage ) );
 
 	if ( !ImGui::BeginChild( "Texture List" ) )
 	{
@@ -208,14 +208,14 @@ void ResourceUsage_DrawStats()
 	u64 stringMemory = ch_str_get_alloc_size();
 
 	ImGui::Text( "String Count: %d", stringCount );
-	ImGui::Text( "String Memory Usage: %.6f KB", Util_BytesToKB( stringMemory ) );
+	ImGui::Text( "String Memory Usage: %.6f KB", ch_bytes_to_kb( stringMemory ) );
 
 	ImGui::Text( "Renderable Count: %d", renderCount );
 	ImGui::Text( "Model Count: TODO - EXPOSE THIS" );
 	ImGui::Text( "Material Count: %d", matCount );
 	ImGui::Text( "Texture Count: %d", textures.size() );
-	ImGui::Text( "Texture Memory: %.4f MB", Util_BytesToMB( memoryUsage ) );
-	ImGui::Text( "Render Target Memory: %.4f MB", Util_BytesToMB( rtMemoryUsage ) );
+	ImGui::Text( "Texture Memory: %.4f MB", ch_bytes_to_mb( memoryUsage ) );
+	ImGui::Text( "Render Target Memory: %.4f MB", ch_bytes_to_mb( rtMemoryUsage ) );
 }
 
 

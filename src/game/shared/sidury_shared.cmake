@@ -7,8 +7,6 @@ set(
     ${SIDURY_SHARED_DIR}/main.h
     ${SIDURY_SHARED_DIR}/game_shared.cpp
     ${SIDURY_SHARED_DIR}/game_shared.h
-    # ${SIDURY_SHARED_DIR}/game_system_base.cpp
-    ${SIDURY_SHARED_DIR}/game_interface.h
 
     ${SIDURY_SHARED_DIR}/mapmanager.cpp
     ${SIDURY_SHARED_DIR}/mapmanager.h

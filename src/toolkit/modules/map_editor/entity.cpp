@@ -104,9 +104,9 @@ ch_handle_t Entity_Create()
 	}
 
 	// Pick a random color for it
-	ent->aSelectColor[ 0 ] = RandomU8( 0, 255 );
-	ent->aSelectColor[ 1 ] = RandomU8( 0, 255 );
-	ent->aSelectColor[ 2 ] = RandomU8( 0, 255 );
+	ent->aSelectColor[ 0 ] = rand_u8( 0, 255 );
+	ent->aSelectColor[ 1 ] = rand_u8( 0, 255 );
+	ent->aSelectColor[ 2 ] = rand_u8( 0, 255 );
 
 	ent->aLightEnabled     = true;
 

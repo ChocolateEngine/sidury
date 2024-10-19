@@ -14,7 +14,7 @@ AppWindow* Window_Create( const char* windowName )
 	AppWindow* appWindow = new AppWindow;
 
 #ifdef _WIN32
-	appWindow->sysWindow = Sys_CreateWindow( windowName, 800, 600, false );
+	appWindow->sysWindow = sys_create_window( windowName, 800, 600, false );
 
 	if ( !appWindow->sysWindow )
 	{

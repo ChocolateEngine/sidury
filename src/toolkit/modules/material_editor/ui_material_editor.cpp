@@ -63,7 +63,7 @@ void Editor_DrawTextureInfo( TextureInfo_t& info )
 	if ( info.aPath.size )
 		ImGui::Text( info.aPath.data );
 
-	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, ch_bytes_to_mb( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
 	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );

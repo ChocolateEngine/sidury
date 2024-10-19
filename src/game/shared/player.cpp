@@ -1,6 +1,6 @@
 #include "main.h"
 #include "player.h"
-#include "util.h"
+#include "core/util.h"
 
 #include "igui.h"
 #include "iinput.h"
@@ -1521,14 +1521,14 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 
 	float speed        = glm::length( glm::vec2( rigidBody->aVel.Get().x, rigidBody->aVel.Get().y ) );
 
-	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform->aPos).c_str() );
-	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform->aAng).c_str() );
-	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody->aVel).c_str() );
+	gui->DebugMessage( "Player Pos:    %s", ch_vec3_to_str(transform->aPos).c_str() );
+	gui->DebugMessage( "Player Ang:    %s", ch_vec3_to_str(transform->aAng).c_str() );
+	gui->DebugMessage( "Player Vel:    %s", ch_vec3_to_str(rigidBody->aVel).c_str() );
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
 	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov.Get() );
-	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform->aPos.Get()).c_str() );
-	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform->aAng.Get()).c_str() );
+	gui->DebugMessage( "Camera Pos:    %s", ch_vec3_to_str(camTransform->aPos.Get()).c_str() );
+	gui->DebugMessage( "Camera Ang:    %s", ch_vec3_to_str(camTransform->aAng.Get()).c_str() );
 
 	gui->DebugMessage( "Flashlight:    %s", flashlight->aEnabled ? "Enabled" : "Disabled" );
 }
@@ -2457,7 +2457,7 @@ Transform PlayerSpawnManager::SelectSpawnTransform()
 	// If we have more than one playerSpawn entity, pick a random one
 	// TODO: maybe make some priority thing, or master spawn like in source engine? idk
 	if ( aEntities.size() > 1 )
-		index = RandomU64( 0, aEntities.size() - 1 );
+		index = rand_u64( 0, aEntities.size() - 1 );
 	
 	auto transform = Ent_GetComponent< CTransform >( aEntities[ index ], "transform" );
 

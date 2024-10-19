@@ -4,7 +4,7 @@
 #include "igraphics.h"
 #include "mesh_builder.h"
 #include "render/irender.h"
-#include "util.h"
+#include "core/util.h"
 
 
 CONVAR_BOOL( r_skybox, 1, "Enable/Disable the Skybox" );
