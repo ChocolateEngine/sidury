@@ -2,7 +2,5 @@
 
 #include "core/platform.h"
 
-int  load_object( Module* mod, const char* path );
-void unload_objects();
-int  start( int argc, char* argv[], const char* spGameName, const char* spModuleName );
+int start( int argc, char* argv[], const char* app_path, const char* module_name );
 
