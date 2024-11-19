@@ -28,12 +28,12 @@ CONVAR_RANGE_FLOAT( host_max_frametime, 0.1, 0, FLT_MAX, "Max time in seconds a 
 CONVAR_RANGE_FLOAT( map_list_rebuild_timer, 30.f, 0, FLT_MAX, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
-int                        gWidth             = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
-int                        gHeight            = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
-static bool                gMaxWindow         = Args_Register( "Maximize the main window", "-max" );
-static bool                gArgNoSteam        = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
-static bool                gWaitForDebugger   = Args_Register( "Upon Program Startup, Wait for the Debugger to attach", "-debugger" );
-static bool                gDedicatedServer   = Args_Register( "Host a Dedicated Server", "-server" );
+int                        gWidth             = args_register_names( 1280, "Width of the main window", 2, "--width", "-w" );
+int                        gHeight            = args_register_names( 720, "Height of the main window", 2, "--height", "-h" );
+static bool                gMaxWindow         = args_register( "Maximize the main window", "--max" );
+static bool                gArgNoSteam        = args_register( "Don't try to load the steam abstraction", "--no-steam" );
+static bool                gWaitForDebugger   = args_register( "Upon Program Startup, Wait for the Debugger to attach", "--debugger" );
+static bool                gDedicatedServer   = args_register( "Host a Dedicated Server", "--server" );
 // static bool    gDedicatedServer = false;
 static bool                gRunning           = true;
 

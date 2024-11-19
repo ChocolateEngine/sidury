@@ -20,8 +20,8 @@
   #include "mimalloc-new-delete.h"
 #endif
 
-static bool        gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debugger to attach", "-debugger" );
-static const char* gArgGamePath     = Args_Register( nullptr, "Path to the game to create assets for", "-game" );
+static bool        gWaitForDebugger = args_register( "Upon Program Startup, Wait for the Debugger to attach", "--debugger" );
+static const char* gArgGamePath     = args_register_names( nullptr, "Path to the game to create assets for", 2, "--game", "-g" );
 static bool        gRunning         = true;
 
 

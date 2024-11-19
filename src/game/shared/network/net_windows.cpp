@@ -13,7 +13,7 @@
 
 LOG_CHANNEL_REGISTER( Network, ELogColor_DarkCyan );
 
-static bool        gOfflineMode    = Args_Register( "Disable All Networking", "-offline" );
+static bool        gOfflineMode    = args_register( "Disable All Networking", "--offline" );
 
 static bool        gNetInit        = false;
 

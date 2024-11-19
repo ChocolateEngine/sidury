@@ -17,7 +17,7 @@
 
 LOG_CHANNEL_REGISTER( Server, ELogColor_Green );
 
-static const char* gServerPort = Args_Register( "41628", "Test Server Port", "-port" );
+static const char* gServerPort = args_register( "41628", "Test Server Port", "--port" );
 
 CONVAR_STRING( sv_server_name, "taco", CVARF_SERVER | CVARF_ARCHIVE, "Server Name" );
 CONVAR_FLOAT( sv_client_timeout, 30.f, CVARF_SERVER | CVARF_ARCHIVE );

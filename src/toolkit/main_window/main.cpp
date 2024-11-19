@@ -21,10 +21,10 @@
 #include <algorithm>
 
 
-int                       gWidth          = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
-int                       gHeight         = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
-static bool               gMaxWindow      = Args_Register( "Maximize the main window", "-max" );
-static bool               gSingleWindow   = Args_Register( "Single Window Mode, all tools will be rendered in tabs on the main window", "-single-window" );
+int                       gWidth          = args_register_names( 1280, "Width of the main window", 2, "--width", "-w" );
+int                       gHeight         = args_register_names( 720, "Height of the main window", 2, "--height", "-h" );
+static bool               gMaxWindow      = args_register( "Maximize the main window", "--max" );
+static bool               gSingleWindow   = args_register( "Single Window Mode, all tools will be rendered in tabs on the main window", "--single-window" );
 
 
 SDL_Window*               gpWindow        = nullptr;

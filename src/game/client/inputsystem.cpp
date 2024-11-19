@@ -39,7 +39,7 @@ static std::unordered_map< EButton, std::string >   gKeyBindToggle;
 static std::unordered_map< EButton, InputConVar_t > gInputCvarKeys;
 
 
-static bool                                         gResetBindings = Args_Register( "Reset All Key Bindings", "-reset-binds" );
+static bool                                         gResetBindings = args_register( "Reset All Key Bindings", "--reset-binds" );
 
 
 // TODO: buffered input

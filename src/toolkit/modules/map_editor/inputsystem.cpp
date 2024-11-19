@@ -18,7 +18,7 @@ static glm::vec2                                    gMouseDeltaScale{ 1.f, 1.f }
 static std::unordered_map< ButtonList_t, EBinding > gKeyBinds;
 static KeyState                                     gBindingState[ EBinding_Count ];
 
-static bool                                         gResetBindings = Args_Register( "Reset All Bindings", "-reset-binds" );
+static bool                                         gResetBindings = args_register( "Reset All Bindings", "--reset-binds" );
 
 
 // TODO: buffered input
