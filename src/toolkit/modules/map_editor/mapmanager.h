@@ -70,7 +70,7 @@ struct SiduryMap
 	std::string            aMapPath = "";
 	MapHandle_t            aMapHandle;  // TODO: USE THIS
 
-	ChVector< ChHandle_t > aMapEntities;
+	ChVector< ch_handle_t > aMapEntities;
 
 	std::string            aSkybox;
 

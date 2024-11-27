@@ -2,7 +2,7 @@
 
 #include "core/filesystem.h"
 #include "core/console.h"
-#include "util.h"
+#include "core/util.h"
 #include "main.h"
 #include "skybox.h"
 #include "igraphics.h"
@@ -13,7 +13,7 @@
 #include <filesystem>
 
 
-LOG_REGISTER_CHANNEL2( Map, LogColor::DarkGreen );
+LOG_CHANNEL_REGISTER( Map, ELogColor_DarkGreen );
 
 std::vector< std::string > gMapList;
 static bool                gRebuildMapList = true;
@@ -175,16 +175,16 @@ bool MapManager_FindMap( const std::string& path )
 static bool MapManager_LoadScene( chmap::Scene& scene )
 {
 	EditorContext_t* context = nullptr;
-	ChHandle_t       handle  = Editor_CreateContext( &context );
+	ch_handle_t       handle  = Editor_CreateContext( &context );
 
 	if ( handle == CH_INVALID_HANDLE )
 		return false;
 
-	std::unordered_map< u32, ChHandle_t > entityHandles;
+	std::unordered_map< u32, ch_handle_t > entityHandles;
 
 	for ( chmap::Entity& mapEntity : scene.entites )
 	{
-		ChHandle_t entHandle = Entity_Create();
+		ch_handle_t entHandle = Entity_Create();
 
 		if ( entHandle == CH_INVALID_HANDLE )
 		{
@@ -276,7 +276,7 @@ static bool MapManager_LoadScene( chmap::Scene& scene )
 						if ( compValue.type != chmap::EComponentType_Vec4 )
 							continue;
 
-						ent->apLight->aColor = compValue.aVec4;
+						ent->apLight->color = compValue.aVec4;
 					}
 					else if ( ch_str_equals( name.data(), name.size(), "radius", 6 ) )
 					{

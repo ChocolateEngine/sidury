@@ -17,7 +17,7 @@ SteamToGame gSteamToGame;
 bool        gSteamLoaded = false;
 
 
-void SteamToGame::OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar )
+void SteamToGame::OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, ch_handle_t sAvatar )
 {
 #if CH_CLIENT
 	CL_SetClientSteamAvatar( sSteamID, sSize, sAvatar );

@@ -28,18 +28,18 @@ CONVAR_RANGE_FLOAT( host_max_frametime, 0.1, 0, FLT_MAX, "Max time in seconds a 
 CONVAR_RANGE_FLOAT( map_list_rebuild_timer, 30.f, 0, FLT_MAX, CVARF_ARCHIVE, "Timer for rebuilding the map list" );
 
 
-int                        gWidth             = Args_RegisterF( 1280, "Width of the main window", 2, "-width", "-w" );
-int                        gHeight            = Args_RegisterF( 720, "Height of the main window", 2, "-height", "-h" );
-static bool                gMaxWindow         = Args_Register( "Maximize the main window", "-max" );
-static bool                gArgNoSteam        = Args_Register( "Don't try to load the steam abstraction", "-no-steam" );
-static bool                gWaitForDebugger   = Args_Register( "Upon Program Startup, Wait for the Debugger to attach", "-debugger" );
-static bool                gDedicatedServer   = Args_Register( "Host a Dedicated Server", "-server" );
+int                        gWidth             = args_register_names( 1280, "Width of the main window", 2, "--width", "-w" );
+int                        gHeight            = args_register_names( 720, "Height of the main window", 2, "--height", "-h" );
+static bool                gMaxWindow         = args_register( "Maximize the main window", "--max" );
+static bool                gArgNoSteam        = args_register( "Don't try to load the steam abstraction", "--no-steam" );
+static bool                gWaitForDebugger   = args_register( "Upon Program Startup, Wait for the Debugger to attach", "--debugger" );
+static bool                gDedicatedServer   = args_register( "Host a Dedicated Server", "--server" );
 // static bool    gDedicatedServer = false;
 static bool                gRunning           = true;
 
 SDL_Window*                gpWindow           = nullptr;
 void*                      gpSysWindow        = nullptr;
-ChHandle_t                 gGraphicsWindow    = CH_INVALID_HANDLE;
+ch_handle_t                 gGraphicsWindow    = CH_INVALID_HANDLE;
 
 u32                        gDedicatedViewport = UINT32_MAX;
 
@@ -122,10 +122,10 @@ CONCMD( mimalloc_print )
 
 static AppModule_t gAppModulesClient[] = 
 {
-	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&input,     "ch_input",     IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
 	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
 	{ (ISystem**)&audio,     "ch_aduio",     IADUIO_NAME, IADUIO_VER },
-	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&physics,   "ch_physics",   IPHYSICS_NAME, IPHYSICS_VER },
     { (ISystem**)&graphics,  "ch_render",  IGRAPHICS_NAME, IGRAPHICS_VER },
     { (ISystem**)&renderOld, "ch_render",  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui",       IGUI_NAME, IGUI_HASH },
@@ -133,9 +133,9 @@ static AppModule_t gAppModulesClient[] =
 
 
 static AppModule_t gAppModulesServer[] = {
-	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
+	{ (ISystem**)&input,     "ch_input", IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
 	{ (ISystem**)&render,    "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
-	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_HASH },
+	{ (ISystem**)&physics,   "ch_physics", IPHYSICS_NAME, IPHYSICS_VER },
 	{ (ISystem**)&graphics,  "ch_render", IGRAPHICS_NAME, IGRAPHICS_VER },
 	{ (ISystem**)&renderOld, "ch_render", IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
 	{ (ISystem**)&gui,       "ch_gui", IGUI_NAME, IGUI_HASH },
@@ -340,7 +340,7 @@ bool CreateMainWindow()
 	windowName += vstring( " - Build %zd - Compiled On - %s %s", Core_GetBuildNumber(), Core_GetBuildDate(), Core_GetBuildTime() );
 
 #ifdef _WIN32
-	gpSysWindow = Sys_CreateWindow( windowName.c_str(), gWidth, gHeight, gMaxWindow );
+	gpSysWindow = sys_create_window( windowName.c_str(), gWidth, gHeight, gMaxWindow );
 
 	if ( !gpSysWindow )
 	{
@@ -576,6 +576,13 @@ extern "C"
 	{
 		if ( gWaitForDebugger )
 			sys_wait_for_debugger();
+
+		// Load main app info (Note that if you don't do this, you need to call FileSys_DefaultSearchPaths() before loading any files)
+		if ( !Core_LoadAppInfo() )
+		{
+			Log_FatalF( "Failed to Load App Info" );
+			return 1;
+		}
 
 		IMGUI_CHECKVERSION();
 

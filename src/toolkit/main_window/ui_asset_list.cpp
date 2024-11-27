@@ -67,26 +67,26 @@ constexpr ch_string ext_material = { (char*)"cmt", 3 };
 
 
 constexpr ch_string ext_models[] = {
-	{ (char*)"obj", 3 },
-	{ (char*)"glb", 3 },
-	{ (char*)"gltf", 4 },
+	{ "obj", 3 },
+	{ "glb", 3 },
+	{ "gltf", 4 },
 };
 
 
 constexpr ch_string ext_image[]  = {
-	{ (char*)"png", 3 },
-	{ (char*)"jpg", 3 },
-	{ (char*)"gif", 3 },
-	{ (char*)"jxl", 3 },
-	{ (char*)"jpeg", 4 },
-	{ (char*)"webp", 4 },
-	{ (char*)"avif", 4 },
+	{ "png", 3 },
+	{ "jpg", 3 },
+	{ "gif", 3 },
+	{ "jxl", 3 },
+	{ "jpeg", 4 },
+	{ "webp", 4 },
+	{ "avif", 4 },
 };
 
 
 constexpr ch_string ext_sound[]  = {
-	{ (char*)"ogg", 3 },
-	{ (char*)"wav", 3 },
+	{ "ogg", 3 },
+	{ "wav", 3 },
 };
 
 
@@ -109,7 +109,7 @@ EAssetType gAssetTypeView = EAssetType_Count;  // EAssetType_Count will be all a
 
 struct AssetBrowserData_t
 {
-	ChHandle_t             icons[ EAssetType_Count ];
+	ch_handle_t             icons[ EAssetType_Count ];
 	ImTextureID            iconsImGui[ EAssetType_Count ];
 
 	ESearchPathType        searchType;

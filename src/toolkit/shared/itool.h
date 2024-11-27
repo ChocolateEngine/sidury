@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "system.h"
 
 
 class IToolkit;
@@ -19,7 +18,7 @@ struct ToolLaunchData
 {
 	IToolkit*   toolkit;
 	SDL_Window* window;
-	ChHandle_t  graphicsWindow;
+	ch_handle_t  graphicsWindow;
 };
 
 
@@ -36,8 +35,8 @@ struct DockableWindow
 //	Func_DockableWindowDraw draw;
 //
 //	SDL_Window*             window         = nullptr;
-//	void*                   nativeWindow      = nullptr;
-//	ChHandle_t              graphicsWindow = CH_INVALID_HANDLE;
+//	void*                   sysWindow      = nullptr;
+//	ch_handle_t              graphicsWindow = CH_INVALID_HANDLE;
 //	ImGuiContext*           context        = nullptr;
 };
 
@@ -77,7 +76,7 @@ class ITool : public ISystem
 {
    public:
 	// Buttons
-	// virtual ChHandle_t  GetIcon() = 0;
+	// virtual ch_handle_t  GetIcon() = 0;
 
 	virtual const char*     GetName()                                                 = 0;
 
@@ -110,7 +109,4 @@ class ITool : public ISystem
 
 #define CH_TOOL_MAP_EDITOR_NAME "MapEditor"
 #define CH_TOOL_MAP_EDITOR_VER  1
-
-#define CH_TOOL_RENDER_TEST_NAME "RenderTest"
-#define CH_TOOL_RENDER_TEST_VER  1
 

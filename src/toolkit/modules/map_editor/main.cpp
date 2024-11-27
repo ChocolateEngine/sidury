@@ -1,5 +1,5 @@
 #include "main.h"
-#include "core/systemmanager.h"
+#include "core/system_loader.h"
 #include "core/asserts.h"
 
 #include "iinput.h"
@@ -8,7 +8,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 
-#include "util.h"
+#include "core/util.h"
 #include "game_physics.h"
 #include "igraphics.h"
 #include "mapmanager.h"
@@ -59,7 +59,7 @@ u32                             gMainViewport         = 0;
 
 EditorData_t                    gEditorData{};
 
-ChHandle_t                      gEditorContextIdx = CH_INVALID_EDITOR_CONTEXT;
+ch_handle_t                      gEditorContextIdx = CH_INVALID_EDITOR_CONTEXT;
 ResourceList< EditorContext_t > gEditorContexts;
 
 
@@ -73,7 +73,7 @@ static ModuleInterface_t        gInterfaces[] = {
 
 extern "C"
 {
-	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	DLL_EXPORT ModuleInterface_t* ch_get_interfaces( u8& srCount )
 	{
 		srCount = 1;
 		return gInterfaces;
@@ -791,7 +791,7 @@ void Game_UpdateProjection()
 // ----------------------------------------------------------------------------
 
 
-ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
+ch_handle_t Editor_CreateContext( EditorContext_t** spContext )
 {
 	if ( gEditorContexts.size() >= CH_MAX_EDITOR_CONTEXTS )
 	{
@@ -800,7 +800,7 @@ ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
 	}
 
 	EditorContext_t* context = nullptr;
-	ChHandle_t       handle  = gEditorContexts.Create( &context );
+	ch_handle_t       handle  = gEditorContexts.Create( &context );
 
 	if ( handle == CH_INVALID_HANDLE )
 		return CH_INVALID_HANDLE;
@@ -817,7 +817,7 @@ ChHandle_t Editor_CreateContext( EditorContext_t** spContext )
 }
 
 
-void Editor_FreeContext( ChHandle_t sContext )
+void Editor_FreeContext( ch_handle_t sContext )
 {
 	// Delete Entities
 	EditorContext_t* context = nullptr;
@@ -829,7 +829,7 @@ void Editor_FreeContext( ChHandle_t sContext )
 
 	for ( u32 i = 0; i < context->aMap.aMapEntities.aSize; i++ )
 	{
-		ChHandle_t entity = context->aMap.aMapEntities.apData[ i ];
+		ch_handle_t entity = context->aMap.aMapEntities.apData[ i ];
 		Entity_Delete( entity );
 	}
 
@@ -850,7 +850,7 @@ EditorContext_t* Editor_GetContext()
 }
 
 
-void Editor_SetContext( ChHandle_t sContext )
+void Editor_SetContext( ch_handle_t sContext )
 {
 	EditorContext_t* context = nullptr;
 	if ( !gEditorContexts.Get( sContext, &context ) )
@@ -859,7 +859,7 @@ void Editor_SetContext( ChHandle_t sContext )
 		return;
 	}
 
-	ChHandle_t       lastContextIdx = gEditorContextIdx;
+	ch_handle_t       lastContextIdx = gEditorContextIdx;
 	EditorContext_t* lastContext    = nullptr;
 	gEditorContextIdx               = sContext;
 
@@ -893,12 +893,12 @@ void Editor_SetContext( ChHandle_t sContext )
 bool MapEditor::Init()
 {
 	// Get Modules
-	CH_GET_INTERFACE( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH );
-	CH_GET_INTERFACE( render, IRender, IRENDER_NAME, IRENDER_VER );
-	CH_GET_INTERFACE( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
-	CH_GET_INTERFACE( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
-	CH_GET_INTERFACE( ch_physics, Ch_IPhysics, IPHYSICS_NAME, IPHYSICS_HASH );
-	CH_GET_INTERFACE( gui, IGuiSystem, IGUI_NAME, IGUI_HASH );
+	CH_GET_SYSTEM( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER );
+	CH_GET_SYSTEM( render, IRender, IRENDER_NAME, IRENDER_VER );
+	CH_GET_SYSTEM( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
+	CH_GET_SYSTEM( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
+	CH_GET_SYSTEM( ch_physics, Ch_IPhysics, IPHYSICS_NAME, IPHYSICS_VER );
+	CH_GET_SYSTEM( gui, IGuiSystem, IGUI_NAME, IGUI_HASH );
 
 	return true;
 }

@@ -18,7 +18,7 @@ CONVAR_BOOL( r_render, 1, "" );
 u32                 gMainViewportIndex = UINT32_MAX;
 
 SDL_Window*         gpWindow           = nullptr;
-ChHandle_t          gGraphicsWindow    = CH_INVALID_HANDLE;
+ch_handle_t          gGraphicsWindow    = CH_INVALID_HANDLE;
 
 extern EClientState gClientState;
 
@@ -138,14 +138,14 @@ public:
 
 	bool Init() override
 	{
-		// Get Modules
-		CH_GET_INTERFACE( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH );
-		CH_GET_INTERFACE( render, IRender, IRENDER_NAME, IRENDER_VER );
-		CH_GET_INTERFACE( audio, IAudioSystem, IADUIO_NAME, IADUIO_VER );
-		CH_GET_INTERFACE( ch_physics, Ch_IPhysics, IPHYSICS_NAME, IPHYSICS_HASH );
-		CH_GET_INTERFACE( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
-		CH_GET_INTERFACE( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
-		CH_GET_INTERFACE( gui, IGuiSystem, IGUI_NAME, IGUI_HASH );
+		// Get Interfaces
+		CH_GET_SYSTEM( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER );
+		CH_GET_SYSTEM( render, IRender, IRENDER_NAME, IRENDER_VER );
+		CH_GET_SYSTEM( audio, IAudioSystem, IADUIO_NAME, IADUIO_VER );
+		CH_GET_SYSTEM( ch_physics, Ch_IPhysics, IPHYSICS_NAME, IPHYSICS_VER );
+		CH_GET_SYSTEM( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
+		CH_GET_SYSTEM( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
+		CH_GET_SYSTEM( gui, IGuiSystem, IGUI_NAME, IGUI_HASH );
 
 		// Now Init
 		Input_Init();
@@ -205,7 +205,7 @@ public:
 		{
 			// update render lists
 			// for now, we only have one primary render list, no cameras or anything yet
-			static ChVector< ChHandle_t > renderList;
+			static ChVector< ch_handle_t > renderList;
 			renderList.clear();
 			renderList.resize( graphics->GetRenderableCount() );
 
@@ -217,21 +217,22 @@ public:
 			// TODO: Make this less stupid with allocating memory each frame
 			u32* viewportList = ch_malloc< u32 >( graphics->GetViewportCount() );
 			viewportList[ 0 ] = gMainViewportIndex;
+			u32 viewportCount = 1;
 
 			// Add Shadowmaps to this list
-			for ( u32 i = 1, j = 0; i < graphics->GetLightCount(); i++ )
+			for ( u32 i = 0; i < graphics->GetLightCount(); i++ )
 			{
 				Light_t* light = graphics->GetLightByIndex( i );
 				if ( !light->apShadowMap )
 					continue;
 
-				viewportList[ j++ ] = light->apShadowMap->aViewportHandle;
+				viewportList[ viewportCount++ ] = light->apShadowMap->aViewportHandle;
 			}
 
 			graphics->SetViewportRenderList( gMainViewportIndex, renderList.data(), renderList.size() );
 
 			renderOld->PrePresent();
-			renderOld->Present( gGraphicsWindow, viewportList, graphics->GetViewportCount() );
+			renderOld->Present( gGraphicsWindow, viewportList, viewportCount );
 
 			free( viewportList );
 		}
@@ -266,7 +267,7 @@ public:
 	{
 	}
 
-	void SetWindowInfo( SDL_Window* window, ChHandle_t graphicsWindow ) override
+	void SetWindowInfo( SDL_Window* window, ch_handle_t graphicsWindow ) override
 	{
 		gpWindow        = window;
 		gGraphicsWindow = graphicsWindow;
@@ -304,7 +305,7 @@ static ModuleInterface_t gInterfaces[] = {
 
 extern "C"
 {
-	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	DLL_EXPORT ModuleInterface_t* ch_get_interfaces( u8& srCount )
 	{
 		srCount = 1;
 		return gInterfaces;

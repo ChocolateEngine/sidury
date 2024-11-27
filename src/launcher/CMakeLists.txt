@@ -1,14 +1,11 @@
 message( "Current Project: Sidury Launcher" )
 
-set(
-	GAME_SRC_FILES
+set( BASE_SRC_FILES
 	launcher_base.cpp
 	launcher_base.h
-
-	launcher_sidury.cpp
 )
 
-add_executable( LauncherSidury ${GAME_SRC_FILES} )
+add_executable( LauncherSidury launcher_sidury.cpp ${BASE_SRC_FILES} )
 
 set( SIDURY_LAUNCHER_NAME sidury )
 
@@ -49,15 +46,7 @@ endif(MSVC)
 
 message( "Current Project: Toolkit Launcher" )
 
-set(
-	EDITOR_SRC_FILES
-	launcher_base.cpp
-	launcher_base.h
-
-	launcher_toolkit.cpp
-)
-
-add_executable( LauncherToolkit ${EDITOR_SRC_FILES} )
+add_executable( LauncherToolkit launcher_toolkit.cpp ${BASE_SRC_FILES} )
 
 set( TOOLKIT_LAUNCHER_NAME toolkit )
 

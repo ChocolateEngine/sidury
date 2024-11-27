@@ -1,7 +1,7 @@
 #include "main.h"
 #include "game_shared.h"
 #include "entity.h"
-#include "util.h"
+#include "core/util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "entity.h"
@@ -65,7 +65,7 @@ CH_STRUCT_REGISTER_COMPONENT( CRenderable, renderable, EEntComponentNetType_Both
 CH_STRUCT_REGISTER_COMPONENT( CLight, light, EEntComponentNetType_Both, ECompRegFlag_None )
 {
 	CH_REGISTER_COMPONENT_VAR2( EEntNetField_S32, ELightType, aType, type, ECompRegFlag_None );
-	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Color4, glm::vec4, aColor, color, ECompRegFlag_None );
+	CH_REGISTER_COMPONENT_VAR2( EEntNetField_Color4, glm::vec4, color, color, ECompRegFlag_None );
 
 	// TODO: these 2 should not be here
 	// it should be attached to it's own entity that can be parented
@@ -161,14 +161,14 @@ void Ent_RegisterBaseComponents()
 
 
 // Helper Functions
-Handle Ent_GetRenderableHandle( Entity sEntity )
+ch_handle_t Ent_GetRenderableHandle( Entity sEntity )
 {
 	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
 	if ( !renderComp )
 	{
 		Log_Error( "Failed to get renderable component\n" );
-		return InvalidHandle;
+		return CH_INVALID_HANDLE;
 	}
 
 	return renderComp->aRenderable;
@@ -200,12 +200,12 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity )
 		return nullptr;
 	}
 
-	if ( renderComp->aRenderable == InvalidHandle )
+	if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 	{
-		if ( renderComp->aModel == InvalidHandle )
+		if ( renderComp->aModel == CH_INVALID_HANDLE )
 		{
 			renderComp->aModel = graphics->LoadModel( renderComp->aPath );
-			if ( renderComp->aModel == InvalidHandle )
+			if ( renderComp->aModel == CH_INVALID_HANDLE )
 			{
 				Log_Error( "Failed to load model for renderable\n" );
 				return nullptr;
@@ -213,7 +213,7 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity )
 		}
 
 		renderComp->aRenderable = graphics->CreateRenderable( renderComp->aModel );
-		if ( renderComp->aRenderable == InvalidHandle )
+		if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 		{
 			Log_Error( "Failed to create renderable\n" );
 			return nullptr;

@@ -6,7 +6,7 @@
 
 extern IInputSystem* input;
 
-LOG_REGISTER_CHANNEL2( GameInput, LogColor::Default );
+LOG_CHANNEL_REGISTER( GameInput, ELogColor_Default );
 
 NEW_CVAR_FLAG( CVARF_INPUT );
 
@@ -39,7 +39,7 @@ static std::unordered_map< EButton, std::string >   gKeyBindToggle;
 static std::unordered_map< EButton, InputConVar_t > gInputCvarKeys;
 
 
-static bool                                         gResetBindings = Args_Register( "Reset All Key Bindings", "-reset-binds" );
+static bool                                         gResetBindings = args_register( "Reset All Key Bindings", "--reset-binds" );
 
 
 // TODO: buffered input
@@ -54,7 +54,7 @@ static bool                                         gResetBindings = Args_Regist
 
 CONCMD_VA( in_dump_all_scancodes, "Dump a List of SDL2 Scancode strings" )
 {
-	LogGroup group = Log_GroupBegin( gLC_GameInput );
+	log_t group = Log_GroupBegin( gLC_GameInput );
 
 	Log_Group( group, "SDL2 Scancodes:\n\n" );
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
@@ -329,7 +329,7 @@ void Input_Init()
 
 	if ( gResetBindings )
 	{
-		bind_reset_all( {}, {} );
+		bind_reset_all_func( {}, {} );
 	}
 }
 

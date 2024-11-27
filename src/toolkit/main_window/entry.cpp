@@ -4,7 +4,8 @@
 #include "core/profiler.h"
 
 #include "iinput.h"
-#include "irender3.h"
+#include "render/irender.h"
+#include "igraphics.h"
 #include "iaudio.h"
 #include "igui.h"
 #include "physics/iphysics.h"
@@ -19,12 +20,12 @@
   #include "mimalloc-new-delete.h"
 #endif
 
-static bool        gWaitForDebugger = Args_Register( "Upon Program Startup, Wait for the Debugger to attach", "-debugger" );
-static const char* gArgGamePath     = Args_Register( nullptr, "Path to the game to create assets for", "-game" );
+static bool        gWaitForDebugger = args_register( "Upon Program Startup, Wait for the Debugger to attach", "--debugger" );
+static const char* gArgGamePath     = args_register_names( nullptr, "Path to the game to create assets for", 2, "--game", "-g" );
 static bool        gRunning         = true;
 
 
-CONVAR_RANGE_FLOAT( host_fps_max, 0, 0, 5000, "Maximum FPS the App can run at" );
+CONVAR_RANGE_FLOAT( host_fps_max, 300, 0, 5000, "Maximum FPS the App can run at" );
 CONVAR_RANGE_FLOAT( host_timescale, 1, 0, FLT_MAX, "Scaled Frametime of the App" );
 CONVAR_RANGE_FLOAT( host_max_frametime, 0.1, 0, FLT_MAX, "Max time in seconds a frame can be" );
 
@@ -51,19 +52,63 @@ CONCMD( mimalloc_print )
 
 
 extern IGuiSystem*       gui;
-extern IRender3*         render;
+extern IRender*          render;
 extern IInputSystem*     input;
 extern IAudioSystem*     audio;
 extern Ch_IPhysics*      ch_physics;
+extern IGraphics*        graphics;
+extern IRenderSystemOld* renderOld;
 
 
 static AppModule_t gAppModules[] = 
 {
-	{ (ISystem**)&input,      "ch_input",    IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH },
-	{ (ISystem**)&render,     "ch_render_3", CH_RENDER3, CH_RENDER3_VER },
-//	{ (ISystem**)&audio,      "ch_aduio",    IADUIO_NAME, IADUIO_VER },
-//	{ (ISystem**)&ch_physics, "ch_physics",  IPHYSICS_NAME, IPHYSICS_HASH },
-	{ (ISystem**)&gui,        "ch_gui",      IGUI_NAME, IGUI_HASH },
+	{ (ISystem**)&input,      "ch_input",           IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER },
+	{ (ISystem**)&render,     "ch_graphics_api_vk", IRENDER_NAME, IRENDER_VER },
+	{ (ISystem**)&audio,      "ch_aduio",           IADUIO_NAME, IADUIO_VER },
+	{ (ISystem**)&ch_physics, "ch_physics",         IPHYSICS_NAME, IPHYSICS_VER },
+    { (ISystem**)&graphics,   "ch_render",          IGRAPHICS_NAME, IGRAPHICS_VER },
+    { (ISystem**)&renderOld,  "ch_render",          IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&gui,        "ch_gui",             IGUI_NAME, IGUI_HASH },
+};
+
+
+static const char* g_modules[] = {
+	"ch_input",
+	"ch_graphics_api_vk",
+	"ch_aduio",
+	"ch_physics",
+	"ch_render",
+	"ch_gui"
+};
+
+
+struct ch_system_entry_t
+{
+	ISystem**   system;  // TODO: try ISystem*&
+	const char* system_name;
+	u16         system_ver;
+	bool        required = true;
+};
+
+#define CH_SYS_PTR( var ) (ISystem**)&var
+
+static ch_system_entry_t g_systems[] = 
+{
+	{ (ISystem**)&input,      IINPUTSYSTEM_NAME,     IINPUTSYSTEM_VER },
+	{ (ISystem**)&render,     IRENDER_NAME,          IRENDER_VER },
+	{ (ISystem**)&audio,      IADUIO_NAME,           IADUIO_VER },
+	{ (ISystem**)&ch_physics, IPHYSICS_NAME,         IPHYSICS_VER },
+	{ (ISystem**)&graphics,   IGRAPHICS_NAME,        IGRAPHICS_VER },
+	{ (ISystem**)&renderOld,  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+	{ (ISystem**)&gui,        IGUI_NAME,             IGUI_HASH },
+
+//	{ CH_SYS_PTR( input ),      IINPUTSYSTEM_NAME,     IINPUTSYSTEM_VER },
+//	{ CH_SYS_PTR( render ),     IRENDER_NAME,          IRENDER_VER },
+//	{ CH_SYS_PTR( audio ),      IADUIO_NAME,           IADUIO_VER },
+//	{ CH_SYS_PTR( ch_physics ), IPHYSICS_NAME,         IPHYSICS_VER },
+//	{ CH_SYS_PTR( graphics ),   IGRAPHICS_NAME,        IGRAPHICS_VER },
+//	{ CH_SYS_PTR( renderOld ),  IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER },
+//	{ CH_SYS_PTR( gui ),        IGUI_NAME,             IGUI_HASH },
 };
 
 
@@ -76,10 +121,8 @@ struct ToolLoadDesc
 
 
 static ToolLoadDesc gToolModules[] = {
-	// { "modules" CH_PATH_SEP_STR "ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
-	// { "modules" CH_PATH_SEP_STR "ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
-
-	{ "modules" CH_PATH_SEP_STR "ch_render3_test", CH_TOOL_RENDER_TEST_NAME, CH_TOOL_RENDER_TEST_VER },
+	{ "modules" CH_PATH_SEP_STR "ch_map_editor", CH_TOOL_MAP_EDITOR_NAME, CH_TOOL_MAP_EDITOR_VER },
+	{ "modules" CH_PATH_SEP_STR "ch_material_editor", CH_TOOL_MAT_EDITOR_NAME, CH_TOOL_MAT_EDITOR_VER },
 };
 
 
@@ -138,6 +181,11 @@ extern "C"
 		// Needs to be done before Renderer is loaded
 		ImGui::CreateContext();
 
+		// if ( gArgUseGL )
+		// {
+		// 	gAppModules[ 1 ].apModuleName = "ch_render_gl";
+		// }
+
 		// Load Modules and Initialize them in this order
 		if ( !Mod_AddSystems( gAppModules, ARR_SIZE( gAppModules ) ) )
 		{
@@ -146,7 +194,6 @@ extern "C"
 		}
 
 		// Add Tools
-#if 0
 		gTools.reserve( ARR_SIZE( gToolModules ) );
 		for ( u32 i = 0; i < ARR_SIZE( gToolModules ); i++ )
 		{
@@ -168,9 +215,7 @@ extern "C"
 			LoadedTool& tool = gTools.emplace_back();
 			tool.interface   = gToolModules[ i ].interface;
 			tool.tool        = (ITool*)toolSystem;
-			tool.window      = UINT16_MAX;
 		}
-#endif
 
 		if ( !App_CreateMainWindow() )
 		{

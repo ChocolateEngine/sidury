@@ -1,7 +1,7 @@
 #include "main.h"
 #include "game_shared.h"
 #include "entity.h"
-#include "util.h"
+#include "core/util.h"
 #include "player.h"  // TEMP - for CPlayerMoveData
 
 #include "entity_systems.h"
@@ -13,7 +13,7 @@
 #include "game_physics.h"  // just for IPhysicsShape* and IPhysicsObject*
 
 
-LOG_CHANNEL2( Entity );
+LOG_CHANNEL( Entity );
 
 CONVAR_BOOL( ent_always_full_update, 0, "For debugging, always send a full update" );
 CONVAR_BOOL( ent_show_component_net_updates, 0, "Show Component Network Updates" );

@@ -5,7 +5,7 @@
 
 extern IInputSystem* input;
 
-LOG_REGISTER_CHANNEL2( EditorInput, LogColor::Default );
+LOG_CHANNEL_REGISTER( EditorInput, ELogColor_Default );
 
 
 CONVAR_FLOAT( m_pitch, 0.022, CVARF_ARCHIVE, "Mouse Pitch" );
@@ -18,7 +18,7 @@ static glm::vec2                                    gMouseDeltaScale{ 1.f, 1.f }
 static std::unordered_map< ButtonList_t, EBinding > gKeyBinds;
 static KeyState                                     gBindingState[ EBinding_Count ];
 
-static bool                                         gResetBindings = Args_Register( "Reset All Bindings", "-reset-binds" );
+static bool                                         gResetBindings = args_register( "Reset All Bindings", "--reset-binds" );
 
 
 // TODO: buffered input
@@ -31,7 +31,7 @@ static bool                                         gResetBindings = Args_Regist
 
 CONCMD_VA( in_dump_all_buttons, "Dump a List of All Button Names" )
 {
-	LogGroup group = Log_GroupBegin( gLC_EditorInput );
+	log_t group = Log_GroupBegin( gLC_EditorInput );
 
 	Log_Group( group, "Buttons:\n\n" );
 	for ( int i = 0; i < SDL_NUM_SCANCODES; i++ )
@@ -932,7 +932,7 @@ void Input_BindKeys( EButton* spKeys, u8 sKeyCount, EBinding sBinding )
 	buttonList.aCount         = newKeyList.size();
 
 	if ( buttonList.aCount )
-		buttonList.apButtons = ch_malloc_count< EButton >( buttonList.aCount );
+		buttonList.apButtons = ch_malloc< EButton >( buttonList.aCount );
 
 	for ( u8 i = 0; i < buttonList.aCount; i++ )
 	{

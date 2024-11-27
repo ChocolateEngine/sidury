@@ -20,7 +20,7 @@ struct MaterialEntry
 {
 	std::string                                     name;
 	std::string                                     path;
-	ChHandle_t                                      mat = CH_INVALID_HANDLE;
+	ch_handle_t                                      mat = CH_INVALID_HANDLE;
 	// std::unordered_map< u32, TextureParameterData > textureData;
 };
 
@@ -29,14 +29,14 @@ struct MaterialEditorData
 {
 	std::vector< MaterialEntry >                    materialList; 
 
-	ChHandle_t                                      mat           = CH_INVALID_HANDLE;
+	ch_handle_t                                      mat           = CH_INVALID_HANDLE;
 
 	bool                                            drawNewDialog = false;
 	std::string                                     newMatName    = "";
 
 	std::string                                     newVarName    = "";
 
-	std::unordered_map< ChHandle_t, ImTextureID >   imguiTextures;
+	std::unordered_map< ch_handle_t, ImTextureID >   imguiTextures;
 
 	FilePickerData_t                                textureBrowser;
 	u32                                             textureBrowserVar  = UINT32_MAX;
@@ -58,12 +58,12 @@ static int StringTextInput( ImGuiInputTextCallbackData* data )
 
 void Editor_DrawTextureInfo( TextureInfo_t& info )
 {
-	ImGui::Text( "Name: %s", info.aName.size ? info.aName.data : "UNNAMED" );
+	ImGui::Text( "Name: %s", info.name.size ? info.name.data : "UNNAMED" );
 
 	if ( info.aPath.size )
 		ImGui::Text( info.aPath.data );
 
-	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, Util_BytesToMB( info.aMemoryUsage ) );
+	ImGui::Text( "%d x %d - %.6f MB", info.aSize.x, info.aSize.y, ch_bytes_to_mb( info.aMemoryUsage ) );
 	ImGui::Text( "Format: TODO" );
 	ImGui::Text( "Mip Levels: TODO" );
 	ImGui::Text( "GPU Index: %d", info.aGpuIndex );
@@ -77,8 +77,8 @@ void MaterialEditor_DrawNewDialog()
 	
 	if ( ImGui::InputText( "Name", gMatEditor.newMatName.data(), 128, ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_EnterReturnsTrue, StringTextInput, &gMatEditor.newMatName ) )
 	{
-		ChHandle_t shader        = graphics->GetShader( "basic_3d" );
-		ChHandle_t mat           = graphics->CreateMaterial( gMatEditor.newMatName, shader );
+		ch_handle_t shader        = graphics->GetShader( "basic_3d" );
+		ch_handle_t mat           = graphics->CreateMaterial( gMatEditor.newMatName, shader );
 
 		MaterialEntry& matEntry      = gMatEditor.materialList.emplace_back();
 		matEntry.mat                 = mat;
@@ -259,7 +259,7 @@ void MaterialEditor_DrawMaterialData()
 	gMaterialDataWidth        = ImGui::GetWindowSize().x;
 
 	const char* matPath       = graphics->Mat_GetName( gMatEditor.mat );
-	ChHandle_t  oldShader     = graphics->Mat_GetShader( gMatEditor.mat );
+	ch_handle_t  oldShader     = graphics->Mat_GetShader( gMatEditor.mat );
 	const char* oldShaderName = graphics->GetShaderName( oldShader );
 
 	ImGui::Text( matPath );
@@ -271,7 +271,7 @@ void MaterialEditor_DrawMaterialData()
 
 		for ( u32 i = 0; i < shaderCount; i++ )
 		{
-			ChHandle_t  shader     = graphics->GetGraphicsShaderByIndex( i );
+			ch_handle_t  shader     = graphics->GetGraphicsShaderByIndex( i );
 			const char* shaderName = graphics->GetShaderName( shader );
 
 			if ( ImGui::Selectable( shaderName ) )
@@ -283,7 +283,7 @@ void MaterialEditor_DrawMaterialData()
 		ImGui::EndCombo();
 	}
 
-	ChHandle_t  shader     = graphics->Mat_GetShader( gMatEditor.mat );
+	ch_handle_t  shader     = graphics->Mat_GetShader( gMatEditor.mat );
 	const char* shaderName = graphics->GetShaderName( shader );
 
 	ImGui::Separator();
@@ -352,7 +352,7 @@ void MaterialEditor_DrawMaterialData()
 
 		if ( ImGui::BeginChild( shaderVar.name, {}, ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY ) )
 		{
-			ChHandle_t        texHandle   = graphics->Mat_GetTexture( gMatEditor.mat, shaderVar.name );
+			ch_handle_t        texHandle   = graphics->Mat_GetTexture( gMatEditor.mat, shaderVar.name );
 
 			float             size        = std::clamp( matedit_texture_size, 2, 8192 );
 
@@ -409,7 +409,7 @@ void MaterialEditor_DrawMaterialData()
 
 					TextureInfo_t texInfo = render->GetTextureInfo( texHandle );
 
-					ImGui::Text( texInfo.aName.data ? texInfo.aName.data : texInfo.aPath.data );
+					ImGui::Text( texInfo.name.data ? texInfo.name.data : texInfo.aPath.data );
 
 					if ( ImGui::IsItemHovered() )
 					{
@@ -434,7 +434,7 @@ void MaterialEditor_DrawMaterialData()
 						TextureCreateData_t createInfo{};
 						createInfo.aUsage     = EImageUsage_Sampled;
 
-						ChHandle_t newTexture = CH_INVALID_HANDLE;
+						ch_handle_t newTexture = CH_INVALID_HANDLE;
 						render->LoadTexture( newTexture, gMatEditor.textureBrowser.selectedItems[ 0 ], createInfo );
 						graphics->Mat_SetVar( gMatEditor.mat, shaderVar.name, newTexture );
 
@@ -609,13 +609,13 @@ void MaterialEditor_Draw( glm::uvec2 sOffset )
 }
 
 
-void MaterialEditor_CloseMaterial( ChHandle_t mat )
+void MaterialEditor_CloseMaterial( ch_handle_t mat )
 {
 	MaterialEditor_FreeImGuiTextures();
 }
 
 
-void MaterialEditor_FreeMaterial( ChHandle_t mat )
+void MaterialEditor_FreeMaterial( ch_handle_t mat )
 {
 	MaterialEditor_CloseMaterial( mat );
 	graphics->FreeMaterial( mat );
@@ -624,7 +624,7 @@ void MaterialEditor_FreeMaterial( ChHandle_t mat )
 
 bool MaterialEditor_LoadMaterial( const std::string& path )
 {
-	ChHandle_t mat = graphics->LoadMaterial( path.data(), path.size() );
+	ch_handle_t mat = graphics->LoadMaterial( path.data(), path.size() );
 
 	if ( mat == CH_INVALID_HANDLE )
 		return false;
@@ -654,7 +654,7 @@ bool MaterialEditor_LoadMaterial( const std::string& path )
 }
 
 
-void MaterialEditor_SetActiveMaterial( ChHandle_t sMat )
+void MaterialEditor_SetActiveMaterial( ch_handle_t sMat )
 {
 	if ( gMatEditor.mat )
 	{
@@ -665,7 +665,7 @@ void MaterialEditor_SetActiveMaterial( ChHandle_t sMat )
 }
 
 
-ChHandle_t MaterialEditor_GetActiveMaterial()
+ch_handle_t MaterialEditor_GetActiveMaterial()
 {
 	return gMatEditor.mat;
 }

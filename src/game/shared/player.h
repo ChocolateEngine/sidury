@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.h"
+#include "core/util.h"
 #include "types/transform.h"
 #include "entity/entity.h"
 #include "game_physics.h"
@@ -72,8 +72,8 @@ struct CPlayerMoveData
 	// HACK FOR IMPACT SOUND ON CLIENT - CHANGE THIS LATER
 	ComponentNetVar< glm::vec3 >       aPrevVel{};
 
-	std::vector< Handle >              aStepSounds;
-	std::vector< Handle >              aImpactSounds;
+	std::vector< ch_handle_t >              aStepSounds;
+	std::vector< ch_handle_t >              aImpactSounds;
 
 	// Physics
 
@@ -86,7 +86,7 @@ struct CPlayerMoveData
 	glm::vec3                          aGroundPosition{};
 	glm::vec3                          aGroundNormal{};
 	// glm::vec3               aGroundVelocity{};
-	// Handle                  aGroundMaterial;
+	// ch_handle_t                  aGroundMaterial;
 };
 
 
@@ -109,7 +109,7 @@ struct CPlayerInfo
 	// Entity with a light component on it to be used as the flashlight
 	ComponentNetVar< Entity > aFlashlight    = CH_ENT_INVALID;
 
-	// std::string aName;
+	// std::string name;
 	bool                      aIsLocalPlayer = false;  // only used on client, probably should split off from this
 };
 
@@ -159,7 +159,7 @@ class PlayerMovement // : public ComponentSystem
 	void   DisplayPlayerStats( Entity player ) const;
 
 	// std::string             GetStepSound(  );
-	Handle GetStepSound();
+	ch_handle_t GetStepSound();
 
 	void   PlayStepSound();
 	void   StopStepSound( bool force = false );  // Temp Hack for sound system

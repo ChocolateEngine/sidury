@@ -2,14 +2,13 @@
 
 
 int                                           gTextureListViewMode = 1;
-std::unordered_map< ChHandle_t, ImTextureID > gImGuiTextures;
+std::unordered_map< ch_handle_t, ImTextureID > gImGuiTextures;
 
 
 void ResourceUsage_DrawTextures()
 {
-#if 0
 	// Draws all currently loaded textures
-	std::vector< ChHandle_t > textures         = render->GetTextureList();
+	std::vector< ch_handle_t > textures         = render->GetTextureList();
 	ImVec2                    windowSize       = ImGui::GetWindowSize();
 
 	glm::vec2                 imageDisplaySize = { 96, 96 };
@@ -36,7 +35,7 @@ void ResourceUsage_DrawTextures()
 	u32  memoryUsage       = 0;
 	u32  rtMemoryUsage     = 0;
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		TextureInfo_t info = render->GetTextureInfo( texture );
 
@@ -50,7 +49,7 @@ void ResourceUsage_DrawTextures()
 
 	ImGui::Text(
 	  "Count: %d | Memory: %.4f MB | Render Target Memory: %.4f MB",
-	  textures.size(), Util_BytesToMB( memoryUsage ), Util_BytesToMB( rtMemoryUsage ) );
+	  textures.size(), ch_bytes_to_mb( memoryUsage ), ch_bytes_to_mb( rtMemoryUsage ) );
 
 	if ( !ImGui::BeginChild( "Texture List" ) )
 	{
@@ -58,7 +57,7 @@ void ResourceUsage_DrawTextures()
 		return;
 	}
 
-	for ( ChHandle_t texture : textures )
+	for ( ch_handle_t texture : textures )
 	{
 		ImTextureID imTexture = 0;
 
@@ -150,13 +149,11 @@ void ResourceUsage_DrawTextures()
 	}
 
 	ImGui::EndChild();
-#endif
 }
 
 
 void ResourceUsage_DrawMaterials()
 {
-#if 0
 	if ( !ImGui::BeginChild( "Material List" ) )
 	{
 		ImGui::EndChild();
@@ -169,7 +166,7 @@ void ResourceUsage_DrawMaterials()
 
 	for ( u32 i = 0; i < matCount; i++ )
 	{
-		ChHandle_t  mat     = graphics->GetMaterialByIndex( i );
+		ch_handle_t  mat     = graphics->GetMaterialByIndex( i );
 		const char* matName = graphics->Mat_GetName( mat );
 
 		ImGui::PushID( i );
@@ -183,58 +180,42 @@ void ResourceUsage_DrawMaterials()
 	}
 
 	ImGui::EndChild();
-#endif
 }
 
 
 void ResourceUsage_DrawStats()
 {
-	//std::vector< ChHandle_t > textures      = render->GetTextureList();
-	//u32                       matCount      = graphics->GetMaterialCount();
-	//u32                       renderCount   = graphics->GetRenderableCount();
+	std::vector< ch_handle_t > textures      = render->GetTextureList();
+	u32                       matCount      = graphics->GetMaterialCount();
+	u32                       renderCount   = graphics->GetRenderableCount();
 
 	u32                       memoryUsage   = 0;
 	u32                       rtMemoryUsage = 0;
 
-//	for ( ChHandle_t texture : textures )
-//	{
-//		TextureInfo_t info = render->GetTextureInfo( texture );
-//
-//		if ( info.aRenderTarget )
-//			rtMemoryUsage += info.aMemoryUsage;
-//		else
-//			memoryUsage += info.aMemoryUsage;
-//
-//		render->FreeTextureInfo( info );
-//	}
+	for ( ch_handle_t texture : textures )
+	{
+		TextureInfo_t info = render->GetTextureInfo( texture );
+
+		if ( info.aRenderTarget )
+			rtMemoryUsage += info.aMemoryUsage;
+		else
+			memoryUsage += info.aMemoryUsage;
+
+		render->FreeTextureInfo( info );
+	}
 
 	u64 stringCount  = ch_str_get_alloc_count();
 	u64 stringMemory = ch_str_get_alloc_size();
 
 	ImGui::Text( "String Count: %d", stringCount );
-	ImGui::Text( "String Memory Usage: %.6f KB", Util_BytesToKB( stringMemory ) );
+	ImGui::Text( "String Memory Usage: %.6f KB", ch_bytes_to_kb( stringMemory ) );
 
-	ImGui::TextUnformatted( "-------------------------------------------------------------\nRendering Info" );
-
-	float fps = ImGui::GetIO().Framerate;
-
-	ImGui::Text( "GPU: %s", render->get_device_name() );
-	ImGui::Text( "FPS: %.4f", fps );  // TODO: smooth this
-
-	static float average_fps = 60.0f;
-	// average_fps = average_fps * 0.9f + fps * 0.1f;
-	// average_fps = average_fps * 0.99f + fps * 0.01f;
-	float        alpha       = 0.99f;
-	average_fps              = alpha * average_fps + ( 1.0 - alpha ) * fps;
-
-	ImGui::Text( "FPS (Smooth): %.4f", average_fps );  // TODO: smooth this
-
-//	ImGui::Text( "Renderable Count: %d", renderCount );
-//	ImGui::Text( "Model Count: TODO - EXPOSE THIS" );
-//	ImGui::Text( "Material Count: %d", matCount );
-//	ImGui::Text( "Texture Count: %d", textures.size() );
-//	ImGui::Text( "Texture Memory: %.4f MB", Util_BytesToMB( memoryUsage ) );
-//	ImGui::Text( "Render Target Memory: %.4f MB", Util_BytesToMB( rtMemoryUsage ) );
+	ImGui::Text( "Renderable Count: %d", renderCount );
+	ImGui::Text( "Model Count: TODO - EXPOSE THIS" );
+	ImGui::Text( "Material Count: %d", matCount );
+	ImGui::Text( "Texture Count: %d", textures.size() );
+	ImGui::Text( "Texture Memory: %.4f MB", ch_bytes_to_mb( memoryUsage ) );
+	ImGui::Text( "Render Target Memory: %.4f MB", ch_bytes_to_mb( rtMemoryUsage ) );
 }
 
 
@@ -248,22 +229,22 @@ void ResourceUsage_Draw()
 			ImGui::EndTabItem();
 		}
 
-//		if ( ImGui::BeginTabItem( "Textures" ) )
-//		{
-//			ResourceUsage_DrawTextures();
-//			ImGui::EndTabItem();
-//		}
-//
-//		if ( ImGui::BeginTabItem( "Models" ) )
-//		{
-//			ImGui::EndTabItem();
-//		}
-//
-//		if ( ImGui::BeginTabItem( "Materials" ) )
-//		{
-//			ResourceUsage_DrawMaterials();
-//			ImGui::EndTabItem();
-//		}
+		if ( ImGui::BeginTabItem( "Textures" ) )
+		{
+			ResourceUsage_DrawTextures();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Models" ) )
+		{
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Materials" ) )
+		{
+			ResourceUsage_DrawMaterials();
+			ImGui::EndTabItem();
+		}
 
 		ImGui::EndTabBar();
 	}

@@ -1,5 +1,5 @@
 #include "material_editor.h"
-#include "core/systemmanager.h"
+#include "core/system_loader.h"
 #include "core/asserts.h"
 
 #include "iinput.h"
@@ -8,7 +8,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 
-#include "util.h"
+#include "core/util.h"
 #include "igraphics.h"
 
 
@@ -36,7 +36,7 @@ static ModuleInterface_t        gInterfaces[] = {
 
 extern "C"
 {
-	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	DLL_EXPORT ModuleInterface_t* ch_get_interfaces( u8& srCount )
 	{
 		srCount = 1;
 		return gInterfaces;
@@ -97,10 +97,10 @@ void Main_DrawMenuBar()
 bool MaterialEditor::Init()
 {
 	// Get Modules
-	CH_GET_INTERFACE( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_HASH );
-	CH_GET_INTERFACE( render, IRender, IRENDER_NAME, IRENDER_VER );
-	CH_GET_INTERFACE( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
-	CH_GET_INTERFACE( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
+	CH_GET_SYSTEM( input, IInputSystem, IINPUTSYSTEM_NAME, IINPUTSYSTEM_VER );
+	CH_GET_SYSTEM( render, IRender, IRENDER_NAME, IRENDER_VER );
+	CH_GET_SYSTEM( graphics, IGraphics, IGRAPHICS_NAME, IGRAPHICS_VER );
+	CH_GET_SYSTEM( renderOld, IRenderSystemOld, IRENDERSYSTEMOLD_NAME, IRENDERSYSTEMOLD_VER );
 
 	return true;
 }

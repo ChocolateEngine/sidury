@@ -1,7 +1,7 @@
 #include "steam.h"
 
-LOG_REGISTER_CHANNEL2( Steam, LogColor::Default );
-LOG_REGISTER_CHANNEL2( SteamAPI, LogColor::Default );
+LOG_CHANNEL_REGISTER( Steam, ELogColor_Default );
+LOG_CHANNEL_REGISTER( SteamAPI, ELogColor_Default );
 
 SteamAbstraction*        gSteam        = new SteamAbstraction;
 bool                     gSteamLoaded  = false;
@@ -17,7 +17,7 @@ static ModuleInterface_t gInterfaces[] = {
 
 extern "C"
 {
-	DLL_EXPORT ModuleInterface_t* cframework_GetInterfaces( size_t& srCount )
+	DLL_EXPORT ModuleInterface_t* ch_get_interfaces( u8& srCount )
 	{
 		srCount = 1;
 		return gInterfaces;
@@ -46,7 +46,7 @@ static CSteamID                                     gSteamID;
 static SteamID64_t                                  gSteamIDHandle = 0;
 
 static std::unordered_map< int, ChVector< uint8 > > gSteamTextureData;
-static std::unordered_map< int, Handle >            gSteamTextureHandles;
+static std::unordered_map< int, ch_handle_t >            gSteamTextureHandles;
 
 // ==================================================
 // ConVars and ConCommands
@@ -85,7 +85,7 @@ CONCMD( steam_load_overlay )
 bool SteamAbstraction::Init()
 {
 	// Used for loading avatar images
-	render = Mod_GetInterfaceCast< IRender >( IRENDER_NAME, IRENDER_VER );
+	render = Mod_GetSystemCast< IRender >( IRENDER_NAME, IRENDER_VER );
 	if ( render == nullptr )
 	{
 		Log_Error( gLC_Steam, "Failed to load Renderer\n" );
@@ -201,7 +201,7 @@ SteamID64_t SteamAbstraction::GetSteamID()
 bool SteamAbstraction::RequestAvatarImage( ESteamAvatarSize sSize, SteamID64_t sSteamID )
 {
 	if ( !gSteamLoaded )
-		return InvalidHandle;
+		return CH_INVALID_HANDLE;
 
 	CSteamID steamID( sSteamID );
 
@@ -269,7 +269,7 @@ bool SteamAbstraction::RequestAvatarImage( ESteamAvatarSize sSize, SteamID64_t s
 bool SteamAbstraction::RequestProfileName( SteamID64_t sSteamID )
 {
 	if ( !gSteamLoaded )
-		return InvalidHandle;
+		return CH_INVALID_HANDLE;
 
 	CSteamID steamID( sSteamID );
 
@@ -336,9 +336,9 @@ void SteamAbstraction::LoadAvatarImage( AvatarImageLoaded_t* spParam )
 	createData.aUsage   = EImageUsage_Sampled;
 	createData.aFilter  = EImageFilter_Nearest;
 	
-	Handle texture = render->CreateTexture( create, createData );
+	ch_handle_t texture = render->CreateTexture( create, createData );
 
-	if ( texture == InvalidHandle )
+	if ( texture == CH_INVALID_HANDLE )
 		return;
 
 	gSteamTextureHandles[ spParam->m_iImage ] = texture;
@@ -410,9 +410,9 @@ void SteamAbstraction::OnAvatarImageLoaded( AvatarImageLoaded_t* spParam )
 	createData.aUsage   = EImageUsage_Sampled;
 	createData.aFilter  = EImageFilter_Nearest;
 	
-	Handle texture = render->CreateTexture( create, createData );
+	ch_handle_t texture = render->CreateTexture( create, createData );
 
-	if ( texture == InvalidHandle )
+	if ( texture == CH_INVALID_HANDLE )
 		return;
 
 	Log_Msg( gLC_Steam, "Loaded Steam Avatar\n" );

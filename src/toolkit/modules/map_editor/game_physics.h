@@ -21,9 +21,9 @@ enum EPhysTransformMode : u8
 IPhysicsEnvironment*      GetPhysEnv();
 
 // TODO: when physics materials are implemented, split up models by their physics material
-void                      Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData );
-void                      Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris );
-void                      Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData );
+void                      Phys_GetModelVerts( ch_handle_t sModel, PhysDataConvex_t& srData );
+void                      Phys_GetModelTris( ch_handle_t sModel, std::vector< PhysTriangle_t >& srTris );
+void                      Phys_GetModelInd( ch_handle_t sModel, PhysDataConcave_t& srData );
 
 void                      Phys_Init();
 void                      Phys_Shutdown();

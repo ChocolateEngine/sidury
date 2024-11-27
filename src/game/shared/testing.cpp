@@ -36,7 +36,7 @@ CONVAR_FLOAT_EXT( phys_friction );
 CONVAR_FLOAT_EXT( cl_view_height );
 
 // Audio Channels
-Handle                        hAudioMusic = InvalidHandle;
+ch_handle_t                        hAudioMusic = CH_INVALID_HANDLE;
 
 // testing
 std::vector< Entity >         gAudioTestEntitiesCl{};
@@ -137,7 +137,7 @@ class ProtogenSystem : public IEntityComponentSystem
 		}
 		else
 		{
-			renderable->aRenderable = InvalidHandle;
+			renderable->aRenderable = CH_INVALID_HANDLE;
 		}
 #endif
 	}
@@ -192,7 +192,7 @@ void CreateProtogen_f( const std::string& path )
 
 	Ent_AddComponent( proto, "protogen" );
 
-	// Handle       model          = graphics->LoadModel( path );
+	// ch_handle_t       model          = graphics->LoadModel( path );
 
 	CRenderable* renderable     = Ent_AddComponent< CRenderable >( proto, "renderable" );
 	renderable->aPath           = path;
@@ -231,7 +231,7 @@ void CreatePhysEntity( const std::string& path )
 #if 0
 	Entity         physEnt    = Entity_CreateEntity();
 
-	Handle         model      = graphics->LoadModel( path );
+	ch_handle_t         model      = graphics->LoadModel( path );
 
 	CRenderable_t& renderComp = Entity_AddComponent< CRenderable_t >( physEnt );
 	renderComp.aHandle        = graphics->CreateRenderable( model );
@@ -427,7 +427,7 @@ void TEST_EntUpdate()
 
 		if ( Renderable_t* renderable = graphics->GetRenderableData( renderComp.aHandle ) )
 		{
-			if ( renderable->aModel == InvalidHandle )
+			if ( renderable->aModel == CH_INVALID_HANDLE )
 				continue;
 
 			// Model *physObjList = &Entity_GetComponent< Model >( ent );
@@ -547,18 +547,18 @@ void TEST_CL_UpdateProtos( float frameTime )
 			continue;
 
 		// I have to do this here, and not in ComponentAdded(), because modelPath may not added yet
-		if ( renderComp->aRenderable == InvalidHandle )
+		if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 		{
-			if ( renderComp->aModel == InvalidHandle )
+			if ( renderComp->aModel == CH_INVALID_HANDLE )
 			{
 				if ( renderComp->aPath.Get().empty() )
 
 				renderComp->aModel = graphics->LoadModel( renderComp->aPath );
-				if ( renderComp->aModel == InvalidHandle )
+				if ( renderComp->aModel == CH_INVALID_HANDLE )
 					continue;
 			}
 
-			Handle        renderable = graphics->CreateRenderable( renderComp->aModel );
+			ch_handle_t        renderable = graphics->CreateRenderable( renderComp->aModel );
 			Renderable_t* renderData = graphics->GetRenderableData( renderable );
 
 			if ( !renderData )
@@ -634,19 +634,19 @@ void TEST_SV_UpdateProtos( float frameTime )
 				if ( Entity_GetEntityCount() > 2 )
 				{
 					while ( protoLook.aLookTarget == 0 || protoLook.aLookTarget == proto )
-						protoLook.aLookTarget = RandomInt( 0, Entity_GetEntityCount() - 1 );
+						protoLook.aLookTarget = rand_int( 0, Entity_GetEntityCount() - 1 );
 				}
 			}
 			else
 			{
-				auto randIt           = std::next( std::begin( gServerData.aClientIDs ), RandomInt( 0, gServerData.aClientIDs.size() - 1 ) );
+				auto randIt           = std::next( std::begin( gServerData.aClientIDs ), rand_int( 0, gServerData.aClientIDs.size() - 1 ) );
 				protoLook.aLookTarget = SV_GetPlayerEnt( randIt->first );
 
 				if ( protoLook.aLookTarget == CH_ENT_INVALID )
 					continue;
 			}
 
-			protoLook.aTimeToDuel    = RandomFloat( proto_swap_target_sec_min, proto_swap_target_sec_max );
+			protoLook.aTimeToDuel    = rand_float( proto_swap_target_sec_min, proto_swap_target_sec_max );
 			protoLook.aTimeToDuelCur = 0.f;
 			targetChanged            = true;
 		}
@@ -703,7 +703,7 @@ void TEST_SV_UpdateProtos( float frameTime )
 			if ( targetChanged )
 			{
 				protoLook.aStartAng    = protoTransform->aAng;
-				protoLook.aTurnEndTime = RandomFloat( proto_swap_turn_time_min, proto_swap_turn_time_max );
+				protoLook.aTurnEndTime = rand_float( proto_swap_turn_time_min, proto_swap_turn_time_max );
 				protoLook.aTurnCurTime = 0.f;
 
 				// Make sure we don't suddenly want to look at something else while midway through turning to look at something
@@ -782,7 +782,7 @@ static void cmd_sound_test( const std::string& srPath, bool sServer )
 	if ( !audio )
 		return;
 
-	Handle soundHandle = audio->OpenSound( srPath );
+	ch_handle_t soundHandle = audio->OpenSound( srPath );
 
 	if ( soundHandle == CH_INVALID_HANDLE )
 		return;

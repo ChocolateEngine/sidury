@@ -1,5 +1,5 @@
 #include "launcher_base.h"
-#include "util.h"
+#include "core/util.h"
 #include <stdio.h>
 #include <string>
 
@@ -7,23 +7,15 @@
   #include "mimalloc-new-delete.h"
 #endif
 
-#ifdef _WIN32
-  #include <Windows.h>
-  #include <direct.h>
-#endif
-
-#ifdef __unix__
-  #include <string.h>
-  #include <unistd.h>
-  #include <dlfcn.h>	
-#endif /* __unix __  */
-
-Module core = 0;
+Module core  = 0;
 Module imgui = 0;
-Module client = 0;
+Module app   = 0;
 
 
 #ifdef _WIN32
+#include <Windows.h>
+#include <direct.h>
+
 Module sys_load_library( const char* path )
 {
 	return (Module)LoadLibraryA( path );
@@ -72,10 +64,13 @@ const char* sys_get_error()
 }
 
 #elif __unix__
+#include <string.h>
+#include <unistd.h>
+#include <dlfcn.h>	
 
 Module sys_load_library( const char* path )
 {
-	return (Module)dlopen( path, RTLD_LAZY );
+	return (Module)dlopen( path, RTLD_NOW );
 }
 
 void sys_close_library( Module mod )
@@ -105,20 +100,50 @@ void unload_objects()
 {
 	if ( core ) sys_close_library( core );
 	if ( imgui ) sys_close_library( imgui );
-	if ( client ) sys_close_library( client );
+	if ( app ) sys_close_library( app );
 }
 
 
-int load_object( Module* mod, const char* path )
+bool load_object( Module* mod, const char* path )
 {
 	if ( *mod = sys_load_library( path ) )
-		return 0;
+		return true;
 
 	fprintf( stderr, "Failed to load %s: %s\n", path, sys_get_error() );
 	unload_objects();
 
-	return -1;
+	return false;
 }
+
+
+void* load_func( Module module, const char* name )
+{
+	void* func = sys_load_func( module, name );
+	if ( !func )
+	{
+		fprintf( stderr, "Error Loading Function \"%s\": %s\n", name, sys_get_error() );
+		unload_objects();
+		return nullptr;
+	}
+
+	return func;
+}
+
+
+// hmmm, this does work, but should i use it...
+// bool load_func2( auto& func, Module module, const char* name )
+// {
+// 	func = sys_load_func( module, name );
+// 	if ( !func )
+// 	{
+// 		fprintf( stderr, "Error Loading Function \"%s\": %s\n", name, sys_get_error() );
+// 		unload_objects();
+// 		return false;
+// 	}
+// 
+// 	return func;
+// }
+
 
 #if CH_USE_MIMALLOC
 // ensure mimalloc is loaded
@@ -140,58 +165,28 @@ static ForceMiMalloc_t forceMiMalloc;
 #endif
 
 
-// This adds a DLL search path, so i can store all dll's in the bin/win64 folder, instead of having dependency dlls in the root folder
-void set_search_directory()
+int start( int argc, char *argv[], const char* app_path, const char* module_name )
 {
-#ifdef _WIN32
-	// TODO: this won't work if the exe is run from a different directory
-	// we need to get the path of the exe and use that
-	char* cwd = getcwd( 0, 0 );
-
-	char  path[ 512 ] = {};
-	strcat( path, cwd );
-	strcat( path, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER );
-
-	auto ret = SetDllDirectoryA( path );
-#endif
-}
-
-
-int start( int argc, char *argv[], const char* spGameName, const char* spModuleName )
-{
-	set_search_directory();
-
-	int  ( *app_init )()                                                         = 0;
-	int  ( *core_init )( int argc, char* argv[], const char* desiredWorkingDir ) = 0;
-	void ( *core_exit )( bool writeArchive )                                     = 0;
-
-	//if ( load_object( &sdl2, "bin/" CH_PLAT_FOLDER "/SDL2" EXT_DLL ) == -1 )
-	//	return -1;
+	int  ( *app_init )()                                                = 0;
+	int  ( *core_init )( int argc, char* argv[], const char* app_path ) = 0;
+	void ( *core_exit )( bool write_archive )                           = 0;
 
 	if ( load_object( &core, "bin/" CH_PLAT_FOLDER "/ch_core" EXT_DLL ) == -1 )
 		return -1;
 
 	if ( load_object( &imgui, "bin/" CH_PLAT_FOLDER "/imgui" EXT_DLL ) == -1 )
-		return -1;
+		return -2;
 
-	*(void**)( &core_init ) = sys_load_func( core, "core_init" );
+	*(void**)( &core_init ) = load_func( core, "core_init" );
 	if ( !core_init )
-	{
-		fprintf( stderr, "Error: %s\n", sys_get_error() );
-		unload_objects();
-		return -1;
-	}
+		return -3;
 
-	*(void**)( &core_exit ) = sys_load_func( core, "core_exit" );
+	*(void**)( &core_exit ) = load_func( core, "core_exit" );
 	if ( !core_exit )
-	{
-		fprintf( stderr, "Error: %s\n", sys_get_error() );
-		unload_objects();
-		return -1;
-	}
+		return -4;
 
-	// MUST LOAD THIS FIRST TO REGISTER LAUNCH ARGUMENTS
-	int core_ret = core_init( argc, argv, spGameName );
+	// MUST LOAD THIS FIRST BEFORE THE APP'S DLL TO REGISTER LAUNCH ARGUMENTS, AND PREPARE EVERYTHING ELSE
+	int core_ret = core_init( argc, argv, app_path );
 
 	// Failed to initialize core systems
 	if ( core_ret != 0 )
@@ -201,34 +196,26 @@ int start( int argc, char *argv[], const char* spGameName, const char* spModuleN
 		return core_ret;
 	}
 
-	char name[ 512 ] = {};
-
-	// TODO: remove path change in core_init()
-#if _WIN32
-	strcat( name, ".." CH_PATH_SEP_STR ".." CH_PATH_SEP_STR );
-#else
-	strcat( name, ".." CH_PATH_SEP_STR );
-#endif
-
-	strcat( name, spGameName );
-	strcat( name, CH_PATH_SEP_STR "bin" CH_PATH_SEP_STR CH_PLAT_FOLDER CH_PATH_SEP_STR );
-	strcat( name, spModuleName );
-	strcat( name, EXT_DLL );
-
-	if ( load_object( &client, name ) == -1 )
-		return -1;
-
-	// if ( load_object( &client, "bin/" CH_PLAT_FOLDER "/client" EXT_DLL ) == -1 )
-	// 	return -1;
-
-	*(void**)( &app_init ) = sys_load_func( client, "app_init" );
-	if ( !app_init )
+	// Now we can load the app module
 	{
-		fprintf( stderr, "Error: %s\n", sys_get_error() );
-		unload_objects();
-		return -1;
+		char name[ 512 ] = {};
+		
+		strcat( name, "../" );  // account for the path change in core_init()
+		strcat( name, app_path );
+		strcat( name, "/bin/" CH_PLAT_FOLDER "/" );
+		strcat( name, module_name );
+		strcat( name, EXT_DLL );
+
+		if ( load_object( &app, name ) == -1 )
+			return -5;
 	}
 
+	// grab the init function from the app
+	*(void**)( &app_init ) = load_func( app, "app_init" );
+	if ( !app_init )
+		return -6;
+
+	// finally run the app
 	int app_ret = app_init();
 	core_exit( app_ret == 0 );
 

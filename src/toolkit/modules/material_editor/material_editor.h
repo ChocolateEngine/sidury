@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "system.h"
 #include "itool.h"
 
 struct ViewportCamera_t;
@@ -83,13 +82,13 @@ extern MaterialEditor gMatEditorTool;
 void                  MaterialEditor_Draw( glm::uvec2 sOffset );
 
 bool                  MaterialEditor_LoadMaterial( const std::string& path );
-void                  MaterialEditor_FreeMaterial( ChHandle_t mat );
-void                  MaterialEditor_CloseMaterial( ChHandle_t mat );
+void                  MaterialEditor_FreeMaterial( ch_handle_t mat );
+void                  MaterialEditor_CloseMaterial( ch_handle_t mat );
 void                  MaterialEditor_CloseActiveMaterial();
 void                  MaterialEditor_FreeImGuiTextures();
 
-void                  MaterialEditor_SetActiveMaterial( ChHandle_t sMat );
-ChHandle_t            MaterialEditor_GetActiveMaterial();
+void                  MaterialEditor_SetActiveMaterial( ch_handle_t sMat );
+ch_handle_t            MaterialEditor_GetActiveMaterial();
 
 void                  MaterialEditor_Init();
 void                  MaterialEditor_Close();

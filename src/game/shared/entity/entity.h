@@ -580,7 +580,7 @@ class EntityComponentPool
 	// Memory Pool of Components
 	// This is an std::array so that when a component is freed, it does not changes the index of each component
 	// TODO: I DON'T LIKE THIS, TAKES UP TOO MUCH MEMORY
-	// maybe use Handle's from ResourceList<> instead, as it uses a memory pool?
+	// maybe use ch_handle_t's from ResourceList<> instead, as it uses a memory pool?
 	std::array< void*, CH_MAX_ENTITIES >             aComponents{};
 
 	// Component Flags, just uses Entity Flags for now
@@ -661,7 +661,7 @@ struct EntityEventListener_t
 // 
 // 	EEntityFlag aFlags;
 // 	Entity      aParent;
-// 	std::string aName;
+// 	std::string name;
 // ;
 
 
@@ -818,13 +818,13 @@ void                    Entity_GetEntitiesByName( std::string_view sName, ChVect
 // // If CH_ENT_INVALID is passed in, it will listen globally for this event
 // // If an entity is passed in, it will only listen for events from that entity
 // // We also pass in the component name to avoid event name clashing
-// Handle                  Entity_AddEventListener( Entity sEntity, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+// ch_handle_t                  Entity_AddEventListener( Entity sEntity, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
 //
 // // Same as above, but with an entity name
-// Handle                  Entity_AddEventListener( std::string_view sEntityName, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
+// ch_handle_t                  Entity_AddEventListener( std::string_view sEntityName, std::string_view sComponent, std::string_view sEvent, FEntSys_EventListener* spCallback );
 //
 // // how tf will this work, will AddEventListener return a handle? idfk
-// void                    Entity_RemoveEventListener( Handle sListenerHandle );
+// void                    Entity_RemoveEventListener( ch_handle_t sListenerHandle );
 
 
 inline void*  Ent_AddComponent( Entity sEnt, const char* spName )
@@ -1265,8 +1265,8 @@ struct CRenderable
 	ComponentNetVar< bool >        aCastShadow = true;
 	ComponentNetVar< bool >        aVisible    = true;
 
-	Handle                         aModel      = InvalidHandle;
-	Handle                         aRenderable = InvalidHandle;
+	ch_handle_t                         aModel      = CH_INVALID_HANDLE;
+	ch_handle_t                         aRenderable = CH_INVALID_HANDLE;
 };
 
 
@@ -1274,7 +1274,7 @@ struct CRenderable
 struct CLight
 {
 	ComponentNetVar< ELightType > aType = ELightType_Directional;
-	ComponentNetVar< glm::vec4 >  aColor{};
+	ComponentNetVar< glm::vec4 >  color{};
 	ComponentNetVar< glm::vec3 >  aPos{};
 	ComponentNetVar< glm::quat >  aRot{};
 	ComponentNetVar< float >      aInnerFov     = 45.f;
@@ -1426,7 +1426,7 @@ struct CHealth
 
 
 // Helper Functions
-Handle        Ent_GetRenderableHandle( Entity sEntity );
+ch_handle_t        Ent_GetRenderableHandle( Entity sEntity );
 
 Renderable_t* Ent_GetRenderable( Entity sEntity );
 
@@ -1435,7 +1435,7 @@ Renderable_t* Ent_CreateRenderable( Entity sEntity );
 
 #if 0
 // This version has an option to enter a model handle
-inline Renderable_t* Ent_CreateRenderable( Entity sEntity, Handle sModel )
+inline Renderable_t* Ent_CreateRenderable( Entity sEntity, ch_handle_t sModel )
 {
 	auto renderComp = Ent_GetComponent< CRenderable >( sEntity, "renderable" );
 
@@ -1448,11 +1448,11 @@ inline Renderable_t* Ent_CreateRenderable( Entity sEntity, Handle sModel )
 	// TODO: CHECK IF renderComp->aModel is different, and handle that
 
 	// I hate this so much
-	if ( renderComp->aRenderable == InvalidHandle )
+	if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 	{
 		renderComp->aModel      = sModel;
 		renderComp->aRenderable = Graphics_CreateRenderable( sModel );
-		if ( renderComp->aRenderable == InvalidHandle )
+		if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 		{
 			Log_Error( "Failed to create renderable\n" );
 			return nullptr;

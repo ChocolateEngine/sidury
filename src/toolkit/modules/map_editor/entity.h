@@ -22,13 +22,13 @@ struct Color3
 // not sure i really need much of a component system for an editor
 struct Entity_t
 {
-	ch_string          aName;
+	ch_string          name;
 
 	Transform          aTransform;
 
 	// Rendering
-	ChHandle_t         aModel;
-	ChHandle_t         aRenderable;
+	ch_handle_t         aModel;
+	ch_handle_t         aRenderable;
 	bool               aHidden;
 
 	// Physics
@@ -38,7 +38,7 @@ struct Entity_t
 	// Lighting
 	bool               aLightEnabled;
 	Light_t*           apLight;
-	ChHandle_t         aLightRenderable;
+	ch_handle_t         aLightRenderable;
 
 	// Audio
 
@@ -58,39 +58,39 @@ bool                                                Entity_Init();
 void                                                Entity_Shutdown();
 void                                                Entity_Update();
 
-ChHandle_t                                          Entity_Create();
-void                                                Entity_Delete( ChHandle_t sHandle );
+ch_handle_t                                          Entity_Create();
+void                                                Entity_Delete( ch_handle_t sHandle );
 
-Entity_t*                                           Entity_GetData( ChHandle_t sHandle );
-const std::vector< ChHandle_t >&                    Entity_GetHandleList();
+Entity_t*                                           Entity_GetData( ch_handle_t sHandle );
+const std::vector< ch_handle_t >&                    Entity_GetHandleList();
 
-void                                                Entity_SetName( ChHandle_t sHandle, const char* name, s64 nameLen = -1 );
+void                                                Entity_SetName( ch_handle_t sHandle, const char* name, s64 nameLen = -1 );
 
-void                                                Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible );
-void                                                Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible );
-void                                                Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool sVisible );
+void                                                Entity_SetEntityVisible( ch_handle_t sEntity, bool sVisible );
+void                                                Entity_SetEntitiesVisible( ch_handle_t* sEntities, u32 sCount, bool sVisible );
+void                                                Entity_SetEntitiesVisibleNoChild( ch_handle_t* sEntities, u32 sCount, bool sVisible );
 
 // Do an update on these entities
-void                                                Entity_SetEntitiesDirty( ChHandle_t* sEntities, u32 sCount );
+void                                                Entity_SetEntitiesDirty( ch_handle_t* sEntities, u32 sCount );
 
 // Get the highest level parent for this entity, returns self if not parented
-ChHandle_t                                          Entity_GetRootParent( ChHandle_t sSelf );
+ch_handle_t                                          Entity_GetRootParent( ch_handle_t sSelf );
 
 // Recursively get all entities attached to this one (SLOW)
-void                                                Entity_GetChildrenRecurse( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren );
-void                                                Entity_GetChildrenRecurse( ChHandle_t sEntity, std::unordered_set< ChHandle_t >& srChildren );
+void                                                Entity_GetChildrenRecurse( ch_handle_t sEntity, ChVector< ch_handle_t >& srChildren );
+void                                                Entity_GetChildrenRecurse( ch_handle_t sEntity, std::unordered_set< ch_handle_t >& srChildren );
 
 // Get child entities attached to this one (SLOW)
-void                                                Entity_GetChildren( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren );
+void                                                Entity_GetChildren( ch_handle_t sEntity, ChVector< ch_handle_t >& srChildren );
 
-// bool                          Entity_IsParented( ChHandle_t sEntity );
-ChHandle_t                                          Entity_GetParent( ChHandle_t sEntity );
-void                                                Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent );
+// bool                          Entity_IsParented( ch_handle_t sEntity );
+ch_handle_t                                          Entity_GetParent( ch_handle_t sEntity );
+void                                                Entity_SetParent( ch_handle_t sEntity, ch_handle_t sParent );
 
 // [ child ] = parent
-const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap();
+const std::unordered_map< ch_handle_t, ch_handle_t >& Entity_GetParentMap();
 
 // Returns a Model Matrix with parents applied in world space
-void                                                Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity );
+void                                                Entity_GetWorldMatrix( glm::mat4& srMat, ch_handle_t sEntity );
 
 

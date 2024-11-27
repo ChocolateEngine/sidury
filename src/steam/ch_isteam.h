@@ -4,7 +4,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "system.h"
 
 
 using SteamID64_t = u64;
@@ -23,7 +22,7 @@ enum ESteamAvatarSize
 class ISteamToGame
 {
   public:
-	virtual void OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, Handle sAvatar ) = 0;
+	virtual void OnRequestAvatarImage( SteamID64_t sSteamID, ESteamAvatarSize sSize, ch_handle_t sAvatar ) = 0;
 	virtual void OnRequestProfileName( SteamID64_t sSteamID, const char* spName ) = 0;
 };
 

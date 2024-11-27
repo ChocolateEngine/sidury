@@ -5,20 +5,20 @@
 #define NAME_LEN 64
 
 
-LOG_REGISTER_CHANNEL2( Entity, LogColor::DarkPurple );
+LOG_CHANNEL_REGISTER( Entity, ELogColor_DarkPurple );
 
 
 static ResourceList< Entity_t >                      gEntityList;
-static std::unordered_set< ChHandle_t >              gEntityDirtyList;
-static std::unordered_map< ChHandle_t, glm::mat4 >   gEntityWorldMatrices;
+static std::unordered_set< ch_handle_t >              gEntityDirtyList;
+static std::unordered_map< ch_handle_t, glm::mat4 >   gEntityWorldMatrices;
 
 // Entity Parents
 // [ child ] = parent
-static std::unordered_map< ChHandle_t, ChHandle_t >  gEntityParents;
+static std::unordered_map< ch_handle_t, ch_handle_t >  gEntityParents;
 // static std::unordered_set< glm::vec3 >               gUsedColors;
 
 
-void Entity_CalcWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity );
+void Entity_CalcWorldMatrix( glm::mat4& srMat, ch_handle_t sEntity );
 
 
 bool Entity_Init()
@@ -37,8 +37,8 @@ void Entity_Update()
 {
 	// update renderables
 
-	// for ( ChHandle_t entityHandle : gEntityList.aHandles )
-	for ( ChHandle_t entityHandle : gEntityDirtyList )
+	// for ( ch_handle_t entityHandle : gEntityList.aHandles )
+	for ( ch_handle_t entityHandle : gEntityDirtyList )
 	{
 		Entity_t* ent = nullptr;
 		if ( !gEntityList.Get( entityHandle, &ent ) )
@@ -76,7 +76,7 @@ void Entity_Update()
 }
 
 
-ChHandle_t Entity_Create()
+ch_handle_t Entity_Create()
 {
 	EditorContext_t* context = Editor_GetContext();
 
@@ -84,7 +84,7 @@ ChHandle_t Entity_Create()
 		return CH_INVALID_HANDLE;
 
 	Entity_t* ent = nullptr;
-	ChHandle_t entHandle = gEntityList.Create( &ent );
+	ch_handle_t entHandle = gEntityList.Create( &ent );
 
 	if ( entHandle == CH_INVALID_HANDLE )
 		return CH_INVALID_HANDLE;
@@ -95,8 +95,8 @@ ChHandle_t Entity_Create()
 
 	context->aMap.aMapEntities.push_back( entHandle );
 
-	ent->aName = ch_str_copy_f( "Entity %zd", entHandle );
-	if ( ent->aName.data == nullptr )
+	ent->name = ch_str_copy_f( "Entity %zd", entHandle );
+	if ( ent->name.data == nullptr )
 	{
 		Log_Error( "Failed to allocate memory for entity name\n" );
 		Entity_Delete( entHandle );
@@ -104,9 +104,9 @@ ChHandle_t Entity_Create()
 	}
 
 	// Pick a random color for it
-	ent->aSelectColor[ 0 ] = RandomU8( 0, 255 );
-	ent->aSelectColor[ 1 ] = RandomU8( 0, 255 );
-	ent->aSelectColor[ 2 ] = RandomU8( 0, 255 );
+	ent->aSelectColor[ 0 ] = rand_u8( 0, 255 );
+	ent->aSelectColor[ 1 ] = rand_u8( 0, 255 );
+	ent->aSelectColor[ 2 ] = rand_u8( 0, 255 );
 
 	ent->aLightEnabled     = true;
 
@@ -119,7 +119,7 @@ ChHandle_t Entity_Create()
 }
 
 
-void Entity_Delete( ChHandle_t sHandle )
+void Entity_Delete( ch_handle_t sHandle )
 {
 	// TODO: queue this for deletion, like in the game? or is that not needed here
 
@@ -142,11 +142,11 @@ void Entity_Delete( ChHandle_t sHandle )
 	// remove the world matrix
 	gEntityWorldMatrices.erase( sHandle );
 
-	if ( ent->aName.data )
+	if ( ent->name.data )
 	{
-		ch_str_free( ent->aName.data );
-		ent->aName.data = nullptr;
-		ent->aName.size = 0;
+		ch_str_free( ent->name.data );
+		ent->name.data = nullptr;
+		ent->name.size = 0;
 	}
 
 	// Check if this entity has a light on it
@@ -168,11 +168,11 @@ void Entity_Delete( ChHandle_t sHandle )
 	}
 
 	// Clear Parent and Children
-	ChVector< ChHandle_t > children;
+	ChVector< ch_handle_t > children;
 	Entity_GetChildrenRecurse( sHandle, children );
 
 	// Mark all of them as destroyed
-	for ( ChHandle_t child : children )
+	for ( ch_handle_t child : children )
 	{
 		Entity_Delete( child );
 		Log_DevF( gLC_Entity, 2, "Deleting Child Entity (parent %zd): %zd\n", sHandle, child );
@@ -205,7 +205,7 @@ void Entity_Delete( ChHandle_t sHandle )
 }
 
 
-Entity_t* Entity_GetData( ChHandle_t sHandle )
+Entity_t* Entity_GetData( ch_handle_t sHandle )
 {
 	Entity_t* ent = nullptr;
 
@@ -219,13 +219,13 @@ Entity_t* Entity_GetData( ChHandle_t sHandle )
 }
 
 
-const std::vector< ChHandle_t > &Entity_GetHandleList()
+const std::vector< ch_handle_t > &Entity_GetHandleList()
 {
 	return gEntityList.aHandles;
 }
 
 
-void Entity_SetName( ChHandle_t sHandle, const char* name, s64 nameLen )
+void Entity_SetName( ch_handle_t sHandle, const char* name, s64 nameLen )
 {
 	Entity_t* ent = nullptr;
 
@@ -244,11 +244,11 @@ void Entity_SetName( ChHandle_t sHandle, const char* name, s64 nameLen )
 	if ( nameLen == 0 )
 		return;
 
-	ent->aName = ch_str_realloc( ent->aName.data, name, nameLen );
+	ent->name = ch_str_realloc( ent->name.data, name, nameLen );
 }
 
 
-void Entity_SetEntityVisible( ChHandle_t sEntity, bool sVisible )
+void Entity_SetEntityVisible( ch_handle_t sEntity, bool sVisible )
 {
 	Entity_t* ent = nullptr;
 
@@ -302,7 +302,7 @@ inline void Entity_SetEntitiesVisibleBase( Entity_t** entity_list, u32 count, bo
 
 		if ( ent->apLight )
 		{
-			ent->apLight->aEnabled != visible;
+			ent->apLight->aEnabled = visible;
 			graphics->UpdateLight( ent->apLight );
 		}
 
@@ -326,11 +326,11 @@ inline void Entity_SetEntitiesVisibleBase( Entity_t** entity_list, u32 count, bo
 }
 
 
-void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible )
+void Entity_SetEntitiesVisible( ch_handle_t* sEntities, u32 sCount, bool sVisible )
 {
-	Entity_t**                       entity_list = ch_malloc_count< Entity_t* >( sCount );
+	Entity_t**                       entity_list = ch_malloc< Entity_t* >( sCount );
 	u32                              new_count   = 0;
-	std::unordered_set< ChHandle_t > child_entities; 
+	std::unordered_set< ch_handle_t > child_entities; 
 
 	for ( u32 i = 0; i < sCount; i++ )
 	{
@@ -354,7 +354,7 @@ void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible
 
 	if ( child_entities.size() )
 	{
-		Entity_t** entity_list_new = ch_realloc_count< Entity_t* >( entity_list, sCount + child_entities.size() );
+		Entity_t** entity_list_new = ch_realloc< Entity_t* >( entity_list, sCount + child_entities.size() );
 		
 		if ( entity_list_new == nullptr )
 		{
@@ -365,7 +365,7 @@ void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible
 
 		entity_list = entity_list_new;
 
-		for ( const ChHandle_t& ent_handle : child_entities )
+		for ( const ch_handle_t& ent_handle : child_entities )
 		{
 			if ( !gEntityList.Get( ent_handle, &entity_list[ new_count ] ) )
 			{
@@ -391,7 +391,7 @@ void Entity_SetEntitiesVisible( ChHandle_t* sEntities, u32 sCount, bool sVisible
 }
 
 
-void Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool sVisible )
+void Entity_SetEntitiesVisibleNoChild( ch_handle_t* sEntities, u32 sCount, bool sVisible )
 {
 	// Entity_t** entity_list = ch_stack_alloc< Entity_t* >( sCount );
 	Entity_t** entity_list = ch_malloc< Entity_t* >( sCount );
@@ -420,7 +420,7 @@ void Entity_SetEntitiesVisibleNoChild( ChHandle_t* sEntities, u32 sCount, bool s
 }
 
 
-void Entity_SetEntitiesDirty( ChHandle_t* sEntities, u32 sCount )
+void Entity_SetEntitiesDirty( ch_handle_t* sEntities, u32 sCount )
 {
 	for ( u32 i = 0; i < sCount; i++ )
 	{
@@ -433,7 +433,7 @@ void Entity_SetEntitiesDirty( ChHandle_t* sEntities, u32 sCount )
 
 
 // Get the highest level parent for this entity, returns self if not parented
-ChHandle_t Entity_GetRootParent( ChHandle_t sSelf )
+ch_handle_t Entity_GetRootParent( ch_handle_t sSelf )
 {
 	PROF_SCOPE();
 
@@ -447,7 +447,7 @@ ChHandle_t Entity_GetRootParent( ChHandle_t sSelf )
 
 
 // Recursively get all entities attached to this one (SLOW)
-void Entity_GetChildrenRecurse( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren )
+void Entity_GetChildrenRecurse( ch_handle_t sEntity, ChVector< ch_handle_t >& srChildren )
 {
 	PROF_SCOPE();
 
@@ -464,7 +464,7 @@ void Entity_GetChildrenRecurse( ChHandle_t sEntity, ChVector< ChHandle_t >& srCh
 
 
 // Recursively get all entities attached to this one (SLOW)
-void Entity_GetChildrenRecurse( ChHandle_t sEntity, std::unordered_set< ChHandle_t >& srChildren )
+void Entity_GetChildrenRecurse( ch_handle_t sEntity, std::unordered_set< ch_handle_t >& srChildren )
 {
 	PROF_SCOPE();
 
@@ -481,7 +481,7 @@ void Entity_GetChildrenRecurse( ChHandle_t sEntity, std::unordered_set< ChHandle
 
 
 // Get child entities attached to this one (SLOW)
-void Entity_GetChildren( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren )
+void Entity_GetChildren( ch_handle_t sEntity, ChVector< ch_handle_t >& srChildren )
 {
 	PROF_SCOPE();
 
@@ -495,7 +495,7 @@ void Entity_GetChildren( ChHandle_t sEntity, ChVector< ChHandle_t >& srChildren 
 }
 
 
-bool Entity_IsParented( ChHandle_t sEntity )
+bool Entity_IsParented( ch_handle_t sEntity )
 {
 	if ( sEntity == CH_INVALID_HANDLE )
 		return false;
@@ -508,7 +508,7 @@ bool Entity_IsParented( ChHandle_t sEntity )
 }
 
 
-ChHandle_t Entity_GetParent( ChHandle_t sEntity )
+ch_handle_t Entity_GetParent( ch_handle_t sEntity )
 {
 	if ( sEntity == CH_INVALID_HANDLE )
 		return CH_INVALID_HANDLE;
@@ -521,7 +521,7 @@ ChHandle_t Entity_GetParent( ChHandle_t sEntity )
 }
 
 
-void Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent )
+void Entity_SetParent( ch_handle_t sEntity, ch_handle_t sParent )
 {
 	if ( sEntity == CH_INVALID_HANDLE || sEntity == sParent )
 		return;
@@ -552,7 +552,7 @@ void Entity_SetParent( ChHandle_t sEntity, ChHandle_t sParent )
 }
 
 
-const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap()
+const std::unordered_map< ch_handle_t, ch_handle_t >& Entity_GetParentMap()
 {
 	return gEntityParents;
 }
@@ -560,11 +560,11 @@ const std::unordered_map< ChHandle_t, ChHandle_t >& Entity_GetParentMap()
 
 // Returns a Model Matrix with parents applied in world space
 // TODO: Cache this
-void Entity_CalcWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
+void Entity_CalcWorldMatrix( glm::mat4& srMat, ch_handle_t sEntity )
 {
 	PROF_SCOPE();
 
-	ChHandle_t parent = Entity_GetParent( sEntity );
+	ch_handle_t parent = Entity_GetParent( sEntity );
 	glm::mat4  parentMat( 1.f );
 
 	if ( parent != CH_INVALID_HANDLE )
@@ -619,7 +619,7 @@ void Entity_CalcWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 }
 
 
-void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
+void Entity_GetWorldMatrix( glm::mat4& srMat, ch_handle_t sEntity )
 {
 	// Is this entity in the dirty list?
 	auto it = gEntityDirtyList.find( sEntity );
@@ -646,7 +646,7 @@ void Entity_GetWorldMatrix( glm::mat4& srMat, ChHandle_t sEntity )
 
 #if 0
 
-ChHandle_t Entity_Create()
+ch_handle_t Entity_Create()
 {
 	EditorContext_t* context = Editor_GetContext();
 
@@ -658,7 +658,7 @@ ChHandle_t Entity_Create()
 }
 
 
-void Entity_Delete( ChHandle_t sHandle )
+void Entity_Delete( ch_handle_t sHandle )
 {
 	Entity_t*        ent = nullptr;
 

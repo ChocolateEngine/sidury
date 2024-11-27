@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/core.h"
-#include "system.h"
 #include "game_physics.h"
 #include "entity/entity.h"
 

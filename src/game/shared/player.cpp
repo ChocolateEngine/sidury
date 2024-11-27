@@ -1,6 +1,6 @@
 #include "main.h"
 #include "player.h"
-#include "util.h"
+#include "core/util.h"
 
 #include "igui.h"
 #include "iinput.h"
@@ -291,7 +291,7 @@ CH_STRUCT_REGISTER_COMPONENT( CPlayerSpawn, playerSpawn, EEntComponentNetType_Se
 void PlayerManager::RegisterComponents()
 {
 	// CH_REGISTER_COMPONENT_FL( CPlayerInfo, playerInfo, EEntComponentNetType_Both, ECompRegFlag_None );
-	// // CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, aName, name );
+	// // CH_REGISTER_COMPONENT_VAR( CPlayerInfo, std::string, name, name );
 	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aCamera, camera, ECompRegFlag_None );
 	// CH_REGISTER_COMPONENT_VAR_EX( CPlayerInfo, EEntNetField_Entity, Entity, aFlashlight, flashlight, ECompRegFlag_None );
 	// CH_REGISTER_COMPONENT_VAR( CPlayerInfo, bool, aIsLocalPlayer, isLocalPlayer, ECompRegFlag_None );  // don't mess with this
@@ -433,7 +433,7 @@ void PlayerManager::Create( Entity player )
 
 	health->aHealth = 100;
 
-	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->aName.c_str() );
+	Log_MsgF( "Server Creating Player Entity: \"%s\"\n", client->name.c_str() );
 
 	// Lets create local entities for the camera and the flashlight, so they have their own unique transform in local space
 	// And we parent them to the player
@@ -460,8 +460,8 @@ void PlayerManager::Create( Entity player )
 	flashlight->aType          = ELightType_Cone;
 	flashlight->aInnerFov      = 0.f;
 	flashlight->aOuterFov      = 45.f;
-	// flashlight->aColor    = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
-	flashlight->aColor.Edit()  = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
+	// flashlight->color    = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+	flashlight->color.Edit()  = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
 	// ------------------------------------------------------------------------------
 	// Setup Physics Shapes
@@ -657,8 +657,8 @@ void Player_UpdateFlashlight( Entity player, bool sToggle )
 
 	if ( flashlight->aEnabled )
 	{
-		// flashlight->aColor = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
-		flashlight->aColor.Edit() = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
+		// flashlight->color = { r_flashlight_brightness, r_flashlight_brightness, r_flashlight_brightness };
+		flashlight->color.Edit() = { r_flashlight_color.x, r_flashlight_color.y, r_flashlight_color.z, r_flashlight_brightness };
 
 		if ( !r_flashlight_lock )
 		{
@@ -699,7 +699,7 @@ void PlayerManager::Update( float frameTime )
 			continue;
 
 		PROF_SCOPE_NAMED( "Player" );
-		CH_PROF_ZONE_TEXT( client->aName.c_str(), client->aName.size() );
+		CH_PROF_ZONE_TEXT( client->name.c_str(), client->name.size() );
 
 		UserCmd_t& userCmd    = client->aUserCmd;
 
@@ -803,20 +803,20 @@ void PlayerManager::UpdateLocalPlayer()
 			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
 
 			// I hate this so much
-			if ( renderComp->aRenderable == InvalidHandle )
+			if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 			{
 				if ( renderComp->aPath.Get().empty() )
 					continue;
 
-				if ( renderComp->aModel == InvalidHandle )
+				if ( renderComp->aModel == CH_INVALID_HANDLE )
 				{
 					renderComp->aModel = graphics->LoadModel( renderComp->aPath );
-					if ( renderComp->aModel == InvalidHandle )
+					if ( renderComp->aModel == CH_INVALID_HANDLE )
 						continue;
 				}
 
 				renderComp->aRenderable = graphics->CreateRenderable( renderComp->aModel );
-				if ( renderComp->aRenderable == InvalidHandle )
+				if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 					continue;
 			}
 			
@@ -879,7 +879,7 @@ void PlayerManager::UpdateLocalPlayer()
 		{
 			// Make sure this thing is hidden
 			auto renderComp = Ent_GetComponent< CRenderable >( player, "renderable" );
-			if ( renderComp->aRenderable == InvalidHandle )
+			if ( renderComp->aRenderable == CH_INVALID_HANDLE )
 				continue;
 
 			Renderable_t* renderData = graphics->GetRenderableData( renderComp->aRenderable );
@@ -1521,14 +1521,14 @@ void PlayerMovement::DisplayPlayerStats( Entity player ) const
 
 	float speed        = glm::length( glm::vec2( rigidBody->aVel.Get().x, rigidBody->aVel.Get().y ) );
 
-	gui->DebugMessage( "Player Pos:    %s", Vec2Str(transform->aPos).c_str() );
-	gui->DebugMessage( "Player Ang:    %s", Vec2Str(transform->aAng).c_str() );
-	gui->DebugMessage( "Player Vel:    %s", Vec2Str(rigidBody->aVel).c_str() );
+	gui->DebugMessage( "Player Pos:    %s", ch_vec3_to_str(transform->aPos).c_str() );
+	gui->DebugMessage( "Player Ang:    %s", ch_vec3_to_str(transform->aAng).c_str() );
+	gui->DebugMessage( "Player Vel:    %s", ch_vec3_to_str(rigidBody->aVel).c_str() );
 	gui->DebugMessage( "Player Speed:  %.4f", speed );
 
 	gui->DebugMessage( "Camera FOV:    %.4f", camera->aFov.Get() );
-	gui->DebugMessage( "Camera Pos:    %s", Vec2Str(camTransform->aPos.Get()).c_str() );
-	gui->DebugMessage( "Camera Ang:    %s", Vec2Str(camTransform->aAng.Get()).c_str() );
+	gui->DebugMessage( "Camera Pos:    %s", ch_vec3_to_str(camTransform->aPos.Get()).c_str() );
+	gui->DebugMessage( "Camera Ang:    %s", ch_vec3_to_str(camTransform->aAng.Get()).c_str() );
 
 	gui->DebugMessage( "Flashlight:    %s", flashlight->aEnabled ? "Enabled" : "Disabled" );
 }
@@ -1893,18 +1893,18 @@ CONVAR_FLOAT( cl_impact_sound, 1 );
 }*/
 
 
-Handle PlayerMovement::GetStepSound()
+ch_handle_t PlayerMovement::GetStepSound()
 {
 	char soundName[128];
 	int soundIndex = (rand() / (RAND_MAX / 40.0f)) + 1;
 	snprintf( soundName, 128, "sound/footsteps/running_dirt_%s%d.ogg", soundIndex < 10 ? "0" : "", soundIndex );
 
 	// audio system should auto free it i think?
-	if ( Handle stepSound = audio->OpenSound( soundName ) )
+	if ( ch_handle_t stepSound = audio->OpenSound( soundName ) )
 		// return audio->PreloadSound( stepSound ) ? stepSound : nullptr;
 		return stepSound;
 
-	return InvalidHandle;
+	return CH_INVALID_HANDLE;
 }
 
 
@@ -1939,7 +1939,7 @@ void PlayerMovement::PlayStepSound()
 	StopStepSound( true );
 
 	// if ( apMove->apStepSound = audio->LoadSound( GetStepSound().c_str() ) )
-	if ( Handle stepSound = GetStepSound() )
+	if ( ch_handle_t stepSound = GetStepSound() )
 	{
 		audio->SetVolume( stepSound, speedFactor );
 		audio->PlaySound( stepSound );
@@ -1987,7 +1987,7 @@ void PlayerMovement::PlayImpactSound()
 		audio->PlaySound( apMove->apImpactSound );
 	}*/
 
-	if ( Handle impactSound = GetStepSound() )
+	if ( ch_handle_t impactSound = GetStepSound() )
 	{
 		audio->SetVolume( impactSound, speedFactor );
 		audio->PlaySound( impactSound );
@@ -2130,7 +2130,7 @@ void PlayerMovement::WalkMove()
 	{
 		glm::vec3 newVel = apRigidBody->aVel;
 
-		// Handle Jumping
+		// ch_handle_t Jumping
 		if ( CalcOnGround() && apUserCmd->aButtons & EBtnInput_Jump )
 		{
 			newVel.z = sv_jump_force;
@@ -2457,7 +2457,7 @@ Transform PlayerSpawnManager::SelectSpawnTransform()
 	// If we have more than one playerSpawn entity, pick a random one
 	// TODO: maybe make some priority thing, or master spawn like in source engine? idk
 	if ( aEntities.size() > 1 )
-		index = RandomU64( 0, aEntities.size() - 1 );
+		index = rand_u64( 0, aEntities.size() - 1 );
 	
 	auto transform = Ent_GetComponent< CTransform >( aEntities[ index ], "transform" );
 

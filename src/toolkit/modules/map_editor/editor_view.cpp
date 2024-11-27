@@ -155,7 +155,7 @@ static void UpdateSelectionRenderables()
 	EditorContext_t*                context  = Editor_GetContext();
 
 	ChVector< SelectionRenderable > selectList;
-	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+	for ( ch_handle_t entHandle : context->aMap.aMapEntities )
 	{
 		Entity_t* ent = Entity_GetData( entHandle );
 
@@ -378,8 +378,8 @@ void EditorView_UpdateView( EditorContext_t* spContext )
 
 	if ( editor_show_pos )
 	{
-		gui->DebugMessage( "Pos: %s", Vec2Str( spContext->aView.aPos ).c_str() );
-		gui->DebugMessage( "Ang: %s", Vec2Str( spContext->aView.aAng ).c_str() );
+		gui->DebugMessage( "Pos: %s", ch_vec3_to_str( spContext->aView.aPos ).c_str() );
+		gui->DebugMessage( "Ang: %s", ch_vec3_to_str( spContext->aView.aAng ).c_str() );
 	}
 }
 
@@ -422,7 +422,7 @@ void EditorView_CheckSelectionResult( EditorContext_t* context )
 		return;
 
 	// scan entities to find a matching color
-	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+	for ( ch_handle_t entHandle : context->aMap.aMapEntities )
 	{
 		Entity_t* ent = Entity_GetData( entHandle );
 
@@ -469,7 +469,7 @@ void EditorView_Update()
 	if ( !gEditorData.aMouseCaptured )
 		gEditorData.aMouseInView = EditorView_IsMouseInView();
 
-	// Handle Inputs
+	// ch_handle_t Inputs
 
 	ImGuiContext* imContext = ImGui::GetCurrentContext();
 
@@ -496,7 +496,7 @@ void EditorView_Update()
 			// not sure why i need to do this after updating imgui
 			SDL_ShowCursor( SDL_FALSE );
 
-			// Handle Mouse Input
+			// ch_handle_t Mouse Input
 			const glm::vec2 mouse = Input_GetMouseDelta();
 
 			// transform.aAng[PITCH] = -mouse.y;
@@ -526,17 +526,17 @@ void EditorView_Update()
 	// 	//SDL_ShowCursor( SDL_TRUE );
 	// }
 
-	// Handle View
+	// ch_handle_t View
 	EditorView_UpdateView( context );
 
 	// Update Renderable List
-	static ChVector< ChHandle_t > renderList;
+	static ChVector< ch_handle_t > renderList;
 	renderList.clear();
 
 #if 0
 	renderList.reserve( context->aMap.aMapEntities.size() * 2 );
 
-	for ( ChHandle_t entHandle : context->aMap.aMapEntities )
+	for ( ch_handle_t entHandle : context->aMap.aMapEntities )
 	{
 		Entity_t* ent = Entity_GetData( entHandle );
 
@@ -556,7 +556,7 @@ void EditorView_Update()
 	// TODO: Make a better render list setup that accounts for hiding entities
 	// internally in set viewport renderlist, it checks for vis right now, we need to do that ourselves eventually
 	// something like
-	// ChHandle_t* outList = graphics->DoRenderableFrustumCulling( viewport, renderList.data(), renderList.size(), outSize );
+	// ch_handle_t* outList = graphics->DoRenderableFrustumCulling( viewport, renderList.data(), renderList.size(), outSize );
 	renderList.reserve( graphics->GetRenderableCount() );
 
 	for ( u32 i = 0; i < graphics->GetRenderableCount(); i++ )

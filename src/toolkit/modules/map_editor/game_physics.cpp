@@ -38,13 +38,13 @@ CONVAR_FLOAT_CMD( phys_gravity, -1, 0, "Physics Engine Gravity" )
 constexpr glm::vec3                         vec3_default( 1, 1, 1 );
 constexpr glm::vec4                         vec4_default( 1, 1, 1, 1 );
 
-static Handle                               gShader_Debug     = InvalidHandle;
-static Handle                               gShader_DebugLine = InvalidHandle;
+static ch_handle_t                               gShader_Debug     = CH_INVALID_HANDLE;
+static ch_handle_t                               gShader_DebugLine = CH_INVALID_HANDLE;
 
-static Handle                               gMatSolid         = InvalidHandle;
-static Handle                               gMatWire          = InvalidHandle;
+static ch_handle_t                               gMatSolid         = CH_INVALID_HANDLE;
+static ch_handle_t                               gMatWire          = CH_INVALID_HANDLE;
 
-static std::unordered_map< Handle, Handle > gPhysRenderables;
+static std::unordered_map< ch_handle_t, ch_handle_t > gPhysRenderables;
 
 
 bool&                                       r_debug_draw = Con_GetConVarData_Bool( "r_debug_draw", false );
@@ -90,13 +90,13 @@ void Phys_DrawTriangle(
 // 	};
 // }
 
-Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangles )
+ch_handle_t Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangles )
 {
 	if ( srTriangles.empty() )
-		return InvalidHandle;  // mEmptyBatch;
+		return CH_INVALID_HANDLE;  // mEmptyBatch;
 
 	Model*      model  = nullptr;
-	Handle      handle = graphics->CreateModel( &model );
+	ch_handle_t      handle = graphics->CreateModel( &model );
 
 	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "_phys_triangle_batch" );
@@ -140,15 +140,15 @@ Handle Phys_CreateTriangleBatch( const std::vector< PhysTriangle_t >& srTriangle
 }
 
 
-Handle Phys_CreateTriangleBatchInd(
+ch_handle_t Phys_CreateTriangleBatchInd(
   const std::vector< PhysVertex_t >& srVerts,
   const std::vector< u32 >&          srInd )
 {
 	if ( srVerts.empty() || srInd.empty() )
-		return InvalidHandle;
+		return CH_INVALID_HANDLE;
 
 	Model*      model  = nullptr;
-	Handle      handle = graphics->CreateModel( &model );
+	ch_handle_t      handle = graphics->CreateModel( &model );
 
 	MeshBuilder meshBuilder( graphics );
 	meshBuilder.Start( model, "__phys_model" );
@@ -162,7 +162,7 @@ Handle Phys_CreateTriangleBatchInd(
 		// pretty awful
 		meshBuilder.SetPos( srVerts[ srInd[ i ] ].aPos );
 		meshBuilder.SetNormal( srVerts[ srInd[ i ] ].aNorm );
-		meshBuilder.SetColor( srVerts[ srInd[ i ] ].aColor );
+		meshBuilder.SetColor( srVerts[ srInd[ i ] ].color );
 		meshBuilder.SetTexCoord( srVerts[ srInd[ i ] ].aUV );
 		meshBuilder.NextVertex();
 	}
@@ -181,7 +181,7 @@ void Phys_DrawGeometry(
   // const JPH::AABox& inWorldSpaceBounds,
   float            sLODScaleSq,
   const glm::vec4& srColor,
-  Handle           sGeometry,
+  ch_handle_t           sGeometry,
   EPhysCullMode    sCullMode,
   bool             sCastShadow,
   bool             sWireframe )
@@ -189,14 +189,14 @@ void Phys_DrawGeometry(
 	if ( !r_debug_draw )
 		return;
 
-	Handle mat = graphics->Model_GetMaterial( sGeometry, 0 );
+	ch_handle_t mat = graphics->Model_GetMaterial( sGeometry, 0 );
 
 	// graphics->Mat_SetVar( mat, "color", srColor );
 	graphics->Mat_SetVar( mat, "color", {1, 0.25, 0, 1} );
 
-	Handle renderHandle = gPhysRenderables[ sGeometry ];
+	ch_handle_t renderHandle = gPhysRenderables[ sGeometry ];
 
-	if ( renderHandle == InvalidHandle )
+	if ( renderHandle == CH_INVALID_HANDLE )
 	{
 		renderHandle                  = graphics->CreateRenderable( sGeometry );
 		gPhysRenderables[ sGeometry ] = renderHandle;
@@ -228,7 +228,7 @@ void Phys_DrawText(
 }
 
 
-void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
+void Phys_GetModelVerts( ch_handle_t sModel, PhysDataConvex_t& srData )
 {
 	Model* model = graphics->GetModelData( sModel );
 
@@ -294,7 +294,7 @@ void Phys_GetModelVerts( Handle sModel, PhysDataConvex_t& srData )
 }
 
 
-void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
+void Phys_GetModelTris( ch_handle_t sModel, std::vector< PhysTriangle_t >& srTris )
 {
 	Model* model = graphics->GetModelData( sModel );
 
@@ -351,7 +351,7 @@ void Phys_GetModelTris( Handle sModel, std::vector< PhysTriangle_t >& srTris )
 }
 
 
-void Phys_GetModelInd( Handle sModel, PhysDataConcave_t& srData )
+void Phys_GetModelInd( ch_handle_t sModel, PhysDataConcave_t& srData )
 {
 	u32    origSize = srData.aVertCount;
 	Model* model    = graphics->GetModelData( sModel );
