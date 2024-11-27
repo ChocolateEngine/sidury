@@ -7,7 +7,8 @@ project( Sidury )
 option( STEAM "Build the steam abstraction" OFF )
 option( GAME_OLD "Build the old game code" OFF )
 # option( GAME "Build the game code" OFF )
-option( EDITOR "Build the editor" ON )
+option( EDITOR "Build the editor" OFF )
+option( RENDER_TEST "Build Render 3 Test App" ON )
 
 # Add Chocolate Framework DLLs
 # add_subdirectory( ../chocolate ${CMAKE_CURRENT_LIST_DIR} )
@@ -35,10 +36,14 @@ add_subdirectory( src/launcher )
 # else()
 # 	add_subdirectory( src/sidury2 )
 # endif( GAME_OLD )
+# 
+# if( EDITOR )
+# 	add_subdirectory( src/toolkit )
+# endif( EDITOR )
 
-if( EDITOR )
-	add_subdirectory( src/toolkit )
-endif( EDITOR )
+if ( RENDER_TEST )
+ 	add_subdirectory( src/render_test )
+endif( RENDER_TEST )
 
 if( STEAM )
 	add_subdirectory( src/steam )
