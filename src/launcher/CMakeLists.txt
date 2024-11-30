@@ -82,3 +82,44 @@ if (MSVC)
 endif(MSVC)
 
 
+# ======================================================================================================
+
+
+message( "Current Project: Render Test Launcher" )
+
+add_executable( ch_render3_test_launch launcher_render_test.cpp ${BASE_SRC_FILES} )
+
+set( RENDER_TEST_LAUNCHER_NAME render3_test_launch )
+
+set_target_properties(
+	ch_render3_test_launch PROPERTIES
+	OUTPUT_NAME ${RENDER_TEST_LAUNCHER_NAME}_${PLAT_FOLDER}
+	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}
+	
+	VS_DEBUGGER_WORKING_DIRECTORY ${CH_BUILD}
+)
+
+# set output directories for all builds (Debug, Release, etc.)
+foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set_target_properties(
+    	ch_render3_test_launch PROPERTIES
+    	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}
+    )
+endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
+
+# Set as startup project in visual studio
+# set_property( DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT ch_render3_test_launch )
+
+if (MSVC)
+	# Copy a pre-built manifest file to the output directory for DPI Scaling
+	add_custom_command(
+		TARGET ch_render3_test_launch POST_BUILD
+        # COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BIN}/${RENDER_TEST_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/launcher.exe.manifest" "${CH_BUILD}/${RENDER_TEST_LAUNCHER_NAME}_${PLAT_FOLDER}.exe.manifest"
+		COMMAND_EXPAND_LISTS
+        COMMENT "Copying ${RENDER_TEST_LAUNCHER_NAME}.exe.manifest to launcher directory"
+    )
+endif(MSVC)
+
+
