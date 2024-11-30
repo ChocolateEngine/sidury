@@ -5,9 +5,9 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 project( Sidury )
 
 option( STEAM "Build the steam abstraction" OFF )
-option( GAME_OLD "Build the old game code" OFF )
-# option( GAME "Build the game code" OFF )
-option( EDITOR "Build the editor" OFF )
+# option( GAME_OLD "Build the old game code" OFF )
+option( GAME "Build the game code" ON )
+option( TOOLKIT "Build the toolkit" ON )
 option( RENDER_TEST "Build Render 3 Test App" ON )
 
 # Add Chocolate Framework DLLs
@@ -31,15 +31,13 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CH_ROOT}/obj/sidury/Release )
 # Now Add Sidury Projects
 add_subdirectory( src/launcher )
 
-# if ( GAME_OLD )
-# 	add_subdirectory( src/game )
-# else()
-# 	add_subdirectory( src/sidury2 )
-# endif( GAME_OLD )
-# 
-# if( EDITOR )
-# 	add_subdirectory( src/toolkit )
-# endif( EDITOR )
+if ( GAME )
+	add_subdirectory( src/game )
+endif( GAME )
+
+if( TOOLKIT )
+	add_subdirectory( src/toolkit )
+endif( TOOLKIT )
 
 if ( RENDER_TEST )
  	add_subdirectory( src/render_test )

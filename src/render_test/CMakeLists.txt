@@ -15,22 +15,27 @@ include_directories(
 	"../../graphics"
 )
 
-add_library( ch_render3_test SHARED ${SRC_FILES} ${PUBLIC_FILES} )
+add_library( ch_render_3_test SHARED ${SRC_FILES} ${PUBLIC_FILES} )
 
 target_link_libraries(
-	ch_render3_test
+	ch_render_3_test
 	PRIVATE
 	Core
 	ImGui
 	SDL2
 )
 
-add_dependencies( ch_render3_test "Core" "ImGui" )
+target_compile_definitions(
+	ch_render_3_test PRIVATE
+	USING_RENDER3=1
+)
+
+add_dependencies( ch_render_3_test "Core" "ImGui" )
 
 set_target_properties(
-	ch_render3_test PROPERTIES
-	RUNTIME_OUTPUT_NAME ch_render3_test
-	LIBRARY_OUTPUT_NAME ch_render3_test
+	ch_render_3_test PROPERTIES
+	RUNTIME_OUTPUT_NAME ch_render_3_test
+	LIBRARY_OUTPUT_NAME ch_render_3_test
 
 	RUNTIME_OUTPUT_DIRECTORY ${CH_BUILD}/render_test/bin/${PLAT_FOLDER}
 	LIBRARY_OUTPUT_DIRECTORY ${CH_BUILD}/render_test/bin/${PLAT_FOLDER}
@@ -40,13 +45,13 @@ set_target_properties(
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
     set_target_properties(
-    	ch_render3_test PROPERTIES
+    	ch_render_3_test PROPERTIES
     	RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/render_test/bin/${PLAT_FOLDER}
     	LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/render_test/bin/${PLAT_FOLDER}
     )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
-target_precompile_headers( ch_render3_test PRIVATE "${CH_PUBLIC}/core/core.h" )
+target_precompile_headers( ch_render_3_test PRIVATE "${CH_PUBLIC}/core/core.h" )
 
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}
