@@ -9,12 +9,7 @@
 #include "igraphics.h"
 #include "mapmanager.h"
 #include "skybox.h"
-
 #include "map_system.h"
-
-#if CH_SERVER
-	#include "../server/sv_main.h"
-#endif
 
 #include "speedykeyv/KeyValue.h"
 
